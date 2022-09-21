@@ -79,7 +79,7 @@ int Scene::loadGeom(string objectid) {
             utilityCore::safeGetline(fp_in, line);
         }
 
-        newGeom.transform = utilityCore::buildTransformationMatrix(
+        newGeom.transform = Math::buildTransformationMatrix(
                 newGeom.translation, newGeom.rotation, newGeom.scale);
         newGeom.inverseTransform = glm::inverse(newGeom.transform);
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
@@ -130,9 +130,9 @@ int Scene::loadCamera() {
     }
 
     //calculate fov based on resolution
-    float yscaled = tan(fovy * (PI / 180));
+    float yscaled = tan(fovy * (Pi / 180));
     float xscaled = (yscaled * camera.resolution.x) / camera.resolution.y;
-    float fovx = (atan(xscaled) * 180) / PI;
+    float fovx = (atan(xscaled) * 180) / Pi;
     camera.fov = glm::vec2(fovx, fovy);
 
     camera.right = glm::normalize(glm::cross(camera.view, camera.up));
@@ -165,13 +165,13 @@ int Scene::loadMaterial(string materialid) {
             utilityCore::safeGetline(fp_in, line);
             vector<string> tokens = utilityCore::tokenizeString(line);
             if (strcmp(tokens[0].c_str(), "RGB") == 0) {
-                glm::vec3 color( atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()) );
-                newMaterial.color = color;
+                glm::vec3 baseColor( atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()) );
+                newMaterial.baseColor = baseColor;
             } else if (strcmp(tokens[0].c_str(), "SPECEX") == 0) {
                 newMaterial.specular.exponent = atof(tokens[1].c_str());
             } else if (strcmp(tokens[0].c_str(), "SPECRGB") == 0) {
                 glm::vec3 specColor(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-                newMaterial.specular.color = specColor;
+                newMaterial.specular.baseColor = specColor;
             } else if (strcmp(tokens[0].c_str(), "REFL") == 0) {
                 newMaterial.hasReflective = atof(tokens[1].c_str());
             } else if (strcmp(tokens[0].c_str(), "REFR") == 0) {

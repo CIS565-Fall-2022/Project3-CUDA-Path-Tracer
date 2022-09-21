@@ -7,13 +7,7 @@
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 
-//enum GeomType {
-//    Sphere,
-//    Cube,
-//    Mesh
-//};
-
-enum class GeomType {
+enum GeomType {
     Sphere = 0,
     Cube = 1,
     Mesh = 2
@@ -22,20 +16,6 @@ enum class GeomType {
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
-};
-
-struct AABB {
-    glm::vec3 pMin;
-    glm::vec3 pMax;
-};
-
-struct BVHNode {
-    AABB box;
-    int geomIdx;
-    int size;
-};
-
-struct BVHTableElement {
 };
 
 struct Geom {
@@ -48,31 +28,6 @@ struct Geom {
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
 };
-
-struct Material {
-    glm::vec3 color;
-    struct {
-        float exponent;
-        glm::vec3 color;
-    } specular;
-    float hasReflective;
-    float hasRefractive;
-    float indexOfRefraction;
-    float emittance;
-};
-
-//struct Material {
-//    enum Type {
-//        Lambertian = 0, MetallicWorkflow = 1, Dielectric = 2
-//    };
-//
-//    glm::vec3 baseColor;
-//    float metallic;
-//    float roughness;
-//    float ior;
-//    float emittance;
-//    int type;
-//};
 
 struct Camera {
     glm::ivec2 resolution;

@@ -4,7 +4,7 @@
 #include <glm/gtx/intersect.hpp>
 
 #include "sceneStructs.h"
-#include "utilities.h"
+#include "mathUtil.h"
 
 /**
  * Handy-dandy hash function that provides seeds for random number generation.

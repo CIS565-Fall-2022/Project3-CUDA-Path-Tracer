@@ -90,6 +90,10 @@ set(sources
     src/scene.cpp
     src/preview.cpp
     src/utilities.cpp
+	src/bvh.cpp
+	src/envMap.cpp
+	src/sampler.cpp
+	src/mathUtil.cpp
     )
 
 list(SORT headers)
