@@ -73,6 +73,7 @@ set(headers
     src/sceneStructs.h
     src/preview.h
     src/utilities.h
+<<<<<<< Updated upstream
     src/ImGui/imconfig.h
 	
 	src/ImGui/imgui.h
@@ -84,6 +85,14 @@ set(headers
      src/ImGui/imstb_rectpack.h 
      src/ImGui/imstb_textedit.h 
      src/ImGui/imstb_truetype.h 
+=======
+    src/intellisense.h
+    src/pathSegPool.h
+    src/bsdf.h
+    src/efficient.h
+    src/GPUArray.h
+    src/GPUArrayTest.h
+>>>>>>> Stashed changes
     )
 
 set(sources
@@ -95,6 +104,7 @@ set(sources
     src/scene.cpp
     src/preview.cpp
     src/utilities.cpp
+<<<<<<< Updated upstream
 	
     src/ImGui/imgui.cpp 
       src/ImGui/imgui_demo.cpp 
@@ -103,6 +113,10 @@ set(sources
      src/ImGui/imgui_impl_opengl3.cpp 
      src/ImGui/imgui_tables.cpp 
      src/ImGui/imgui_widgets.cpp 
+=======
+    src/pathSegPool.cu
+    src/GPUArrayTest.cu
+>>>>>>> Stashed changes
     )
 
 list(SORT headers)
@@ -111,11 +125,15 @@ list(SORT sources)
 source_group(Headers FILES ${headers})
 source_group(Sources FILES ${sources})
 
+<<<<<<< Updated upstream
 #add_subdirectory(src/ImGui)
 #add_subdirectory(stream_compaction)  # TODO: uncomment if using your stream compaction
+=======
+# add_subdirectory(stream_compaction)  # TODO: uncomment if using your stream compaction
+>>>>>>> Stashed changes
 
 cuda_add_executable(${CMAKE_PROJECT_NAME} ${sources} ${headers})
 target_link_libraries(${CMAKE_PROJECT_NAME}
     ${LIBRARIES}
-    #stream_compaction  # TODO: uncomment if using your stream compaction
+    # stream_compaction  # TODO: uncomment if using your stream compaction
     )

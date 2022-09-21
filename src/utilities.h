@@ -1,9 +1,11 @@
 #pragma once
 
 #include "glm/glm.hpp"
+#include "intellisense.h"
 #include <algorithm>
 #include <istream>
 #include <ostream>
+#include <iostream>
 #include <iterator>
 #include <sstream>
 #include <string>
@@ -20,6 +22,47 @@ public:
     GuiDataContainer() : TracedDepth(0) {}
     int TracedDepth;
 };
+
+// convenience macro
+#ifndef NDEBUG
+void checkCUDAErrorFn(const char* msg, const char* file, int line);
+#define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
+#define CHECK_CUDA(func_call) do { if(func_call != cudaSuccess) checkCUDAError("cuda func failed:\n" ## #func_call); } while(0)
+#define PRINT_GPU(dev_arr, size) printGPU(#dev_arr, dev_arr, size)
+#else
+#define checkCUDAError(msg) (void)0
+#define CHECK_CUDA(func_call) (void)0
+#define PRINT_GPU(dev_arr, size) (void)0
+#endif // !NDEBUG
+
+#define ALLOC(name, size) CHECK_CUDA(cudaMalloc((void**)&(name), (size) * sizeof(*name)))
+#define MEMSET(name, val, size) CHECK_CUDA(cudaMemset(name, val, size))
+#define FREE(name) CHECK_CUDA(cudaFree(name))
+#define H2D(dev_name, name, size) CHECK_CUDA(cudaMemcpy(dev_name, name, (size) * sizeof(*name), cudaMemcpyHostToDevice))
+#define D2H(name, dev_name, size) CHECK_CUDA(cudaMemcpy(name, dev_name, (size) * sizeof(*name), cudaMemcpyDeviceToHost))
+#define D2D(dev_name1, dev_name2, size) CHECK_CUDA(cudaMemcpy(dev_name1, dev_name2, (size) * sizeof(*dev_name1), cudaMemcpyDeviceToDevice))
+
+template<typename T>
+static inline void printGPU(char const* name, T * dev, int n) {
+    T* tmp = new T[n];
+    std::cout << name << "\n";
+    D2H(tmp, dev, n);
+    for (int i = 0; i < n; ++i)
+        std::cout << tmp[i] << " \n"[i < n - 1 ? 0 : 1];
+    delete[] tmp;
+}
+
+template<typename T>
+static inline T getGPU(T * dev, int i) {
+    T tmp;
+    D2H(&tmp, dev + i, 1);
+    return tmp;
+}
+template<typename T>
+static inline void setGPU(T * dev, int i, T val) {
+    H2D(dev + i, &val, 1);
+}
 
 namespace utilityCore {
     extern float clamp(float f, float min, float max);

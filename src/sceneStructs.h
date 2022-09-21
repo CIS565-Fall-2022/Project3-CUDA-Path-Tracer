@@ -64,6 +64,13 @@ struct PathSegment {
     glm::vec3 color;
     int pixelIndex;
     int remainingBounces;
+
+    __host__ __device__ bool operator!() const {
+        return pixelIndex == INT_MIN;
+    }
+    __host__ __device__ void terminate() {
+        pixelIndex = INT_MIN;
+    }
 };
 
 // Use with a corresponding PathSegment to do:
