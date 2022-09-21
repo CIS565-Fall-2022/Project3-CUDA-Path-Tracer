@@ -73,12 +73,26 @@ set(headers
     src/sceneStructs.h
     src/preview.h
     src/utilities.h
+<<<<<<< HEAD
     src/material.h
     src/bvh.h
     src/envMap.h
     src/sampler.h
     src/mathUtil.h
     src/texture.h
+=======
+    src/ImGui/imconfig.h
+	
+	src/ImGui/imgui.h
+    src/ImGui/imconfig.h
+    src/ImGui/imgui_impl_glfw.h
+     src/ImGui/imgui_impl_opengl3.h 
+     src/ImGui/imgui_impl_opengl3_loader.h 
+     src/ImGui/imgui_internal.h 
+     src/ImGui/imstb_rectpack.h 
+     src/ImGui/imstb_textedit.h 
+     src/ImGui/imstb_truetype.h 
+>>>>>>> 5000086204b01665fa76d7d0f109b76f8da6b77f
     )
 
 set(sources
@@ -90,10 +104,21 @@ set(sources
     src/scene.cpp
     src/preview.cpp
     src/utilities.cpp
+<<<<<<< HEAD
 	src/bvh.cpp
 	src/envMap.cpp
 	src/sampler.cpp
 	src/mathUtil.cpp
+=======
+	
+    src/ImGui/imgui.cpp 
+      src/ImGui/imgui_demo.cpp 
+      src/ImGui/imgui_draw.cpp 
+     src/ImGui/imgui_impl_glfw.cpp 
+     src/ImGui/imgui_impl_opengl3.cpp 
+     src/ImGui/imgui_tables.cpp 
+     src/ImGui/imgui_widgets.cpp 
+>>>>>>> 5000086204b01665fa76d7d0f109b76f8da6b77f
     )
 
 list(SORT headers)
@@ -102,6 +127,7 @@ list(SORT sources)
 source_group(Headers FILES ${headers})
 source_group(Sources FILES ${sources})
 
+#add_subdirectory(src/ImGui)
 #add_subdirectory(stream_compaction)  # TODO: uncomment if using your stream compaction
 
 cuda_add_executable(${CMAKE_PROJECT_NAME} ${sources} ${headers})
