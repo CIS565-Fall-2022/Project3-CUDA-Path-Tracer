@@ -112,6 +112,15 @@ void pathtraceFree() {
 }
 
 /**
+* Map a pair of evenly distributed [0, 1] coordinate to disc
+*/
+__host__ __device__ glm::vec2 toConcentricDisk(glm::vec2 c) {
+    float r = glm::sqrt(c.x);
+    float theta = c.y * PI * 2.0f;
+    return glm::vec2(glm::cos(theta), glm::sin(theta)) * r;
+}
+
+/**
 * Generate PathSegments with rays from the camera through the screen into the
 * scene, which is the first bounce of rays.
 *
@@ -129,7 +138,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
         PathSegment & segment = pathSegments[index];
 
         segment.ray.origin = cam.position;
-    segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
+        segment.throughput = glm::vec3(1.0f);
 
         // TODO: implement antialiasing by jittering the ray
         segment.ray.direction = glm::normalize(cam.view
@@ -153,12 +162,11 @@ __global__ void computeIntersections(
     , Geom * geoms
     , int geoms_size
     , ShadeableIntersection * intersections
-    )
-{
+    ) {
+
     int path_index = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (path_index < num_paths)
-    {
+    if (path_index < num_paths) {
         PathSegment pathSegment = pathSegments[path_index];
 
         float t;
@@ -173,19 +181,10 @@ __global__ void computeIntersections(
 
         // naive parse through global geoms
 
-        for (int i = 0; i < geoms_size; i++)
-        {
+        for (int i = 0; i < geoms_size; i++) {
             Geom & geom = geoms[i];
 
-            if (geom.type == CUBE)
-            {
-                t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
-            }
-            else if (geom.type == SPHERE)
-            {
-                t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
-            }
-            // TODO: add more intersection tests here... triangle? metaball? CSG?
+            t = intersectGeom(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 
             // Compute the minimum t from the intersection tests to determine what
             // scene geometry object was hit first.
@@ -245,22 +244,22 @@ __global__ void shadeFakeMaterial (
 
       // If the material indicates that the object was a light, "light" the ray
       if (material.emittance > 0.0f) {
-        pathSegments[idx].color *= (materialColor * material.emittance);
+        pathSegments[idx].throughput *= (materialColor * material.emittance);
       }
       // Otherwise, do some pseudo-lighting computation. This is actually more
       // like what you would expect from shading in a rasterizer like OpenGL.
       // TODO: replace this! you should be able to start with basically a one-liner
       else {
         float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));
-        pathSegments[idx].color *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f;
-        pathSegments[idx].color *= u01(rng); // apply some noise because why not
+        pathSegments[idx].throughput *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f;
+        pathSegments[idx].throughput *= u01(rng); // apply some noise because why not
       }
     // If there was no intersection, color the ray black.
     // Lots of renderers use 4 channel color, RGBA, where A = alpha, often
     // used for opacity, in which case they can indicate "no opacity".
     // This can be useful for post-processing and image compositing.
     } else {
-      pathSegments[idx].color = glm::vec3(0.0f);
+      pathSegments[idx].throughput = glm::vec3(0.0f);
     }
   }
 }
@@ -273,7 +272,7 @@ __global__ void finalGather(int nPaths, glm::vec3 * image, PathSegment * iterati
     if (index < nPaths)
     {
         PathSegment iterationPath = iterationPaths[index];
-        image[iterationPath.pixelIndex] += iterationPath.color;
+        image[iterationPath.pixelIndex] += iterationPath.throughput;
     }
 }
 

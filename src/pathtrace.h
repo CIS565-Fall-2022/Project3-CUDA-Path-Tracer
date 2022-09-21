@@ -1,5 +1,6 @@
 #pragma once
 
+#include <device_launch_parameters.h>
 #include <vector>
 #include "scene.h"
 

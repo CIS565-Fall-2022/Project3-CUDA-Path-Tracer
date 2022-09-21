@@ -12,7 +12,6 @@
 #include <iostream>
 #include <sstream>
 #include <stdlib.h>
-#include <string>
 
 #include "sceneStructs.h"
 #include "image.h"

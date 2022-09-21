@@ -7,9 +7,16 @@
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 
-enum GeomType {
-    SPHERE,
-    CUBE,
+//enum GeomType {
+//    Sphere,
+//    Cube,
+//    Mesh
+//};
+
+enum class GeomType {
+    Sphere = 0,
+    Cube = 1,
+    Mesh = 2
 };
 
 struct Ray {
@@ -17,8 +24,22 @@ struct Ray {
     glm::vec3 direction;
 };
 
+struct AABB {
+    glm::vec3 pMin;
+    glm::vec3 pMax;
+};
+
+struct BVHNode {
+    AABB box;
+    int geomIdx;
+    int size;
+};
+
+struct BVHTableElement {
+};
+
 struct Geom {
-    enum GeomType type;
+    GeomType type;
     int materialid;
     glm::vec3 translation;
     glm::vec3 rotation;
@@ -39,6 +60,19 @@ struct Material {
     float indexOfRefraction;
     float emittance;
 };
+
+//struct Material {
+//    enum Type {
+//        Lambertian = 0, MetallicWorkflow = 1, Dielectric = 2
+//    };
+//
+//    glm::vec3 baseColor;
+//    float metallic;
+//    float roughness;
+//    float ior;
+//    float emittance;
+//    int type;
+//};
 
 struct Camera {
     glm::ivec2 resolution;
@@ -61,7 +95,7 @@ struct RenderState {
 
 struct PathSegment {
     Ray ray;
-    glm::vec3 color;
+    glm::vec3 throughput;
     int pixelIndex;
     int remainingBounces;
 };
@@ -69,8 +103,10 @@ struct PathSegment {
 // Use with a corresponding PathSegment to do:
 // 1) color contribution computation
 // 2) BSDF evaluation: generate a new ray
+
 struct ShadeableIntersection {
   float t;
   glm::vec3 surfaceNormal;
+  glm::vec2 surfaceUV;
   int materialId;
 };

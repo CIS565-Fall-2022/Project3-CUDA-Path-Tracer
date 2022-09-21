@@ -47,10 +47,10 @@ int Scene::loadGeom(string objectid) {
         if (!line.empty() && fp_in.good()) {
             if (strcmp(line.c_str(), "sphere") == 0) {
                 cout << "Creating new sphere..." << endl;
-                newGeom.type = SPHERE;
+                newGeom.type = GeomType::Sphere;
             } else if (strcmp(line.c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
-                newGeom.type = CUBE;
+                newGeom.type = GeomType::Cube;
             }
         }
 

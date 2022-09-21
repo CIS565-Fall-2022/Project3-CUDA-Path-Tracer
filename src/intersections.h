@@ -142,3 +142,24 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 
     return glm::length(r.origin - intersectionPoint);
 }
+
+__host__ __device__ float intersectGeom(
+    Geom geom, Ray ray, glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+
+    float dist = FLT_MAX;
+
+    switch (geom.type) {
+    case GeomType::Cube:
+        dist = boxIntersectionTest(geom, ray, intersectionPoint, normal, outside);
+        break;
+    case GeomType::Sphere:
+        dist = sphereIntersectionTest(geom, ray, intersectionPoint, normal, outside);
+        break;
+    case GeomType::Mesh:
+        // TODO
+        // intersect BVH
+    default:
+        dist = -1.0f;
+    }
+    return dist;
+}
