@@ -3,8 +3,13 @@ CUDA Path Tracer
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 3**
 
-* (TODO) YOUR NAME HERE
-* Tested on: (TODO) Windows 22, i7-2222 @ 2.22GHz 22GB, GTX 222 222MB (Moore 2222 Lab)
+Constance Wang
+  * [LinkedIn](https://www.linkedin.com/in/conswang/)
+
+Tested on AORUS 15P XD laptop with specs:  
+- Windows 11 22000.856  
+- 11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz 2.30 GHz  
+- NVIDIA GeForce RTX 3070 Laptop GPU  
 
 ### (TODO: Your README)
 
