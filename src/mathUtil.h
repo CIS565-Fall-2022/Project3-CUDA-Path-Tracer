@@ -50,10 +50,10 @@ namespace Math {
     }
 
     __device__ static glm::mat3 localRefMatrix(glm::vec3 n) {
-        glm::vec3 t = (glm::abs(n.z) > 0.999f) ? glm::vec3(0.f, 1.f, 0.f) : glm::vec3(0.f, 0.f, 1.f);
-        glm::vec3 b = glm::cross(n, t);
-        t = glm::cross(b, n);
-        return glm::mat3(t, b, n);
+        glm::vec3 dist = (glm::abs(n.z) > 0.999f) ? glm::vec3(0.f, 1.f, 0.f) : glm::vec3(0.f, 0.f, 1.f);
+        glm::vec3 b = glm::cross(n, dist);
+        dist = glm::cross(b, n);
+        return glm::mat3(dist, b, n);
     }
 
     __device__ static glm::vec3 localToWorld(glm::vec3 n, glm::vec3 v) {

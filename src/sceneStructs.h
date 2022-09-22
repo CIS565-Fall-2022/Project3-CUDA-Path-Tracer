@@ -20,7 +20,7 @@ struct Ray {
 
 struct Geom {
     GeomType type;
-    int materialid;
+    int materialId;
     glm::vec3 translation;
     glm::vec3 rotation;
     glm::vec3 scale;
@@ -38,6 +38,8 @@ struct Camera {
     glm::vec3 right;
     glm::vec2 fov;
     glm::vec2 pixelLength;
+    float lensRadius;
+    float focalDist;
 };
 
 struct RenderState {
@@ -60,8 +62,9 @@ struct PathSegment {
 // 2) BSDF evaluation: generate a new ray
 
 struct ShadeableIntersection {
-  float t;
-  glm::vec3 surfaceNormal;
-  glm::vec2 surfaceUV;
-  int materialId;
+    float dist;
+    glm::vec3 surfaceNormal;
+    glm::vec2 surfaceUV;
+    glm::vec3 incomingDir;
+    int materialId;
 };

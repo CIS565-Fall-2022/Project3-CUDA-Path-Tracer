@@ -1,3 +1,5 @@
+./src/ImGui
+
 *.orig
 *.filters
 *.sln
@@ -558,3 +560,4 @@ xcuserdata
 *.xccheckout
 *.moved-aside
 *.xcuserstate
+src/ImGui/imgui.cpp

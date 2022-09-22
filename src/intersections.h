@@ -24,8 +24,8 @@ __host__ __device__ inline unsigned int utilhash(unsigned int a) {
  * Compute a point at parameter value `t` on ray `r`.
  * Falls slightly short so that it doesn't intersect the object it's hitting.
  */
-__host__ __device__ glm::vec3 getPointOnRay(Ray r, float t) {
-    return r.origin + (t - .0001f) * glm::normalize(r.direction);
+__host__ __device__ glm::vec3 getPointOnRay(Ray r, float dist) {
+    return r.origin + (dist - .0001f) * glm::normalize(r.direction);
 }
 
 /**
@@ -121,18 +121,18 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     float t1 = firstTerm + squareRoot;
     float t2 = firstTerm - squareRoot;
 
-    float t = 0;
+    float dist = 0;
     if (t1 < 0 && t2 < 0) {
         return -1;
     } else if (t1 > 0 && t2 > 0) {
-        t = min(t1, t2);
+        dist = min(t1, t2);
         outside = true;
     } else {
-        t = max(t1, t2);
+        dist = max(t1, t2);
         outside = false;
     }
 
-    glm::vec3 objspaceIntersection = getPointOnRay(rt, t);
+    glm::vec3 objspaceIntersection = getPointOnRay(rt, dist);
 
     intersectionPoint = multiplyMV(sphere.transform, glm::vec4(objspaceIntersection, 1.f));
     normal = glm::normalize(multiplyMV(sphere.invTranspose, glm::vec4(objspaceIntersection, 0.f)));

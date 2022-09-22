@@ -62,8 +62,8 @@ std::vector<std::string> utilityCore::tokenizeString(std::string str) {
     return results;
 }
 
-std::istream& utilityCore::safeGetline(std::istream& is, std::string& t) {
-    t.clear();
+std::istream& utilityCore::safeGetline(std::istream& is, std::string& dist) {
+    dist.clear();
 
     // The characters in the stream are read one-by-one using a std::streambuf.
     // That is faster than reading them one-by-one using the std::istream.
@@ -85,11 +85,11 @@ std::istream& utilityCore::safeGetline(std::istream& is, std::string& t) {
             return is;
         case EOF:
             // Also handle the case when the last line has no line ending
-            if (t.empty())
+            if (dist.empty())
                 is.setstate(std::ios::eofbit);
             return is;
         default:
-            t += (char)c;
+            dist += (char)c;
         }
     }
 }

@@ -9,16 +9,14 @@
 #include "sceneStructs.h"
 #include "material.h"
 
-using namespace std;
-
 class Scene {
 private:
-    ifstream fp_in;
-    int loadMaterial(string materialid);
-    int loadGeom(string objectid);
+    std::ifstream fp_in;
+    int loadMaterial(std::string materialId);
+    int loadGeom(std::string objectid);
     int loadCamera();
 public:
-    Scene(string filename);
+    Scene(std::string filename);
     ~Scene();
 
     std::vector<Geom> geoms;

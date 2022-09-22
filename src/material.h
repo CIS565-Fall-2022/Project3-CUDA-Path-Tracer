@@ -9,29 +9,17 @@
 #define InvalidPdf -1.f
 
 struct Material {
+    enum Type {
+        Lambertian = 0, MetallicWorkflow = 1, Dielectric = 2, Light = 3
+    };
+
+    int type;
     glm::vec3 baseColor;
-    struct {
-        float exponent;
-        glm::vec3 baseColor;
-    } specular;
-    float hasReflective;
-    float hasRefractive;
-    float indexOfRefraction;
+    float metallic;
+    float roughness;
+    float ior;
     float emittance;
 };
-
-//struct Material {
-//    enum Type {
-//        Lambertian = 0, MetallicWorkflow = 1, Dielectric = 2
-//    };
-//
-//    glm::vec3 baseColor;
-//    float metallic;
-//    float roughness;
-//    float ior;
-//    float emittance;
-//    int type;
-//};
 
 enum BSDFSampleType {
     Diffuse = 1 << 0,
@@ -97,7 +85,7 @@ __device__ static float dielectricPdf(glm::vec3 n, glm::vec3 wo, glm::vec3 wi, c
 }
 
 __device__ static void dielectricSample(glm::vec3 n, glm::vec3 wo, const Material& m, glm::vec3 r, BSDFSample& sample) {
-    float ior = m.indexOfRefraction;
+    float ior = m.ior;
     float pdfRefl = fresnel(glm::dot(n, wo), ior);
     float pdfTran = 1.f - pdfRefl;
 

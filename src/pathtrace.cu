@@ -167,7 +167,7 @@ __global__ void computeIntersections(
 	if (path_index < num_paths) {
 		PathSegment pathSegment = pathSegments[path_index];
 
-		float t;
+		float dist;
 		glm::vec3 intersect_point;
 		glm::vec3 normal;
 		float t_min = FLT_MAX;
@@ -181,13 +181,13 @@ __global__ void computeIntersections(
 
 		for (int i = 0; i < geoms_size; i++) {
 			Geom& geom = geoms[i];
-			t = intersectGeom(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+			dist = intersectGeom(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
-			if (t > 0.0f && t_min > t) {
-				t_min = t;
+			if (dist > 0.0f && t_min > dist) {
+				t_min = dist;
 				hit_geom_index = i;
 				intersect_point = tmp_intersect;
 				normal = tmp_normal;
@@ -195,12 +195,12 @@ __global__ void computeIntersections(
 		}
 
 		if (hit_geom_index == -1) {
-			intersections[path_index].t = -1.0f;
+			intersections[path_index].dist = -1.0f;
 		}
 		else {
 			//The ray hits something
-			intersections[path_index].t = t_min;
-			intersections[path_index].materialId = geoms[hit_geom_index].materialid;
+			intersections[path_index].dist = t_min;
+			intersections[path_index].materialId = geoms[hit_geom_index].materialId;
 			intersections[path_index].surfaceNormal = normal;
 		}
 	}
@@ -225,7 +225,7 @@ __global__ void shadeFakeMaterial(
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx < num_paths) {
 		ShadeableIntersection intersection = shadeableIntersections[idx];
-		if (intersection.t > 0.0f) { // if the intersection exists...
+		if (intersection.dist > 0.0f) { // if the intersection exists...
 		  // Set up the RNG
 		  // LOOK: this is how you use thrust's RNG! Please look at
 		  // makeSeededRandomEngine as well.
@@ -244,7 +244,7 @@ __global__ void shadeFakeMaterial(
 			// TODO: replace this! you should be able to start with basically a one-liner
 			else {
 				float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));
-				pathSegments[idx].throughput *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f;
+				pathSegments[idx].throughput *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.dist * 0.02f) * materialColor) * 0.7f;
 				pathSegments[idx].throughput *= u01(rng); // apply some noise because why not
 			}
 			// If there was no intersection, color the ray black.
@@ -256,6 +256,26 @@ __global__ void shadeFakeMaterial(
 			pathSegments[idx].throughput = glm::vec3(0.0f);
 		}
 	}
+}
+
+__global__ void pathIntegSampleSurface(
+	int iter,
+	PathSegment* segments,
+	ShadeableIntersection* intersections,
+	Material* materials,
+	int numPaths
+) {
+	int idx = blockDim.x * blockIdx.x + threadIdx.x;
+	if (idx >= numPaths) {
+		return;
+	}
+	ShadeableIntersection intersec = intersections[idx];
+	if (intersec.dist < 0) {
+		return;
+	}
+
+	thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
+	Material material = materials[intersec.materialId];
 }
 
 // Add the current iteration's output to the overall image
