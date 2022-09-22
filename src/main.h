@@ -32,6 +32,7 @@ extern int iteration;
 extern int width;
 extern int height;
 
+bool switchScene(int idx);
 void runCuda();
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
 void mousePositionCallback(GLFWwindow* window, double xpos, double ypos);

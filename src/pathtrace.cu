@@ -88,11 +88,16 @@ void pathtraceInit(Scene* scene) {
 
 	const Camera& cam = hst_scene->state.camera;
 	const int pixelcount = cam.resolution.x * cam.resolution.y;
-    dev_image.resize(pixelcount);
+
+    dev_image.resize(pixelcount)
+		.zero_mem();
     dev_paths.resize(pixelcount);
-    dev_geoms.resize(scene->geoms.size()).copy_from(scene->geoms.data());
-    dev_materials.resize(scene->materials.size()).copy_from(scene->materials.data());
-    dev_intersections.resize(pixelcount);
+    dev_geoms.resize(scene->geoms.size())
+		.copy_from(scene->geoms.data());
+    dev_materials.resize(scene->materials.size())
+		.copy_from(scene->materials.data());
+    dev_intersections.resize(pixelcount)
+		.zero_mem();
 
     // TODO: initialize any extra device memeory you need
     checkCUDAError("pathtraceInit");
@@ -111,7 +116,7 @@ void pathtraceFree() {
 * motion blur - jitter rays "in time"
 * lens effect - jitter ray origin positions based on a lens
 */
-__global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, PathSegment* pathSegments)
+__global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, GPUArray<PathSegment> pathSegments)
 {
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;

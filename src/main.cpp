@@ -4,6 +4,10 @@
 #include "GPUArrayTest.h"
 #include <cstring>
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif // _WIN32
+
 static std::string startTimeString;
 
 // For camera controls
@@ -22,12 +26,44 @@ glm::vec3 cameraPosition;
 glm::vec3 ogLookAt; // for recentering the camera
 
 Scene* scene;
+constexpr char const* scene_files_dir = "../scenes/";
+std::vector<std::string> scene_files;
 GuiDataContainer* guiData;
 RenderState* renderState;
 int iteration;
 
 int width;
 int height;
+
+/// <summary>
+/// gets all files in a directory
+/// from https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
+/// </summary>
+/// <param name="dir">path to the directory</param>
+static std::vector<std::string> getFilesInDir(char const* dir) {
+	std::vector<std::string> names;
+#ifdef _WIN32
+	std::string search_pattern(dir);
+	std::string search_path(dir);
+	search_pattern += "*.*";
+
+	WIN32_FIND_DATA fd;
+	HANDLE hFind = ::FindFirstFile(search_pattern.c_str(), &fd);
+	if (hFind != INVALID_HANDLE_VALUE) {
+		do {
+			// read all (real) files in current folder
+			// , delete '!' read other 2 default folder . and ..
+			if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+				names.emplace_back(search_path + fd.cFileName);
+			}
+		} while (::FindNextFile(hFind, &fd));
+		::FindClose(hFind);
+	}
+#else
+	assert(!"unsupported platform")
+#endif
+	return names;
+}
 
 //-------------------------------
 //-------------MAIN--------------
@@ -36,18 +72,41 @@ int height;
 int main(int argc, char** argv) {
 	startTimeString = currentTimeString();
 
-	if (argc < 2) {
-		printf("Usage: %s SCENEFILE.txt\n", argv[0]);
-		return 1;
+	scene_files = getFilesInDir(scene_files_dir);
+	if (!switchScene(0)) {
+		return EXIT_FAILURE;
 	}
 
-	const char* sceneFile = argv[1];
-
-	// Load scene file
-	scene = new Scene(sceneFile);
-
 	//Create Instance for ImGUIData
-	guiData = new GuiDataContainer();
+	guiData = new GuiDataContainer(scene_files);
+
+	// Initialize CUDA and GL components
+	init();
+
+    // Unit Tests
+    GPUArrayTest::unit_test();
+    PathSegPool::unit_test();
+
+	// Initialize ImGui Data
+	InitImguiData(guiData);
+	InitDataContainer(guiData);
+
+	// GLFW main loop
+	mainLoop();
+
+	return EXIT_SUCCESS;
+}
+
+bool switchScene(int i) {
+	if (i < 0 || i >= scene_files.size()) {
+		return false;
+	}
+	
+	// Load scene file
+	if (scene) {
+		delete scene;
+	}
+	scene = new Scene(scene_files[i]);
 
 	// Set up camera stuff from loaded path tracer settings
 	iteration = 0;
@@ -72,21 +131,12 @@ int main(int argc, char** argv) {
 	ogLookAt = cam.lookAt;
 	zoom = glm::length(cam.position - ogLookAt);
 
-    // Unit Tests
-    GPUArrayTest::unit_test();
-    PathSegPool::unit_test();
+	camchanged = true;
+	leftMousePressed = rightMousePressed = middleMousePressed = false;
+	lastX = lastY = 0;
+	resetImguiState();
 
-    // GLFW main loop
-    mainLoop();
-
-	// Initialize ImGui Data
-	InitImguiData(guiData);
-	InitDataContainer(guiData);
-
-	// GLFW main loop
-	mainLoop();
-
-	return 0;
+	return true;
 }
 
 void saveImage() {

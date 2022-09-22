@@ -5,6 +5,7 @@
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_glfw.h"
 #include "ImGui/imgui_impl_opengl3.h"
+
 GLuint positionLocation = 0;
 GLuint texcoordsLocation = 1;
 GLuint pbo;
@@ -13,7 +14,7 @@ GLuint displayImage;
 GLFWwindow* window;
 GuiDataContainer* imguiData = NULL;
 ImGuiIO* io = nullptr;
-bool mouseOverImGuiWinow = false;
+bool mouseOverImGuiWinow;
 
 std::string currentTimeString() {
 	time_t now;
@@ -188,13 +189,15 @@ void InitImguiData(GuiDataContainer* guiData)
 }
 
 
+void resetImguiState() {
+	mouseOverImGuiWinow = false;
+}
+
 // LOOK: Un-Comment to check ImGui Usage
 void RenderImGui()
 {
-	if(io->WantCaptureMouse)
-	{
-		mouseOverImGuiWinow = true;
-	}
+	mouseOverImGuiWinow = io->WantCaptureMouse;
+
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
@@ -221,12 +224,28 @@ void RenderImGui()
 	//ImGui::Text("counter = %d", counter);
 	ImGui::Text("Traced Depth %d", imguiData->TracedDepth);
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	
+	int lastSelection = imguiData->CurScene;
+	ImGui::Combo("Scenes", &imguiData->CurScene, imguiData->Scenes, imguiData->NumScenes);
+
+	//if (ImGui::BeginCombo("##Selet Scenes", imguiData->Scenes[imguiData->CurScene])) {
+	//	for (int i = 0; i < imguiData->NumScenes; ++i) {
+	//		if (ImGui::Selectable(imguiData->Scenes[i], i == imguiData->CurScene)) {
+	//			imguiData->CurScene = i;
+	//		}
+	//	}
+	//	ImGui::EndCombo();
+	//}
+	
 	ImGui::End();
 
 
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
+	if (lastSelection != imguiData->CurScene) {
+		switchScene(imguiData->CurScene);
+	}
 }
 
 bool MouseOverImGuiWindow()

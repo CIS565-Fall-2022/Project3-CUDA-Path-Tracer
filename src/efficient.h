@@ -28,6 +28,15 @@ namespace StreamCompaction {
         thrust::copy(dev_out.begin(), dev_out.end(), out);
     }
     template<typename T>
+    int compact(int n, thrust::device_ptr<T> out, thrust::device_ptr<T> in) {
+        thrust::device_vector<T> dev_in(in, in + n);
+        auto it = thrust::remove_if(dev_in.begin(), dev_in.end(), Pred<T>());
+        int ret = thrust::distance(dev_in.begin(), it);
+        thrust::copy(dev_in.begin(), it, out);
+        return ret;
+    }
+
+    template<typename T>
     int compact(int n, T* out, const T* in) {
         thrust::device_vector<T> dev_in(in, in + n);
         auto it = thrust::remove_if(dev_in.begin(), dev_in.end(), Pred<T>());

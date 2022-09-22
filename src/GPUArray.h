@@ -32,13 +32,15 @@ public:
 		ALLOC(new_ptr, new_size);
 
 		if (_raw_ptr) {
+			thrust::device_ptr<T> dev_raw(_raw_ptr);
+			thrust::device_ptr<T> dev_new(new_ptr);
+
 			if (_size < new_size) {
-				thrust::copy_n(_raw_ptr, _size, new_ptr);
+				thrust::copy_n(dev_raw, _size, dev_new);
 				MEMSET(new_ptr + _size, 0, sizeof(T) * (new_size - _size));
 			} else { // if(size > new_size)
-				thrust::copy_n(_raw_ptr, new_size, new_ptr);
+				thrust::copy_n(dev_raw, new_size, dev_new);
 			}
-			
 			FREE(_raw_ptr);
 		}
 		_raw_ptr = new_ptr;
@@ -51,7 +53,6 @@ public:
 		if (_is_copy) {
 			throw std::runtime_error("cannot modify a copy of GPU Array");
 		}
-
 		thrust::copy_n(src, _size, thrust::device_ptr<T>(_raw_ptr));
 		return *this;
 	}
@@ -74,11 +75,12 @@ public:
 	__host__ __device__ size_t size() {
 		return _size;
 	}
-
 	__host__ __device__ operator T* () {
 		return _raw_ptr;
 	}
-
+	operator thrust::device_ptr<T>() {
+		return thrust::device_ptr<T>(_raw_ptr);
+	}
 	__device__ T& operator[](int idx) {
 #ifndef NDEBUG
 		if (idx < 0 || idx >= _size) {

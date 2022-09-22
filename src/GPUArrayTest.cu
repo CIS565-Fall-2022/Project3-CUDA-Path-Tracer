@@ -37,6 +37,7 @@ namespace GPUArrayTest {
 
 		unit_test_kernel KERN_PARAM(1, 1) (dev_arr);
 
+		// non-primitive
 		glm::ivec3 vec_data[3]{
 			{1,0,0},
 			{0,1,0},
@@ -45,6 +46,13 @@ namespace GPUArrayTest {
 
 		GPUArray<glm::ivec3> dev_vec_arr;
 		dev_vec_arr.resize(3).copy_from(vec_data);
+		unit_test_kernel KERN_PARAM(1, 1) (dev_vec_arr);
+
+		// test resize
+		dev_arr.resize(5);
+		unit_test_kernel KERN_PARAM(1, 1) (dev_arr);
+
+		dev_vec_arr.resize(2);
 		unit_test_kernel KERN_PARAM(1, 1) (dev_vec_arr);
 #endif
 	}

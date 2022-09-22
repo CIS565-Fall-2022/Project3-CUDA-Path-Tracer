@@ -76,5 +76,30 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    assert(pathSegment.remainingBounces > 0);
 
+    glm::vec3 dir;
+    glm::vec3 color = m.color;
+    Ray& ray = pathSegment.ray;
+    float diffuse_chance;
+    if (!m.hasReflective) {
+        diffuse_chance = 1;
+    } else {
+        diffuse_chance = thrust::uniform_real_distribution<float>(0, 1)(rng);
+    }
+    // use even-split
+    if (diffuse_chance < 0.5f) {
+        dir = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
+    } else {
+        dir = glm::reflect(ray.direction, normal);
+    }
+
+    // update path segment
+    pathSegment.color *= color;
+    ray.origin = intersect;
+    ray.direction = dir;
+    if (--pathSegment.remainingBounces == 0) {
+        // mark to be filtered by compaction
+        pathSegment.terminate();
+    }
 }

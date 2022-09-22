@@ -19,8 +19,20 @@
 class GuiDataContainer
 {
 public:
-    GuiDataContainer() : TracedDepth(0) {}
+    GuiDataContainer(std::vector<std::string> const& scenesVec) : 
+        TracedDepth(0), NumScenes(scenesVec.size()), CurScene(0) {
+        Scenes = new char const* [NumScenes];
+        for (int i = 0; i < NumScenes; ++i) {
+            Scenes[i] = scenesVec[i].c_str();
+        }
+    }
+    ~GuiDataContainer() {
+        delete[] Scenes;
+    }
     int TracedDepth;
+    char const** Scenes;
+    int NumScenes; 
+    int CurScene;
 };
 
 // convenience macro
@@ -44,7 +56,7 @@ void checkCUDAErrorFn(const char* msg, const char* file, int line);
 #define D2D(dev_name1, dev_name2, size) CHECK_CUDA(cudaMemcpy(dev_name1, dev_name2, (size) * sizeof(*dev_name1), cudaMemcpyDeviceToDevice))
 
 template<typename T>
-static inline void printGPU(char const* name, T * dev, int n) {
+static inline void printGPU(char const* name, T* dev, int n) {
     T* tmp = new T[n];
     std::cout << name << "\n";
     D2H(tmp, dev, n);
