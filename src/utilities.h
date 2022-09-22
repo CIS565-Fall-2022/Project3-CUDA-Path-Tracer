@@ -22,5 +22,5 @@ namespace utilityCore {
     extern glm::vec3 clampRGB(glm::vec3 baseColor);
     extern std::vector<std::string> tokenizeString(std::string str);
     extern std::string convertIntToString(int number);
-    extern std::istream& safeGetline(std::istream& is, std::string& dist); //Thanks to http://stackoverflow.com/a/6089413
+    extern std::istream& safeGetline(std::istream& is, std::string& t); //Thanks to http://stackoverflow.com/a/6089413
 }
