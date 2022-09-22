@@ -146,6 +146,7 @@ int Scene::loadCamera() {
     float xscaled = (yscaled * camera.resolution.x) / camera.resolution.y;
     float fovx = (atan(xscaled) * 180) / Pi;
     camera.fov = glm::vec2(fovx, fovy);
+    camera.tanFovY = glm::tan(glm::radians(fovy * 0.5f));
 
     camera.right = glm::normalize(glm::cross(camera.view, camera.up));
     camera.pixelLength = glm::vec2(2 * xscaled / (float)camera.resolution.x,

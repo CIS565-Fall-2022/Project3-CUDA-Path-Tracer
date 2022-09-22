@@ -11,7 +11,7 @@ static bool middleMousePressed = false;
 static double lastX;
 static double lastY;
 
-static bool camchanged = true;
+static bool camChanged = true;
 static float dtheta = 0, dphi = 0;
 static glm::vec3 cammove;
 
@@ -107,7 +107,7 @@ void saveImage() {
 }
 
 void runCuda() {
-	if (camchanged) {
+	if (camChanged) {
 		iteration = 0;
 		Camera& cam = renderState->camera;
 		cameraPosition.x = zoom * sin(phi) * sin(theta);
@@ -121,10 +121,9 @@ void runCuda() {
 		cam.up = glm::cross(r, v);
 		cam.right = r;
 
-		cam.position = cameraPosition;
 		cameraPosition += cam.lookAt;
 		cam.position = cameraPosition;
-		camchanged = false;
+		camChanged = false;
 	}
 
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
@@ -166,7 +165,7 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 			saveImage();
 			break;
 		case GLFW_KEY_SPACE:
-			camchanged = true;
+			camChanged = true;
 			renderState = &scene->state;
 			Camera& cam = renderState->camera;
 			cam.lookAt = ogLookAt;
@@ -192,12 +191,12 @@ void mousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
 		phi -= (xpos - lastX) / width;
 		theta -= (ypos - lastY) / height;
 		theta = std::fmax(0.001f, std::fmin(theta, Pi));
-		camchanged = true;
+		camChanged = true;
 	}
 	else if (rightMousePressed) {
 		zoom += (ypos - lastY) / height;
 		zoom = std::fmax(0.1f, zoom);
-		camchanged = true;
+		camChanged = true;
 	}
 	else if (middleMousePressed) {
 		renderState = &scene->state;
@@ -211,7 +210,7 @@ void mousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
 
 		cam.lookAt -= (float)(xpos - lastX) * right * 0.01f;
 		cam.lookAt += (float)(ypos - lastY) * forward * 0.01f;
-		camchanged = true;
+		camChanged = true;
 	}
 	lastX = xpos;
 	lastY = ypos;

@@ -134,17 +134,38 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 
 	if (x < cam.resolution.x && y < cam.resolution.y) {
 		int index = x + (y * cam.resolution.x);
+
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+		thrust::uniform_real_distribution<float> u(0.f, 1.f);
+		float rx = u(rng);
+		float ry = u(rng);
+		float rz = u(rng);
+		float rw = u(rng);
+
 		PathSegment& segment = pathSegments[index];
 
-		segment.ray.origin = cam.position;
-		segment.throughput = glm::vec3(1.0f, 1.0f, 1.0f);
-
 		// TODO: implement antialiasing by jittering the ray
-		segment.ray.direction = glm::normalize(cam.view
-			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
-		);
+		/*segment.ray.direction = glm::normalize(cam.view
+			- cam.right * cam.pixelLength.x * ((float)x + rx - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)y + ry - (float)cam.resolution.y * 0.5f)
+		);*/
 
+		float aspect = float(cam.resolution.x) / cam.resolution.y;
+		float tanFovY = glm::tan(glm::radians(cam.fov.y));
+		glm::vec2 pixelSize = 1.f / glm::vec2(cam.resolution);
+		glm::vec2 scr = glm::vec2(x, y) * pixelSize;
+		glm::vec2 ruv = scr + pixelSize * glm::vec2(rx, ry);
+		ruv = 1.f - ruv * 2.f;
+
+		glm::vec3 pLens = glm::vec3(Math::toConcentricDisk(rz, rw) * cam.lensRadius, 0.f);
+		glm::vec3 pFocusPlane = glm::vec3(ruv * glm::vec2(aspect, 1.f) * cam.focalDist * tanFovY, cam.focalDist);
+		glm::vec3 dir = pFocusPlane - pLens;
+		dir = glm::normalize(glm::mat3(cam.right, cam.up, cam.view) * dir);
+
+		segment.ray.origin = cam.position + cam.right * pLens.x + cam.up * pLens.y;
+		segment.ray.direction = dir;
+
+		segment.throughput = glm::vec3(1.0f, 1.0f, 1.0f);
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
 	}
