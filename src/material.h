@@ -116,7 +116,7 @@ __device__ static glm::vec3 materialBSDF(glm::vec3 n, glm::vec3 wo, glm::vec3 wi
     case Material::Type::Lambertian:
         return lambertianBSDF(n, wo, wi, m);
     case Material::Type::MetallicWorkflow:
-        break;
+        return glm::vec3(0.f);
     case Material::Type::Dielectric:
         return dielectricBSDF(n, wo, wi, m);
     }
@@ -128,7 +128,7 @@ __device__ static float materialPdf(glm::vec3 n, glm::vec3 wo, glm::vec3 wi, con
     case Material::Type::Lambertian:
         return lambertianPdf(n, wo, wi, m);
     case Material::Type::MetallicWorkflow:
-        break;
+        return 0.f;
     case Material::Dielectric:
         return dielectricPdf(n, wo, wi, m);
     }
@@ -141,6 +141,10 @@ __device__ static void materialSample(glm::vec3 n, glm::vec3 wo, const Material&
         lambertianSample(n, wo, m, r, sample);
         break;
     case Material::Type::MetallicWorkflow:
+        sample.bsdf = glm::vec3(1.f);
+        sample.dir = glm::reflect(-wo, n);
+        sample.pdf = 1.f;
+        sample.type = Specular | Reflection;
         break;
     case Material::Type::Dielectric:
         dielectricSample(n, wo, m, r, sample);

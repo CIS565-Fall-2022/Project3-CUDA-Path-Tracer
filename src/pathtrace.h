@@ -5,6 +5,6 @@
 #include "scene.h"
 
 void InitDataContainer(GuiDataContainer* guiData);
-void pathtraceInit(Scene *scene);
-void pathtraceFree();
+void pathTraceInit(Scene *scene);
+void pathTraceFree();
 void pathTrace(uchar4 *pbo, int frame, int iteration);

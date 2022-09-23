@@ -32,6 +32,14 @@ namespace Math {
         return x * x;
     }
 
+    template<typename T>
+    __host__ __device__ inline T calcFilmic(T c) {
+        return (c * (c * 0.22f + 0.03f) + 0.002f) / (c * (c * 0.22f + 0.3f) + 0.06f) - 1.f / 30.f;
+    }
+    __host__ __device__ inline glm::vec3 filmic(glm::vec3 c) {
+        return calcFilmic(c * 1.6f) / calcFilmic(11.2f);
+    }
+
     __host__ __device__ inline glm::vec3 ACES(glm::vec3 color) {
         return (color * (color * 2.51f + 0.03f)) / (color * (color * 2.43f + 0.59f) + 0.14f);
     }

@@ -104,7 +104,7 @@ int Scene::loadCamera() {
     float fovy;
 
     //load static properties
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 7; i++) {
         std::string line;
         utilityCore::safeGetline(fp_in, line);
         std::vector<std::string> tokens = utilityCore::tokenizeString(line);

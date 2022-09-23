@@ -130,8 +130,8 @@ void runCuda() {
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
 	if (iteration == 0) {
-		pathtraceFree();
-		pathtraceInit(scene);
+		pathTraceFree();
+		pathTraceInit(scene);
 	}
 
 	if (iteration < renderState->iterations) {
@@ -148,7 +148,7 @@ void runCuda() {
 	}
 	else {
 		saveImage();
-		pathtraceFree();
+		pathTraceFree();
 		cudaDeviceReset();
 		exit(EXIT_SUCCESS);
 	}
