@@ -1,4 +1,5 @@
 ./src/ImGui
+imgui.ini
 
 *.orig
 *.filters

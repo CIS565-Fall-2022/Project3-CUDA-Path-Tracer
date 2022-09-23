@@ -19,6 +19,8 @@ struct Material {
     float roughness;
     float ior;
     float emittance;
+
+    int textureId;
 };
 
 enum BSDFSampleType {
@@ -31,7 +33,7 @@ enum BSDFSampleType {
 };
 
 struct BSDFSample {
-    glm::vec3 wi;
+    glm::vec3 dir;
     glm::vec3 bsdf;
     float pdf;
     int type;
@@ -70,13 +72,13 @@ __device__ static float lambertianPdf(glm::vec3 n, glm::vec3 wo, glm::vec3 wi, c
 }
 
 __device__ static void lambertianSample(glm::vec3 n, glm::vec3 wo, const Material& m, glm::vec3 r, BSDFSample& sample) {
-    sample.wi = Math::sampleHemisphereCosine(n, r.x, r.y);
+    sample.dir = Math::sampleHemisphereCosine(n, r.x, r.y);
     sample.bsdf = m.baseColor * PiInv;
-    sample.pdf = glm::dot(n, sample.wi) * PiInv;
+    sample.pdf = glm::dot(n, sample.dir) * PiInv;
     sample.type = Diffuse | Reflection;
 }
 
-__device__ static glm::vec3 dielectricBSDF(glm::vec3 n, glm::vec3 wi, const Material& m) {
+__device__ static glm::vec3 dielectricBSDF(glm::vec3 n, glm::vec3 wo, glm::vec3 wi, const Material& m) {
     return glm::vec3(0.f);
 }
 
@@ -93,11 +95,11 @@ __device__ static void dielectricSample(glm::vec3 n, glm::vec3 wo, const Materia
     sample.bsdf = m.baseColor;
 
     if (r.z < pdfRefl) {
-        sample.wi = glm::reflect(-wo, n);
+        sample.dir = glm::reflect(-wo, n);
         sample.type = Specular | Reflection;
     }
     else {
-        if (!Math::refract(n, wo, ior, sample.wi)) {
+        if (!Math::refract(n, wo, ior, sample.dir)) {
             sample.pdf = InvalidPdf;
             return;
         }
@@ -107,4 +109,43 @@ __device__ static void dielectricSample(glm::vec3 n, glm::vec3 wo, const Materia
         sample.bsdf /= ior * ior;
         sample.type = Specular | Transmission;
     }
-} 
+}
+
+__device__ static glm::vec3 materialBSDF(glm::vec3 n, glm::vec3 wo, glm::vec3 wi, const Material& m) {
+    switch (m.type) {
+    case Material::Type::Lambertian:
+        return lambertianBSDF(n, wo, wi, m);
+    case Material::Type::MetallicWorkflow:
+        break;
+    case Material::Type::Dielectric:
+        return dielectricBSDF(n, wo, wi, m);
+    }
+    return glm::vec3(0.f);
+}
+
+__device__ static float materialPdf(glm::vec3 n, glm::vec3 wo, glm::vec3 wi, const Material& m) {
+    switch (m.type) {
+    case Material::Type::Lambertian:
+        return lambertianPdf(n, wo, wi, m);
+    case Material::Type::MetallicWorkflow:
+        break;
+    case Material::Dielectric:
+        return dielectricPdf(n, wo, wi, m);
+    }
+    return 0.f;
+}
+
+__device__ static void materialSample(glm::vec3 n, glm::vec3 wo, const Material& m, glm::vec3 r, BSDFSample& sample) {
+    switch (m.type) {
+    case Material::Type::Lambertian:
+        lambertianSample(n, wo, m, r, sample);
+        break;
+    case Material::Type::MetallicWorkflow:
+        break;
+    case Material::Type::Dielectric:
+        dielectricSample(n, wo, m, r, sample);
+        break;
+    default:
+        sample.pdf = InvalidPdf;
+    }
+}
