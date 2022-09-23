@@ -67,7 +67,7 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  * You may need to change the parameter list for your purposes!
  */
 __host__ __device__
-void scatterRay(
+void scatterRay(    // similar to sample_f, calculate the new wi and f
         PathSegment & pathSegment,
         glm::vec3 intersect,
         glm::vec3 normal,
@@ -76,4 +76,9 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+
+    glm::vec3 wi_scatteredRayDir = calculateRandomDirectionInHemisphere(normal, rng);  // for pure diffused material
+    pathSegment.ray.direction = wi_scatteredRayDir;
+    pathSegment.ray.origin = intersect;
+    pathSegment.remainingBounces--;
 }
