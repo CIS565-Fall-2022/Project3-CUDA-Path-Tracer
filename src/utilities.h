@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#define INV_PI            0.3183098861837907f
 #define PI                3.1415926535897932384626422832795028841971f
 #define TWO_PI            6.2831853071795864769252867665590057683943f
 #define SQRT_OF_ONE_THIRD 0.5773502691896257645091487805019574556476f
@@ -44,12 +45,13 @@ void checkCUDAErrorFn(const char* msg, const char* file, int line);
 #define PRINT_GPU(dev_arr, size) printGPU(#dev_arr, dev_arr, size)
 #else
 #define checkCUDAError(msg) (void)0
-#define CHECK_CUDA(func_call) (void)0
+#define CHECK_CUDA(func_call) func_call
 #define PRINT_GPU(dev_arr, size) (void)0
 #endif // !NDEBUG
 
 #define ALLOC(name, size) CHECK_CUDA(cudaMalloc((void**)&(name), (size) * sizeof(*name)))
 #define MEMSET(name, val, size) CHECK_CUDA(cudaMemset(name, val, size))
+#define ZERO(name, size) CHECK_CUDA(cudaMemset(name, 0, (size) * sizeof(*name)))
 #define FREE(name) CHECK_CUDA(cudaFree(name))
 #define H2D(dev_name, name, size) CHECK_CUDA(cudaMemcpy(dev_name, name, (size) * sizeof(*name), cudaMemcpyHostToDevice))
 #define D2H(name, dev_name, size) CHECK_CUDA(cudaMemcpy(name, dev_name, (size) * sizeof(*name), cudaMemcpyDeviceToHost))

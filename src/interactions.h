@@ -1,6 +1,13 @@
 #pragma once
 
 #include "intersections.h"
+#include "utilities.h"
+
+__host__ __device__
+bool feq(float a, float b) {
+    a -= b;
+    return a <= EPSILON && a >= -EPSILON;
+}
 
 // CHECKITOUT
 /**
@@ -66,9 +73,12 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  *
  * You may need to change the parameter list for your purposes!
  */
+#define X
+#ifdef X
+#define OFFSET_EPS 0.0001f
 __host__ __device__
 void scatterRay(
-        PathSegment & pathSegment,
+        PathSegment & path,
         glm::vec3 intersect,
         glm::vec3 normal,
         const Material &m,
@@ -76,30 +86,50 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
-    assert(pathSegment.remainingBounces > 0);
 
+    assert(path.remainingBounces > 0);
+    assert(feq(m.emittance, 0));
+    assert(feq(glm::length(normal), 1));
+
+
+    Ray& ray = path.ray;
     glm::vec3 dir;
-    glm::vec3 color = m.color;
-    Ray& ray = pathSegment.ray;
-    float diffuse_chance;
-    if (!m.hasReflective) {
-        diffuse_chance = 1;
+    color_t color = m.color;
+
+    float chance = thrust::uniform_real_distribution<float>(0, 1)(rng);
+    if (chance > m.hasReflective) {
+        // do diffuse
+        dir = calculateRandomDirectionInHemisphere(normal, rng);
     } else {
-        diffuse_chance = thrust::uniform_real_distribution<float>(0, 1)(rng);
-    }
-    // use even-split
-    if (diffuse_chance < 0.5f) {
-        dir = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
-    } else {
+        // do reflection
         dir = glm::reflect(ray.direction, normal);
     }
 
     // update path segment
-    pathSegment.color *= color;
-    ray.origin = intersect;
-    ray.direction = dir;
-    if (--pathSegment.remainingBounces == 0) {
-        // mark to be filtered by compaction
-        pathSegment.terminate();
-    }
+    path.color *= m.color;
+    ray.origin = intersect + OFFSET_EPS * normal;
+    ray.direction = glm::normalize(dir);
+    --path.remainingBounces;
 }
+#else
+#define EPSILON_SCALE 10
+__host__ __device__
+void scatterRay(
+    PathSegment& pathSegment,
+    glm::vec3 intersect,
+    glm::vec3 normal,
+    const Material& m,
+    thrust::default_random_engine& rng) {
+    // TODO: implement this.
+    // A basic implementation of pure-diffuse shading will just call the
+    // calculateRandomDirectionInHemisphere defined above.
+
+    //glm::vec3 rayVec = glm::normalize(pathSegment.ray.direction);
+    //glm::vec3 norVec = glm::normalize(normal);
+    --pathSegment.remainingBounces;
+    // Diffusion
+    pathSegment.ray.origin = intersect + (float)EPSILON * EPSILON_SCALE * normal;
+    pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
+    pathSegment.color *= m.color;
+}
+#endif

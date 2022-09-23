@@ -4,6 +4,7 @@
 #include <vector>
 #include <cuda_runtime.h>
 #include "glm/glm.hpp"
+#include "utilities.h"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 
@@ -28,16 +29,23 @@ struct Geom {
     glm::mat4 invTranspose;
 };
 
+typedef glm::vec3 color_t;
 struct Material {
-    glm::vec3 color;
+    color_t color;
     struct {
         float exponent;
-        glm::vec3 color;
+        color_t color;
     } specular;
     float hasReflective;
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+
+
+    // BSDF
+    __host__ __device__ color_t f(glm::vec3 const& wo, glm::vec3 const& wi) const {
+        return color * INV_PI;
+    }
 };
 
 struct Camera {
@@ -59,17 +67,31 @@ struct RenderState {
     std::string imageName;
 };
 
+
 struct PathSegment {
+    struct Pred {
+        __host__ __device__
+        bool operator()(PathSegment const& seg) const {
+            return seg.remainingBounces > 0;
+        }
+    };
+
     Ray ray;
-    glm::vec3 color;
+    color_t color;
     int pixelIndex;
     int remainingBounces;
 
     __host__ __device__ bool operator!() const {
-        return pixelIndex == INT_MIN;
+        return !remainingBounces;
+    }
+    __host__ __device__ void init(int max_bounce, int pix_idx, Ray const& ray) {        
+        pixelIndex = pix_idx;
+        remainingBounces = max_bounce;
+        this->ray = ray;
+        color = glm::vec3(1,1,1);
     }
     __host__ __device__ void terminate() {
-        pixelIndex = INT_MIN;
+        remainingBounces = 0;
     }
 };
 

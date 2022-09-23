@@ -84,11 +84,6 @@ set(headers
     src/ImGui/imstb_textedit.h 
     src/ImGui/imstb_truetype.h 
     src/intellisense.h
-    src/pathSegPool.h
-    src/bsdf.h
-    src/efficient.h
-    src/GPUArray.h
-    src/GPUArrayTest.h
     )
 
 set(sources
@@ -107,8 +102,6 @@ set(sources
     src/ImGui/imgui_impl_opengl3.cpp 
     src/ImGui/imgui_tables.cpp 
     src/ImGui/imgui_widgets.cpp 
-    src/pathSegPool.cu
-    src/GPUArrayTest.cu
     )
 
 list(SORT headers)

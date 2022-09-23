@@ -1,7 +1,5 @@
 #include "main.h"
 #include "preview.h"
-#include "pathSegPool.h"
-#include "GPUArrayTest.h"
 #include <cstring>
 
 #ifdef _WIN32
@@ -82,10 +80,6 @@ int main(int argc, char** argv) {
 
 	// Initialize CUDA and GL components
 	init();
-
-    // Unit Tests
-    GPUArrayTest::unit_test();
-    PathSegPool::unit_test();
 
 	// Initialize ImGui Data
 	InitImguiData(guiData);
