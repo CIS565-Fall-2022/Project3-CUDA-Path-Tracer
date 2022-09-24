@@ -9,6 +9,22 @@ bool feq(float a, float b) {
     return a <= EPSILON && a >= -EPSILON;
 }
 
+__host__ __device__
+glm::vec3 randomVecInUnitSphere(thrust::default_random_engine& rng) {
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    glm::vec3 ret(u01(rng), u01(rng), u01(rng));
+    return ret / glm::length(ret);
+}
+
+__host__ __device__
+float reflectance(float cosine, float eta) {
+    // Use Schlick's approximation for reflectance.
+    // Taken from https://raytracing.github.io/books/RayTracingInOneWeekend.html
+    auto r0 = (1 - eta) / (1 + eta);
+    r0 = r0 * r0;
+    return r0 + (1 - r0) * powf((1 - cosine), 5);
+}
+
 // CHECKITOUT
 /**
  * Computes a cosine-weighted random direction in a hemisphere.
@@ -73,63 +89,82 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  *
  * You may need to change the parameter list for your purposes!
  */
-#define X
-#ifdef X
+
+
 #define OFFSET_EPS 0.0001f
 __host__ __device__
 void scatterRay(
-        PathSegment & path,
-        glm::vec3 intersect,
-        glm::vec3 normal,
-        const Material &m,
-        thrust::default_random_engine &rng) {
-    // TODO: implement this.
-    // A basic implementation of pure-diffuse shading will just call the
-    // calculateRandomDirectionInHemisphere defined above.
-
-    assert(path.remainingBounces > 0);
-    assert(feq(m.emittance, 0));
-    assert(feq(glm::length(normal), 1));
-
-
-    Ray& ray = path.ray;
-    glm::vec3 dir;
-    color_t color = m.color;
-
-    float chance = thrust::uniform_real_distribution<float>(0, 1)(rng);
-    if (chance > m.hasReflective) {
-        // do diffuse
-        dir = calculateRandomDirectionInHemisphere(normal, rng);
-    } else {
-        // do reflection
-        dir = glm::reflect(ray.direction, normal);
-    }
-
-    // update path segment
-    path.color *= m.color;
-    ray.origin = intersect + OFFSET_EPS * normal;
-    ray.direction = glm::normalize(dir);
-    --path.remainingBounces;
-}
-#else
-#define EPSILON_SCALE 10
-__host__ __device__
-void scatterRay(
-    PathSegment& pathSegment,
+    PathSegment& path,
     glm::vec3 intersect,
     glm::vec3 normal,
     const Material& m,
     thrust::default_random_engine& rng) {
-    // TODO: implement this.
-    // A basic implementation of pure-diffuse shading will just call the
-    // calculateRandomDirectionInHemisphere defined above.
+    
+    /*
+    ** Heavily based on https://raytracing.github.io/books/RayTracingInOneWeekend.html
+    */
 
-    //glm::vec3 rayVec = glm::normalize(pathSegment.ray.direction);
-    //glm::vec3 norVec = glm::normalize(normal);
-    --pathSegment.remainingBounces;
-    // Diffusion
-    pathSegment.ray.origin = intersect + (float)EPSILON * EPSILON_SCALE * normal;
-    pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
-    pathSegment.color *= m.color;
+
+    assert(path.remainingBounces > 0);
+    assert(feq(m.emittance, 0));
+    assert(feq(glm::length(normal), 1));
+    assert(feq(glm::length(path.ray.direction), 1));
+
+    Ray& ray = path.ray;
+    glm::vec3 dir;
+    color_t color = m.color;
+    thrust::uniform_real_distribution<float> u01(0,1);
+
+    MaterialType type;    
+    
+    if (m.hasReflective > 0) {
+        if (m.hasRefractive > 0 && m.indexOfRefraction > 0) {
+            type = DIELECTIC;
+        } else {
+            type = METAL;
+        }
+    } else {
+        type = LAMBERT;
+    }
+
+    bool finish;
+    bool leaving = glm::dot(ray.direction, normal) > 0;
+    do {
+        finish = true;
+        float eta, cos_theta, sin_theta;
+
+        switch (type) {
+        case METAL:
+            dir = glm::reflect(ray.direction, leaving ? -normal : normal);
+            dir += fmax(1 - m.hasReflective, 0.0f) * randomVecInUnitSphere(rng);
+            color *= m.specular.color;
+            break;
+        case DIELECTIC:
+            // eta = source / dest
+            // so entering ==> air / idx of refraction
+            //    leaving ==> idx of refraction / air = idx of refraction
+            eta = leaving ?  m.indexOfRefraction : 1 / m.indexOfRefraction;
+            cos_theta = fmin(glm::dot(-ray.direction, normal), 1.0f);
+            sin_theta = sqrtf(1 - cos_theta * cos_theta);
+
+            // divide reflection/refraction based on how significant the factor is
+            if (eta * sin_theta > 1 || reflectance(cos_theta, eta) > m.hasRefractive * u01(rng)) {
+                type = METAL;
+                finish = false;
+            } else {
+                dir = glm::refract(ray.direction, leaving ? -normal : normal, eta);
+            }
+            break;
+        case LAMBERT:
+        default:
+            dir = calculateRandomDirectionInHemisphere(normal, rng);
+            break;
+        }
+    } while (!finish);
+
+    // update path segment
+    path.color *= color;
+    ray.origin = intersect + OFFSET_EPS * normal;
+    ray.direction = glm::normalize(dir);
+    --path.remainingBounces;
 }
-#endif

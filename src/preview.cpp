@@ -208,8 +208,8 @@ void RenderImGui()
 	static float f = 0.0f;
 	static int counter = 0;
 
-	ImGui::Begin("Path Tracer Analytics");                  // Create a window called "Hello, world!" and append into it.
-	
+	ImGui::Begin("Path Tracer Analytics", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+
 	// LOOK: Un-Comment to check the output window and usage
 	//ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
 	//ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
@@ -228,15 +228,6 @@ void RenderImGui()
 	int lastSelection = imguiData->CurScene;
 	ImGui::Combo("Scenes", &imguiData->CurScene, imguiData->Scenes, imguiData->NumScenes);
 
-	//if (ImGui::BeginCombo("##Selet Scenes", imguiData->Scenes[imguiData->CurScene])) {
-	//	for (int i = 0; i < imguiData->NumScenes; ++i) {
-	//		if (ImGui::Selectable(imguiData->Scenes[i], i == imguiData->CurScene)) {
-	//			imguiData->CurScene = i;
-	//		}
-	//	}
-	//	ImGui::EndCombo();
-	//}
-	
 	ImGui::End();
 
 

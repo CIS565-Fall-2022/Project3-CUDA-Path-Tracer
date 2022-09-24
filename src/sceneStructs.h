@@ -8,6 +8,12 @@
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 
+enum MaterialType {
+    LAMBERT,
+    METAL,
+    DIELECTIC,
+};
+
 enum GeomType {
     SPHERE,
     CUBE,
@@ -41,9 +47,8 @@ struct Material {
     float indexOfRefraction;
     float emittance;
 
-
     // BSDF
-    __host__ __device__ color_t f(glm::vec3 const& wo, glm::vec3 const& wi) const {
+    __host__ __device__ color_t brdf(glm::vec3 const& wo, glm::vec3 const& wi) const {
         return color * INV_PI;
     }
 };
@@ -69,7 +74,7 @@ struct RenderState {
 
 
 struct PathSegment {
-    struct Pred {
+    struct PartitionRule {
         __host__ __device__
         bool operator()(PathSegment const& seg) const {
             return seg.remainingBounces > 0;
@@ -99,7 +104,10 @@ struct PathSegment {
 // 1) color contribution computation
 // 2) BSDF evaluation: generate a new ray
 struct ShadeableIntersection {
-  float t;
-  glm::vec3 surfaceNormal;
-  int materialId;
+    float t;
+    glm::vec3 surfaceNormal;
+    int materialId;
+    __host__ __device__ friend bool operator<(ShadeableIntersection const& a, ShadeableIntersection const& b) {
+        return a.materialId < b.materialId;
+    }
 };

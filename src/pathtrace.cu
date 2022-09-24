@@ -5,7 +5,7 @@
 #include <thrust/device_ptr.h>
 #include <thrust/partition.h>
 #include <thrust/random.h>
-
+#include <thrust/sort.h>
 #include "sceneStructs.h"
 #include "scene.h"
 #include "glm/glm.hpp"
@@ -17,6 +17,7 @@
 
 // impl switches
 #define COMPACTION
+#define SORT_MAT
 // #define FAKE_SHADE
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
@@ -76,8 +77,10 @@ static Material*              dev_materials;
 static PathSegment*           dev_paths;
 static ShadeableIntersection* dev_intersections;
 
-// TODO: static variables for device memory, any extra info you need, etc
+// static variables for device memory, any extra info you need, etc
 // ...
+static thrust::device_ptr<PathSegment> dev_thrust_paths;
+static thrust::device_ptr<ShadeableIntersection> dev_thrust_inters;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -104,6 +107,8 @@ void pathtraceInit(Scene* scene) {
 	ALLOC(dev_intersections, pixelcount);
 	ZERO(dev_intersections, pixelcount);
 
+	dev_thrust_paths = thrust::device_ptr<PathSegment>(dev_paths);
+	dev_thrust_inters = thrust::device_ptr<ShadeableIntersection>(dev_intersections);
     checkCUDAError("pathtraceInit");
 }
 
@@ -388,7 +393,6 @@ void pathtrace(uchar4 *pbo, int const frame, int const iter) {
     // --- PathSegment Tracing Stage ---
     // Shoot ray into scene, bounce between objects, push shading chunks
 	for (int depth = 0, num_paths = pixelcount; num_paths > 0 && depth < traceDepth; ++depth) {
-		
 		// clean shading chunks
 		MEMSET(dev_intersections, 0, num_paths);
 
@@ -415,7 +419,7 @@ void pathtrace(uchar4 *pbo, int const frame, int const iter) {
 		// TODO: compare between directly shading the path segments and shading
 		// path segments that have been reshuffled to be contiguous in memory.
 #ifdef SORT_MAT
-
+		thrust::sort_by_key(dev_thrust_inters,dev_thrust_inters + num_paths, dev_thrust_paths);
 #endif
 
 #ifdef FAKE_SHADE
@@ -433,8 +437,7 @@ void pathtrace(uchar4 *pbo, int const frame, int const iter) {
 		cudaDeviceSynchronize();
 
 #ifdef COMPACTION
-		auto ptr = thrust::device_ptr<PathSegment>(dev_paths);
-		num_paths = thrust::partition(ptr, ptr + num_paths, PathSegment::Pred()) - ptr;
+		num_paths = thrust::partition(dev_thrust_paths, dev_thrust_paths + num_paths, PathSegment::PartitionRule()) - dev_thrust_paths;
 #endif // COMPACTION
 
 #ifdef MAX_DEPTH_OVERRIDE
