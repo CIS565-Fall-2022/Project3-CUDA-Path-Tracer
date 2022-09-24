@@ -15,5 +15,10 @@ struct BVHNode {
     int size;
 };
 
+struct BVHDeviceNode {
+    int triangleIdx;
+
+};
+
 struct BVHTableElement {
 };

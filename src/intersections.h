@@ -6,6 +6,14 @@
 #include "sceneStructs.h"
 #include "mathUtil.h"
 
+__host__ __device__ inline Ray makeRay(glm::vec3 ori, glm::vec3 dir) {
+    return { ori, dir };
+}
+
+__host__ __device__ inline Ray makeOffsetedRay(glm::vec3 ori, glm::vec3 dir) {
+    return { ori + dir * 1e-4f, dir };
+}
+
 // CHECKITOUT
 /**
  * Compute a point at parameter value `t` on ray `r`.

@@ -23,8 +23,6 @@ struct Material {
     float roughness;
     float ior;
     float emittance;
-
-    int textureId;
 };
 
 enum BSDFSampleType {

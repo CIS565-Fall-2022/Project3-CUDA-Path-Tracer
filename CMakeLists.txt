@@ -75,21 +75,19 @@ set(headers
     src/utilities.h
     src/material.h
     src/bvh.h
-    src/envMap.h
     src/sampler.h
     src/mathUtil.h
-    src/texture.h
     src/ImGui/imconfig.h
-	
-	src/ImGui/imgui.h
+    src/ImGui/imgui.h
     src/ImGui/imconfig.h
     src/ImGui/imgui_impl_glfw.h
-     src/ImGui/imgui_impl_opengl3.h 
-     src/ImGui/imgui_impl_opengl3_loader.h 
-     src/ImGui/imgui_internal.h 
-     src/ImGui/imstb_rectpack.h 
-     src/ImGui/imstb_textedit.h 
-     src/ImGui/imstb_truetype.h 
+    src/ImGui/imgui_impl_opengl3.h 
+    src/ImGui/imgui_impl_opengl3_loader.h 
+    src/ImGui/imgui_internal.h 
+    src/ImGui/imstb_rectpack.h 
+    src/ImGui/imstb_textedit.h 
+    src/ImGui/imstb_truetype.h 
+    src/tinyobjloader/tiny_obj_loader.h
     )
 
 set(sources
@@ -101,10 +99,9 @@ set(sources
     src/scene.cpp
     src/preview.cpp
     src/utilities.cpp
-	src/bvh.cpp
-	src/envMap.cpp
-	src/sampler.cpp
-	src/mathUtil.cpp
+    src/bvh.cpp
+    src/sampler.cpp
+    src/mathUtil.cpp
     src/ImGui/imgui.cpp 
     src/ImGui/imgui_demo.cpp 
     src/ImGui/imgui_draw.cpp 
@@ -112,6 +109,7 @@ set(sources
     src/ImGui/imgui_impl_opengl3.cpp 
     src/ImGui/imgui_tables.cpp 
     src/ImGui/imgui_widgets.cpp
+    src/tinyobjloader/tiny_obj_loader.cpp
     )
 
 list(SORT headers)

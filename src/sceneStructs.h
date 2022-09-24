@@ -4,6 +4,7 @@
 #include <vector>
 #include <cuda_runtime.h>
 #include "glm/glm.hpp"
+#include "bvh.h"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 
@@ -71,11 +72,3 @@ struct Intersection {
     glm::vec3 incomingDir;
     int materialId;
 };
-
-__host__ __device__ inline Ray makeRay(glm::vec3 ori, glm::vec3 dir) {
-    return { ori, dir };
-}
-
-__host__ __device__ inline Ray makeOffsetedRay(glm::vec3 ori, glm::vec3 dir) {
-    return { ori + dir * 1e-4f, dir };
-}

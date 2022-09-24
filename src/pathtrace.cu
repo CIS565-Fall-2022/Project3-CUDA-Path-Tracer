@@ -387,12 +387,6 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 		cudaDeviceSynchronize();
 		depth++;
 
-		// TODO:
-		// --- Shading Stage ---
-		// Shade path segments based on intersections and generate new rays by
-		// evaluating the BSDF.
-		// Start off with just a big kernel that handles all the different
-		// materials you have in the scenefile.
 		// TODO: compare between directly shading the path segments and shading
 		// path segments that have been reshuffled to be contiguous in memory.
 
@@ -402,7 +396,7 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 
 		// Compact paths that are terminated but carry contribution into a separate buffer
 		devTerminatedThr = thrust::remove_copy_if(devPathsThr, devPathsThr + numPaths, devTerminatedThr, CompactTerminatedPaths());
-		// Remove paths that yield no contribution
+		// Only keep active paths
 		auto end = thrust::remove_if(devPathsThr, devPathsThr + numPaths, RemoveInvalidPaths());
 		numPaths = end - devPathsThr;
 		//std::cout << "Remaining paths: " << numPaths << "\n";
