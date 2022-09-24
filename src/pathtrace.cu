@@ -6,6 +6,7 @@
 #include <thrust/remove.h>
 #include <thrust/sort.h>
 #include <thrust/device_vector.h>
+#include <thrust/partition.h>
 
 #include "sceneStructs.h"
 #include "scene.h"
@@ -17,7 +18,6 @@
 #include "interactions.h"
 
 #include <device_launch_parameters.h>
-#include "../stream_compaction/efficient.cu"
 
 #define ERRORCHECK 1
 
@@ -79,8 +79,6 @@ static Geom* dev_geoms = NULL;
 static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
 
-static thrust::device_ptr<PathSegment> dev_new_end_path = NULL;
-static thrust::device_ptr<PathSegment> dev_thrust_paths = NULL;
 
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
@@ -90,14 +88,6 @@ void InitDataContainer(GuiDataContainer* imGuiData)
 {
 	guiData = imGuiData;
 }
-
-//// DEBUGGER TEST
-//__global__ void kernTestDebugger(int param) {
-//    int index = threadIdx.x + (blockIdx.x * blockDim.x);
-//    index = 1;
-//    index = threadIdx.x + (blockIdx.x * blockDim.x);
-//    index += param;
-//}
 
 void pathtraceInit(Scene* scene) {
 	hst_scene = scene;
@@ -119,13 +109,7 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_intersections, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
-	// TODO: initialize any extra device memeory you need
-	
-	//// DEBUGGER TEST
-	//int noOfBlocks = 1;
-	//dim3 blockSize(32, 32);
-	//kernTestDebugger << < noOfBlocks, blockSize >> > (2);
-			 
+	// TODO: initialize any extra device memeory you need			 
 
 	checkCUDAError("pathtraceInit");
 }
@@ -314,7 +298,7 @@ __global__ void shadeWithMaterial(
 		  // Set up the RNG
 		  // LOOK: this is how you use thrust's RNG! Please look at
 		  // makeSeededRandomEngine as well.
-			thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
+			thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, pathSegments->remainingBounces);
 			thrust::uniform_real_distribution<float> u01(0, 1);
 
 			Material material = materials[intersection.materialId];
@@ -331,7 +315,7 @@ __global__ void shadeWithMaterial(
 				// 2. Ideal diffused shading and bounce
 				glm::vec3 pointOfIntersection = getPointOnRay(pathSegments[idx].ray, intersection.t);
 				scatterRay(pathSegments[idx], pointOfIntersection, intersection.surfaceNormal, material, rng);
-				pathSegments[idx].color *= materialColor;
+				//pathSegments[idx].color *= materialColor;
 
 				//float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));
 				//pathSegments[idx].color *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f;
@@ -362,13 +346,19 @@ __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iteration
 	}
 }
 
-__host__ __device__ bool is_Terminated(const PathSegment &path) {
-	return (path.remainingBounces == 0) ? true : false;
-}
+struct is_Terminated {
+	__host__ __device__
+		bool operator()(const PathSegment& path) {
+		return path.remainingBounces;
+	}
+};
 
-__host__ __device__ bool compareMaterialId(const ShadeableIntersection &isect1, const ShadeableIntersection& isect2) {
-	return (isect1.materialId > isect2.materialId) ? true : false;
-}
+struct compareMaterialId {
+	__host__ __device__ bool operator()(const ShadeableIntersection& isect1, const ShadeableIntersection& isect2) {
+		return isect1.materialId < isect2.materialId;
+	}
+};
+
 
 /**
  * Wrapper for the __global__ call that sets up the kernel calls and does a ton
@@ -460,7 +450,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		// path segments that have been reshuffled to be contiguous in memory.
 
 		// 1. Sort ray by material
-		//thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + num_paths, dev_paths, compareMaterialId);
+		//thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + num_paths, dev_paths, compareMaterialId());
 
 		// 2. Ideal diffused shading and bounce and // 3. Perfect specular reflection
 		shadeWithMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
@@ -472,28 +462,21 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			);
 
 		// 4. Stream compaction
-		//dev_thrust_paths = thrust::device_pointer_cast(dev_paths);
-		//dev_new_end_path = thrust::device_pointer_cast(thrust::remove_if(dev_thrust_paths, dev_thrust_paths + num_paths, is_Terminated));
-		//int count = StreamCompaction::Efficient::compact(num_paths, dev_paths, dev_paths);
-		
-		//int new_num_path = dev_new_end_path - dev_thrust_paths;
+		//dev_thrust_paths = thrust::device_ptr<PathSegment>(dev_paths);
+		//dev_new_end_path = thrust::device_ptr<PathSegment>(thrust::remove_if(dev_thrust_paths, dev_thrust_paths + num_paths, is_Terminated()));
+		//dev_thrust_paths = thrust::device_ptr<PathSegment>(dev_paths);
+		dev_path_end = thrust::partition(thrust::device, dev_paths, dev_paths + num_paths, is_Terminated());
+		num_paths = dev_path_end - dev_paths;
 
+
+		//int count = StreamCompaction::Efficient::compact(num_paths, dev_paths, dev_paths);
+		// 
 		// 5. Cache first bounce
 
-		//shadeFakeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
-		//	iter,
-		//	num_paths,
-		//	dev_intersections,
-		//	dev_paths,
-		//	dev_materials
-		//	);
-		//if (new_num_path == 0){
+		//if (num_paths == 0){
 		if (depth == 3) {
 			iterationComplete = true; // TODO: should be based off stream compaction results.
 		}
-		/*else {
-			num_paths = new_num_path;
-		}*/
 
 		//iterationComplete = true; // TODO: should be based off stream compaction results.
 		if (guiData != NULL)

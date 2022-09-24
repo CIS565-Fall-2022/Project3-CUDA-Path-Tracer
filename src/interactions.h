@@ -80,5 +80,6 @@ void scatterRay(    // similar to sample_f, calculate the new wi and f
     glm::vec3 wi_scatteredRayDir = calculateRandomDirectionInHemisphere(normal, rng);  // for pure diffused material
     pathSegment.ray.direction = wi_scatteredRayDir;
     pathSegment.ray.origin = intersect;
+    pathSegment.color *= m.color;
     pathSegment.remainingBounces--;
 }
