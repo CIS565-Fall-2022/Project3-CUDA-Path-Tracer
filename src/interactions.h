@@ -73,7 +73,55 @@ void scatterRay(
         glm::vec3 normal,
         const Material &m,
         thrust::default_random_engine &rng) {
+    
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    if (pathSegment.remainingBounces == 0) return;
+    thrust::uniform_real_distribution<float> u01(0, 1);
+
+
+    if (!m.hasReflective && !m.hasRefractive) {
+        pathSegment.color *= m.color;
+        pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
+        pathSegment.ray.origin = intersect;
+    }
+    else if (m.hasReflective && m.hasRefractive) {//both and we will use the equation
+        glm::vec3 incident = pathSegment.ray.direction;//incident vector
+        float rayDir = glm::dot(incident, normal);
+        if (rayDir > 0) {
+            normal = -normal;
+        }
+        //We will use 50/50 first to scrum; >0.5 refraction <0.5 reflection
+        if (u01(rng) > 0.5) {
+            //inside? outside?
+
+            
+            pathSegment.ray.direction = glm::normalize(glm::refract(incident, normal, m.indexOfRefraction));
+            pathSegment.ray.origin = intersect;
+            pathSegment.color *= m.specular.color * 0.5f;
+        }
+        else {
+            
+            pathSegment.color *= m.specular.color * 0.5f;
+            pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+            pathSegment.ray.origin = intersect;
+        }
+        //
+
+    }
+    else if (m.hasReflective) {//reflection only
+        pathSegment.color *= m.specular.color;
+        pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+        pathSegment.ray.origin = intersect;
+    }
+    else {//refraction only
+        glm::vec3 incident = pathSegment.ray.direction;//incident vector
+        pathSegment.ray.direction = glm::normalize(glm::refract(incident, normal, m.indexOfRefraction));
+        pathSegment.ray.origin = intersect;
+        pathSegment.color *= m.specular.color;
+    }
+
+    pathSegment.remainingBounces--;
+
 }
