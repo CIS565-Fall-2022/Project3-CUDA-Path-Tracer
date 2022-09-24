@@ -75,11 +75,11 @@ namespace Math {
     }
 
     __device__ static bool refract(glm::vec3 n, glm::vec3 wi, float ior, glm::vec3& wt) {
-        float cosIn = glm::min(glm::dot(n, wi), 1.f);
+        float cosIn = glm::dot(n, wi);
         if (cosIn < 0) {
             ior = 1.f / ior;
         }
-        float sin2In = 1.f - cosIn * cosIn;
+        float sin2In = glm::max(0.f, 1.f - cosIn * cosIn);
         float sin2Tr = sin2In / (ior * ior);
 
         if (sin2Tr >= 1.f) {

@@ -54,7 +54,9 @@ __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
 
 		// ACES tonemapping and gamma correction
 		glm::vec3 color = image[index] / float(iter);
-		glm::vec3 mapped = Math::correctGamma(Math::filmic(color));
+		glm::vec3 mapped = Math::ACES(color);
+		mapped = color;
+		mapped = Math::correctGamma(mapped);
 		glm::ivec3 iColor = glm::clamp(glm::ivec3(mapped * 255.f), glm::ivec3(0), glm::ivec3(255));
 
 		// Each thread writes one pixel location in the texture (textel)
@@ -267,12 +269,12 @@ __global__ void pathIntegSampleSurface(
 		BSDFSample sample;
 		materialSample(intersec.surfaceNormal, intersec.incomingDir, material, sample3D(rng), sample);
 
-		if (sample.pdf < 0) {
+		if (sample.type == BSDFSampleType::Invalid) {
 			// Terminate path if sampling fails
-			segments[idx].remainingBounces = 0;
+			segment.remainingBounces = 0;
 		}
 		else {
-			bool isSampleDelta = sample.type & BSDFSampleType::Specular;
+			bool isSampleDelta = (sample.type & BSDFSampleType::Specular);
 			segment.throughput *= sample.bsdf / sample.pdf *
 				(isSampleDelta ? 1.f : Math::absDot(intersec.surfaceNormal, sample.dir));
 			segment.ray = makeOffsetedRay(intersec.position, sample.dir);
