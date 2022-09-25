@@ -1,6 +1,7 @@
 #pragma once
 
 #include "intersections.h"
+#include <thrust/random.h>
 
 // CHECKITOUT
 /**
@@ -76,4 +77,38 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    glm::vec3 wi = glm::vec3(0.0f);
+
+    thrust::uniform_real_distribution<float> u01(0, 1);
+
+    float diffuse_intensity = glm::length(m.color);
+    float spec_intensity = glm::length(m.specular.color);
+    float total_intensity = diffuse_intensity + spec_intensity;
+
+    diffuse_intensity /= total_intensity;
+    spec_intensity /= total_intensity;
+
+    float ray_type_prob = u01(rng);
+
+    if (ray_type_prob > diffuse_intensity) {
+        // specular
+        wi = glm::reflect(pathSegment.ray.direction, normal);
+        pathSegment.rayThroughput *= m.specular.color / spec_intensity;
+    }
+    else {
+        // diffuse
+        wi = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
+        pathSegment.rayThroughput *= m.color / diffuse_intensity;
+    }
+
+
+    // Change ray direction
+    pathSegment.ray.direction = wi;
+    pathSegment.ray.origin = intersect;
+
+    
+
+    // Color computation
+    
+
 }
