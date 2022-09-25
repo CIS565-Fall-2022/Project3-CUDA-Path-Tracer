@@ -2,6 +2,8 @@
 
 #include "glm/glm.hpp"
 #include "intellisense.h"
+#include <cuda.h>
+
 #include <algorithm>
 #include <istream>
 #include <ostream>
@@ -77,6 +79,44 @@ template<typename T>
 static inline void setGPU(T * dev, int i, T val) {
     H2D(dev + i, &val, 1);
 }
+
+#ifdef __CUDACC__
+#define DEVICE __device__ __forceinline__
+#define HOST_DEVICE __host__ __device__ __forceinline__
+#else
+#define DEVICE
+#define HOST_DEVICE
+#endif
+
+/// <summary>
+/// non-owning view on a GPU array
+/// may only be indexed on GPU
+/// </summary>
+/// <typeparam name="T"></typeparam>
+template<typename T>
+struct Span {
+    int _size;
+    T* _arr;
+    Span() : _size(0), _arr(nullptr) { }
+    Span(int size, T* arr) : _size(size), _arr(arr) { }
+    operator T* () const {
+        return _arr;
+    }
+
+    DEVICE T& operator[](int idx) {
+#ifndef NDEBUG
+        if (idx < 0 || idx >= _size) {
+            assert(!"array out of bounds");
+        }
+#endif // !NDEBUG
+        return _arr[idx];
+    }
+    DEVICE T const& operator[](int idx) const {
+        return const_cast<Span<T>*>(this)->operator[](idx);
+    }
+    HOST_DEVICE int size() const { return _size; }
+};
+
 
 namespace utilityCore {
     extern float clamp(float f, float min, float max);

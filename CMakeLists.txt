@@ -84,6 +84,7 @@ set(headers
     src/ImGui/imstb_textedit.h 
     src/ImGui/imstb_truetype.h 
     src/intellisense.h
+    src/TinyObjLoader/tiny_obj_loader.h
     )
 
 set(sources
@@ -102,6 +103,7 @@ set(sources
     src/ImGui/imgui_impl_opengl3.cpp 
     src/ImGui/imgui_tables.cpp 
     src/ImGui/imgui_widgets.cpp 
+    src/TinyObjLoader/tiny_obj_loader.cc
     )
 
 list(SORT headers)

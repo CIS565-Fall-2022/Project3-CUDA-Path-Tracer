@@ -17,6 +17,7 @@ enum MaterialType {
 enum GeomType {
     SPHERE,
     CUBE,
+    MESH
 };
 
 struct Ray {
@@ -27,6 +28,7 @@ struct Ray {
 struct Geom {
     enum GeomType type;
     int materialid;
+    int meshid;
     glm::vec3 translation;
     glm::vec3 rotation;
     glm::vec3 scale;
@@ -46,11 +48,6 @@ struct Material {
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
-
-    // BSDF
-    __host__ __device__ color_t brdf(glm::vec3 const& wo, glm::vec3 const& wi) const {
-        return color * INV_PI;
-    }
 };
 
 struct Camera {

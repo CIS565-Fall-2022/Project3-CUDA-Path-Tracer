@@ -3,6 +3,7 @@
 #include <cstring>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include "TinyObjLoader/tiny_obj_loader.h"
 
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
@@ -55,6 +56,63 @@ int Scene::loadGeom(string objectid) {
             } else if (strcmp(line.c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
+            } else {
+                newGeom.type = MESH;
+
+                // mesh objects are in the fomat: [file type] [path to file]
+                vector<string> tokens = utilityCore::tokenizeString(line);
+                if (tokens.size() != 2) {
+                    cerr << "ERROR: unrecognized object type\nat line: " << line << endl;
+                    return -1;
+                }
+                if (tokens[0] == "obj") {
+                    cout << "Loading obj mesh " << tokens[1] << endl;
+
+                    tinyobj::ObjReader reader;
+                    if (!reader.ParseFromFile(tokens[1])) {
+                        if (!reader.Error().empty()) {
+                            cerr << "TinyObjReader: " << reader.Error() << endl;
+                        } else {
+                            cerr << "no idea what the hell is happening\n";
+                        }
+                        return -1;
+                    }
+                    if (!reader.Warning().empty()) {
+                        cerr << reader.Warning() << endl;
+                    }
+                    
+
+                    auto const& attrib = reader.GetAttrib();
+                    // fill vertices
+                    for (size_t i = 2; i < attrib.vertices.size(); i += 3) {
+                        vertices.emplace_back(
+                            attrib.vertices[i - 2],
+                            attrib.vertices[i - 1],
+                            attrib.vertices[i]
+                        );
+                    }
+
+                    for (auto const& s : reader.GetShapes()) {
+                        size_t index_offset = 0;
+                        auto const& indices = s.mesh.indices;
+                      
+                        for (size_t i = 0; i < s.mesh.material_ids.size(); ++i) {
+                            int vals[6]{
+                                indices[3 * i + 0].vertex_index,
+                                indices[3 * i + 1].vertex_index,
+                                indices[3 * i + 2].vertex_index,
+                                indices[3 * i + 0].normal_index,
+                                indices[3 * i + 1].normal_index,
+                                indices[3 * i + 2].normal_index,
+                            };
+
+                            triangles.emplace_back(&vals);
+                        }
+                    }
+                } else {
+                    cerr << "unknown object format" << endl;
+                    return -1;
+                }
             }
         }
 
@@ -88,6 +146,15 @@ int Scene::loadGeom(string objectid) {
         newGeom.inverseTransform = glm::inverse(newGeom.transform);
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
 
+        // record lights
+        Material const& mat = materials[newGeom.materialid];
+        if (mat.emittance > 0) {
+            Light light;
+            light.color = mat.color;
+            light.intensity = mat.emittance / MAX_EMITTANCE;
+            light.position = newGeom.translation;
+            lights.emplace_back(light);
+        }
         geoms.push_back(newGeom);
         return 1;
     }
@@ -186,6 +253,7 @@ int Scene::loadMaterial(string materialid) {
                 newMaterial.emittance = atof(tokens[1].c_str());
             }
         }
+
         materials.push_back(newMaterial);
         return 1;
     }
