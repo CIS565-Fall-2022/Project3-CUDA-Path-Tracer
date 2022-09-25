@@ -45,7 +45,7 @@ void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 
 //Kernel that writes the image to the OpenGL PBO directly.
 __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
-	int iter, glm::vec3* image) {
+	int iter, glm::vec3* Image) {
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
 
@@ -53,7 +53,7 @@ __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
 		int index = x + (y * resolution.x);
 
 		// ACES tonemapping and gamma correction
-		glm::vec3 color = image[index] / float(iter);
+		glm::vec3 color = Image[index] / float(iter);
 		glm::vec3 mapped = Math::ACES(color);
 		mapped = color;
 		mapped = Math::correctGamma(mapped);
@@ -284,13 +284,13 @@ __global__ void pathIntegSampleSurface(
 }
 
 // Add the current iteration's output to the overall image
-__global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iterationPaths) {
+__global__ void finalGather(int nPaths, glm::vec3* Image, PathSegment* iterationPaths) {
 	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
 
 	if (index < nPaths) {
 		PathSegment iterationPath = iterationPaths[index];
 		if (iterationPath.pixelIndex >= 0 && iterationPath.remainingBounces == 0) {
-			image[iterationPath.pixelIndex] += iterationPath.radiance;
+			Image[iterationPath.pixelIndex] += iterationPath.radiance;
 		}
 	}
 }

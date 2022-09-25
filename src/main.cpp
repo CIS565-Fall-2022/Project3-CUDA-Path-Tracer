@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
 
 	// Load scene file
 	scene = new Scene(sceneFile);
+	exit(0);
 
 	//Create Instance for ImGUIData
 	guiData = new GuiDataContainer();
@@ -80,13 +81,15 @@ int main(int argc, char** argv) {
 	// GLFW main loop
 	mainLoop();
 
+	Resource::clear();
+
 	return 0;
 }
 
 void saveImage() {
 	float samples = iteration;
 	// output image file
-	image img(width, height);
+	Image img(width, height);
 
 	for (int x = 0; x < width; x++) {
 		for (int y = 0; y < height; y++) {
