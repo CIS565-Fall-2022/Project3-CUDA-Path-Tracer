@@ -38,7 +38,9 @@ typedef glm::vec3 Vertex;
 typedef glm::vec3 Normal;
 
 struct Mesh {
-    vector<int> verts;
+    Mesh(int tri_start, int tri_end) : tri_start(tri_start), tri_end(tri_end) { }
+    int tri_start;
+    int tri_end;
 };
 
 class Scene {

@@ -118,20 +118,21 @@ __global__ void sendImageToPBO(int iter, glm::vec3* pixs, uchar4* pbo, glm::ivec
 static Scene* hst_scene = NULL;
 static GuiDataContainer* guiData = NULL;
 
-static glm::vec3*             dev_image;
-static Geom*                  dev_geoms;
-static Material*              dev_materials;
-static PathSegment*           dev_paths;
-static ShadeableIntersection* dev_intersections;
+static Span<glm::vec3>             dev_image;
+static Span<Geom>                  dev_geoms;
+static Span<Material>              dev_materials;
+static Span<PathSegment>           dev_paths;
+static Span<ShadeableIntersection> dev_intersections;
 
 // static variables for device memory, any extra info you need, etc
 // ...
-static Light* dev_lights;
+static Span<Light> dev_lights;
 static struct {
-	vector<Span<int>> dev_ptrs;
-	Span<Span<int>> data;
-} dev_meshes;
-static Triangle* dev_triangles;
+	Span<Vertex> vertices;
+	Span<Normal> normals;
+	Span<Triangle> tris;
+	Span<Mesh> meshes;
+} dev_mesh_info;
 
 static thrust::device_ptr<PathSegment> dev_thrust_paths;
 static thrust::device_ptr<ShadeableIntersection> dev_thrust_inters;
@@ -149,43 +150,20 @@ void pathtraceInit(Scene* scene) {
 	const Camera& cam = hst_scene->state.camera;
 	const int pixelcount = cam.resolution.x * cam.resolution.y;
 
-	ALLOC(dev_image, pixelcount);
-	ZERO(dev_image, pixelcount);
+	dev_image = make_span<glm::vec3>(pixelcount);
+	dev_paths = make_span<PathSegment>(pixelcount);
+	dev_materials = make_span(scene->materials);
+	dev_intersections = make_span<ShadeableIntersection>(pixelcount);
+	dev_geoms = make_span(scene->geoms);
+	dev_lights = make_span(scene->lights);
 
-	ALLOC(dev_paths, pixelcount);
-
-	ALLOC(dev_geoms, scene->geoms.size());
-	H2D(dev_geoms, scene->geoms.data(), scene->geoms.size());
+	dev_mesh_info.vertices = make_span(scene->vertices);
+	dev_mesh_info.normals = make_span(scene->normals);
+	dev_mesh_info.tris = make_span(scene->triangles);
+	dev_mesh_info.meshes = make_span(scene->meshes);
 	
-	ALLOC(dev_materials, scene->materials.size());
-	H2D(dev_materials, scene->materials.data(), scene->materials.size());
-	
-	ALLOC(dev_intersections, pixelcount);
-	ZERO(dev_intersections, pixelcount);
-
-	if (scene->lights.size()) {
-		ALLOC(dev_lights, scene->lights.size());
-		H2D(dev_lights, scene->lights.data(), scene->lights.size());
-	} else {
-		dev_lights = nullptr;
-	}
-	auto& meshes = scene->meshes;
-	if (meshes.size()) {
-		for (auto const& v : meshes) {
-			int* p;
-			int sz = v.size();
-			ALLOC(p, sz);
-			H2D(p, v.data(), sz);
-			dev_meshes.dev_ptrs.emplace_back(sz, p);
-		}
-		Span<int>* p;
-		ALLOC(p, meshes.size());
-		H2D(p, dev_meshes.dev_ptrs.data(), meshes.size());
-		dev_meshes.data = Span<Span<int>>(meshes.size(), p);
-	}
-
-	dev_thrust_paths = thrust::device_ptr<PathSegment>(dev_paths);
-	dev_thrust_inters = thrust::device_ptr<ShadeableIntersection>(dev_intersections);
+	dev_thrust_paths = thrust::device_ptr<PathSegment>((PathSegment*)dev_paths);
+	dev_thrust_inters = thrust::device_ptr<ShadeableIntersection>((ShadeableIntersection*)dev_intersections);
     checkCUDAError("pathtraceInit");
 }
 
@@ -195,17 +173,11 @@ void pathtraceFree() {
 	FREE(dev_geoms);
 	FREE(dev_materials);
 	FREE(dev_intersections);
-
-	if (dev_lights) {
-		FREE(dev_lights);
-	}
-	if (dev_meshes.data.size()) {
-		for (auto span : dev_meshes.dev_ptrs) {
-			FREE(span);
-		}
-		FREE(dev_meshes.data);
-	}
-
+	FREE(dev_lights);
+	FREE(dev_mesh_info.vertices);
+	FREE(dev_mesh_info.normals);
+	FREE(dev_mesh_info.tris);
+	FREE(dev_mesh_info.meshes);
     checkCUDAError("pathtraceFree");
 }
 
@@ -480,20 +452,17 @@ void pathtrace(uchar4 *pbo, int const frame, int const iter) {
 
     // --- PathSegment Tracing Stage ---
     // Shoot ray into scene, bounce between objects, push shading chunks
-	Span<Geom> geoms(hst_scene->geoms.size(), dev_geoms);
-	Span<Light> lights(hst_scene->lights.size(), dev_lights);
 
 	for (int depth = 0, num_paths = pixelcount; num_paths > 0 && depth < traceDepth; ++depth) {
 		// clean shading chunks
 		MEMSET(dev_intersections, 0, num_paths);
-		Span<PathSegment> paths(num_paths, dev_paths);
 
 		// tracing
 		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
 		computeIntersections KERN_PARAM(numblocksPathSegmentTracing, blockSize1d) (
 			depth,
-			paths,
-			geoms,
+			dev_paths.subspan(0, num_paths),
+			dev_geoms,
 			dev_intersections
 		);
 
@@ -517,8 +486,8 @@ void pathtrace(uchar4 *pbo, int const frame, int const iter) {
 #endif
 		shadeMaterial KERN_PARAM(numblocksPathSegmentTracing, blockSize1d) (
 			iter,
-			paths,
-			lights,
+			dev_paths.subspan(0, num_paths),
+			dev_lights,
 			dev_intersections,
 			dev_materials
 		);

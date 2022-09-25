@@ -89,7 +89,7 @@ static inline void setGPU(T * dev, int i, T val) {
 #endif
 
 /// <summary>
-/// non-owning view on a GPU array
+/// non-owning view on a GPU array, which
 /// may only be indexed on GPU
 /// </summary>
 /// <typeparam name="T"></typeparam>
@@ -102,7 +102,14 @@ struct Span {
     operator T* () const {
         return _arr;
     }
-
+    HOST_DEVICE Span<T> subspan(int idx, int sub_sz) const {
+#ifndef NDEBUG
+        if (idx < 0 || idx + sub_sz > _size) {
+            assert(!"invalid subspan");
+        }
+#endif
+        return Span<T>(sub_sz, _arr + idx);
+    }
     DEVICE T& operator[](int idx) {
 #ifndef NDEBUG
         if (idx < 0 || idx >= _size) {
@@ -117,6 +124,38 @@ struct Span {
     HOST_DEVICE int size() const { return _size; }
 };
 
+
+
+template<typename T>
+Span<T> make_span(T const* hst_ptr, int n) {
+    if (hst_ptr) {
+        T* tmp;
+        ALLOC(tmp, n);
+        H2D(tmp, const_cast<T*>(hst_ptr), n);
+        return Span<T>(n, tmp);
+    } else {
+        return Span<T>();
+    }
+}
+template<typename T>
+Span<T> make_span(std::vector<T> const& hst_vec) {
+    if (hst_vec.size()) {
+        return make_span(hst_vec.data(), hst_vec.size());
+    } else {
+        return Span<T>();
+    }
+}
+template<typename T>
+Span<T> make_span(int n) {
+    if (n) {
+        T* tmp;
+        ALLOC(tmp, n);
+        ZERO(tmp, n);
+        return Span<T>(n, tmp);
+    } else {
+        return Span<T>();
+    }
+}
 
 namespace utilityCore {
     extern float clamp(float f, float min, float max);

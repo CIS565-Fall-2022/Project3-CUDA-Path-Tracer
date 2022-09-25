@@ -82,6 +82,13 @@ int Scene::loadGeom(string objectid) {
                     }
                     
 
+                    size_t vert_offset = vertices.size();
+                    size_t norm_offset = normals.size();
+                    if (vert_offset != norm_offset) {
+                        cerr << "internal error, vert offset should match norm offset\n";
+                        return -1;
+                    }
+
                     auto const& attrib = reader.GetAttrib();
                     // fill vertices
                     for (size_t i = 2; i < attrib.vertices.size(); i += 3) {
@@ -89,6 +96,11 @@ int Scene::loadGeom(string objectid) {
                             attrib.vertices[i - 2],
                             attrib.vertices[i - 1],
                             attrib.vertices[i]
+                        );
+                        normals.emplace_back(
+                            attrib.normals[i - 2],
+                            attrib.normals[i - 1],
+                            attrib.normals[i]
                         );
                     }
 
@@ -98,17 +110,19 @@ int Scene::loadGeom(string objectid) {
                       
                         for (size_t i = 0; i < s.mesh.material_ids.size(); ++i) {
                             int vals[6]{
-                                indices[3 * i + 0].vertex_index,
-                                indices[3 * i + 1].vertex_index,
-                                indices[3 * i + 2].vertex_index,
-                                indices[3 * i + 0].normal_index,
-                                indices[3 * i + 1].normal_index,
-                                indices[3 * i + 2].normal_index,
+                                indices[3 * i + 0].vertex_index + vert_offset,
+                                indices[3 * i + 1].vertex_index + vert_offset,
+                                indices[3 * i + 2].vertex_index + vert_offset,
+                                indices[3 * i + 0].normal_index + norm_offset,
+                                indices[3 * i + 1].normal_index + norm_offset,
+                                indices[3 * i + 2].normal_index + norm_offset,
                             };
 
                             triangles.emplace_back(&vals);
                         }
                     }
+
+                    meshes.emplace_back(vert_offset, vertices.size());
                 } else {
                     cerr << "unknown object format" << endl;
                     return -1;
