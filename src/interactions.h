@@ -2,6 +2,8 @@
 
 #include "intersections.h"
 #include "utilities.h"
+#include <thrust/random.h>
+#include "scene.h"
 
 // #define GLM_REFRACT
 
@@ -134,8 +136,7 @@ glm::vec3 calculateRandomDirectionInHemisphere(
 __device__
 void scatterRay(
     PathSegment& path,
-    glm::vec3 intersect,
-    glm::vec3 normal,
+    ShadeableIntersection const& inters,
     Material const& m,
     Span<Light> const& lights,
     thrust::default_random_engine& rng) {
@@ -145,6 +146,13 @@ void scatterRay(
     *  https://raytracing.github.io/books/RayTracingInOneWeekend.html
     *  https://www.pbr-book.org/3ed-2018/Light_Transport_I_Surface_Reflection/Path_Tracing
     */
+
+    glm::vec3 normal = inters.surfaceNormal;
+    glm::vec3 intersect = inters.hitPoint;
+    bool leaving = !inters.rayFromOutside;
+
+    // bool leaving = glm::dot(ray.direction, normal) > 0;
+
 
     assert(path.remainingBounces > 0);
     assert(feq(m.emittance, 0));
@@ -170,7 +178,6 @@ void scatterRay(
     }
 
     bool finish;
-    bool leaving = glm::dot(ray.direction, normal) > 0;
     do {
         finish = true;
         float eta, cos_theta, sin_theta;

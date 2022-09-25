@@ -71,13 +71,15 @@ int Scene::loadGeom(string objectid) {
                     tinyobj::ObjReader reader;
                     if (!reader.ParseFromFile(tokens[1])) {
                         if (!reader.Error().empty()) {
-                            cerr << "TinyObjReader: " << reader.Error() << endl;
+                            cerr << "TinyObjReader: ERROR: \n";
+                            cerr << reader.Error() << endl;
                         } else {
                             cerr << "no idea what the hell is happening\n";
                         }
                         return -1;
                     }
                     if (!reader.Warning().empty()) {
+                        cerr << "TinyObjReader: WARNING: \n";
                         cerr << reader.Warning() << endl;
                     }
                     
@@ -122,7 +124,14 @@ int Scene::loadGeom(string objectid) {
                         }
                     }
 
+                    newGeom.meshid = meshes.size();
                     meshes.emplace_back(vert_offset, vertices.size());
+
+                    cout << "Loaded:\n"
+                        << triangles.size() << " triangles\n"
+                        << vertices.size() << " vertices\n"
+                        << normals.size() << " normals\n"
+                        << meshes.size() << " mesh\n";
                 } else {
                     cerr << "unknown object format" << endl;
                     return -1;

@@ -103,8 +103,50 @@ struct PathSegment {
 struct ShadeableIntersection {
     float t;
     glm::vec3 surfaceNormal;
+    glm::vec3 hitPoint;
+    bool rayFromOutside;
     int materialId;
+
+
     __host__ __device__ friend bool operator<(ShadeableIntersection const& a, ShadeableIntersection const& b) {
         return a.materialId < b.materialId;
     }
+};
+
+// Stored in the scene structure
+// automatically generated from objects with emittance > 0 
+// to provide info about what lights are in the scene
+struct Light {
+    color_t color;
+    float intensity;
+    glm::vec3 position;
+};
+
+// Stored in the scene structure
+struct Triangle {
+    glm::ivec3 verts;
+    glm::ivec3 norms;
+    Triangle(int(*arr)[6]) {
+        for (int i = 0; i < 3; ++i) {
+            verts[i] = (*arr)[i];
+        }
+        for (int i = 0; i < 3; ++i) {
+            norms[i] = (*arr)[i + 3];
+        }
+    }
+};
+typedef glm::vec3 Vertex;
+typedef glm::vec3 Normal;
+
+struct Mesh {
+    Mesh(int tri_start, int tri_end) : tri_start(tri_start), tri_end(tri_end) { }
+    int tri_start;
+    int tri_end;
+};
+
+struct MeshInfo {
+    Span<Vertex> vertices;
+    Span<Normal> normals;
+    Span<Triangle> tris;
+    Span<Mesh> meshes;
 };

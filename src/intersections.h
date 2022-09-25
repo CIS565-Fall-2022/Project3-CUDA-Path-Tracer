@@ -6,6 +6,7 @@
 #include "sceneStructs.h"
 #include "utilities.h"
 
+
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
  */
@@ -26,6 +27,17 @@ __host__ __device__ inline unsigned int utilhash(unsigned int a) {
  */
 __host__ __device__ glm::vec3 getPointOnRay(Ray r, float t) {
     return r.origin + (t - .0001f) * glm::normalize(r.direction);
+}
+
+/// <summary>
+/// lerp between 3 vectors based on barycentric coord
+/// </summary>
+/// <param name="bary">barycentric coord</param>
+/// <param name="vecs">3 vectors</param>
+/// <returns>the interpolated vector</returns>
+template<typename T>
+__host__ __device__ glm::vec3 lerpBarycentric(glm::vec3 bary, T(*vecs)[3]) {
+    return (1.0f - bary.x - bary.y) * (*vecs)[0] + bary.x * (*vecs)[1] + bary.y * (*vecs)[2];
 }
 
 /**
@@ -151,11 +163,54 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ float meshIntersectionTest(Geom mesh, Ray r,
+__device__ float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo,
     glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
     
     glm::vec3 ro = multiplyMV(mesh.inverseTransform, glm::vec4(r.origin, 1.0f));
     glm::vec3 rd = glm::normalize(multiplyMV(mesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+    float t_min = FLT_MAX;
+    bool intersect = false;
     
-    return 0;
+    auto const& meshes = meshInfo.meshes;
+    auto const& tris = meshInfo.tris;
+    auto const& verts = meshInfo.vertices;
+
+    for (int i = meshes[mesh.meshid].tri_start; i < meshes[mesh.meshid].tri_end; ++i) {
+        
+        glm::vec3 barycoord;
+        glm::vec3 triangle_verts[3]{
+            verts[tris[i].verts[0]],
+            verts[tris[i].verts[1]],
+            verts[tris[i].verts[2]]
+        };
+        glm::vec3 triangle_norms[3]{
+            verts[tris[i].norms[0]],
+            verts[tris[i].norms[1]],
+            verts[tris[i].norms[2]]
+        };
+        if (glm::intersectRayTriangle(ro, rd, triangle_verts[0], triangle_verts[1], triangle_verts[2], barycoord)) {
+            intersect = true;
+            if (barycoord.z > t_min) {
+                continue;
+            }
+            t_min = barycoord.z;
+            normal = lerpBarycentric(barycoord, &triangle_norms);
+        }
+    }
+
+    if (!intersect) {
+        return -1;
+    }
+
+    // transform to world space and store results
+    Ray local_ray;
+    local_ray.origin = ro;
+    local_ray.direction = rd;
+
+    intersectionPoint = multiplyMV(mesh.transform, glm::vec4(getPointOnRay(local_ray, t_min), 1));
+    normal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(normal, 1)));
+    outside = glm::dot(normal, r.direction) < 0;
+
+    return glm::length(r.origin - intersectionPoint);
 }

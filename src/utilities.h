@@ -97,9 +97,9 @@ template<typename T>
 struct Span {
     int _size;
     T* _arr;
-    Span() : _size(0), _arr(nullptr) { }
-    Span(int size, T* arr) : _size(size), _arr(arr) { }
-    operator T* () const {
+    HOST_DEVICE Span() : _size(0), _arr(nullptr) { }
+    HOST_DEVICE Span(int size, T* arr) : _size(size), _arr(arr) { }
+    HOST_DEVICE operator T* () const {
         return _arr;
     }
     HOST_DEVICE Span<T> subspan(int idx, int sub_sz) const {

@@ -127,12 +127,7 @@ static Span<ShadeableIntersection> dev_intersections;
 // static variables for device memory, any extra info you need, etc
 // ...
 static Span<Light> dev_lights;
-static struct {
-	Span<Vertex> vertices;
-	Span<Normal> normals;
-	Span<Triangle> tris;
-	Span<Mesh> meshes;
-} dev_mesh_info;
+static MeshInfo dev_mesh_info;
 
 static thrust::device_ptr<PathSegment> dev_thrust_paths;
 static thrust::device_ptr<ShadeableIntersection> dev_thrust_inters;
@@ -226,7 +221,8 @@ __global__ void computeIntersections(
 	int depth,
 	Span<PathSegment> paths,
 	Span<Geom> geoms,
-	ShadeableIntersection* intersections)
+	ShadeableIntersection* intersections, 
+	MeshInfo meshInfo)
 {
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
 	if (path_index >= paths.size()) {
@@ -262,7 +258,7 @@ __global__ void computeIntersections(
 		} else if (geom.type == SPHERE) {
 			t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 		} else if (geom.type == MESH) {
-			t = meshIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+			t = meshIntersectionTest(geom, pathSegment.ray, meshInfo, tmp_intersect, tmp_normal, outside);
 		}
 		// add more intersection tests here... triangle? metaball? CSG?
 
@@ -280,9 +276,12 @@ __global__ void computeIntersections(
 		intersections[path_index].t = -1.0f;
 	} else {
 		//The ray hits something
-		intersections[path_index].t = t_min;
-		intersections[path_index].materialId = geoms[hit_geom_index].materialid;
-		intersections[path_index].surfaceNormal = normal;
+		auto& inters = intersections[path_index];
+		inters.t = t_min;
+		inters.materialId = geoms[hit_geom_index].materialid;
+		inters.surfaceNormal = normal;
+		inters.hitPoint = intersect_point;
+		inters.rayFromOutside = outside;
 	}
 }
 
@@ -321,8 +320,8 @@ __global__ void shadeMaterial(
 			path.color *= (materialColor * material.emittance);
 			path.terminate();
 		} else {
-			glm::vec3 hit = intersection.t * path.ray.direction + path.ray.origin;
-			scatterRay(path, hit, glm::normalize(intersection.surfaceNormal), material, lights, rng);
+			// glm::vec3 hit = intersection.t * path.ray.direction + path.ray.origin;
+			scatterRay(path, intersection, material, lights, rng);
 		}
 	} else {
 		path.color = BACKGROUND_COLOR;
@@ -463,13 +462,13 @@ void pathtrace(uchar4 *pbo, int const frame, int const iter) {
 			depth,
 			dev_paths.subspan(0, num_paths),
 			dev_geoms,
-			dev_intersections
+			dev_intersections,
+			dev_mesh_info
 		);
 
 		checkCUDAError("trace one bounce");
 		cudaDeviceSynchronize();
 
-		// TODO:
 		// --- Shading Stage ---
 		// Shade path segments based on intersections and generate new rays by
 		// evaluating the BSDF.
