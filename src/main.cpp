@@ -153,7 +153,7 @@ void runCuda() {
 	}
 
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
-	// No devData is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
+	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
 	if (iteration == 0) {
 		pathTraceFree();

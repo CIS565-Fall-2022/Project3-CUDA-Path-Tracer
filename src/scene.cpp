@@ -139,26 +139,6 @@ Scene::~Scene() {
 }
 
 void Scene::buildDevData() {
-    // Put all texture devData in a big buffer
-    // and setup device texture objects to manage
-    /*std::vector<DevTextureObj> textureObjs;
-
-    size_t textureTotalSize = 0;
-    for (auto tex : textures) {
-        textureTotalSize += tex->byteSize();
-    }
-    cudaMalloc(&devTextureData, textureTotalSize);
-
-    size_t textureOffset = 0;
-    for (auto tex : textures) {
-        cudaMemcpy(devTextureData + textureOffset, tex->data(), tex->byteSize(), cudaMemcpyKind::cudaMemcpyHostToDevice);
-        textureObjs.push_back({ tex, devTextureData + textureOffset });
-        textureOffset += tex->byteSize();
-    }
-    cudaMalloc(&devTextureObjs, textureObjs.size() * sizeof(DevTextureObj));
-    cudaMemcpy(devTextureObjs, textureObjs.data(), textureObjs.size() * sizeof(DevTextureObj),
-        cudaMemcpyKind::cudaMemcpyHostToDevice);*/
-
 #if MESH_DATA_INDEXED
 #else
     for (const auto& inst : modelInstances) {
@@ -171,6 +151,8 @@ void Scene::buildDevData() {
     }
 #endif
     BVHBuilder::build(meshData.vertices, boundingBoxes, BVHNodes);
+
+    devResources.createDevData(*this);
 }
 
 void Scene::clear() {
@@ -339,3 +321,63 @@ void Scene::loadMaterial(const std::string& matId) {
 //    float emittance;
 //    int type;
 //};
+
+void DevResource::createDevData(Scene& scene) {
+    // Put all texture devData in a big buffer
+    // and setup device texture objects to manage
+    std::vector<DevTextureObj> textureObjs;
+
+    size_t textureTotalSize = 0;
+    for (auto tex : scene.textures) {
+        textureTotalSize += tex->byteSize();
+    }
+    cudaMalloc(&devTextureData, textureTotalSize);
+
+    size_t textureOffset = 0;
+    for (auto tex : scene.textures) {
+        cudaMemcpy(devTextureData + textureOffset, tex->data(), tex->byteSize(), cudaMemcpyKind::cudaMemcpyHostToDevice);
+        textureObjs.push_back({ tex, devTextureData + textureOffset });
+        textureOffset += tex->byteSize();
+    }
+    cudaMalloc(&devTextureObjs, textureObjs.size() * sizeof(DevTextureObj));
+    cudaMemcpyHostToDev(devTextureObjs, textureObjs.data(), textureObjs.size() * sizeof(DevTextureObj));
+
+    cudaMalloc(&devMaterials, byteSizeOf(scene.materials));
+    cudaMemcpyHostToDev(devMaterials, scene.materials.data(), byteSizeOf(scene.materialIds));
+
+    cudaMalloc(&devMaterialIds, byteSizeOf(scene.materialIds));
+    cudaMemcpyHostToDev(devMaterialIds, scene.materialIds.data(), byteSizeOf(scene.materialIds));
+
+    cudaMalloc(&devVertices, byteSizeOf(scene.meshData.vertices));
+    cudaMemcpyHostToDev(devVertices, scene.meshData.vertices.data(), byteSizeOf(scene.meshData.vertices));
+
+    cudaMalloc(&devNormals, byteSizeOf(scene.meshData.normals));
+    cudaMemcpyHostToDev(devNormals, scene.meshData.normals.data(), byteSizeOf(scene.meshData.normals));
+
+    cudaMalloc(&devTexcoords, byteSizeOf(scene.meshData.texcoords));
+    cudaMemcpyHostToDev(devTexcoords, scene.meshData.texcoords.data(), byteSizeOf(scene.meshData.texcoords));
+
+    cudaMalloc(&devBoundingBoxes, byteSizeOf(scene.boundingBoxes));
+    cudaMemcpyHostToDev(devBoundingBoxes, scene.boundingBoxes.data(), byteSizeOf(scene.boundingBoxes));
+
+    for (int i = 0; i < 6; i++) {
+        cudaMalloc(&devBVHNodes[i], byteSizeOf(scene.BVHNodes[i]));
+        cudaMemcpyHostToDev(devBVHNodes[i], scene.BVHNodes[i].data(), byteSizeOf(scene.BVHNodes[i]));
+    }
+}
+
+void DevResource::freeDevData() {
+    cudaSafeFree(devTextureData);
+    cudaSafeFree(devTextureObjs);
+    cudaSafeFree(devMaterials);
+    cudaSafeFree(devMaterialIds);
+    
+    cudaSafeFree(devVertices);
+    cudaSafeFree(devNormals);
+    cudaSafeFree(devTexcoords);
+    cudaSafeFree(devBoundingBoxes);
+
+    for (int i = 0; i < 6; i++) {
+        cudaSafeFree(devBVHNodes[i]);
+    }
+}

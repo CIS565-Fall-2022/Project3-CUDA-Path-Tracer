@@ -77,6 +77,7 @@ set(headers
     src/bvh.h
     src/sampler.h
     src/mathUtil.h
+    src/cudaUtil.h
     src/ImGui/imconfig.h
     src/ImGui/imgui.h
     src/ImGui/imconfig.h

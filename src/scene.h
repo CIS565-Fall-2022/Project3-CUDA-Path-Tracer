@@ -8,6 +8,7 @@
 #include "tinyobjloader/tiny_obj_loader.h"
 #include "glm/glm.hpp"
 #include "utilities.h"
+#include "cudaUtil.h"
 #include "sceneStructs.h"
 #include "material.h"
 #include "image.h"
@@ -58,7 +59,12 @@ private:
     static std::map<std::string, Image*> texturePool;
 };
 
+class Scene;
+
 struct DevResource {
+    void createDevData(Scene& scene);
+    void freeDevData();
+
     glm::vec3* devVertices = nullptr;
     glm::vec3* devNormals = nullptr;
     glm::vec2* devTexcoords = nullptr;
@@ -74,6 +80,8 @@ struct DevResource {
 
 class Scene {
 public:
+    friend struct DevResource;
+
     Scene(const std::string& filename);
     ~Scene();
 

@@ -12,6 +12,7 @@ int BVHBuilder::build(
     std::vector<AABB>& boundingBoxes,
     std::vector<std::vector<MTBVHNode>>& BVHNodes
 ) {
+    std::cout << "[BVH building...]" << std::endl;
     int numPrims = vertices.size() / 3;
     int BVHSize = numPrims * 2 - 1;
 
@@ -30,9 +31,11 @@ int BVHBuilder::build(
     int stackTop = 0;
     stack[stackTop++] = { 0, 0, numPrims - 1 };
 
-    const int NumBuckets = 32;
+    const int NumBuckets = 16;
     // Using non-recursive approach to build BVH data directly flattened
+    int depth = 0;
     while (stackTop) {
+        depth = std::max(depth, stackTop);
         stackTop--;
         int offset = stack[stackTop].offset;
         int start = stack[stackTop].start;
@@ -50,7 +53,7 @@ int BVHBuilder::build(
         }
         boundingBoxes[offset] = nodeBound;
 
-        std::cout << nodeBound.toString() << " " << offset << " " << start << " " << end << "\n";
+        //std::cout << std::setw(10) << offset << " " << start << " " << end << " " << nodeBound.toString() << "\n";
 
         if (isLeaf) {
             continue;
@@ -121,7 +124,7 @@ int BVHBuilder::build(
         stack[stackTop++] = { offset + 1 + lSize, divPrim + 1, end };
         stack[stackTop++] = { offset + 1, start, divPrim };
     }
-
+    std::cout << "\t[Size = " << BVHSize << ", depth = " << depth << "]" << std::endl;
     buildMTBVH(boundingBoxes, nodeInfo, BVHSize, BVHNodes);
     return BVHSize;
 }
@@ -137,6 +140,17 @@ void BVHBuilder::buildMTBVH(
         node.resize(BVHSize);
     }
     std::vector<int> stack(BVHSize);
+
+    /*
+    for (auto& info : nodeInfo) {
+        std::cout << (info.isLeaf ? info.primIdOrSize : 0) << " ";
+    }
+    std::cout << "\n";
+    for (auto& info : nodeInfo) {
+        std::cout << (info.isLeaf ? 0 : info.primIdOrSize) << " ";
+    }
+    std::cout << "\n\n";
+    */
 
     for (int i = 0; i < 6; i++) {
         auto& nodes = BVHNodes[i];
@@ -176,4 +190,17 @@ void BVHBuilder::buildMTBVH(
             stack[stackTop++] = left;
         }
     }
+
+    /*
+    for (const auto& nodes : BVHNodes) {
+        for (const auto& node : nodes) {
+            std::cout << node.primitiveId << " ";
+        }
+        std::cout << "\n";
+        for (const auto& node : nodes) {
+            std::cout << node.nextNodeIfMiss << " ";
+        }
+        std::cout << "\n\n";
+    }
+    */
 }

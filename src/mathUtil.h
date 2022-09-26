@@ -100,11 +100,6 @@ namespace Math {
         return pdf * absDot(ny, glm::normalize(yToRef)) / glm::dot(yToRef, yToRef);
     }
 
-    template<typename T>
-    size_t byteSizeOfVector(const std::vector<T>& v) {
-        return v.size() * sizeof(T);
-    }
-
     /**
     * Handy-dandy hash function that provides seeds for random number generation.
     */
