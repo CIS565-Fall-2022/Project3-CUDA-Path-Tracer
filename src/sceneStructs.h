@@ -89,6 +89,6 @@ struct rayTerminated
     __host__ __device__
         bool operator()(const PathSegment& pathSegment)
     {
-        return pathSegment.remainingBounces == 0;
+        return pathSegment.remainingBounces;
     }
 };
