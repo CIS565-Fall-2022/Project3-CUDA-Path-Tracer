@@ -58,7 +58,7 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  *   being taken.
  *   - This way is inefficient, but serves as a good starting point - it
  *     converges slowly, especially for pure-diffuse or pure-specular.
- * - Pick the split based on the intensity of each material color, and divide
+ * - Pick the split based on the intensity of each material color that you hit, and divide
  *   branch result by that branch's probability (whatever probability you use).
  *
  * This method applies its changes to the Ray parameter `ray` in place.
@@ -77,18 +77,70 @@ void scatterRay(
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
 
-    glm::vec3 newDirection = calculateRandomDirectionInHemisphere(normal, rng);
-    Ray newRay = {
-        intersect,
-        newDirection
-    };
+    // perfectly diffuse
+    if (m.hasReflective == 0 && m.hasRefractive == 0) {
+        glm::vec3 newDirection = calculateRandomDirectionInHemisphere(normal, rng);
+        Ray newRay = {
+            intersect,
+            newDirection
+        };
 
-    PathSegment newPath = {
-        newRay,
-        m.color * pathSegment.color,
-        pathSegment.pixelIndex,
-        pathSegment.remainingBounces
-    };
+        PathSegment newPath = {
+            newRay,
+            m.color * pathSegment.color,
+            pathSegment.pixelIndex,
+            pathSegment.remainingBounces
+        };
 
-    pathSegment = newPath;
+        pathSegment = newPath;
+    }
+    else {
+        // treat the rest as perfectly specular.
+        // assuming there's only one light
+
+        // based on float value of reflective and refractive
+        // with float percent likelihood the ray goes reflective vs. refractive
+
+        thrust::uniform_real_distribution<float> u01(0, 1);
+
+        float randGen = u01(rng);
+
+        if (randGen <= m.hasReflective) {
+            // take a reflective ray
+            glm::vec3 newDirection = glm::reflect(pathSegment.ray.direction, normal);
+            Ray newRay = {
+                intersect,
+                newDirection
+            };
+
+            PathSegment newPath = {
+                newRay,
+                m.specular.color * pathSegment.color * m.hasReflective,
+                pathSegment.pixelIndex,
+                pathSegment.remainingBounces
+            };
+
+            pathSegment = newPath;
+        }
+        else {
+            // take a refractive ray
+            float airIOR = 1.0003f;
+            float ratioRefraction = airIOR / m.indexOfRefraction;
+            glm::vec3 newDirection = glm::refract(pathSegment.ray.direction, normal, ratioRefraction);
+
+            Ray newRay = {
+                intersect,
+                newDirection
+            };
+
+            PathSegment newPath = {
+                newRay,
+                m.specular.color * pathSegment.color * m.hasRefractive,
+                pathSegment.pixelIndex,
+                pathSegment.remainingBounces
+            };
+
+            pathSegment = newPath;
+        }
+    }
 }

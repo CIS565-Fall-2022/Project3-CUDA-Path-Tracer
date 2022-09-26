@@ -319,6 +319,7 @@ struct invalid_intersection
 struct path_cmp {
 	__host__ __device__
 		bool operator()(ShadeableIntersection& inter1, ShadeableIntersection& inter2) {
+		// todo fix this not correct
 		return inter1.materialId < inter2.materialId;
 	}
 };
@@ -466,10 +467,9 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		//// compute bsdf for shading and generating new intersections
 		//// remove any intersections that don't hit anything.
 
-		// 1. sort pathSegments by intersection materialId
-		// std::cout << "numPaths: " << num_paths << std::endl;
-
+		// 1. sort pathSegments by material type
 		// thrust::sort_by_key(dev_intersections, dev_intersections + currNumPaths, dev_paths, path_cmp());
+		
 		// 2. shade the ray and spawn new path segments using BSDF
 		// this function generates a new ray to replace the old one using BSDF
 		kernComputeShade << <numblocksPathSegmentTracing, blockSize1d >> > (
@@ -479,18 +479,20 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_paths,
 			dev_materials
 			);
+
 		cudaDeviceSynchronize();
+
 		// 4. remove_if sorts all contents such that useless paths are all at the end.
 		// if the remainingBounces = 0 (any material that doesn't hit anything or number of depth is at its limit)
-		// thrust::device_ptr<PathSegment> lastValPath = thrust::remove_if(dev_thrust_paths, dev_thrust_paths + num_paths, invalid_intersection());
-		// dev_path_end = thrust::remove_if(thrust::device, dev_paths, dev_paths + num_paths, invalid_intersection());
 		dev_path_end = thrust::stable_partition(thrust::device, dev_paths, dev_paths + currNumPaths, invalid_intersection());
 		
 		// nothing shows up if i set it out side of the if/else statement.
 		currNumPaths = dev_path_end - dev_paths;
+
 		// don't need to remove intersections because new intersections will be computed based on sorted dev_paths
 		// thrust uses exclusive start and end pointers, so if end pointer is the same as start pointer, we have no rays left.
-		if (currNumPaths < 1) {
+		if (currNumPaths < 1) 
+		{
 			iterationComplete = true;
 		}
 
@@ -498,9 +500,6 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		{
 			guiData->TracedDepth = depth;
 		}
-		// std::cout << "num_paths " << currNumPaths << std::endl;
-
-
 	}
 
 
