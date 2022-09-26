@@ -8,17 +8,14 @@
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 
-enum MaterialType {
-    LAMBERT,
-    METAL,
-    DIELECTIC,
-};
-
 enum GeomType {
     SPHERE,
     CUBE,
     MESH
 };
+
+typedef glm::vec3 color_t;
+
 
 struct Ray {
     glm::vec3 origin;
@@ -37,17 +34,53 @@ struct Geom {
     glm::mat4 invTranspose;
 };
 
-typedef glm::vec3 color_t;
+struct Texture {
+    int w, h;
+    color_t* data;
+};
+
 struct Material {
-    color_t color;
+    color_t diffuse;
     struct {
         float exponent;
         color_t color;
     } specular;
     float hasReflective;
     float hasRefractive;
-    float indexOfRefraction;
+    float ior;
     float emittance;
+
+    // below fields are used by PBRT
+    enum Type {
+        DIFFUSE,
+        GLOSSY,
+        REFL,
+        TRANSPARENT,
+        REFR,
+        SUBSURFACE,
+        INVALID
+    };
+    
+
+    struct {
+        int tex_idx;
+    } textures;      // optional: invalid = -1
+
+    Type type;       // optional: default = DIFFUSE
+    float roughness; // optional: default = 1
+    static Type str_to_mat_type(std::string str) {
+#define CHK(x) if(str == #x) return x
+        CHK(DIFFUSE);
+        CHK(GLOSSY);
+        CHK(REFL);
+        CHK(TRANSPARENT);
+        CHK(REFR);
+        CHK(SUBSURFACE);
+
+        assert(!"invalid material");
+        return INVALID;
+#undef CHK
+    }
 };
 
 struct Camera {
@@ -80,6 +113,7 @@ struct PathSegment {
 
     Ray ray;
     color_t color;
+    
     int pixelIndex;
     int remainingBounces;
 
@@ -104,9 +138,10 @@ struct ShadeableIntersection {
     float t;
     glm::vec3 surfaceNormal;
     glm::vec3 hitPoint;
-    bool rayFromOutside;
     int materialId;
 
+    // only used by mesh
+    glm::vec2 uv;
 
     __host__ __device__ friend bool operator<(ShadeableIntersection const& a, ShadeableIntersection const& b) {
         return a.materialId < b.materialId;
@@ -126,17 +161,25 @@ struct Light {
 struct Triangle {
     glm::ivec3 verts;
     glm::ivec3 norms;
-    Triangle(int(*arr)[6]) {
+    glm::ivec3 uvs;
+    int mat_id;
+
+    Triangle(int(*arr)[10]) {
         for (int i = 0; i < 3; ++i) {
             verts[i] = (*arr)[i];
         }
         for (int i = 0; i < 3; ++i) {
             norms[i] = (*arr)[i + 3];
         }
+        for (int i = 0; i < 3; ++i) {
+            uvs[i] = (*arr)[i + 6];
+        }
+        mat_id = (*arr)[9];
     }
 };
 typedef glm::vec3 Vertex;
 typedef glm::vec3 Normal;
+typedef glm::vec2 TexCoord;
 
 struct Mesh {
     Mesh(int tri_start, int tri_end) : tri_start(tri_start), tri_end(tri_end) { }
@@ -144,9 +187,15 @@ struct Mesh {
     int tri_end;
 };
 
+
+/// <summary>
+/// this is basically GPU counterpart of the mesh vectors
+/// </summary>
 struct MeshInfo {
     Span<Vertex> vertices;
     Span<Normal> normals;
+    Span<TexCoord> uvs;
+    Span<Texture> texs;
     Span<Triangle> tris;
     Span<Mesh> meshes;
 };

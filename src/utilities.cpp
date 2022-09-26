@@ -110,3 +110,12 @@ std::istream& utilityCore::safeGetline(std::istream& is, std::string& t) {
         }
     }
 }
+
+
+std::istream& utilityCore::peekline(std::istream& is, std::string& t) {
+    t.clear();
+    int pos = is.tellg();
+    safeGetline(is, t);
+    is.seekg(pos, std::ios_base::beg);
+    return is;
+}

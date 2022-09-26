@@ -36,7 +36,7 @@ __host__ __device__ glm::vec3 getPointOnRay(Ray r, float t) {
 /// <param name="vecs">3 vectors</param>
 /// <returns>the interpolated vector</returns>
 template<typename T>
-__host__ __device__ glm::vec3 lerpBarycentric(glm::vec3 bary, T(*vecs)[3]) {
+__host__ __device__ T lerpBarycentric(glm::vec3 bary, T(*vecs)[3]) {
     return (1.0f - bary.x - bary.y) * (*vecs)[0] + bary.x * (*vecs)[1] + bary.y * (*vecs)[2];
 }
 
@@ -57,8 +57,7 @@ __host__ __device__ glm::vec3 multiplyMV(glm::mat4 m, glm::vec4 v) {
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ float boxIntersectionTest(Geom box, Ray r,
-        glm::vec3 &intersectionPoint, glm::vec3 &normal, bool &outside) {
+__host__ __device__ float boxIntersectionTest(Geom box, Ray r, ShadeableIntersection& inters) {
     Ray q;
     q.origin    =                multiplyMV(box.inverseTransform, glm::vec4(r.origin   , 1.0f));
     q.direction = glm::normalize(multiplyMV(box.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -88,15 +87,17 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
     }
 
     if (tmax >= tmin && tmax > 0) {
-        outside = true;
-        if (tmin <= 0) {
-            tmin = tmax;
-            tmin_n = tmax_n;
-            outside = false;
-        }
-        intersectionPoint = multiplyMV(box.transform, glm::vec4(getPointOnRay(q, tmin), 1.0f));
-        normal = glm::normalize(multiplyMV(box.invTranspose, glm::vec4(tmin_n, 0.0f)));
-        return glm::length(r.origin - intersectionPoint);
+        //outside = true;
+        //if (tmin <= 0) {
+        //    tmin = tmax;
+        //    tmin_n = tmax_n;
+        //    outside = false;
+        //}
+        inters.hitPoint = multiplyMV(box.transform, glm::vec4(getPointOnRay(q, tmin), 1.0f));
+        inters.surfaceNormal = glm::normalize(multiplyMV(box.invTranspose, glm::vec4(tmin_n, 0.0f)));
+        inters.materialId = box.materialid;
+
+        return glm::length(r.origin - inters.hitPoint);
     }
     return -1;
 }
@@ -111,48 +112,26 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
-        glm::vec3 &intersectionPoint, glm::vec3 &normal, bool &outside) {
+__host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r, ShadeableIntersection& inters) {
     float radius = .5;
 
     glm::vec3 ro = multiplyMV(sphere.inverseTransform, glm::vec4(r.origin, 1.0f));
     glm::vec3 rd = glm::normalize(multiplyMV(sphere.inverseTransform, glm::vec4(r.direction, 0.0f)));
-
     Ray rt;
     rt.origin = ro;
     rt.direction = rd;
 
-    float vDotDirection = glm::dot(rt.origin, rt.direction);
-    float radicand = vDotDirection * vDotDirection - (glm::dot(rt.origin, rt.origin) - powf(radius, 2));
-    if (radicand < 0) {
+    float t;
+    if (!glm::intersectRaySphere(ro, rd, glm::vec3(0), radius * radius, t)) {
         return -1;
-    }
-
-    float squareRoot = sqrt(radicand);
-    float firstTerm = -vDotDirection;
-    float t1 = firstTerm + squareRoot;
-    float t2 = firstTerm - squareRoot;
-
-    float t = 0;
-    if (t1 < 0 && t2 < 0) {
-        return -1;
-    } else if (t1 > 0 && t2 > 0) {
-        t = min(t1, t2);
-        outside = true;
-    } else {
-        t = max(t1, t2);
-        outside = false;
     }
 
     glm::vec3 objspaceIntersection = getPointOnRay(rt, t);
+    inters.hitPoint = multiplyMV(sphere.transform, glm::vec4(objspaceIntersection, 1.f));
+    inters.surfaceNormal = glm::normalize(multiplyMV(sphere.invTranspose, glm::vec4(objspaceIntersection, 0.f)));
+    inters.materialId = sphere.materialid;
 
-    intersectionPoint = multiplyMV(sphere.transform, glm::vec4(objspaceIntersection, 1.f));
-    normal = glm::normalize(multiplyMV(sphere.invTranspose, glm::vec4(objspaceIntersection, 0.f)));
-    if (!outside) {
-        normal = -normal;
-    }
-
-    return glm::length(r.origin - intersectionPoint);
+    return glm::length(r.origin - inters.hitPoint);
 }
 
 /**
@@ -163,8 +142,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__device__ float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo,
-    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+__device__ float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo, ShadeableIntersection& inters) {
     
     glm::vec3 ro = multiplyMV(mesh.inverseTransform, glm::vec4(r.origin, 1.0f));
     glm::vec3 rd = glm::normalize(multiplyMV(mesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -175,6 +153,12 @@ __device__ float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo,
     auto const& meshes = meshInfo.meshes;
     auto const& tris = meshInfo.tris;
     auto const& verts = meshInfo.vertices;
+    auto const& norms = meshInfo.normals;
+    auto const& uvs = meshInfo.uvs;
+
+    glm::vec3 normal;
+    glm::vec2 uv;
+    int mat_id = -1;
 
     for (int i = meshes[mesh.meshid].tri_start; i < meshes[mesh.meshid].tri_end; ++i) {
         
@@ -185,17 +169,25 @@ __device__ float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo,
             verts[tris[i].verts[2]]
         };
         glm::vec3 triangle_norms[3]{
-            verts[tris[i].norms[0]],
-            verts[tris[i].norms[1]],
-            verts[tris[i].norms[2]]
+            norms[tris[i].norms[0]],
+            norms[tris[i].norms[1]],
+            norms[tris[i].norms[2]]
+        };
+        glm::vec2 triangle_uvs[3]{
+            uvs[tris[i].uvs[0]],
+            uvs[tris[i].uvs[1]],
+            uvs[tris[i].uvs[2]]
         };
         if (glm::intersectRayTriangle(ro, rd, triangle_verts[0], triangle_verts[1], triangle_verts[2], barycoord)) {
             intersect = true;
             if (barycoord.z > t_min) {
                 continue;
             }
+            
             t_min = barycoord.z;
             normal = lerpBarycentric(barycoord, &triangle_norms);
+            uv = lerpBarycentric(barycoord, &triangle_uvs);
+            mat_id = tris[i].mat_id;
         }
     }
 
@@ -208,9 +200,10 @@ __device__ float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo,
     local_ray.origin = ro;
     local_ray.direction = rd;
 
-    intersectionPoint = multiplyMV(mesh.transform, glm::vec4(getPointOnRay(local_ray, t_min), 1));
-    normal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(normal, 1)));
-    outside = glm::dot(normal, r.direction) < 0;
+    inters.hitPoint = multiplyMV(mesh.transform, glm::vec4(getPointOnRay(local_ray, t_min), 1));
+    inters.surfaceNormal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(normal, 0)));
+    inters.uv = uv;
+    inters.materialId = mat_id;
 
-    return glm::length(r.origin - intersectionPoint);
+    return glm::length(r.origin - inters.hitPoint);
 }

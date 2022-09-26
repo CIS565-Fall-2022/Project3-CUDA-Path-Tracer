@@ -19,10 +19,7 @@ Scene::Scene(string filename) {
         utilityCore::safeGetline(fp_in, line);
         if (!line.empty()) {
             vector<string> tokens = utilityCore::tokenizeString(line);
-            if (strcmp(tokens[0].c_str(), "MATERIAL") == 0) {
-                loadMaterial(tokens[1]);
-                cout << " " << endl;
-            } else if (strcmp(tokens[0].c_str(), "OBJECT") == 0) {
+            if (strcmp(tokens[0].c_str(), "OBJECT") == 0) {
                 loadGeom();
                 cout << " " << endl;
             } else if (strcmp(tokens[0].c_str(), "CAMERA") == 0) {
@@ -63,9 +60,20 @@ int Scene::loadGeom() {
             }
             if (tokens[0] == "obj") {
                 cout << "Loading obj mesh " << tokens[1] << endl;
+                size_t pos = tokens[1].find_last_of('/');
+                if (pos == string::npos) {
+                    cerr << "ERROR: invalid obj file path: " << tokens[1] << endl;
+                    return -1;
+                }
+                
+                // default material folder to the folder where the mesh is in
+                tinyobj::ObjReaderConfig config;
+                config.mtl_search_path = tokens[1].substr(0, pos);
+                cout << "set material lookup path to: " << config.mtl_search_path << endl;
+                
 
                 tinyobj::ObjReader reader;
-                if (!reader.ParseFromFile(tokens[1])) {
+                if (!reader.ParseFromFile(tokens[1], config)) {
                     if (!reader.Error().empty()) {
                         cerr << "TinyObjReader: ERROR: \n";
                         cerr << reader.Error() << endl;
@@ -79,11 +87,19 @@ int Scene::loadGeom() {
                     cerr << reader.Warning() << endl;
                 }
 
-
                 size_t vert_offset = vertices.size();
                 size_t norm_offset = normals.size();
+                size_t uv_offset = uvs.size();
+                size_t mat_offset = materials.size();
 
                 auto const& attrib = reader.GetAttrib();
+                auto const& mats = reader.GetMaterials();
+                
+                // fill textures
+                for (auto const& mat : mats) {
+                    
+                }
+
                 // fill vertices
                 for (size_t i = 2; i < attrib.vertices.size(); i += 3) {
                     vertices.emplace_back(
@@ -100,20 +116,34 @@ int Scene::loadGeom() {
                         attrib.normals[i]
                     );
                 }
-
+                // fill uvs
+                for (size_t i = 1; i < attrib.texcoords.size(); i += 2) {
+                    uvs.emplace_back(
+                        attrib.texcoords[i - 1],
+                        attrib.texcoords[i]
+                    );
+                }
+                
                 int triangles_start = triangles.size();
-
                 for (auto const& s : reader.GetShapes()) {
                     auto const& indices = s.mesh.indices;
                     for (size_t i = 0; i < s.mesh.material_ids.size(); ++i) {
-                        int vals[6]{
+                        int vals[]{
                             indices[3 * i + 0].vertex_index + vert_offset,
                             indices[3 * i + 1].vertex_index + vert_offset,
                             indices[3 * i + 2].vertex_index + vert_offset,
+
                             indices[3 * i + 0].normal_index + norm_offset,
                             indices[3 * i + 1].normal_index + norm_offset,
                             indices[3 * i + 2].normal_index + norm_offset,
+
+                            indices[3 * i + 0].texcoord_index + uv_offset,
+                            indices[3 * i + 1].texcoord_index + uv_offset,
+                            indices[3 * i + 2].texcoord_index + uv_offset,
+
+                            s.mesh.material_ids[i] + mat_offset
                         };
+
                         triangles.emplace_back(&vals);
                     }
                 }
@@ -125,7 +155,8 @@ int Scene::loadGeom() {
                     << triangles.size() << " triangles\n"
                     << vertices.size() << " vertices\n"
                     << normals.size() << " normals\n"
-                    << meshes.size() << " mesh\n";
+                    << uvs.size() << " uvs\n"
+                    << meshes.size() << " meshes\n";
             } else {
                 cerr << "unknown object format" << endl;
                 return -1;
@@ -137,8 +168,17 @@ int Scene::loadGeom() {
     utilityCore::safeGetline(fp_in, line);
     if (!line.empty() && fp_in.good()) {
         vector<string> tokens = utilityCore::tokenizeString(line);
-        newGeom.materialid = atoi(tokens[1].c_str());
-        cout << "Connecting Geom " << objectid << " to Material " << newGeom.materialid << "..." << endl;
+        if (tokens[0] == "material") {
+            int mat_id = loadMaterial(tokens[1]);
+            if (mat_id < 0) {
+                return 1;
+            }
+            newGeom.materialid = mat_id;
+            cout << "Connecting Geom " << objectid << " to Material " << tokens[1] << "..." << endl;
+        } else {
+            cerr << "unknown field: " << tokens[0] << endl;
+            return -1;
+        }
     }
 
     //load transformations
@@ -167,7 +207,7 @@ int Scene::loadGeom() {
     Material const& mat = materials[newGeom.materialid];
     if (mat.emittance > 0) {
         Light light;
-        light.color = mat.color;
+        light.color = mat.diffuse;
         light.intensity = mat.emittance / MAX_EMITTANCE;
         light.position = newGeom.translation;
         lights.emplace_back(light);
@@ -237,40 +277,58 @@ int Scene::loadCamera() {
     return 1;
 }
 
-int Scene::loadMaterial(string materialid) {
-    int id = atoi(materialid.c_str());
-    if (id != materials.size()) {
-        cout << "ERROR: MATERIAL ID does not match expected number of materials" << endl;
-        return -1;
-    } else {
-        cout << "Loading Material " << id << "..." << endl;
-        Material newMaterial;
 
-        //load static properties
-        for (int i = 0; i < 7; i++) {
-            string line;
-            utilityCore::safeGetline(fp_in, line);
-            vector<string> tokens = utilityCore::tokenizeString(line);
-            if (strcmp(tokens[0].c_str(), "RGB") == 0) {
-                glm::vec3 color( atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()) );
-                newMaterial.color = color;
-            } else if (strcmp(tokens[0].c_str(), "SPECEX") == 0) {
-                newMaterial.specular.exponent = atof(tokens[1].c_str());
-            } else if (strcmp(tokens[0].c_str(), "SPECRGB") == 0) {
-                glm::vec3 specColor(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-                newMaterial.specular.color = specColor;
-            } else if (strcmp(tokens[0].c_str(), "REFL") == 0) {
-                newMaterial.hasReflective = atof(tokens[1].c_str());
-            } else if (strcmp(tokens[0].c_str(), "REFR") == 0) {
-                newMaterial.hasRefractive = atof(tokens[1].c_str());
-            } else if (strcmp(tokens[0].c_str(), "REFRIOR") == 0) {
-                newMaterial.indexOfRefraction = atof(tokens[1].c_str());
-            } else if (strcmp(tokens[0].c_str(), "EMITTANCE") == 0) {
-                newMaterial.emittance = atof(tokens[1].c_str());
-            }
+static Material initMaterial(tinyobj::material_t const& tinyobj_mat) {
+    Material mat;
+    mat.diffuse = color_t(tinyobj_mat.diffuse[0], tinyobj_mat.diffuse[1], tinyobj_mat.diffuse[2]);
+    mat.emittance = tinyobj_mat.emission[0];
+    mat.ior = tinyobj_mat.ior;
+    mat.hasReflective = tinyobj_mat.metallic;
+    mat.hasRefractive = 1 - tinyobj_mat.dissolve;
+    mat.roughness = tinyobj_mat.roughness;
+    mat.specular.color = color_t(tinyobj_mat.specular[0], tinyobj_mat.specular[1], tinyobj_mat.specular[2]);
+    mat.specular.exponent = tinyobj_mat.shininess;
+
+    mat.textures.tex_idx = tinyobj_mat.diffuse_texname;
+
+    return mat;
+}
+
+// standardize material using mtl format
+// returns the material id on success or -1 on error
+// NOTE: only loads 1 material per mtl file, the rest will be discarded
+int Scene::loadMaterial(string mtl_file) {
+    // maps mtl file to material index
+    static unordered_map<string, int> s_loaded;
+    
+    if (s_loaded.count(mtl_file)) {
+        return s_loaded[mtl_file];
+    } else {
+        ifstream fin(mtl_file);
+        if (!fin) {
+            cerr << "cannot find mtl file: " << mtl_file << endl;
+            return -1;
         }
 
-        materials.push_back(newMaterial);
-        return 1;
+        map<string, int> mat_mp;
+        vector<tinyobj::material_t> mats;
+        string warn, err;
+
+        tinyobj::LoadMtl(&mat_mp, &mats, &fin, &warn, &err);
+        if (!err.empty()) {
+            cerr << "Tiny obj loader: ERROR:\n" << err << endl;
+            return -1;
+        }
+        if (!warn.empty()) {
+            cerr << "Tiny obj loader: WARNING:\n" << err << endl;
+        }
+
+        if (mat_mp.size() > 1) {
+            cerr << "WARNING: " << mat_mp.size()-1 << "materials discarded in " << mtl_file << endl;
+        }
+
+        materials.emplace_back(initMaterial(mats[0]));
+        s_loaded[mtl_file] = materials.size() - 1;
+        return materials.size() - 1;
     }
 }

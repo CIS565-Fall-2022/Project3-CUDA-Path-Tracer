@@ -153,6 +153,7 @@ void pathtraceInit(Scene* scene) {
 
 	dev_mesh_info.vertices = make_span(scene->vertices);
 	dev_mesh_info.normals = make_span(scene->normals);
+	dev_mesh_info.uvs = make_span(scene->uvs);
 	dev_mesh_info.tris = make_span(scene->triangles);
 	dev_mesh_info.meshes = make_span(scene->meshes);
 	
@@ -170,6 +171,7 @@ void pathtraceFree() {
 	FREE(dev_lights);
 	FREE(dev_mesh_info.vertices);
 	FREE(dev_mesh_info.normals);
+	FREE(dev_mesh_info.uvs);
 	FREE(dev_mesh_info.tris);
 	FREE(dev_mesh_info.meshes);
     checkCUDAError("pathtraceFree");
@@ -240,24 +242,24 @@ __global__ void computeIntersections(
 	float t;
 	glm::vec3 intersect_point;
 	glm::vec3 normal;
+	glm::vec2 uv;
+	int mat_id;
+
 	float t_min = FLT_MAX;
 	int hit_geom_index = -1;
-	bool outside = true;
-
-	glm::vec3 tmp_intersect;
-	glm::vec3 tmp_normal;
 
 	// naive parse through global geoms
+	auto& inters = intersections[path_index];
 
 	for (int i = 0; i < geoms.size(); i++) {
 		Geom& geom = geoms[i];
 
 		if (geom.type == CUBE) {
-			t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+			t = boxIntersectionTest(geom, pathSegment.ray, inters);
 		} else if (geom.type == SPHERE) {
-			t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+			t = sphereIntersectionTest(geom, pathSegment.ray, inters);
 		} else if (geom.type == MESH) {
-			t = meshIntersectionTest(geom, pathSegment.ray, meshInfo, tmp_intersect, tmp_normal, outside);
+			t = meshIntersectionTest(geom, pathSegment.ray, meshInfo, inters);
 		}
 		// add more intersection tests here... triangle? metaball? CSG?
 
@@ -266,8 +268,10 @@ __global__ void computeIntersections(
 		if (t > 0.0f && t_min > t) {
 			t_min = t;
 			hit_geom_index = i;
-			intersect_point = tmp_intersect;
-			normal = tmp_normal;
+			intersect_point = inters.hitPoint;
+			normal = inters.surfaceNormal;
+			mat_id = inters.materialId;
+			uv = inters.uv;
 		}
 	}
 
@@ -275,12 +279,11 @@ __global__ void computeIntersections(
 		intersections[path_index].t = -1.0f;
 	} else {
 		//The ray hits something
-		auto& inters = intersections[path_index];
 		inters.t = t_min;
-		inters.materialId = geoms[hit_geom_index].materialid;
-		inters.surfaceNormal = normal;
 		inters.hitPoint = intersect_point;
-		inters.rayFromOutside = outside;
+		inters.surfaceNormal = normal;
+		inters.materialId = mat_id;
+		inters.uv = uv;
 	}
 }
 
@@ -312,7 +315,7 @@ __global__ void shadeMaterial(
 		thrust::uniform_real_distribution<float> u01(0, 1);
 
 		Material material = materials[intersection.materialId];
-		glm::vec3 materialColor = material.color;
+		glm::vec3 materialColor = material.diffuse;
 
 		// If the material indicates that the object was a light, "light" the ray
 		if (material.emittance > 0.0f) {
@@ -360,7 +363,7 @@ __global__ void shadeFakeMaterial(
 			thrust::uniform_real_distribution<float> u01(0, 1);
 
 			Material material = materials[intersection.materialId];
-			glm::vec3 materialColor = material.color;
+			glm::vec3 materialColor = material.diffuse;
 
 			// If the material indicates that the object was a light, "light" the ray
 			if (material.emittance > 0.0f) {
