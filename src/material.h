@@ -99,8 +99,6 @@ __device__ static float dielectricPdf(glm::vec3 n, glm::vec3 wo, glm::vec3 wi, c
 __device__ static void dielectricSample(glm::vec3 n, glm::vec3 wo, const Material& m, glm::vec3 r, BSDFSample& sample) {
     float ior = m.ior;
     float pdfRefl = fresnel(glm::dot(n, wo), ior);
-    float pdfTran = 1.f - pdfRefl;
-    pdfRefl = 1.f;
 
     sample.bsdf = m.baseColor;
 

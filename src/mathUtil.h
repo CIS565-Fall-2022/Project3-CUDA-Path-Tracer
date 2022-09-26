@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include <cuda_runtime.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -97,6 +98,11 @@ namespace Math {
     __device__ inline float areaPdfToSolidAngle(float pdf, glm::vec3 ref, glm::vec3 y, glm::vec3 ny) {
         glm::vec3 yToRef = ref - y;
         return pdf * absDot(ny, glm::normalize(yToRef)) / glm::dot(yToRef, yToRef);
+    }
+
+    template<typename T>
+    size_t byteSizeOfVector(const std::vector<T>& v) {
+        return v.size() * sizeof(T);
     }
 
     /**

@@ -1,6 +1,7 @@
-#include <iostream>
 #include "scene.h"
+#include <iostream>
 #include <cstring>
+#include <stack>
 #include <map>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
@@ -12,15 +13,15 @@ std::map<std::string, int> MaterialTypeTokenMap = {
     { "Light", Material::Type::Light }
 };
 
-std::map<std::string, Model*> Resource::modelPool;
+std::map<std::string, MeshData*> Resource::meshDataPool;
 std::map<std::string, Image*> Resource::texturePool;
 
-Model* Resource::loadModel(const std::string& filename) {
-    auto find = modelPool.find(filename);
-    if (find != modelPool.end()) {
+MeshData* Resource::loadOBJMesh(const std::string& filename) {
+    auto find = meshDataPool.find(filename);
+    if (find != meshDataPool.end()) {
         return find->second;
     }
-    auto model = new Model;
+    auto model = new MeshData;
 
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -33,7 +34,7 @@ Model* Resource::loadModel(const std::string& filename) {
     }
     bool hasTexcoord = !attrib.texcoords.empty();
 
-#if INDEXED_MESH_DATA
+#if MESH_DATA_INDEXED
     model->vertices.resize(attrib.vertices.size() / 3);
     model->normals.resize(attrib.normals.size() / 3);
     memcpy(model->vertices.data(), attrib.vertices.data(), attrib.vertices.size() * sizeof(float));
@@ -65,8 +66,21 @@ Model* Resource::loadModel(const std::string& filename) {
         }
     }
 #endif
-    modelPool[filename] = model;
+    meshDataPool[filename] = model;
     return model;
+}
+
+MeshData* Resource::loadGLTFMesh(const std::string& filename) {
+    return nullptr;
+}
+
+MeshData* Resource::loadModelMeshData(const std::string& filename) {
+    if (filename.find(".obj") != filename.npos) {
+        return loadOBJMesh(filename);
+    }
+    else {
+        return loadGLTFMesh(filename);
+    }
 }
 
 Image* Resource::loadTexture(const std::string& filename) {
@@ -80,10 +94,10 @@ Image* Resource::loadTexture(const std::string& filename) {
 }
 
 void Resource::clear() {
-    for (auto i : modelPool) {
+    for (auto i : meshDataPool) {
         delete i.second;
     }
-    modelPool.clear();
+    meshDataPool.clear();
 
     for (auto i : texturePool) {
         delete i.second;
@@ -117,9 +131,49 @@ Scene::Scene(const std::string& filename) {
             }
         }
     }
+
+    buildDevData();
 }
 
 Scene::~Scene() {
+}
+
+void Scene::buildDevData() {
+    // Put all texture devData in a big buffer
+    // and setup device texture objects to manage
+    /*std::vector<DevTextureObj> textureObjs;
+
+    size_t textureTotalSize = 0;
+    for (auto tex : textures) {
+        textureTotalSize += tex->byteSize();
+    }
+    cudaMalloc(&devTextureData, textureTotalSize);
+
+    size_t textureOffset = 0;
+    for (auto tex : textures) {
+        cudaMemcpy(devTextureData + textureOffset, tex->data(), tex->byteSize(), cudaMemcpyKind::cudaMemcpyHostToDevice);
+        textureObjs.push_back({ tex, devTextureData + textureOffset });
+        textureOffset += tex->byteSize();
+    }
+    cudaMalloc(&devTextureObjs, textureObjs.size() * sizeof(DevTextureObj));
+    cudaMemcpy(devTextureObjs, textureObjs.data(), textureObjs.size() * sizeof(DevTextureObj),
+        cudaMemcpyKind::cudaMemcpyHostToDevice);*/
+
+#if MESH_DATA_INDEXED
+#else
+    for (const auto& inst : modelInstances) {
+        for (size_t i = 0; i < inst.meshData->vertices.size(); i++) {
+            meshData.vertices.push_back(glm::vec3(inst.transform * glm::vec4(inst.meshData->vertices[i], 1.f)));
+            meshData.normals.push_back(glm::normalize(inst.normalMat * inst.meshData->normals[i]));
+            meshData.texcoords.push_back(inst.meshData->texcoords[i]);
+            materialIds.push_back(inst.materialId);
+        }
+    }
+#endif
+    BVHBuilder::build(meshData.vertices, boundingBoxes, BVHNodes);
+}
+
+void Scene::clear() {
 }
 
 void Scene::loadModel(const std::string& objId) {
@@ -132,7 +186,7 @@ void Scene::loadModel(const std::string& objId) {
 
     std::string filename = line;
     std::cout << "\tFrom file " << filename << std::endl;
-    instance.meshData = Resource::loadModel(filename);
+    instance.meshData = Resource::loadModelMeshData(filename);
 
     //link material
     utilityCore::safeGetline(fpIn, line);

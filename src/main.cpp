@@ -31,6 +31,28 @@ int height;
 //-------------MAIN--------------
 //-------------------------------
 
+void testAABB() {
+	AABB boxes[] = {
+		{ glm::vec3(-1.f), glm::vec3(1.f) },
+		{ glm::vec3(0.f), glm::vec3(1.f) },
+		{ glm::vec3(0.f), glm::vec3(1.f) },
+		{ glm::vec3(0.f), glm::vec3(1.f) }
+	};
+
+	Ray ray[] = {
+		{ glm::vec3(-0.1f), glm::normalize(glm::vec3(1.f, 0.f, 0.f)) },
+		{ glm::vec3(0.f, 0.1f, 0.5f), glm::normalize(glm::vec3(1.f, 1.f, 0.f)) },
+		{ glm::vec3(-1.f), glm::normalize(glm::vec3(1.f, 0.f, 0.f)) },
+		{ glm::vec3(1.1f), glm::normalize(glm::vec3(1.f, 1.f, 0.f)) },
+	};
+
+	for (int i = 0; i < sizeof(boxes) / sizeof(AABB); i++) {
+		float dist;
+		bool intersec = boxes[i].intersect(ray[i], dist);
+		std::cout << intersec << " " << dist << "\n";
+	}
+}
+
 int main(int argc, char** argv) {
 	startTimeString = currentTimeString();
 
@@ -131,7 +153,7 @@ void runCuda() {
 	}
 
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
-	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
+	// No devData is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
 	if (iteration == 0) {
 		pathTraceFree();

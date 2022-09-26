@@ -4,7 +4,6 @@
 #include <vector>
 #include <cuda_runtime.h>
 #include "glm/glm.hpp"
-#include "bvh.h"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 
@@ -15,6 +14,10 @@ enum GeomType {
 };
 
 struct Ray {
+    __host__ __device__ glm::vec3 getPoint(float dist) {
+        return origin + direction * dist;
+    }
+
     glm::vec3 origin;
     glm::vec3 direction;
 };

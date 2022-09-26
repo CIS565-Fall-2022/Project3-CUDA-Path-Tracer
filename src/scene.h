@@ -11,14 +11,22 @@
 #include "sceneStructs.h"
 #include "material.h"
 #include "image.h"
+#include "bvh.h"
 
-#define INDEXED_MESH_DATA false
+#define MESH_DATA_STRUCT_OF_ARRAY false
+#define MESH_DATA_INDEXED false
 
-struct Model {
+struct Triangle {
+    glm::vec3 vertex[3];
+    glm::vec3 normal[3];
+    glm::vec2 texcoord[3];
+};
+
+struct MeshData {
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> normals;
     std::vector<glm::vec2> texcoords;
-#if INDEXED_MESH_DATA
+#if MESH_DATA_INDEXED
     std::vector<glm::ivec3> indices;
 #endif
 };
@@ -33,19 +41,35 @@ struct ModelInstance {
     glm::mat3 normalMat;
 
     int materialId;
-    Model* meshData;
+    MeshData* meshData;
 };
 
 class Resource {
 public:
-    static Model* loadModel(const std::string& filename);
+    static MeshData* loadOBJMesh(const std::string& filename);
+    static MeshData* loadGLTFMesh(const std::string& filename);
+    static MeshData* loadModelMeshData(const std::string& filename);
     static Image* loadTexture(const std::string& filename);
 
     static void clear();
 
 private:
-    static std::map<std::string, Model*> modelPool;
+    static std::map<std::string, MeshData*> meshDataPool;
     static std::map<std::string, Image*> texturePool;
+};
+
+struct DevResource {
+    glm::vec3* devVertices = nullptr;
+    glm::vec3* devNormals = nullptr;
+    glm::vec2* devTexcoords = nullptr;
+    AABB* devBoundingBoxes = nullptr;
+    MTBVHNode* devBVHNodes[6] = { nullptr };
+    int BVHSize;
+
+    int* devMaterialIds = nullptr;
+    Material* devMaterials = nullptr;
+    glm::vec3* devTextureData = nullptr;
+    DevTextureObj* devTextureObjs = nullptr;
 };
 
 class Scene {
@@ -64,28 +88,17 @@ private:
 public:
     RenderState state;
     std::vector<Geom> geoms;
-
     std::vector<ModelInstance> modelInstances;
     std::vector<Image*> textures;
     std::vector<Material> materials;
     std::map<std::string, int> materialMap;
+    std::vector<int> materialIds;
+    int BVHSize;
+    std::vector<AABB> boundingBoxes;
+    std::vector<std::vector<MTBVHNode>> BVHNodes;
+    MeshData meshData;
 
-    std::vector<glm::vec3> vertices;
-    std::vector<glm::vec3> normals;
-    std::vector<glm::vec3> texcoords;
-#if INDEXED_MESH_DATA
-    std::vector<glm::ivec3> indices;
-#endif
-
-    glm::vec3* devVertices = nullptr;
-    glm::vec3* devNormals = nullptr;
-    glm::vec3* devTexcoords = nullptr;
-#if INDEXED_MESH_DATA
-    glm::ivec3* devIndices = nullptr;
-#endif
-    AABB* devBoundingBoxes = nullptr;
-    glm::vec3* devMaterials = nullptr;
-    glm::vec3* devTexture = nullptr;
+    DevResource devResources;
 
 private:
     std::ifstream fpIn;
