@@ -337,7 +337,6 @@ __global__ void shadeBaseOnMaterial(
 				pathSegment.remainingBounces = 0;
 			}
 			else {
-				pathSegment.color *= materialColor;
 				//sample the material BSDFs to generate a new ray, update the pathSegment with the new ray
 				glm::vec3 intersectionPoint = getPointOnRay(pathSegment.ray, intersection.t);
 				scatterRay(pathSegment, intersectionPoint, intersection.surfaceNormal, material, rng);
