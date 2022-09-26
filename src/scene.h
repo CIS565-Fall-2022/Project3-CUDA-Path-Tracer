@@ -227,7 +227,8 @@ public:
     std::vector<std::vector<MTBVHNode>> BVHNodes;
     MeshData meshData;
 
-    DevScene devScene;
+    DevScene hstScene;
+    DevScene* devScene = nullptr;
 
 private:
     std::ifstream fpIn;

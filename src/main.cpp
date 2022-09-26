@@ -65,7 +65,6 @@ int main(int argc, char** argv) {
 
 	// Load scene file
 	scene = new Scene(sceneFile);
-	exit(0);
 
 	//Create Instance for ImGUIData
 	guiData = new GuiDataContainer();
@@ -100,6 +99,7 @@ int main(int argc, char** argv) {
 	InitImguiData(guiData);
 	InitDataContainer(guiData);
 
+	scene->buildDevData();
 	// GLFW main loop
 	mainLoop();
 

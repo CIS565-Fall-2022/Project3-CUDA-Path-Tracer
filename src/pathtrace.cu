@@ -76,17 +76,14 @@ void pathTraceInit(Scene* scene) {
 	cudaMalloc(&devIntersections, pixelcount * sizeof(Intersection));
 	cudaMemset(devIntersections, 0, pixelcount * sizeof(Intersection));
 
-	// TODO: initialize any extra device memeory you need
 	checkCUDAError("pathTraceInit");
 }
 
 void pathTraceFree() {
-
 	cudaFree(devImage);  // no-op if devImage is null
 	cudaFree(devPaths);
 	cudaFree(devTerminatedPaths);
 	cudaFree(devIntersections);
-	checkCUDAError("pathTraceFree");
 }
 
 /**
@@ -142,14 +139,14 @@ __global__ void computeIntersections(
 	int depth,
 	int numPaths,
 	PathSegment* pathSegments,
-	DevScene &scene,
+	DevScene* scene,
 	Intersection* intersections
 ) {
 	int pathIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (pathIdx < numPaths) {
 		PathSegment pathSegment = pathSegments[pathIdx];
-		int primId = scene.intersect(pathSegment.ray, intersections[pathIdx]);
+		int primId = scene->intersect(pathSegment.ray, intersections[pathIdx]);
 	}
 }
 
@@ -157,7 +154,7 @@ __global__ void pathIntegSampleSurface(
 	int iter,
 	PathSegment* segments,
 	Intersection* intersections,
-	DevScene &scene,
+	DevScene* scene,
 	int numPaths
 ) {
 	const int SamplesConsumedOneIter = 10;
@@ -177,7 +174,7 @@ __global__ void pathIntegSampleSurface(
 
 	PathSegment& segment = segments[idx];
 	thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 4 + iter * SamplesConsumedOneIter);
-	Material material = scene.devMaterials[intersec.materialId];
+	Material material = scene->devMaterials[intersec.materialId];
 
 	// TODO
 	// Perform light area sampling and MIS
@@ -282,7 +279,8 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 	// TODO: perform one iteration of path tracing
 
 	generateRayFromCamera<<<blocksPerGrid2D, blockSize2D>>>(cam, iter, traceDepth, devPaths);
-	checkCUDAError("generate camera ray");
+	checkCUDAError("PT::generateRayFromCamera");
+	cudaDeviceSynchronize();
 
 	int depth = 0;
 	int numPaths = pixelCount;
@@ -306,7 +304,7 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 			hstScene->devScene,
 			devIntersections
 		);
-		checkCUDAError("trace one bounce");
+		checkCUDAError("PT::computeInteractions");
 		cudaDeviceSynchronize();
 		depth++;
 
@@ -316,6 +314,8 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 		pathIntegSampleSurface<<<numBlocksPathSegmentTracing, blockSize1D>>>(
 			iter, devPaths, devIntersections, hstScene->devScene, numPaths
 		);
+		checkCUDAError("PT::sampleSurface");
+		cudaDeviceSynchronize();
 
 		// Compact paths that are terminated but carry contribution into a separate buffer
 		devTerminatedThr = thrust::remove_copy_if(devPathsThr, devPathsThr + numPaths, devTerminatedThr, CompactTerminatedPaths());

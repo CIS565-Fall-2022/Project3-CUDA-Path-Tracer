@@ -132,8 +132,6 @@ Scene::Scene(const std::string& filename) {
             }
         }
     }
-
-    buildDevData();
 }
 
 Scene::~Scene() {
@@ -152,11 +150,16 @@ void Scene::buildDevData() {
     }
 #endif
     BVHSize = BVHBuilder::build(meshData.vertices, boundingBoxes, BVHNodes);
-    devScene.createDevData(*this);
+    checkCUDAError("BVH Build");
+    hstScene.createDevData(*this);
+    cudaMalloc(&devScene, sizeof(DevScene));
+    cudaMemcpyHostToDev(devScene, &hstScene, sizeof(DevScene));
+    checkCUDAError("Dev Scene");
 }
 
 void Scene::clear() {
-    devScene.freeDevData();
+    hstScene.freeDevData();
+    cudaSafeFree(devScene);
 }
 
 void Scene::loadModel(const std::string& objId) {
