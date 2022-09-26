@@ -74,3 +74,21 @@ struct ShadeableIntersection {
   glm::vec3 surfaceNormal;
   int materialId;
 };
+
+struct compareIntersections 
+{
+    __host__ __device__
+        bool operator()(const ShadeableIntersection& a, const ShadeableIntersection& b) 
+    {
+        return a.materialId < b.materialId;
+    }
+};
+
+struct rayTerminated 
+{
+    __host__ __device__
+        bool operator()(const PathSegment& pathSegment)
+    {
+        return pathSegment.remainingBounces == 0;
+    }
+};

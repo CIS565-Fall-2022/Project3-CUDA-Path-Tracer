@@ -4,6 +4,9 @@
 #include <thrust/execution_policy.h>
 #include <thrust/random.h>
 #include <thrust/remove.h>
+#include <thrust/sort.h>
+#include <thrust/partition.h>
+
 
 #include "sceneStructs.h"
 #include "scene.h"
@@ -14,7 +17,12 @@
 #include "intersections.h"
 #include "interactions.h"
 
+#include "../stream_compaction/efficient.h"
+
+
 #define ERRORCHECK 1
+
+#define SORT_RAYS 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -103,6 +111,7 @@ void pathtraceInit(Scene* scene) {
 	cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
 	// TODO: initialize any extra device memeory you need
+
 
 	checkCUDAError("pathtraceInit");
 }
@@ -273,6 +282,48 @@ __global__ void shadeFakeMaterial(
 	}
 }
 
+__global__ void shadeMaterial(
+	int iter
+	, int num_paths
+	, ShadeableIntersection* shadeableIntersections
+	, PathSegment* pathSegments
+	, Material* materials
+)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx < num_paths && pathSegments[idx].remainingBounces >= 0)
+	{
+		ShadeableIntersection intersection = shadeableIntersections[idx];
+		// No intersection then return black and no more bounce
+		if (intersection.t <= 0.0f)
+		{
+			pathSegments[idx].color = glm::vec3(0.0f);
+			pathSegments[idx].remainingBounces = 0;
+			return;
+		}
+
+		Material material = materials[intersection.materialId];
+		glm::vec3 materialColor = material.color;
+
+		// Light source then return light color 
+		if (material.emittance > 0.0f)
+		{
+			pathSegments[idx].color *= (materialColor * material.emittance);
+			pathSegments[idx].remainingBounces = 0;
+			return;
+		}
+		// ScatterRay and accumulate color
+		else
+		{
+			thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
+			glm::vec3 i = getPointOnRay(pathSegments[idx].ray, intersection.t);
+			scatterRay(pathSegments[idx], i, intersection.surfaceNormal, material, rng);
+			return;
+		}
+	}
+}
+
+
 // Add the current iteration's output to the overall image
 __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iterationPaths)
 {
@@ -341,6 +392,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	PathSegment* dev_path_end = dev_paths + pixelcount;
 	int num_paths = dev_path_end - dev_paths;
 
+	int ori_num_paths = num_paths;
+
 	// --- PathSegment Tracing Stage ---
 	// Shoot ray into scene, bounce between objects, push shading chunks
 
@@ -364,6 +417,9 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		cudaDeviceSynchronize();
 		depth++;
 
+		//Sort rays by material
+		thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + num_paths, dev_paths, compareIntersections());
+
 		// TODO:
 		// --- Shading Stage ---
 		// Shade path segments based on intersections and generate new rays by
@@ -373,14 +429,31 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	  // TODO: compare between directly shading the path segments and shading
 	  // path segments that have been reshuffled to be contiguous in memory.
 
-		shadeFakeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
+		//shadeFakeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
+		//	iter,
+		//	num_paths,
+		//	dev_intersections,
+		//	dev_paths,
+		//	dev_materials
+		//	);
+
+		shadeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
 			iter,
 			num_paths,
 			dev_intersections,
 			dev_paths,
 			dev_materials
 			);
-		iterationComplete = true; // TODO: should be based off stream compaction results.
+
+
+
+		//Stream compact
+		PathSegment* path_end = thrust::partition(thrust::device, dev_paths, dev_paths + num_paths, rayTerminated());
+		num_paths = path_end - dev_paths;
+
+
+		iterationComplete = (num_paths == 0); 
+		//iterationComplete = depth > traceDepth; // TODO: should be based off stream compaction results.
 
 		if (guiData != NULL)
 		{
@@ -390,7 +463,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	// Assemble this iteration and apply it to the image
 	dim3 numBlocksPixels = (pixelcount + blockSize1d - 1) / blockSize1d;
-	finalGather << <numBlocksPixels, blockSize1d >> > (num_paths, dev_image, dev_paths);
+	finalGather << <numBlocksPixels, blockSize1d >> > (ori_num_paths, dev_image, dev_paths);
 
 	///////////////////////////////////////////////////////////////////////////
 
