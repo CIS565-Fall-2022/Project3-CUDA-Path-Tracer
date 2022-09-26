@@ -103,6 +103,7 @@ int main(int argc, char** argv) {
 	// GLFW main loop
 	mainLoop();
 
+	scene->clear();
 	Resource::clear();
 
 	return 0;

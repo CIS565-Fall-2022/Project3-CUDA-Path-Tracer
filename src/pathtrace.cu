@@ -47,8 +47,6 @@ __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
 static Scene* hstScene = nullptr;
 static GuiDataContainer* guiData = nullptr;
 static glm::vec3* devImage = nullptr;
-static Geom* devGeoms = nullptr;
-static Material* devMaterials = nullptr;
 static PathSegment* devPaths = nullptr;
 static PathSegment* devTerminatedPaths = nullptr;
 static Intersection* devIntersections = nullptr;
@@ -75,17 +73,10 @@ void pathTraceInit(Scene* scene) {
 	devPathsThr = thrust::device_ptr<PathSegment>(devPaths);
 	devTerminatedPathsThr = thrust::device_ptr<PathSegment>(devTerminatedPaths);
 
-	cudaMalloc(&devGeoms, scene->geoms.size() * sizeof(Geom));
-	cudaMemcpy(devGeoms, scene->geoms.data(), scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
-
-	cudaMalloc(&devMaterials, scene->materials.size() * sizeof(Material));
-	cudaMemcpy(devMaterials, scene->materials.data(), scene->materials.size() * sizeof(Material), cudaMemcpyHostToDevice);
-
 	cudaMalloc(&devIntersections, pixelcount * sizeof(Intersection));
 	cudaMemset(devIntersections, 0, pixelcount * sizeof(Intersection));
 
 	// TODO: initialize any extra device memeory you need
-
 	checkCUDAError("pathTraceInit");
 }
 
@@ -94,11 +85,7 @@ void pathTraceFree() {
 	cudaFree(devImage);  // no-op if devImage is null
 	cudaFree(devPaths);
 	cudaFree(devTerminatedPaths);
-	cudaFree(devGeoms);
-	cudaFree(devMaterials);
 	cudaFree(devIntersections);
-	// TODO: clean up any extra device memory you created
-
 	checkCUDAError("pathTraceFree");
 }
 
@@ -153,54 +140,16 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 // Feel free to modify the code below.
 __global__ void computeIntersections(
 	int depth,
-	int num_paths,
+	int numPaths,
 	PathSegment* pathSegments,
-	Geom* geoms,
-	int geoms_size,
+	DevScene &scene,
 	Intersection* intersections
 ) {
 	int pathIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (pathIdx < num_paths) {
+	if (pathIdx < numPaths) {
 		PathSegment pathSegment = pathSegments[pathIdx];
-
-		float dist;
-		glm::vec3 intersectPoint;
-		glm::vec3 normal;
-		float tMin = FLT_MAX;
-		int hitGeomIdx = -1;
-		bool outside = true;
-
-		glm::vec3 tmpIntersect;
-		glm::vec3 tmpNormal;
-
-		// naive parse through global geoms
-
-		for (int i = 0; i < geoms_size; i++) {
-			Geom& geom = geoms[i];
-			// TODO: add more intersection tests here... triangle? metaball? CSG?
-			dist = intersectGeom(geom, pathSegment.ray, tmpIntersect, tmpNormal, outside);
-			// Compute the minimum t from the intersection tests to determine what
-			// scene geometry object was hit first.
-			if (dist > 0.0f && tMin > dist) {
-				tMin = dist;
-				hitGeomIdx = i;
-				intersectPoint = tmpIntersect;
-				normal = tmpNormal;
-			}
-		}
-
-		if (hitGeomIdx == -1) {
-			intersections[pathIdx].dist = -1.0f;
-		}
-		else {
-			//The ray hits something
-			intersections[pathIdx].dist = tMin;
-			intersections[pathIdx].materialId = geoms[hitGeomIdx].materialId;
-			intersections[pathIdx].surfaceNormal = normal;
-			intersections[pathIdx].position = intersectPoint;
-			intersections[pathIdx].incomingDir = -pathSegment.ray.direction;
-		}
+		int primId = scene.intersect(pathSegment.ray, intersections[pathIdx]);
 	}
 }
 
@@ -208,7 +157,7 @@ __global__ void pathIntegSampleSurface(
 	int iter,
 	PathSegment* segments,
 	Intersection* intersections,
-	Material* materials,
+	DevScene &scene,
 	int numPaths
 ) {
 	const int SamplesConsumedOneIter = 10;
@@ -228,7 +177,7 @@ __global__ void pathIntegSampleSurface(
 
 	PathSegment& segment = segments[idx];
 	thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 4 + iter * SamplesConsumedOneIter);
-	Material material = materials[intersec.materialId];
+	Material material = scene.devMaterials[intersec.materialId];
 
 	// TODO
 	// Perform light area sampling and MIS
@@ -242,7 +191,7 @@ __global__ void pathIntegSampleSurface(
 	}
 	else {
 		BSDFSample sample;
-		materialSample(intersec.surfaceNormal, intersec.incomingDir, material, sample3D(rng), sample);
+		materialSample(intersec.normal, intersec.incomingDir, material, sample3D(rng), sample);
 
 		if (sample.type == BSDFSampleType::Invalid) {
 			// Terminate path if sampling fails
@@ -251,7 +200,7 @@ __global__ void pathIntegSampleSurface(
 		else {
 			bool isSampleDelta = (sample.type & BSDFSampleType::Specular);
 			segment.throughput *= sample.bsdf / sample.pdf *
-				(isSampleDelta ? 1.f : Math::absDot(intersec.surfaceNormal, sample.dir));
+				(isSampleDelta ? 1.f : Math::absDot(intersec.normal, sample.dir));
 			segment.ray = makeOffsetedRay(intersec.position, sample.dir);
 			segment.remainingBounces--;
 		}
@@ -353,9 +302,8 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 		computeIntersections<<<numBlocksPathSegmentTracing, blockSize1D>>>(
 			depth, 
 			numPaths,
-			devPaths, 
-			devGeoms,
-			hstScene->geoms.size(), 
+			devPaths,
+			hstScene->devScene,
 			devIntersections
 		);
 		checkCUDAError("trace one bounce");
@@ -366,7 +314,7 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 		// path segments that have been reshuffled to be contiguous in memory.
 
 		pathIntegSampleSurface<<<numBlocksPathSegmentTracing, blockSize1D>>>(
-			iter, devPaths, devIntersections, devMaterials, numPaths
+			iter, devPaths, devIntersections, hstScene->devScene, numPaths
 		);
 
 		// Compact paths that are terminated but carry contribution into a separate buffer

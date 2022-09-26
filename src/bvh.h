@@ -9,7 +9,7 @@
 
 #include "sceneStructs.h"
 
-#define BVHNodeNonLeaf -1
+#define NullPrimitive -1
 
 struct AABB {
     AABB() = default;

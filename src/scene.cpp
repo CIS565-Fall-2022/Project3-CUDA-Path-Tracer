@@ -27,9 +27,9 @@ MeshData* Resource::loadOBJMesh(const std::string& filename) {
     std::vector<tinyobj::shape_t> shapes;
     std::string warn, err;
 
-    std::cout << "Model::loading {" << filename << "}" << std::endl;
+    std::cout << "\t\t[Model loading " << filename << " ...]" << std::endl;
     if (!tinyobj::LoadObj(&attrib, &shapes, nullptr, &warn, &err, filename.c_str())) {
-        std::cout << "failed\n\tError msg {" << err << "}" << std::endl;
+        std::cout << "\t\t\t[Fail Error msg [" << err << "]" << std::endl;
         return nullptr;
     }
     bool hasTexcoord = !attrib.texcoords.empty();
@@ -66,6 +66,7 @@ MeshData* Resource::loadOBJMesh(const std::string& filename) {
         }
     }
 #endif
+    std::cout << "\t\t[Vertex count = " << model->vertices.size() << "]" << std::endl;
     meshDataPool[filename] = model;
     return model;
 }
@@ -106,7 +107,7 @@ void Resource::clear() {
 }
 
 Scene::Scene(const std::string& filename) {
-    std::cout << "Scene::Reading from {" << filename << "}..." << std::endl;
+    std::cout << "[Scene loading " << filename << " ...]" << std::endl;
     std::cout << " " << std::endl;
     char* fname = (char*)filename.c_str();
     fpIn.open(fname);
@@ -150,16 +151,16 @@ void Scene::buildDevData() {
         }
     }
 #endif
-    BVHBuilder::build(meshData.vertices, boundingBoxes, BVHNodes);
-
-    devResources.createDevData(*this);
+    BVHSize = BVHBuilder::build(meshData.vertices, boundingBoxes, BVHNodes);
+    devScene.createDevData(*this);
 }
 
 void Scene::clear() {
+    devScene.freeDevData();
 }
 
 void Scene::loadModel(const std::string& objId) {
-    std::cout << "Scene::Loading Model {" << objId << "}..." << std::endl;
+    std::cout << "\t[Object " << objId << "]" << std::endl;
 
     ModelInstance instance;
 
@@ -167,7 +168,7 @@ void Scene::loadModel(const std::string& objId) {
     utilityCore::safeGetline(fpIn, line);
 
     std::string filename = line;
-    std::cout << "\tFrom file " << filename << std::endl;
+    std::cout << "\t\t[File " << filename << "]" << std::endl;
     instance.meshData = Resource::loadModelMeshData(filename);
 
     //link material
@@ -175,11 +176,11 @@ void Scene::loadModel(const std::string& objId) {
     if (!line.empty() && fpIn.good()) {
         std::vector<std::string> tokens = utilityCore::tokenizeString(line);
         if (materialMap.find(tokens[1]) == materialMap.end()) {
-            std::cout << "\tMaterial {" << tokens[1] << "} doesn't exist" << std::endl;
+            std::cout << "\t\t[Material " << tokens[1] << " doesn't exist]" << std::endl;
             throw;
         }
         instance.materialId = materialMap[tokens[1]];
-        std::cout << "\tLink to Material {" << tokens[1] << "(" << instance.materialId << ")}..." << std::endl;
+        std::cout << "\t\t[Link to Material " << tokens[1] << "{" << instance.materialId << "} ...]" << std::endl;
     }
 
     //load transformations
@@ -207,12 +208,11 @@ void Scene::loadModel(const std::string& objId) {
     instance.transfInv = glm::inverse(instance.transform);
     instance.normalMat = glm::transpose(glm::mat3(instance.transfInv));
 
-    std::cout << "\tComplete" << std::endl;
     modelInstances.push_back(instance);
 }
 
 void Scene::loadCamera() {
-    std::cout << "Scene::Loading Camera..." << std::endl;
+    std::cout << "\t[Camera]" << std::endl;
     RenderState &state = this->state;
     Camera &camera = state.camera;
     float fovy;
@@ -271,12 +271,10 @@ void Scene::loadCamera() {
     int arraylen = camera.resolution.x * camera.resolution.y;
     state.image.resize(arraylen);
     std::fill(state.image.begin(), state.image.end(), glm::vec3());
-
-    std::cout << "\tComplete" << std::endl;
 }
 
 void Scene::loadMaterial(const std::string& matId) {
-    std::cout << "Scene::Loading Material {" << matId << "}..." << std::endl;
+    std::cout << "\t[Material " << matId << "]" << std::endl;
     Material material;
 
     //load static properties
@@ -286,6 +284,7 @@ void Scene::loadMaterial(const std::string& matId) {
         auto tokens = utilityCore::tokenizeString(line);
         if (tokens[0] == "Type") {
             material.type = MaterialTypeTokenMap[tokens[1]];
+            std::cout << "\t\t[Type " << tokens[1] << "]" << std::endl;
         }
         else if (tokens[0] == "BaseColor") {
             glm::vec3 baseColor(std::stof(tokens[1]), std::stof(tokens[2]), std::stof(tokens[3]));
@@ -306,23 +305,9 @@ void Scene::loadMaterial(const std::string& matId) {
     }
     materialMap[matId] = materials.size();
     materials.push_back(material);
-    std::cout << "\tComplete" << std::endl;
 }
 
-//struct Material {
-//    enum Type {
-//        Lambertian = 0, MetallicWorkflow = 1, Dielectric = 2, Light = 3
-//    };
-//
-//    glm::vec3 baseColor;
-//    float metallic;
-//    float roughness;
-//    float ior;
-//    float emittance;
-//    int type;
-//};
-
-void DevResource::createDevData(Scene& scene) {
+void DevScene::createDevData(Scene& scene) {
     // Put all texture devData in a big buffer
     // and setup device texture objects to manage
     std::vector<DevTextureObj> textureObjs;
@@ -341,12 +326,14 @@ void DevResource::createDevData(Scene& scene) {
     }
     cudaMalloc(&devTextureObjs, textureObjs.size() * sizeof(DevTextureObj));
     cudaMemcpyHostToDev(devTextureObjs, textureObjs.data(), textureObjs.size() * sizeof(DevTextureObj));
+    checkCUDAError("DevScene::texture");
 
     cudaMalloc(&devMaterials, byteSizeOf(scene.materials));
-    cudaMemcpyHostToDev(devMaterials, scene.materials.data(), byteSizeOf(scene.materialIds));
+    cudaMemcpyHostToDev(devMaterials, scene.materials.data(), byteSizeOf(scene.materials));
 
     cudaMalloc(&devMaterialIds, byteSizeOf(scene.materialIds));
     cudaMemcpyHostToDev(devMaterialIds, scene.materialIds.data(), byteSizeOf(scene.materialIds));
+    checkCUDAError("DevScene::material");
 
     cudaMalloc(&devVertices, byteSizeOf(scene.meshData.vertices));
     cudaMemcpyHostToDev(devVertices, scene.meshData.vertices.data(), byteSizeOf(scene.meshData.vertices));
@@ -364,9 +351,11 @@ void DevResource::createDevData(Scene& scene) {
         cudaMalloc(&devBVHNodes[i], byteSizeOf(scene.BVHNodes[i]));
         cudaMemcpyHostToDev(devBVHNodes[i], scene.BVHNodes[i].data(), byteSizeOf(scene.BVHNodes[i]));
     }
+    BVHSize = scene.BVHSize;
+    checkCUDAError("DevScene::meshData");
 }
 
-void DevResource::freeDevData() {
+void DevScene::freeDevData() {
     cudaSafeFree(devTextureData);
     cudaSafeFree(devTextureObjs);
     cudaSafeFree(devMaterials);

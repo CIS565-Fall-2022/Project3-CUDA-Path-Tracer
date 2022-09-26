@@ -165,7 +165,7 @@ void BVHBuilder::buildMTBVH(
             int nodeSize = isLeaf ? 1 : nodeInfo[nodeIdOrig].primIdOrSize;
 
             nodes[nodeIdNew] = {
-                isLeaf ? nodeInfo[nodeIdOrig].primIdOrSize : BVHNodeNonLeaf,
+                isLeaf ? nodeInfo[nodeIdOrig].primIdOrSize : NullPrimitive,
                 nodeIdOrig,
                 nodeIdNew + nodeSize
             };

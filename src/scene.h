@@ -61,9 +61,131 @@ private:
 
 class Scene;
 
-struct DevResource {
+struct DevScene {
     void createDevData(Scene& scene);
     void freeDevData();
+
+    __device__ int getMTBVHId(glm::vec3 dir) {
+        glm::vec3 absDir = glm::abs(dir);
+        if (absDir.x > absDir.y) {
+            if (absDir.x > absDir.z) {
+                return dir.x > 0 ? 0 : 1;
+            }
+            else {
+                return dir.z > 0 ? 4 : 5;
+            }
+        }
+        else {
+            if (absDir.y > absDir.z) {
+                return dir.y > 0 ? 2 : 3;
+            }
+            else {
+                return dir.z > 0 ? 4 : 5;
+            }
+        }
+    }
+
+    __device__ void getIntersecGeomInfo(int primId, glm::vec3 bary, Intersection& intersec) {
+        glm::vec3 va = devVertices[primId * 3 + 0];
+        glm::vec3 vb = devVertices[primId * 3 + 1];
+        glm::vec3 vc = devVertices[primId * 3 + 2];
+
+        glm::vec3 na = devNormals[primId * 3 + 0];
+        glm::vec3 nb = devNormals[primId * 3 + 1];
+        glm::vec3 nc = devNormals[primId * 3 + 2];
+
+        glm::vec2 ta = devTexcoords[primId * 3 + 0];
+        glm::vec2 tb = devTexcoords[primId * 3 + 1];
+        glm::vec2 tc = devTexcoords[primId * 3 + 2];
+
+        intersec.position = va * bary.x + vb * bary.y + vc * bary.z;
+        intersec.normal = na * bary.x + nb * bary.y + nc * bary.z;
+        intersec.texcoord = ta * bary.x + tb * bary.y + tc * bary.z;
+    }
+
+    __device__ bool intersectPrimitive(int primId, Ray ray, float& dist, glm::vec3& bary) {
+        glm::vec3 va = devVertices[primId * 3 + 0];
+        glm::vec3 vb = devVertices[primId * 3 + 1];
+        glm::vec3 vc = devVertices[primId * 3 + 2];
+
+        if (!glm::intersectRayTriangle(ray.origin, ray.direction, va, vb, vc, bary)) {
+            return false;
+        }
+        glm::vec3 hitPoint = va * bary.x + vb * bary.y + vc * bary.z;
+        dist = glm::length(hitPoint - ray.origin);
+        return true;
+    }
+
+    __device__ bool intersectPrimitiveDetailed(int primId, Ray ray, Intersection& intersec) {
+        glm::vec3 va = devVertices[primId * 3 + 0];
+        glm::vec3 vb = devVertices[primId * 3 + 1];
+        glm::vec3 vc = devVertices[primId * 3 + 2];
+        glm::vec3 bary;
+
+        if (!glm::intersectRayTriangle(ray.origin, ray.direction, va, vb, vc, bary)) {
+            return false;
+        }
+
+        glm::vec3 na = devNormals[primId * 3 + 0];
+        glm::vec3 nb = devNormals[primId * 3 + 1];
+        glm::vec3 nc = devNormals[primId * 3 + 2];
+
+        glm::vec2 ta = devTexcoords[primId * 3 + 0];
+        glm::vec2 tb = devTexcoords[primId * 3 + 1];
+        glm::vec2 tc = devTexcoords[primId * 3 + 2];
+
+        intersec.position = va * bary.x + vb * bary.y + vc * bary.z;
+        intersec.normal = na * bary.x + nb * bary.y + nc * bary.z;
+        intersec.texcoord = ta * bary.x + tb * bary.y + tc * bary.z;
+        intersec.dist = glm::length(intersec.position - ray.origin);
+        return true;
+    }
+
+    __device__ int intersect(Ray ray, Intersection& intersec) {
+        float closestDist = FLT_MAX;
+        int closestPrimId = NullPrimitive;
+        glm::vec3 closestBary;
+
+        MTBVHNode* nodes = devBVHNodes[getMTBVHId(-ray.direction)];
+        int node = 0;
+
+        while (node != BVHSize) {
+            AABB& bound = devBoundingBoxes[nodes[node].boundingBoxId];
+            float boundDist;
+            bool boundHit = bound.intersect(ray, boundDist);
+
+            // Only intersect a primitive if its bounding box is hit and
+            // that box is closer than previous hit record
+            if (boundHit && boundDist < closestDist) {
+                int primId = nodes[node].primitiveId;
+                if (primId != NullPrimitive) {
+                    float dist;
+                    glm::vec3 bary;
+                    bool hit = intersectPrimitive(primId, ray, dist, bary);
+
+                    if (hit && dist < closestDist) {
+                        closestDist = dist;
+                        closestBary = bary;
+                        closestPrimId = primId;
+                    }
+                }
+                node++;
+            }
+            else {
+                node = nodes[node].nextNodeIfMiss;
+            }
+        }
+        if (closestPrimId != NullPrimitive) {
+            getIntersecGeomInfo(closestPrimId, closestBary, intersec);
+            intersec.dist = closestDist;
+            intersec.incomingDir = -ray.direction;
+            intersec.materialId = devMaterialIds[closestPrimId];
+        }
+        else {
+            intersec.dist = -1.f;
+        }
+        return closestPrimId;
+    }
 
     glm::vec3* devVertices = nullptr;
     glm::vec3* devNormals = nullptr;
@@ -80,7 +202,7 @@ struct DevResource {
 
 class Scene {
 public:
-    friend struct DevResource;
+    friend struct DevScene;
 
     Scene(const std::string& filename);
     ~Scene();
@@ -95,7 +217,6 @@ private:
 
 public:
     RenderState state;
-    std::vector<Geom> geoms;
     std::vector<ModelInstance> modelInstances;
     std::vector<Image*> textures;
     std::vector<Material> materials;
@@ -106,7 +227,7 @@ public:
     std::vector<std::vector<MTBVHNode>> BVHNodes;
     MeshData meshData;
 
-    DevResource devResources;
+    DevScene devScene;
 
 private:
     std::ifstream fpIn;
