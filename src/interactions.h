@@ -66,6 +66,7 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  *
  * You may need to change the parameter list for your purposes!
  */
+
 __host__ __device__
 void scatterRay(
         PathSegment & pathSegment,
@@ -76,4 +77,55 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+
+    //pure diffuse
+    if (!m.hasReflective && !m.hasRefractive) {
+        auto direction = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
+        pathSegment.ray.direction = direction;
+        pathSegment.ray.origin = intersect + 0.0001f * normal;
+        pathSegment.color *= m.color;
+    }
+    //perfect reflective
+    else if (m.hasReflective && !m.hasRefractive) {
+        glm::vec3 reflection = glm::reflect(pathSegment.ray.direction, normal);
+        pathSegment.ray.direction = reflection;
+        pathSegment.ray.origin = intersect + 0.0001f * normal;
+        pathSegment.color *= m.color;
+    }
+    //both reflection and refraction
+    else if (m.hasReflective && m.hasRefractive) {
+        glm::vec3 incident = pathSegment.ray.direction;
+        float cos_theta = glm::dot(incident, normal);
+        float n1 = 0.f;
+        float n2 = 0.f;
+        if (cos_theta < 0) { //vacuum to object
+            n1 = 1.f;
+            n2 = m.indexOfRefraction;
+        }
+        else {//object to vacuum
+            normal = glm::normalize(-normal); 
+            cos_theta = glm::dot(incident, normal);
+            n1 = m.indexOfRefraction;
+            n2 = 1.f;
+        }
+        //schlick's approximation
+        float R0 = (n1 - n2) / (n1 + n2);
+        R0 = R0 * R0;
+        float Fresnel_term = R0 + (1 - R0) * pow(1 - cos_theta, 5);
+        thrust::uniform_real_distribution<float> u01(0, 1);
+        if (u01(rng) < Fresnel_term) {//reflection
+            glm::vec3 reflection = glm::reflect(incident, normal);
+            pathSegment.ray.direction = reflection;
+            pathSegment.ray.origin = intersect + 0.0001f * normal;
+            pathSegment.color *= m.color;
+        }
+        else {//refraction
+            glm::vec3 refraction = glm::normalize(glm::refract(incident, normal, n2 / n1));
+            pathSegment.ray.direction = refraction;
+            pathSegment.ray.origin = intersect + 0.0001f * normal;
+            pathSegment.color *= m.color;
+        }
+
+    }
+
 }

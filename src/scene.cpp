@@ -4,6 +4,11 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
 
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "../src/glTF/tiny_gltf.h"
+
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;
@@ -185,4 +190,36 @@ int Scene::loadMaterial(string materialid) {
         materials.push_back(newMaterial);
         return 1;
     }
+}
+
+int Scene::loadGLTF(string fileName)
+{
+    tinygltf::Model model;
+    tinygltf::TinyGLTF gltf_ctx;
+    std::string err;
+    std::string warn;
+    std::string input_filename(fileName);
+    std::string ext = tinygltf::GetFilePathExtension(input_filename);
+   
+    bool ret = false;
+    if (ext.compare("glb") == 0) {
+        ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn, input_filename.c_str());
+    }
+    else {
+        ret = gltf_ctx.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
+    }
+    if (!warn.empty()) {
+        printf("Warn: %s\n", warn.c_str());
+    }
+
+    if (!err.empty()) {
+        printf("Err: %s\n", err.c_str());
+    }
+
+    if (!ret) {
+        printf("Failed to parse glTF\n");
+        return -1;
+    }
+
+    
 }

@@ -14,6 +14,14 @@
 #include "intersections.h"
 #include "interactions.h"
 
+#include "device_launch_parameters.h"
+#include <thrust/partition.h>
+
+
+#define CACHE_FIRST_BOUNCE 1
+#define SORT_MATERIAL 1
+#define COMPACTION 1
+
 #define ERRORCHECK 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
@@ -74,6 +82,10 @@ static Geom* dev_geoms = NULL;
 static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
+
+//for caching first bounce
+static ShadeableIntersection* dev_firstBounce = NULL;
+static PathSegment* dev_first_paths = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
 
@@ -103,7 +115,12 @@ void pathtraceInit(Scene* scene) {
 	cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
 	// TODO: initialize any extra device memeory you need
-
+#if CACHE_FIRST_BOUNCE
+	cudaMalloc(&dev_firstBounce, pixelcount * sizeof(ShadeableIntersection));
+	cudaMemset(dev_firstBounce, 0, pixelcount * sizeof(ShadeableIntersection));
+	cudaMalloc(&dev_first_paths, pixelcount * sizeof(PathSegment));
+	
+#endif
 	checkCUDAError("pathtraceInit");
 }
 
@@ -114,7 +131,10 @@ void pathtraceFree() {
 	cudaFree(dev_materials);
 	cudaFree(dev_intersections);
 	// TODO: clean up any extra device memory you created
-
+#if CACHE_FIRST_BOUNCE
+	cudaFree(dev_firstBounce);
+	cudaFree(dev_first_paths);
+#endif
 	checkCUDAError("pathtraceFree");
 }
 
@@ -273,6 +293,47 @@ __global__ void shadeFakeMaterial(
 	}
 }
 
+__global__ void kernSimpleShade(
+	int iter, 
+	int num_paths, 
+	int depth,
+	ShadeableIntersection* shadeableIntersections, 
+	PathSegment* pathSegments,         
+	Material* materials)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx < num_paths)
+	{
+		ShadeableIntersection &intersection = shadeableIntersections[idx];
+		PathSegment &ps = pathSegments[idx];
+		if (ps.remainingBounces <= 0) return;
+
+		if (intersection.t > 0.0f) { // if the intersection exists...
+			thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, depth);
+			thrust::uniform_real_distribution<float> u01(0, 1);
+
+			Material &material = materials[intersection.materialId];
+			glm::vec3 materialColor = material.color;
+
+			if (material.emittance > 0.0f) {
+				ps.remainingBounces = 0;
+				ps.color *= (materialColor * material.emittance);
+			}
+			
+			else{
+				glm::vec3 intersect = getPointOnRay(ps.ray, intersection.t);
+				scatterRay(ps, intersect, intersection.surfaceNormal, material, rng);
+				ps.remainingBounces--;
+			}
+		}
+		else {
+			ps.remainingBounces = 0;
+			ps.color = glm::vec3(0);
+		}
+	}
+}
+
+
 // Add the current iteration's output to the overall image
 __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iterationPaths)
 {
@@ -284,6 +345,21 @@ __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iteration
 		image[iterationPath.pixelIndex] += iterationPath.color;
 	}
 }
+
+//comparators
+struct isZero {
+	__host__ __device__ 
+		bool operator()(const PathSegment &ps) {
+		return ps.remainingBounces;
+	}
+};
+
+struct compareMaterial {
+	__host__ __device__
+		bool operator()(const ShadeableIntersection &i1, const ShadeableIntersection& i2) {
+		return i1.materialId < i2.materialId;
+	}
+};
 
 /**
  * Wrapper for the __global__ call that sets up the kernel calls and does a ton
@@ -333,10 +409,16 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	//   for you.
 
 	// TODO: perform one iteration of path tracing
-
+#if CACHE_FIRST_BOUNCE
+	if (iter == 1) {
+		generateRayFromCamera << <blocksPerGrid2d, blockSize2d >> > (cam, iter, traceDepth, dev_first_paths);
+		checkCUDAError("generate camera ray");
+	}
+	cudaMemcpy(dev_paths, dev_first_paths, pixelcount * sizeof(PathSegment), cudaMemcpyDeviceToDevice);
+#else
 	generateRayFromCamera << <blocksPerGrid2d, blockSize2d >> > (cam, iter, traceDepth, dev_paths);
 	checkCUDAError("generate camera ray");
-
+#endif
 	int depth = 0;
 	PathSegment* dev_path_end = dev_paths + pixelcount;
 	int num_paths = dev_path_end - dev_paths;
@@ -349,8 +431,43 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 		// clean shading chunks
 		cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
-
+		//create blocks
+		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
 		// tracing
+#if CACHE_FIRST_BOUNCE
+		//if first intersection in iteration 1, computer intersection to dev_firstBounce
+		//and then copy dev_firstBounce to dev_intersections
+		if (iter == 1 && depth == 0) {
+			computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+				depth
+				, num_paths
+				, dev_paths
+				, dev_geoms
+				, hst_scene->geoms.size()
+				, dev_firstBounce
+				);
+			checkCUDAError("trace one bounce");
+			cudaDeviceSynchronize();
+			cudaMemcpy(dev_intersections, dev_firstBounce, num_paths * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
+		}
+		//if not first iteration but first bounce
+		//just copy to dev_intersections
+		else if (iter != 1 && depth == 0) {
+			cudaMemcpy(dev_intersections, dev_firstBounce, num_paths * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
+		}
+		else {
+			computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+				depth
+				, num_paths
+				, dev_paths
+				, dev_geoms
+				, hst_scene->geoms.size()
+				, dev_intersections
+				);
+			checkCUDAError("trace one bounce");
+			cudaDeviceSynchronize();
+		}
+#else 
 		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
 		computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
 			depth
@@ -362,25 +479,52 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			);
 		checkCUDAError("trace one bounce");
 		cudaDeviceSynchronize();
+#endif
+
 		depth++;
 
 		// TODO:
 		// --- Shading Stage ---
 		// Shade path segments based on intersections and generate new rays by
-	  // evaluating the BSDF.
-	  // Start off with just a big kernel that handles all the different
-	  // materials you have in the scenefile.
-	  // TODO: compare between directly shading the path segments and shading
-	  // path segments that have been reshuffled to be contiguous in memory.
+		// evaluating the BSDF.
+		// Start off with just a big kernel that handles all the different
+		// materials you have in the scenefile.
+		// TODO: compare between directly shading the path segments and shading
+		// path segments that have been reshuffled to be contiguous in memory.
 
-		shadeFakeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
+		/*shadeFakeMaterial <<<numblocksPathSegmentTracing, blockSize1d >>> (
 			iter,
 			num_paths,
 			dev_intersections,
 			dev_paths,
 			dev_materials
-			);
-		iterationComplete = true; // TODO: should be based off stream compaction results.
+		);*/
+
+		kernSimpleShade << <numblocksPathSegmentTracing, blockSize1d >> > (
+			iter,
+			num_paths,
+			depth,
+			dev_intersections,
+			dev_paths,
+			dev_materials
+		);
+
+		//stream compaction
+#if COMPACTION
+		//referring to the first element of the second partition
+		dev_path_end = thrust::stable_partition(thrust::device, dev_paths, dev_path_end, isZero());
+		num_paths = dev_path_end - dev_paths;
+#endif
+
+#if SORT_MATERIAL
+		//sort dev_intersectoins and dev_paths based on materialId
+		thrust::stable_sort_by_key(thrust::device, dev_intersections, dev_intersections+ num_paths, dev_paths, compareMaterial());
+#endif
+
+
+		if(depth >= traceDepth || num_paths == 0)
+			iterationComplete = true; // TODO: should be based off stream compaction results.
+
 
 		if (guiData != NULL)
 		{
@@ -390,7 +534,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	// Assemble this iteration and apply it to the image
 	dim3 numBlocksPixels = (pixelcount + blockSize1d - 1) / blockSize1d;
-	finalGather << <numBlocksPixels, blockSize1d >> > (num_paths, dev_image, dev_paths);
+	finalGather << <numBlocksPixels, blockSize1d >> > (pixelcount, dev_image, dev_paths);
 
 	///////////////////////////////////////////////////////////////////////////
 
