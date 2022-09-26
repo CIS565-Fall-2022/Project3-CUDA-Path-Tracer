@@ -76,6 +76,9 @@ void scatterRay(    // similar to sample_f, calculate the new wi and f
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    if (pathSegment.remainingBounces == 0) {
+        return;
+    }
 
     glm::vec3 wi_scatteredRayDir = calculateRandomDirectionInHemisphere(normal, rng);  // for pure diffused material
     pathSegment.ray.direction = wi_scatteredRayDir;

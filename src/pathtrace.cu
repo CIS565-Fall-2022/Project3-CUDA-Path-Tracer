@@ -3,9 +3,9 @@
 #include <cmath>
 #include <thrust/execution_policy.h>
 #include <thrust/random.h>
-#include <thrust/remove.h>
-#include <thrust/sort.h>
-#include <thrust/device_vector.h>
+//#include <thrust/remove.h>
+//#include <thrust/sort.h>
+//#include <thrust/device_vector.h>
 #include <thrust/partition.h>
 
 #include "sceneStructs.h"
@@ -170,6 +170,9 @@ __global__ void computeIntersections(
 )
 {
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
+	/*if (pathSegments[path_index].remainingBounces <= 0) {
+		return;
+	}*/
 
 	if (path_index < num_paths)
 	{
@@ -215,7 +218,7 @@ __global__ void computeIntersections(
 		if (hit_geom_index == -1)
 		{
 			intersections[path_index].t = -1.0f;
-			pathSegment.remainingBounces = 0;
+			pathSegments[path_index].remainingBounces = 0;
 		}
 		else
 		{
@@ -307,6 +310,7 @@ __global__ void shadeWithMaterial(
 			// If the material indicates that the object was a light, "light" the ray
 			if (material.emittance > 0.0f) {
 				pathSegments[idx].color *= (materialColor * material.emittance);
+				pathSegments[idx].remainingBounces = 0;
 			}
 			// Otherwise, do some pseudo-lighting computation. This is actually more
 			// like what you would expect from shading in a rasterizer like OpenGL.
@@ -315,7 +319,7 @@ __global__ void shadeWithMaterial(
 				// 2. Ideal diffused shading and bounce
 				glm::vec3 pointOfIntersection = getPointOnRay(pathSegments[idx].ray, intersection.t);
 				scatterRay(pathSegments[idx], pointOfIntersection, intersection.surfaceNormal, material, rng);
-				//pathSegments[idx].color *= materialColor;
+				//pathSegments[idx].color /= iter;
 
 				//float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));
 				//pathSegments[idx].color *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f;
@@ -329,6 +333,7 @@ __global__ void shadeWithMaterial(
 		}
 		else {
 			pathSegments[idx].color = glm::vec3(0.0f);
+			pathSegments[idx].remainingBounces = 0;
 		}
 	}
 }
@@ -419,7 +424,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	// --- PathSegment Tracing Stage ---
 	// Shoot ray into scene, bounce between objects, push shading chunks
-
+	int new_num_paths = num_paths;
 	bool iterationComplete = false;
 	while (!iterationComplete) {
 
@@ -427,10 +432,10 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
 		// tracing
-		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
+		dim3 numblocksPathSegmentTracing = (new_num_paths + blockSize1d - 1) / blockSize1d;
 		computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
 			depth
-			, num_paths
+			, new_num_paths
 			, dev_paths
 			, dev_geoms
 			, hst_scene->geoms.size()
@@ -450,12 +455,12 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		// path segments that have been reshuffled to be contiguous in memory.
 
 		// 1. Sort ray by material
-		//thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + num_paths, dev_paths, compareMaterialId());
+		//thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + new_num_paths, dev_paths, compareMaterialId());
 
 		// 2. Ideal diffused shading and bounce and // 3. Perfect specular reflection
 		shadeWithMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
 			iter,
-			num_paths,
+			new_num_paths,
 			dev_intersections,
 			dev_paths,
 			dev_materials
@@ -463,18 +468,18 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 		// 4. Stream compaction
 		//dev_thrust_paths = thrust::device_ptr<PathSegment>(dev_paths);
-		//dev_new_end_path = thrust::device_ptr<PathSegment>(thrust::remove_if(dev_thrust_paths, dev_thrust_paths + num_paths, is_Terminated()));
+		//dev_new_end_path = thrust::device_ptr<PathSegment>(thrust::remove_if(dev_thrust_paths, dev_thrust_paths + new_num_paths, is_Terminated()));
 		//dev_thrust_paths = thrust::device_ptr<PathSegment>(dev_paths);
-		dev_path_end = thrust::partition(thrust::device, dev_paths, dev_paths + num_paths, is_Terminated());
-		num_paths = dev_path_end - dev_paths;
+		dev_path_end = thrust::partition(thrust::device, dev_paths, dev_paths + new_num_paths, is_Terminated());
+		new_num_paths = dev_path_end - dev_paths;
 
 
 		//int count = StreamCompaction::Efficient::compact(num_paths, dev_paths, dev_paths);
 		// 
 		// 5. Cache first bounce
 
-		//if (num_paths == 0){
-		if (depth == 3) {
+		if (new_num_paths == 0){
+		//if (depth == 3) {
 			iterationComplete = true; // TODO: should be based off stream compaction results.
 		}
 
