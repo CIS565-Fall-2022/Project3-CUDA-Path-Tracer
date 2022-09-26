@@ -35,7 +35,6 @@ public:
     std::vector<TexCoord> uvs;
     
     std::vector<Texture> textures;
-    std::unordered_map<string, int> tex_name_to_id;
 
     // all triangles, untransformed, in model space
     std::vector<Triangle> triangles;

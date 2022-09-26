@@ -95,9 +95,9 @@ int Scene::loadGeom() {
                 auto const& attrib = reader.GetAttrib();
                 auto const& mats = reader.GetMaterials();
                 
-                // fill textures
+                // fill materials
                 for (auto const& mat : mats) {
-                    
+                    materials.emplace_back(initMaterial(mat));
                 }
 
                 // fill vertices
@@ -279,6 +279,8 @@ int Scene::loadCamera() {
 
 
 static Material initMaterial(tinyobj::material_t const& tinyobj_mat) {
+    static unordered_map<string, int> s_tex_name_to_id;
+
     Material mat;
     mat.diffuse = color_t(tinyobj_mat.diffuse[0], tinyobj_mat.diffuse[1], tinyobj_mat.diffuse[2]);
     mat.emittance = tinyobj_mat.emission[0];
@@ -289,7 +291,15 @@ static Material initMaterial(tinyobj::material_t const& tinyobj_mat) {
     mat.specular.color = color_t(tinyobj_mat.specular[0], tinyobj_mat.specular[1], tinyobj_mat.specular[2]);
     mat.specular.exponent = tinyobj_mat.shininess;
 
-    mat.textures.tex_idx = tinyobj_mat.diffuse_texname;
+
+    if (s_tex_name_to_id.count(tinyobj_mat.diffuse_texname)) {
+        mat.textures.tex_idx = s_tex_name_to_id[tinyobj_mat.diffuse_texname];
+    } else {
+        // load texture
+        Texture tex;
+
+        //TODO
+    }
 
     return mat;
 }
