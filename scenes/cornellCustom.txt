@@ -50,13 +50,13 @@ EMITTANCE   0
 
 // Refractive glass
 MATERIAL 5
-RGB		.98 .98 .98
-SPECEX	0
-SPECRGB	.98 .98 .98
-REFL	 	0.2
-REFR		0.8
-REFRIOR	1.52
-EMMITANCE	0
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0.3
+REFR        0.7
+REFRIOR     1.52
+EMITTANCE   0
 
 // Camera
 CAMERA
@@ -128,8 +128,8 @@ SCALE       3 3 3
 
 // Glass Sphere
 OBJECT 7
-sphere
+cube
 material 5
-TRANS		2 7 -3
+TRANS		2 7 -2
 ROTAT		0 0 0
 SCALE		3 3 3

@@ -76,9 +76,79 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    // treat the rest as perfectly specular.
+    // assuming there's only one light
 
-    // perfectly diffuse
-    if (m.hasReflective == 0 && m.hasRefractive == 0) {
+    // based on float value of reflective and refractive
+    // with float percent likelihood the ray goes reflective vs. refractive
+
+    thrust::uniform_real_distribution<float> u01(0, 1);
+
+    float randGen = u01(rng);
+
+    if (randGen <= m.hasReflective) {
+        // take a reflective ray
+        glm::vec3 newDirection = glm::reflect(pathSegment.ray.direction, normal);
+        Ray newRay = {
+            intersect,
+            newDirection
+        };
+
+        PathSegment newPath = {
+            newRay,
+            m.specular.color * m.color * pathSegment.color * m.hasReflective,
+            pathSegment.pixelIndex,
+            pathSegment.remainingBounces
+        };
+
+        pathSegment = newPath;
+    }
+    else if (randGen <= m.hasReflective + m.hasRefractive) {
+        // take a refractive ray
+        float airIOR = 1.0f;
+        float eta = m.indexOfRefraction / airIOR;
+
+        // then entering
+        float cosTheta = glm::clamp(glm::dot(-pathSegment.ray.direction, normal), -1.f, 1.f);
+
+        bool entering = cosTheta > 0;
+
+        if (!entering) {
+            eta = 1.0f / eta; // invert eta
+            cosTheta = abs(cosTheta);
+        }
+
+        float sinThetaI = sqrt(1.0 - cosTheta * cosTheta);
+        float sinThetaT = eta * sinThetaI;
+
+        glm::vec3 newDirection = pathSegment.ray.direction;
+
+        // if total internal reflection
+        if (sinThetaT > 1) {
+            newDirection = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+        }
+        else {
+            newDirection = glm::normalize(glm::refract(pathSegment.ray.direction, normal, eta));
+        }
+
+        glm::vec3 newColor = pathSegment.color * m.specular.color;
+
+        Ray newRay = {
+            intersect + 0.001f * pathSegment.ray.direction,
+            newDirection
+        };
+
+        PathSegment newPath = {
+            newRay,
+            newColor,
+            pathSegment.pixelIndex,
+            pathSegment.remainingBounces
+        };
+
+        pathSegment = newPath;
+    }
+    else {
+        // only diffuse
         glm::vec3 newDirection = calculateRandomDirectionInHemisphere(normal, rng);
         Ray newRay = {
             intersect,
@@ -93,54 +163,5 @@ void scatterRay(
         };
 
         pathSegment = newPath;
-    }
-    else {
-        // treat the rest as perfectly specular.
-        // assuming there's only one light
-
-        // based on float value of reflective and refractive
-        // with float percent likelihood the ray goes reflective vs. refractive
-
-        thrust::uniform_real_distribution<float> u01(0, 1);
-
-        float randGen = u01(rng);
-
-        if (randGen <= m.hasReflective) {
-            // take a reflective ray
-            glm::vec3 newDirection = glm::reflect(pathSegment.ray.direction, normal);
-            Ray newRay = {
-                intersect,
-                newDirection
-            };
-
-            PathSegment newPath = {
-                newRay,
-                m.specular.color * pathSegment.color * m.hasReflective,
-                pathSegment.pixelIndex,
-                pathSegment.remainingBounces
-            };
-
-            pathSegment = newPath;
-        }
-        else {
-            // take a refractive ray
-            float airIOR = 1.0003f;
-            float ratioRefraction = airIOR / m.indexOfRefraction;
-            glm::vec3 newDirection = glm::refract(pathSegment.ray.direction, normal, ratioRefraction);
-
-            Ray newRay = {
-                intersect,
-                newDirection
-            };
-
-            PathSegment newPath = {
-                newRay,
-                m.specular.color * pathSegment.color * m.hasRefractive,
-                pathSegment.pixelIndex,
-                pathSegment.remainingBounces
-            };
-
-            pathSegment = newPath;
-        }
     }
 }
