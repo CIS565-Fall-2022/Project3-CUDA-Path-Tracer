@@ -104,7 +104,7 @@ void scatterRay(
         pathSegment.color *= m.color;
     }
 
-    pathSegment.ray.origin = intersect;
+    pathSegment.ray.origin = intersect + pathSegment.ray.direction * EPSILON;
     pathSegment.remainingBounces--;
 
 }
