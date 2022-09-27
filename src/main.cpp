@@ -101,6 +101,8 @@ void saveImage() {
 	ss << filename << "." << startTimeString << "." << samples << "samp";
 	filename = ss.str();
 
+	std::cout << "current time: " << currentTimeString() << std::endl;
+
 	// CHECKITOUT
 	img.savePNG(filename);
 	//img.saveHDR(filename);  // Save a Radiance HDR file

@@ -2,7 +2,6 @@
 
 #include "intersections.h"
 
-// CHECKITOUT
 /**
  * Computes a cosine-weighted random direction in a hemisphere.
  * Used for diffuse lighting.
@@ -20,7 +19,6 @@ glm::vec3 calculateRandomDirectionInHemisphere(
     // normal's components are all equal to sqrt(1/3) or whether or not at
     // least one component is less than sqrt(1/3). Learned this trick from
     // Peter Kutz.
-
     glm::vec3 directionNotNormal;
     if (abs(normal.x) < SQRT_OF_ONE_THIRD) {
         directionNotNormal = glm::vec3(1, 0, 0);
@@ -61,19 +59,24 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  * - Pick the split based on the intensity of each material color, and divide
  *   branch result by that branch's probability (whatever probability you use).
  *
- * This method applies its changes to the Ray parameter `ray` in place.
- * It also modifies the color `color` of the ray in place.
- *
  * You may need to change the parameter list for your purposes!
  */
 __host__ __device__
 void scatterRay(
-        PathSegment & pathSegment,
+        PathSegment &pathSegment,
         glm::vec3 intersect,
         glm::vec3 normal,
         const Material &m,
         thrust::default_random_engine &rng) {
-    // TODO: implement this.
-    // A basic implementation of pure-diffuse shading will just call the
-    // calculateRandomDirectionInHemisphere defined above.
+    // bias origin to avoid shadow acne
+    pathSegment.ray.origin = intersect + 1e-4f * normal;
+    pathSegment.color *= m.color;
+
+    if (m.hasReflective == 0.f && m.hasRefractive == 0.f) { // pure diffuse shading
+        pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
+    }
+    else if (m.hasRefractive == 0.f) { // reflective, 0 refraction
+        pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+    }
+    // TODO: more types
 }
