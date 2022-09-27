@@ -109,13 +109,12 @@ void scatterRay(
         float eta = m.indexOfRefraction / airIOR;
 
         // then entering
-        float cosTheta = glm::clamp(glm::dot(-pathSegment.ray.direction, normal), -1.f, 1.f);
+        float cosTheta = glm::min(glm::dot(pathSegment.ray.direction, normal), 1.f);
 
         bool entering = cosTheta > 0;
 
         if (!entering) {
             eta = 1.0f / eta; // invert eta
-            cosTheta = abs(cosTheta);
         }
 
         float sinThetaI = sqrt(1.0 - cosTheta * cosTheta);
@@ -125,7 +124,7 @@ void scatterRay(
 
         // if total internal reflection
         if (sinThetaT > 1) {
-            newDirection = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+            newDirection = glm::normalize(glm::reflect(glm::normalize(pathSegment.ray.direction), normal));
         }
         else {
             newDirection = glm::normalize(glm::refract(pathSegment.ray.direction, normal, eta));
