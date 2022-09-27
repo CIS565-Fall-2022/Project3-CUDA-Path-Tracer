@@ -70,7 +70,7 @@ struct DevScene {
         glm::vec3 absDir = glm::abs(dir);
         if (absDir.x > absDir.y) {
             if (absDir.x > absDir.z) {
-                return dir.x > 0 ? 0 : 1;
+                return dir.x > 0 ? 1 : 0;
             }
             else {
                 return dir.z > 0 ? 4 : 5;
@@ -156,7 +156,7 @@ struct DevScene {
 
             // Only intersect a primitive if its bounding box is hit and
             // that box is closer than previous hit record
-            if (boundHit /*&& boundDist < closestDist*/) {
+            if (boundHit && boundDist < closestDist) {
                 int primId = nodes[node].primitiveId;
                 if (primId != NullPrimitive) {
                     float dist;
@@ -184,6 +184,49 @@ struct DevScene {
         else {
             intersec.primitive = NullPrimitive;
         }
+    }
+
+    __device__ void debugIntersect(Ray ray, Intersection& intersec) {
+        float closestDist = FLT_MAX;
+        int closestPrimId = NullPrimitive;
+        glm::vec2 closestBary;
+
+        MTBVHNode* nodes = devBVHNodes[getMTBVHId(-ray.direction)];
+        int node = 0;
+        int maxDepth = 0;
+
+        while (node != BVHSize) {
+            AABB& bound = devBoundingBoxes[nodes[node].boundingBoxId];
+            float boundDist;
+            bool boundHit = bound.intersect(ray, boundDist);
+
+            // Only intersect a primitive if its bounding box is hit and
+            // that box is closer than previous hit record
+            if (boundHit && boundDist < closestDist) {
+                int primId = nodes[node].primitiveId;
+                if (primId != NullPrimitive) {
+                    float dist;
+                    glm::vec2 bary;
+                    bool hit = intersectPrimitive(primId, ray, dist, bary);
+
+                    if (hit && dist < closestDist) {
+                        closestDist = dist;
+                        closestBary = bary;
+                        closestPrimId = primId;
+                        maxDepth += 1.f;
+                    }
+                }
+                node++;
+                maxDepth += 1.f;
+            }
+            else {
+                node = nodes[node].nextNodeIfMiss;
+            }
+        }
+        if (closestPrimId == 0) {
+            maxDepth = 100.f;
+        }
+        intersec.primitive = maxDepth;
     }
 
     glm::vec3* devVertices = nullptr;

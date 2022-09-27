@@ -196,6 +196,7 @@ void Scene::loadModel(const std::string& objId) {
         //load tranformations
         if (tokens[0] == "Translate") {
             instance.translation = glm::vec3(std::stof(tokens[1]), std::stof(tokens[2]), std::stof(tokens[3]));
+            std::cout << vec3ToString(instance.translation) << "\n";
         }
         else if (tokens[0] == "Rotate") {
             instance.rotation = glm::vec3(std::stof(tokens[1]), std::stof(tokens[2]), std::stof(tokens[3]));

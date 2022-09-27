@@ -84,12 +84,12 @@ struct AABB {
             }
         }
         dist = tMin;
-
-        if (tMax >= 0.f && tMax >= tMin) {
+         
+        if (tMax >= 0.f && tMax >= tMin - Eps) {
             glm::vec3 mid = ray.getPoint((tMin + tMax) * .5f);
 #pragma unroll
             for (int i = 0; i < 3; i++) {
-                if (mid[i] < pMin[i] || mid[i] > pMax[i]) {
+                if (mid[i] <= pMin[i] - Eps || mid[i] >= pMax[i] + Eps) {
                     return false;
                 }
             }

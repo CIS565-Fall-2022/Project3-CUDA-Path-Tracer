@@ -18,6 +18,8 @@
 #include "mathUtil.h"
 #include "sampler.h"
 
+#define BVH_DEBUG_VISUALIZATION false
+
 //Kernel that writes the image to the OpenGL PBO directly.
 __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
 	int iter, glm::vec3* Image) {
@@ -117,7 +119,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		ruv = 1.f - ruv * 2.f;
 
 		glm::vec3 pLens = glm::vec3(Math::toConcentricDisk(r.z, r.w) * cam.lensRadius, 0.f);
-		glm::vec3 pFocusPlane = glm::vec3(ruv * glm::vec2(aspect, 1.f) * cam.focalDist * tanFovY, cam.focalDist);
+		glm::vec3 pFocusPlane = glm::vec3(ruv * glm::vec2(aspect, 1.f) * tanFovY, 1.f) * cam.focalDist;
 		glm::vec3 dir = pFocusPlane - pLens;
 		dir = glm::normalize(glm::mat3(cam.right, cam.up, cam.view) * dir);
 
@@ -131,7 +133,6 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 	}
 }
 
-// TODO:
 // computeIntersections handles generating ray intersections ONLY.
 // Generating new rays is handled in your shader(s).
 // Feel free to modify the code below.
@@ -145,8 +146,18 @@ __global__ void computeIntersections(
 	int pathIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (pathIdx < numPaths) {
-		PathSegment pathSegment = pathSegments[pathIdx];
-		scene->intersect(pathSegment.ray, intersections[pathIdx]);
+#if BVH_DEBUG_VISUALIZATION
+	scene->debugIntersect(pathSegments[pathIdx].ray, intersections[pathIdx]);
+#else
+	scene->intersect(pathSegments[pathIdx].ray, intersections[pathIdx]);
+	/*AABB box;
+	box.pMin = glm::vec3(-3.f);
+	box.pMax = glm::vec3(3.f);
+	float dist;
+	bool hit = box.intersect(pathSegments[pathIdx].ray, dist);
+	intersections[pathIdx].primitive = hit ? 1 : NullPrimitive;
+	intersections[pathIdx].position = pathSegments[pathIdx].ray.getPoint(dist);*/
+#endif
 	}
 }
 
@@ -177,7 +188,22 @@ __global__ void pathIntegSampleSurface(
 
 	// TODO
 	// Perform light area sampling and MIS
-	//segment.radiance = material.baseColor;
+	 
+#if BVH_DEBUG_VISUALIZATION
+	float logDepth = 0.f;
+	int size = scene->BVHSize;
+	while (size) {
+		logDepth += 1.f;
+		size >>= 1;
+	}
+	segment.radiance = glm::vec3(float(intersec.primitive) / logDepth * .1f);
+	//segment.radiance = intersec.primitive > 16 ? glm::vec3(1.f) : glm::vec3(0.f);
+	segment.remainingBounces = 0;
+	return;
+#endif
+	/*segment.radiance = intersec.position;
+	segment.remainingBounces = 0;
+	return;*/
 
 	if (material.type == Material::Type::Light) {
 		// TODO
