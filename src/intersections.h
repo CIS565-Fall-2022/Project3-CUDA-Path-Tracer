@@ -203,7 +203,9 @@ __device__ float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo, Shade
     inters.hitPoint = multiplyMV(mesh.transform, glm::vec4(getPointOnRay(local_ray, t_min), 1));
     inters.surfaceNormal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(normal, 0)));
     inters.uv = uv;
-    inters.materialId = mat_id;
+
+    // use per-mesh material if per-face material is missing
+    inters.materialId = mat_id < 0 ? mesh.materialid : mat_id;
 
     return glm::length(r.origin - inters.hitPoint);
 }

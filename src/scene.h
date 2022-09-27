@@ -39,5 +39,9 @@ public:
     // all triangles, untransformed, in model space
     std::vector<Triangle> triangles;
 
+    // caches
+    unordered_map<string, int> tex_name_to_id;
+    unordered_map<string, int> mtl_to_id;
+
     RenderState state;
 };

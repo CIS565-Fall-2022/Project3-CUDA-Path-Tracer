@@ -6,7 +6,7 @@
 #include <glm/gtc/epsilon.hpp>
 #include "scene.h"
 
-// #define PBRT
+#define PBRT
 
 // Reference: https://www.pbr-book.org/3ed-2018/Reflection_Models/Microfacet_Models#MicrofacetDistribution::D
 // BeckmannDistribution for microfacet modeling
@@ -379,7 +379,6 @@ void scatterRay(
 #ifndef NDEBUG
         printf("glm::dot(wo, up_norm) < 0\n");
 #endif // !NDEBUG
-
         path.terminate();
         return;
     }

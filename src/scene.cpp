@@ -4,6 +4,7 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include "TinyObjLoader/tiny_obj_loader.h"
+#include "stb_image.h"
 
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
@@ -32,6 +33,45 @@ Scene::Scene(string filename) {
 
 Scene::~Scene() {
 
+}
+
+static bool initMaterial(
+    Material& ret,
+    string const& obj_dir,
+    unordered_map<string, int>& tex_name_to_id, 
+    tinyobj::material_t const& tinyobj_mat
+) {
+    Material mat;
+    mat.diffuse = color_t(tinyobj_mat.diffuse[0], tinyobj_mat.diffuse[1], tinyobj_mat.diffuse[2]);
+    mat.emittance = tinyobj_mat.emission[0];
+    mat.ior = tinyobj_mat.ior;
+    mat.hasReflective = tinyobj_mat.metallic;
+    mat.hasRefractive = 1 - tinyobj_mat.dissolve;
+    mat.roughness = tinyobj_mat.roughness;
+    mat.specular.color = color_t(tinyobj_mat.specular[0], tinyobj_mat.specular[1], tinyobj_mat.specular[2]);
+    mat.specular.exponent = tinyobj_mat.shininess;
+
+    string const& texname = tinyobj_mat.diffuse_texname;
+    if (!texname.empty()) {
+        if (tex_name_to_id.count(texname)) {
+            mat.textures.tex_idx = tex_name_to_id[texname];
+        } else {
+            // TODO load texture
+            int x, y, n;
+            string texpath = obj_dir + '/' + texname;
+            unsigned char* data = stbi_load(texpath.c_str(), &x, &y, &n, 0);
+            if (!data) {
+                return false;
+            }
+
+
+        }
+    }
+
+    // TODO deduce material type
+
+    ret = move(mat);
+    return true;
 }
 
 int Scene::loadGeom() {
@@ -97,7 +137,11 @@ int Scene::loadGeom() {
                 
                 // fill materials
                 for (auto const& mat : mats) {
-                    materials.emplace_back(initMaterial(mat));
+                    Material material;
+                    if (!initMaterial(material, config.mtl_search_path, tex_name_to_id, mat)) {
+                        return -1;
+                    }
+                    materials.emplace_back(material);
                 }
 
                 // fill vertices
@@ -125,26 +169,47 @@ int Scene::loadGeom() {
                 }
                 
                 int triangles_start = triangles.size();
+                bool missing_norm = false;
+                bool missing_uv = false;
                 for (auto const& s : reader.GetShapes()) {
                     auto const& indices = s.mesh.indices;
                     for (size_t i = 0; i < s.mesh.material_ids.size(); ++i) {
-                        int vals[]{
+                        glm::ivec3 verts {
                             indices[3 * i + 0].vertex_index + vert_offset,
                             indices[3 * i + 1].vertex_index + vert_offset,
                             indices[3 * i + 2].vertex_index + vert_offset,
-
-                            indices[3 * i + 0].normal_index + norm_offset,
-                            indices[3 * i + 1].normal_index + norm_offset,
-                            indices[3 * i + 2].normal_index + norm_offset,
-
-                            indices[3 * i + 0].texcoord_index + uv_offset,
-                            indices[3 * i + 1].texcoord_index + uv_offset,
-                            indices[3 * i + 2].texcoord_index + uv_offset,
-
-                            s.mesh.material_ids[i] + mat_offset
                         };
+                        glm::ivec3 norms;
+                        if (indices[3*i].normal_index >= 0) {
+                            norms = {
+                                indices[3 * i + 0].normal_index + norm_offset,
+                                indices[3 * i + 1].normal_index + norm_offset,
+                                indices[3 * i + 2].normal_index + norm_offset,
+                            };
+                        } else {
+                            missing_norm = true;
+                            norms = { -1,-1,-1 };
+                        }
+                        glm::ivec3 uvs;
+                        if (indices[3 * i].texcoord_index >= 0) {
+                            uvs = {
+                                indices[3 * i + 0].texcoord_index + uv_offset,
+                                indices[3 * i + 1].texcoord_index + uv_offset,
+                                indices[3 * i + 2].texcoord_index + uv_offset,
+                            };
+                        } else {
+                            missing_uv = true;
+                            uvs = { -1,-1,-1 };
+                        }
 
-                        triangles.emplace_back(&vals);
+                        int mat_id;
+                        if (s.mesh.material_ids[i] >= 0) {
+                            mat_id = s.mesh.material_ids[i] + mat_offset;
+                        } else {
+                            mat_id = -1;
+                        }
+                        
+                        triangles.emplace_back(verts, norms, uvs, mat_id);
                     }
                 }
 
@@ -163,15 +228,13 @@ int Scene::loadGeom() {
             }
         }
     }
-
-    //link material
     utilityCore::safeGetline(fp_in, line);
     if (!line.empty() && fp_in.good()) {
         vector<string> tokens = utilityCore::tokenizeString(line);
         if (tokens[0] == "material") {
             int mat_id = loadMaterial(tokens[1]);
             if (mat_id < 0) {
-                return 1;
+                return -1;
             }
             newGeom.materialid = mat_id;
             cout << "Connecting Geom " << objectid << " to Material " << tokens[1] << "..." << endl;
@@ -180,7 +243,6 @@ int Scene::loadGeom() {
             return -1;
         }
     }
-
     //load transformations
     utilityCore::safeGetline(fp_in, line);
     while (!line.empty() && fp_in.good()) {
@@ -203,16 +265,19 @@ int Scene::loadGeom() {
     newGeom.inverseTransform = glm::inverse(newGeom.transform);
     newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
 
-    // record lights
-    Material const& mat = materials[newGeom.materialid];
-    if (mat.emittance > 0) {
-        Light light;
-        light.color = mat.diffuse;
-        light.intensity = mat.emittance / MAX_EMITTANCE;
-        light.position = newGeom.translation;
-        lights.emplace_back(light);
+    // record lights, for now primitives only
+    if (newGeom.type != MESH) {
+        Material const& mat = materials[newGeom.materialid];
+        if (mat.emittance > 0) {
+            Light light;
+            light.color = mat.diffuse;
+            light.intensity = mat.emittance / MAX_EMITTANCE;
+            light.position = newGeom.translation;
+            lights.emplace_back(light);
+        }
     }
     geoms.push_back(newGeom);
+
     return 1;
 }
 
@@ -278,41 +343,12 @@ int Scene::loadCamera() {
 }
 
 
-static Material initMaterial(tinyobj::material_t const& tinyobj_mat) {
-    static unordered_map<string, int> s_tex_name_to_id;
-
-    Material mat;
-    mat.diffuse = color_t(tinyobj_mat.diffuse[0], tinyobj_mat.diffuse[1], tinyobj_mat.diffuse[2]);
-    mat.emittance = tinyobj_mat.emission[0];
-    mat.ior = tinyobj_mat.ior;
-    mat.hasReflective = tinyobj_mat.metallic;
-    mat.hasRefractive = 1 - tinyobj_mat.dissolve;
-    mat.roughness = tinyobj_mat.roughness;
-    mat.specular.color = color_t(tinyobj_mat.specular[0], tinyobj_mat.specular[1], tinyobj_mat.specular[2]);
-    mat.specular.exponent = tinyobj_mat.shininess;
-
-
-    if (s_tex_name_to_id.count(tinyobj_mat.diffuse_texname)) {
-        mat.textures.tex_idx = s_tex_name_to_id[tinyobj_mat.diffuse_texname];
-    } else {
-        // load texture
-        Texture tex;
-
-        //TODO
-    }
-
-    return mat;
-}
-
 // standardize material using mtl format
 // returns the material id on success or -1 on error
 // NOTE: only loads 1 material per mtl file, the rest will be discarded
-int Scene::loadMaterial(string mtl_file) {
-    // maps mtl file to material index
-    static unordered_map<string, int> s_loaded;
-    
-    if (s_loaded.count(mtl_file)) {
-        return s_loaded[mtl_file];
+int Scene::loadMaterial(string mtl_file) {    
+    if (mtl_to_id.count(mtl_file)) {
+        return mtl_to_id[mtl_file];
     } else {
         ifstream fin(mtl_file);
         if (!fin) {
@@ -337,8 +373,13 @@ int Scene::loadMaterial(string mtl_file) {
             cerr << "WARNING: " << mat_mp.size()-1 << "materials discarded in " << mtl_file << endl;
         }
 
-        materials.emplace_back(initMaterial(mats[0]));
-        s_loaded[mtl_file] = materials.size() - 1;
+        Material material;
+        if (!initMaterial(material, mtl_file.substr(0, mtl_file.find_last_of('/')), tex_name_to_id, mats[0])) {
+            return -1;
+        }
+        materials.emplace_back(material);
+        
+        mtl_to_id[mtl_file] = materials.size() - 1;
         return materials.size() - 1;
     }
 }

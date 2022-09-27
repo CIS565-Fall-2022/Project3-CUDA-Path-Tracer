@@ -35,8 +35,13 @@ struct Geom {
 };
 
 struct Texture {
-    int w, h;
-    color_t* data;
+    Texture(int pixel_width, int pixel_height, unsigned char* raw_pixel) : 
+        pixel_width(pixel_width), pixel_height(pixel_height) {
+
+    }
+    int pixel_width;
+    int pixel_height;
+    color_t* pixels;
 };
 
 struct Material {
@@ -61,7 +66,6 @@ struct Material {
         INVALID
     };
     
-
     struct {
         int tex_idx;
     } textures;      // optional: invalid = -1
@@ -164,18 +168,8 @@ struct Triangle {
     glm::ivec3 uvs;
     int mat_id;
 
-    Triangle(int(*arr)[10]) {
-        for (int i = 0; i < 3; ++i) {
-            verts[i] = (*arr)[i];
-        }
-        for (int i = 0; i < 3; ++i) {
-            norms[i] = (*arr)[i + 3];
-        }
-        for (int i = 0; i < 3; ++i) {
-            uvs[i] = (*arr)[i + 6];
-        }
-        mat_id = (*arr)[9];
-    }
+    Triangle(glm::ivec3 verts, glm::ivec3 norms, glm::ivec3 uvs, int mat_id) 
+        : verts(verts), norms(norms), uvs(uvs), mat_id(mat_id) {}
 };
 typedef glm::vec3 Vertex;
 typedef glm::vec3 Normal;

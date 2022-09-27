@@ -133,12 +133,11 @@ static thrust::device_ptr<ShadeableIntersection> dev_thrust_inters;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
+	unitTest();
 	guiData = imGuiData;
 }
 
 void pathtraceInit(Scene* scene) {
-	unitTest();
-
 	hst_scene = scene;
 
 	const Camera& cam = hst_scene->state.camera;
@@ -276,7 +275,7 @@ __global__ void computeIntersections(
 	}
 
 	if (hit_geom_index == -1) {
-		intersections[path_index].t = -1.0f;
+		inters.t = -1.0f;
 	} else {
 		//The ray hits something
 		inters.t = t_min;
