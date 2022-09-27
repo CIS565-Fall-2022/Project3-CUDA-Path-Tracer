@@ -177,7 +177,7 @@ __global__ void pathIntegSampleSurface(
 
 	// TODO
 	// Perform light area sampling and MIS
-	segment.radiance = material.baseColor;
+	//segment.radiance = material.baseColor;
 
 	if (material.type == Material::Type::Light) {
 		// TODO

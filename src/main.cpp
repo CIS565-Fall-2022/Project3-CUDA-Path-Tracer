@@ -1,5 +1,6 @@
 #include "main.h"
 #include "preview.h"
+#include "intersections.h"
 #include <cstring>
 
 static std::string startTimeString;
@@ -58,17 +59,17 @@ void testAABB() {
 /**
 * GLM intersection returns false when triangle is back-faced
 */
-void testGLM() {
-	glm::vec3 v[] = { glm::vec3(-1.f, -1.f, 0.f), glm::vec3(1.f, -1.f, 0.f), glm::vec3(0.f, 1.f, 0.f) };
+void testTriangle() {
+	glm::vec3 v[] = { glm::vec3(-1.f, -1.f, 0.f), glm::vec3(1.f, -1.f, 0.f), glm::vec3(1.f, 1.f, 0.f) };
 	glm::vec3 ori(0.f, 0.f, 1.f);
 	glm::vec3 dir(0.f, 0.f, -1.f);
 	glm::vec2 bary;
 	float dist;
-	bool hit = glm::intersectRayTriangle(ori, dir, v[0], v[1], v[2], bary, dist);
+	bool hit = intersectTriangle({ ori, dir }, v[0], v[1], v[2], bary, dist);
 	std::cout << hit << " " << vec3ToString(glm::vec3(1.f - bary.x - bary.y, bary)) << "\n";
-	glm::vec3 hitPos = v[0] * bary.x + v[1] * bary.y + v[2] * (1.f - bary.x - bary.y);
+	glm::vec3 hitPos = v[0] * (1.f - bary.x - bary.y) + v[1] * bary.x + v[2] * bary.y;
 	std::cout << vec3ToString(hitPos) << "\n";
-	hit = glm::intersectRayTriangle(-ori, -dir, v[0], v[1], v[2], bary, dist);
+	hit = intersectTriangle({ -ori, -dir }, v[0], v[1], v[2], bary, dist);
 	std::cout << hit << " " << vec3ToString(glm::vec3(1.f - bary.x - bary.y, bary)) << "\n";
 }
 
@@ -82,8 +83,6 @@ int main(int argc, char** argv) {
 
 	const char* sceneFile = argv[1];
 
-	testGLM();
-	exit(0);
 	// Load scene file
 	scene = new Scene(sceneFile);
 

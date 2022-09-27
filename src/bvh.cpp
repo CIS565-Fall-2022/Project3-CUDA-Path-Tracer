@@ -53,7 +53,8 @@ int BVHBuilder::build(
         }
         boundingBoxes[offset] = nodeBound;
 
-        std::cout << std::setw(10) << offset << " " << start << " " << end << " " << nodeBound.toString() << "\n";
+        /*std::cout << std::setw(4) << nodeInfo[offset].primIdOrSize << " " << offset << 
+            " " << start << " " << end << " " << nodeBound.toString() << "\n";*/
 
         if (isLeaf) {
             continue;
@@ -181,7 +182,7 @@ void BVHBuilder::buildMTBVH(
             int right = nodeIdOrig + 1 + leftSize;
 
             int dim = i / 2;
-            bool lesser = dim & 1;
+            bool lesser = i & 1;
             if ((boundingBoxes[left].center()[dim] < boundingBoxes[right].center()[dim]) ^ lesser) {
                 std::swap(left, right);
             }
@@ -191,14 +192,11 @@ void BVHBuilder::buildMTBVH(
         }
     }
 
-    for (const auto& nodes : BVHNodes) {
+    /*for (const auto& nodes : BVHNodes) {
         for (const auto& node : nodes) {
-            std::cout << std::setw(3) << node.primitiveId << " ";
+            std::cout << std::setw(3) << node.primitiveId << " " << node.nextNodeIfMiss << " " <<
+                vec3ToString(boundingBoxes[node.boundingBoxId].center()) << "\n";
         }
         std::cout << "\n";
-        for (const auto& node : nodes) {
-            std::cout << std::setw(3) << node.nextNodeIfMiss << " ";
-        }
-        std::cout << "\n\n";
-    }
+    }*/
 }

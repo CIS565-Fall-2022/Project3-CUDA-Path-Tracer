@@ -9,6 +9,7 @@
 #include "glm/glm.hpp"
 #include "utilities.h"
 #include "cudaUtil.h"
+#include "intersections.h"
 #include "sceneStructs.h"
 #include "material.h"
 #include "image.h"
@@ -98,9 +99,9 @@ struct DevScene {
         glm::vec2 tb = devTexcoords[primId * 3 + 1];
         glm::vec2 tc = devTexcoords[primId * 3 + 2];
 
-        intersec.position = va * bary.x + vb * bary.y + vc * (1.f - bary.x - bary.y);
-        intersec.normal = na * bary.x + nb * bary.y + nc * (1.f - bary.x - bary.y);
-        intersec.texcoord = ta * bary.x + tb * bary.y + tc * (1.f - bary.x - bary.y);
+        intersec.position = vb * bary.x + vc * bary.y + va * (1.f - bary.x - bary.y);
+        intersec.normal = nb * bary.x + nc * bary.y + na * (1.f - bary.x - bary.y);
+        intersec.texcoord = tb * bary.x + tc * bary.y + ta * (1.f - bary.x - bary.y);
     }
 
     __device__ bool intersectPrimitive(int primId, Ray ray, float& dist, glm::vec2& bary) {
@@ -108,10 +109,10 @@ struct DevScene {
         glm::vec3 vb = devVertices[primId * 3 + 1];
         glm::vec3 vc = devVertices[primId * 3 + 2];
 
-        if (!glm::intersectRayTriangle(ray.origin, ray.direction, va, vb, vc, bary, dist)) {
+        if (!intersectTriangle(ray, va, vb, vc, bary, dist)) {
             return false;
         }
-        glm::vec3 hitPoint = va * bary.x + vb * bary.y + vc * (1.f - bary.x - bary.y);
+        glm::vec3 hitPoint = vb * bary.x + vc * bary.y + va * (1.f - bary.x - bary.y);
         return true;
     }
 
@@ -122,7 +123,7 @@ struct DevScene {
         float dist;
         glm::vec2 bary;
 
-        if (!glm::intersectRayTriangle(ray.origin, ray.direction, va, vb, vc, bary, dist)) {
+        if (!intersectTriangle(ray, va, vb, vc, bary, dist)) {
             return false;
         }
 
@@ -134,9 +135,9 @@ struct DevScene {
         glm::vec2 tb = devTexcoords[primId * 3 + 1];
         glm::vec2 tc = devTexcoords[primId * 3 + 2];
 
-        intersec.position = va * bary.x + vb * bary.y + vc * (1.f - bary.x - bary.y);
-        intersec.normal = na * bary.x + nb * bary.y + nc * (1.f - bary.x - bary.y);
-        intersec.texcoord = ta * bary.x + tb * bary.y + tc * (1.f - bary.x - bary.y);
+        intersec.position = vb * bary.x + vc * bary.y + va * (1.f - bary.x - bary.y);
+        intersec.normal = nb * bary.x + nc * bary.y + na * (1.f - bary.x - bary.y);
+        intersec.texcoord = tb * bary.x + tc * bary.y + ta * (1.f - bary.x - bary.y);
         return true;
     }
 
@@ -145,7 +146,7 @@ struct DevScene {
         int closestPrimId = NullPrimitive;
         glm::vec2 closestBary;
 
-        MTBVHNode* nodes = devBVHNodes[0/*getMTBVHId(ray.direction)*/];
+        MTBVHNode* nodes = devBVHNodes[getMTBVHId(-ray.direction)];
         int node = 0;
 
         while (node != BVHSize) {
