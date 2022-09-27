@@ -410,8 +410,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 		// tracing
 		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
-		
-		
+
 		
 		// Caching the first intersection
 		if (depth == 0 && iter == 1)
@@ -445,13 +444,11 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			checkCUDAError("trace one bounce");
 			cudaDeviceSynchronize();
 		}
-
-
 		depth++;
 
 
 		//Sort rays by material
-		thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + num_paths, compareIntersections());
+		thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + num_paths, dev_paths, compareIntersections());
 
 		// TODO:
 		// --- Shading Stage ---
