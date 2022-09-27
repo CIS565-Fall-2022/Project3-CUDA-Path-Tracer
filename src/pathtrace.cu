@@ -146,7 +146,7 @@ __global__ void computeIntersections(
 
 	if (pathIdx < numPaths) {
 		PathSegment pathSegment = pathSegments[pathIdx];
-		int primId = scene->intersect(pathSegment.ray, intersections[pathIdx]);
+		scene->intersect(pathSegment.ray, intersections[pathIdx]);
 	}
 }
 
@@ -164,10 +164,9 @@ __global__ void pathIntegSampleSurface(
 		return;
 	}
 	Intersection intersec = intersections[idx];
-	if (intersec.dist < 0) {
+	if (intersec.primitive == NullPrimitive) {
 		// TODO
 		// Environment map
-
 		segments[idx].pixelIndex = PixelIdxForTerminated;
 		return;
 	}
@@ -178,6 +177,7 @@ __global__ void pathIntegSampleSurface(
 
 	// TODO
 	// Perform light area sampling and MIS
+	segment.radiance = material.baseColor;
 
 	if (material.type == Material::Type::Light) {
 		// TODO

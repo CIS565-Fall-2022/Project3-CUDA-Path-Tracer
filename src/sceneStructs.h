@@ -69,7 +69,7 @@ struct PathSegment {
 // 2) BSDF evaluation: generate a new ray
 
 struct Intersection {
-    float dist;
+    int primitive;
     glm::vec3 position;
     glm::vec3 normal;
     glm::vec2 texcoord;

@@ -17,6 +17,12 @@ struct Material {
         Light
     };
 
+    std::string toString() const {
+        std::stringstream ss;
+        ss << "[Type = " << type << ", BaseColor = " << vec3ToString(baseColor) << "]";
+        return ss.str();
+    }
+
     int type;
     glm::vec3 baseColor;
     float metallic;

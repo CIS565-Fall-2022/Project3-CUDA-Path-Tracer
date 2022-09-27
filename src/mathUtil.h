@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+#include <sstream>
 #include <vector>
 #include <cuda_runtime.h>
 #include <glm/glm.hpp>
@@ -11,6 +13,12 @@
 #define PiInv 1.f / Pi
 #define OneThirdSqrt 0.5773502691896257645091487805019574556476f
 #define EpsCmp 0.00001f
+
+static std::string vec3ToString(const glm::vec3& vec) {
+    std::stringstream ss;
+    ss << "{ x = " << vec.x << ", y = " << vec.y << ", z = " << vec.z << " }";
+    return ss.str();
+}
 
 namespace Math {
     bool epsilonCheck(float a, float b);

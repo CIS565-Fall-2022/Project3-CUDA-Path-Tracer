@@ -145,7 +145,9 @@ void Scene::buildDevData() {
             meshData.vertices.push_back(glm::vec3(inst.transform * glm::vec4(inst.meshData->vertices[i], 1.f)));
             meshData.normals.push_back(glm::normalize(inst.normalMat * inst.meshData->normals[i]));
             meshData.texcoords.push_back(inst.meshData->texcoords[i]);
-            materialIds.push_back(inst.materialId);
+            if (i % 3 == 0) {
+                materialIds.push_back(inst.materialId);
+            }
         }
     }
 #endif

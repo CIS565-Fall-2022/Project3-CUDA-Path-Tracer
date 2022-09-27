@@ -53,7 +53,7 @@ int BVHBuilder::build(
         }
         boundingBoxes[offset] = nodeBound;
 
-        //std::cout << std::setw(10) << offset << " " << start << " " << end << " " << nodeBound.toString() << "\n";
+        std::cout << std::setw(10) << offset << " " << start << " " << end << " " << nodeBound.toString() << "\n";
 
         if (isLeaf) {
             continue;
@@ -191,16 +191,14 @@ void BVHBuilder::buildMTBVH(
         }
     }
 
-    /*
     for (const auto& nodes : BVHNodes) {
         for (const auto& node : nodes) {
-            std::cout << node.primitiveId << " ";
+            std::cout << std::setw(3) << node.primitiveId << " ";
         }
         std::cout << "\n";
         for (const auto& node : nodes) {
-            std::cout << node.nextNodeIfMiss << " ";
+            std::cout << std::setw(3) << node.nextNodeIfMiss << " ";
         }
         std::cout << "\n\n";
     }
-    */
 }

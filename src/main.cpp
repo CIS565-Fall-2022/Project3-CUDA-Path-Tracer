@@ -36,7 +36,8 @@ void testAABB() {
 		{ glm::vec3(-1.f), glm::vec3(1.f) },
 		{ glm::vec3(0.f), glm::vec3(1.f) },
 		{ glm::vec3(0.f), glm::vec3(1.f) },
-		{ glm::vec3(0.f), glm::vec3(1.f) }
+		{ glm::vec3(0.f), glm::vec3(1.f) },
+		{ glm::vec3(0.f), glm::vec3(1.f) },
 	};
 
 	Ray ray[] = {
@@ -44,6 +45,7 @@ void testAABB() {
 		{ glm::vec3(0.f, 0.1f, 0.5f), glm::normalize(glm::vec3(1.f, 1.f, 0.f)) },
 		{ glm::vec3(-1.f), glm::normalize(glm::vec3(1.f, 0.f, 0.f)) },
 		{ glm::vec3(1.1f), glm::normalize(glm::vec3(1.f, 1.f, 0.f)) },
+		{ glm::vec3(2.f), glm::normalize(glm::vec3(-1.f)) },
 	};
 
 	for (int i = 0; i < sizeof(boxes) / sizeof(AABB); i++) {
@@ -51,6 +53,23 @@ void testAABB() {
 		bool intersec = boxes[i].intersect(ray[i], dist);
 		std::cout << intersec << " " << dist << "\n";
 	}
+}
+
+/**
+* GLM intersection returns false when triangle is back-faced
+*/
+void testGLM() {
+	glm::vec3 v[] = { glm::vec3(-1.f, -1.f, 0.f), glm::vec3(1.f, -1.f, 0.f), glm::vec3(0.f, 1.f, 0.f) };
+	glm::vec3 ori(0.f, 0.f, 1.f);
+	glm::vec3 dir(0.f, 0.f, -1.f);
+	glm::vec2 bary;
+	float dist;
+	bool hit = glm::intersectRayTriangle(ori, dir, v[0], v[1], v[2], bary, dist);
+	std::cout << hit << " " << vec3ToString(glm::vec3(1.f - bary.x - bary.y, bary)) << "\n";
+	glm::vec3 hitPos = v[0] * bary.x + v[1] * bary.y + v[2] * (1.f - bary.x - bary.y);
+	std::cout << vec3ToString(hitPos) << "\n";
+	hit = glm::intersectRayTriangle(-ori, -dir, v[0], v[1], v[2], bary, dist);
+	std::cout << hit << " " << vec3ToString(glm::vec3(1.f - bary.x - bary.y, bary)) << "\n";
 }
 
 int main(int argc, char** argv) {
@@ -63,6 +82,8 @@ int main(int argc, char** argv) {
 
 	const char* sceneFile = argv[1];
 
+	testGLM();
+	exit(0);
 	// Load scene file
 	scene = new Scene(sceneFile);
 

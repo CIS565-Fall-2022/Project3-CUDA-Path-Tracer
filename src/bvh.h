@@ -8,6 +8,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "sceneStructs.h"
+#include "mathUtil.h"
 
 #define NullPrimitive -1
 
@@ -32,8 +33,9 @@ struct AABB {
 
     std::string toString() const {
         std::stringstream ss;
-        ss << "[AABB " << "pMin = " << pMin.x << " " << pMin.y << " " << pMin.z;
-        ss << ", pMax = " << pMax.x << " " << pMax.y << " " << pMax.z << "]";
+        ss << "[AABB " << "pMin = " << vec3ToString(pMin);
+        ss << ", pMax = " << vec3ToString(pMax);
+        ss << ", center = " << vec3ToString(this->center()) << "]";
         return ss.str();
     }
 
