@@ -68,11 +68,11 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  */
 __host__ __device__
 void scatterRay(    // similar to sample_f, calculate the new wi and f
-        PathSegment & pathSegment,
-        glm::vec3 intersect,
-        glm::vec3 normal,
-        const Material &m,
-        thrust::default_random_engine &rng) {
+    PathSegment& pathSegment,
+    glm::vec3 intersect,
+    glm::vec3 normal,
+    const Material& m,
+    thrust::default_random_engine& rng) {
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
@@ -95,24 +95,24 @@ void scatterRay(    // similar to sample_f, calculate the new wi and f
 
     if (random <= m.hasReflective) {
         wi_scatteredRayDir = glm::reflect(wo, normal);
-
+        color = m.specular.color * m.color * m.hasReflective;
     }
     else if (random <= m.hasReflective + m.hasRefractive) {
-        float cosTheta = glm::dot(wo, normal);
+        float cosTheta = glm::dot(glm::normalize(wo), normal);
+
+        bool entering = cosTheta > 0;
+        eta = entering ? m.indexOfRefraction : 1.f / m.indexOfRefraction;
+
         float sinThetaI = sqrt(1 - pow(cosTheta, 2));
         float sinThetaT = eta * sinThetaI;
 
-        bool entering = cosTheta > 0;
-        eta = entering ? m.indexOfRefraction : 1.f/m.indexOfRefraction;
-        
         if (sinThetaT > 1) {
-            wi_scatteredRayDir = glm::reflect(wo, normal);
+            wi_scatteredRayDir = glm::normalize(glm::reflect(glm::normalize(wo), normal));
         }
         else {
-            wi_scatteredRayDir = glm::refract(glm::normalize(wo), normal, eta);
+            wi_scatteredRayDir = glm::normalize(glm::refract(glm::normalize(wo), normal, eta));
         }
-        
-
+        color = m.specular.color;
         //intersect += 0.001f * glm::normalize(wi_scatteredRayDir);
         //bool entering = (glm::dot(wo, normal) > 0);
         //float etaI = entering ? etaA : etaB;
@@ -123,9 +123,108 @@ void scatterRay(    // similar to sample_f, calculate the new wi and f
     else {
         wi_scatteredRayDir = calculateRandomDirectionInHemisphere(normal, rng);  // for pure diffused material
     }
-    
+
     pathSegment.ray.direction = wi_scatteredRayDir;
     pathSegment.ray.origin = intersect + 0.001f * glm::normalize(wi_scatteredRayDir);
     pathSegment.color *= color;
     pathSegment.remainingBounces--;
 }
+
+//__host__ __device__
+//void scatterRay(
+//    PathSegment& pathSegment,
+//    glm::vec3 intersect,
+//    glm::vec3 normal,
+//    const Material& m,
+//    thrust::default_random_engine& rng) {
+//    // TODO: implement this.
+//    // A basic implementation of pure-diffuse shading will just call the
+//    // calculateRandomDirectionInHemisphere defined above.
+//    // treat the rest as perfectly specular.
+//    // assuming there's only one light
+//
+//    // based on float value of reflective and refractive
+//    // with float percent likelihood the ray goes reflective vs. refractive
+//
+//    thrust::uniform_real_distribution<float> u01(0, 1);
+//
+//    float randGen = u01(rng);
+//
+//    if (randGen <= m.hasReflective) {
+//        // take a reflective ray
+//        glm::vec3 newDirection = glm::reflect(pathSegment.ray.direction, normal);
+//        Ray newRay = {
+//            intersect,
+//            newDirection
+//        };
+//
+//        PathSegment newPath = {
+//            newRay,
+//            m.specular.color * m.color * pathSegment.color * m.hasReflective,
+//            pathSegment.pixelIndex,
+//            pathSegment.remainingBounces - 1
+//        };
+//
+//        pathSegment = newPath;
+//    }
+//    else if (randGen <= m.hasReflective + m.hasRefractive) {
+//        // take a refractive ray
+//        float airIOR = 1.0f;
+//        float eta = airIOR / m.indexOfRefraction;
+//
+//        // then entering
+//        float cosTheta = glm::dot(-1.f * pathSegment.ray.direction, normal);
+//
+//        bool entering = cosTheta > 0;
+//
+//        if (!entering) {
+//            eta = 1.0f / eta; // invert eta
+//        }
+//
+//        float sinThetaI = sqrt(1.0 - cosTheta * cosTheta);
+//        float sinThetaT = eta * sinThetaI;
+//
+//        glm::vec3 newDirection = pathSegment.ray.direction;
+//
+//        // if total internal reflection
+//        if (sinThetaT >= 1) {
+//            newDirection = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+//        }
+//        else {
+//            newDirection = glm::normalize(glm::refract(pathSegment.ray.direction, normal, eta));
+//        }
+//
+//        glm::vec3 newColor = pathSegment.color * m.specular.color;
+//
+//        Ray newRay = {
+//            intersect + 0.001f * pathSegment.ray.direction,
+//            newDirection
+//        };
+//
+//        PathSegment newPath = {
+//            newRay,
+//            newColor,
+//            pathSegment.pixelIndex,
+//            pathSegment.remainingBounces - 1
+//        };
+//
+//        pathSegment = newPath;
+//    }
+//    else {
+//        // only diffuse
+//        glm::vec3 newDirection = calculateRandomDirectionInHemisphere(normal, rng);
+//        Ray newRay = {
+//            intersect,
+//            newDirection
+//        };
+//
+//        PathSegment newPath = {
+//            newRay,
+//            m.color * pathSegment.color,
+//            pathSegment.pixelIndex,
+//            pathSegment.remainingBounces - 1
+//        };
+//
+//        pathSegment = newPath;
+//    }
+//}
