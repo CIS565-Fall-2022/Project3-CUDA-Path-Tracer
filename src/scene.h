@@ -13,6 +13,7 @@ using namespace std;
 class Scene {
 private:
     ifstream fp_in;
+    int loadObj(const char* filename, const char* basepath, bool triangulate);
     int loadMaterial(string materialid);
     int loadGeom(string objectid);
     int loadCamera();

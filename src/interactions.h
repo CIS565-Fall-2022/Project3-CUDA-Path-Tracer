@@ -108,9 +108,9 @@ void scatterRay(
         float airIOR = 1.0f;
         float eta = airIOR / m.indexOfRefraction;
 
-        // then entering
         float cosTheta = glm::dot(-1.f * pathSegment.ray.direction, normal);
 
+        // then entering
         bool entering = cosTheta > 0;
 
         if (!entering) {
