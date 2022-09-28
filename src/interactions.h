@@ -79,11 +79,19 @@ void scatterRay(
     
     //if m.material is diffuse do the following
     
+    if (m.hasReflective != 0) {
+        pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+        pathSegment.ray.origin = intersect + (pathSegment.ray.direction * .0001f);
+        pathSegment.remainingBounces--;
+        pathSegment.color *= m.specular.color;
+    }
+    else {
+        pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
+        pathSegment.ray.origin = intersect + (pathSegment.ray.direction * .0001f);
+        pathSegment.remainingBounces--;
+        pathSegment.color *= m.color;
+    }
     
-    pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
-    pathSegment.ray.origin = intersect + (pathSegment.ray.direction * .0001f);
-    pathSegment.remainingBounces--;
-    pathSegment.color *= m.color;
 
 
 }
