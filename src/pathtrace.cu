@@ -18,6 +18,7 @@
 #include "interactions.h"
 
 #define ERRORCHECK 1
+#define RAYCACHE 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -39,6 +40,37 @@ void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #  endif
 	exit(EXIT_FAILURE);
 #endif
+}
+
+/**
+* Generate PathSegments with rays from the camera through the screen into the
+* scene, which is the first bounce of rays.
+*
+* Antialiasing - add rays for sub-pixel sampling
+* motion blur - jitter rays "in time"
+* lens effect - jitter ray origin positions based on a lens
+*/
+__global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, PathSegment* pathSegments)
+{
+	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
+	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+
+	if (x < cam.resolution.x && y < cam.resolution.y) {
+		int index = x + (y * cam.resolution.x);
+		PathSegment& segment = pathSegments[index];
+
+		segment.ray.origin = cam.position;
+		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
+
+		// TODO: implement antialiasing by jittering the ray
+		segment.ray.direction = glm::normalize(cam.view
+			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
+		);
+
+		segment.pixelIndex = index;
+		segment.remainingBounces = traceDepth;
+	}
 }
 
 __host__ __device__
@@ -80,6 +112,7 @@ static PathSegment* dev_paths_initial = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
+static ShadeableIntersection* dev_isect_cache = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -106,7 +139,14 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_intersections, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
+	cudaMalloc(&dev_isect_cache, pixelcount * sizeof(ShadeableIntersection));
+	cudaMemset(dev_isect_cache, 0, pixelcount * sizeof(ShadeableIntersection));
+
 	// TODO: initialize any extra device memeory you need
+
+	//generateRayFromCamera << <blocksPerGrid2d, blockSize2d >> > (cam, 0, hst_scene->state.traceDepth, dev_paths);
+
+	//checkCUDAError("generate camera ray");
 
 	checkCUDAError("pathtraceInit");
 }
@@ -117,41 +157,13 @@ void pathtraceFree() {
 	cudaFree(dev_geoms);
 	cudaFree(dev_materials);
 	cudaFree(dev_intersections);
+	cudaFree(dev_isect_cache);
 	// TODO: clean up any extra device memory you created
 
 	checkCUDAError("pathtraceFree");
 }
 
-/**
-* Generate PathSegments with rays from the camera through the screen into the
-* scene, which is the first bounce of rays.
-*
-* Antialiasing - add rays for sub-pixel sampling
-* motion blur - jitter rays "in time"
-* lens effect - jitter ray origin positions based on a lens
-*/
-__global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, PathSegment* pathSegments)
-{
-	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
-	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
 
-	if (x < cam.resolution.x && y < cam.resolution.y) {
-		int index = x + (y * cam.resolution.x);
-		PathSegment& segment = pathSegments[index];
-
-		segment.ray.origin = cam.position;
-		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
-
-		// TODO: implement antialiasing by jittering the ray
-		segment.ray.direction = glm::normalize(cam.view
-			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
-		);
-
-		segment.pixelIndex = index;
-		segment.remainingBounces = traceDepth;
-	}
-}
 
 // TODO:
 // computeIntersections handles generating ray intersections ONLY.
@@ -401,16 +413,70 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	//thrust::device_ptr<PathSegment*> dev_thrust_paths = thrust::device_ptr<PathSegment*>(dev_paths);
 	//thrust::device_ptr<PathSegment*> dev_thrust_path_end = thrust::device_ptr<PathSegment*>(dev_path_end);
+	dim3 numblocksPathSegmentTracing;
 
 	bool iterationComplete = false;
 
 	int i = 0;
 	while (!iterationComplete) {
-		// clean shading chunks
+
+#if RAYCACHE
+		if (iter == 1 && depth == 0) {
+			numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
+			computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+				depth
+				, num_paths
+				, dev_paths
+				, dev_geoms
+				, hst_scene->geoms.size()
+				, dev_isect_cache
+				);
+			checkCUDAError("trace one bounce");
+		}
+		cudaDeviceSynchronize();
+		if (depth == 0) {
+			// tracing
+			cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
+
+			numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
+			cudaMemcpy(dev_intersections, dev_isect_cache, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
+
+			shadeMaterialBSDF << <numblocksPathSegmentTracing, blockSize1d >> > (
+				iter,
+				num_paths,
+				dev_intersections,
+				dev_paths,
+				dev_materials
+				);
+		}
+		else {
+			cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
+
+			// tracing
+			numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
+			computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+				depth
+				, num_paths
+				, dev_paths
+				, dev_geoms
+				, hst_scene->geoms.size()
+				, dev_intersections
+				);
+			checkCUDAError("trace one bounce");
+			shadeMaterialBSDF << <numblocksPathSegmentTracing, blockSize1d >> > (
+				iter,
+				num_paths,
+				dev_intersections,
+				dev_paths,
+				dev_materials
+				);
+		}
+		cudaDeviceSynchronize();
+#else
 		cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
 		// tracing
-		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
+		numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
 		computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
 			depth
 			, num_paths
@@ -420,6 +486,15 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, dev_intersections
 			);
 		checkCUDAError("trace one bounce");
+		shadeMaterialBSDF << <numblocksPathSegmentTracing, blockSize1d >> > (
+			iter,
+			num_paths,
+			dev_intersections,
+			dev_paths,
+			dev_materials
+			);
+#endif // !RAYCACHE
+
 		cudaDeviceSynchronize();
 		depth++;
 
@@ -432,13 +507,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	  // TODO: compare between directly shading the path segments and shading
 	  // path segments that have been reshuffled to be contiguous in memory.
 
-		shadeMaterialBSDF << <numblocksPathSegmentTracing, blockSize1d >> > (
-			iter,
-			num_paths,
-			dev_intersections,
-			dev_paths,
-			dev_materials
-			);
+		
 		dev_paths = thrust::stable_partition(thrust::device, dev_paths, dev_paths + num_paths, is_terminated());
 		num_paths = dev_path_end - dev_paths;
 		if (num_paths == 0){
