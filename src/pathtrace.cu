@@ -241,39 +241,6 @@ __global__ void computeIntersections(
     }
 }
 
-__device__ Ray scatterRay(int iter
-    , int idx
-    , ShadeableIntersection& intersection
-    , PathSegment& pathSegment
-    , Material& material
-    , Geom& shape)
-{
-
-    thrust::default_random_engine e1 = makeSeededRandomEngine(iter, idx, 0);
-    thrust::default_random_engine e2 = makeSeededRandomEngine(iter, idx, 1);
-    thrust::uniform_real_distribution<float> u01(0, 1);
-
-    float x = cosf(2 * PI * u01(e2)) * sqrt(1 - powf(u01(e1), 2));
-    float y = sinf(2 * PI * u01(e2)) * sqrt(1 - powf(u01(e1), 2));
-    float z = u01(e1);
-
-    //setting w to 0.0 should negate translation
-    glm::vec4 world_Het_InRay = glm::vec4(pathSegment.ray.direction, 0.0);
-    glm::vec4 local_Het_InRay = shape.inverseTransform * world_Het_InRay;
-
-
-    //Ray r = { intersection.intersectPoint, glm::vec3(x, y, z) };
-    //flip z to correct Hemisphere
-    if (local_Het_InRay.z < 0) {
-        z *= -1;
-    }
-
-    glm::vec4 local_Het_OutRay = glm::vec4(x, y, z, 0.0);
-    glm::vec4 world_Het_OutRay = shape.transform * local_Het_OutRay;
-
-    return Ray { intersection.intersectPoint + (glm::vec3(world_Het_OutRay) * .05f)
-        , glm::vec3(world_Het_OutRay) };
-}
 
 __device__ glm::vec3 shadeMaterial(int iter
     , int idx
@@ -299,7 +266,6 @@ __global__ void sampleF (int iter
     , ShadeableIntersection* shadeableIntersections
     , PathSegment* pathSegments
     , Material* materials
-    , Geom* shapes
     )
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -308,7 +274,6 @@ __global__ void sampleF (int iter
         ShadeableIntersection intersection = shadeableIntersections[idx];
         if (intersection.t > 0.0f) {
             // if the intersection exists...
-            Geom shape = shapes[intersection.hit_geom_index];
             Material material = materials[intersection.materialId];
             glm::vec3 materialColor = material.color;
 
@@ -322,10 +287,12 @@ __global__ void sampleF (int iter
             // TODO: replace this! you should be able to start with basically a one-liner
             else {
                 //float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));
-                Ray r = scatterRay(iter, idx, intersection, pathSegments[idx], material, shape);
-                pathSegments[idx].ray = r;
-                pathSegments[idx].color *= shadeMaterial(iter, idx, intersection, pathSegments[idx], material);
-                pathSegments[idx].remainingBounces--;
+				thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, pathSegments[idx].remainingBounces);
+				scatterRay(pathSegments[idx], intersection.intersectPoint, intersection.surfaceNormal, material, rng);
+				//pathSegments[idx].color *= shadeMaterial(iter, idx, intersection, pathSegments[idx], material);
+                /*
+                
+                pathSegments[idx].remainingBounces--;*/
                 //pathSegments[idx].color = intersection.surfaceNormal;
             }
             // If there was no intersection, color the ray black.
@@ -462,9 +429,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
           num_paths,
           dev_intersections,
           dev_paths,
-          dev_materials,
-          dev_geoms
-        );
+          dev_materials
+		);
 
         addTerminatedPaths << <numblocksPathSegmentTracing, blockSize1d >> > (
             num_paths,
