@@ -61,22 +61,63 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  *
  * You may need to change the parameter list for your purposes!
  */
-__host__ __device__
+//__host__
+__device__
 void scatterRay(
-        PathSegment &pathSegment,
+        PathSegment& pathSegment,
         glm::vec3 intersect,
         glm::vec3 normal,
+        bool outside, // ray coming from outside? 
         const Material &m,
         thrust::default_random_engine &rng) {
-    // bias origin to avoid shadow acne
-    pathSegment.ray.origin = intersect + 1e-4f * normal;
-    pathSegment.color *= m.color;
+    const float ACNE_BIAS = 3e-3f; //TODO: this is a very annoying parameter to tune. solutions?
 
-    if (m.hasReflective == 0.f && m.hasRefractive == 0.f) { // pure diffuse shading
+    // currently using the given hasReflective, hasRefractive as the probability of the ray
+    // reflecting or refracting. fresnel's is more physically accurate, but less user control
+    if (m.matType == MatType::DIFFUSE) {
         pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
-    }
-    else if (m.hasRefractive == 0.f) { // reflective, 0 refraction
+    } else if (m.matType == MatType::MIRROR) { // rand < m.hasReflective
         pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+    } else if (m.matType == MatType::DIELECTRIC) { // Fresnel eqns
+        // use below to check if normal is against ray direction; traps if not.
+        // intersections.h should take care of all need to align normals and whatnot
+        // if (glm::dot(normal, pathSegment.ray.direction) >= 0.f) { __trap(); }
+        const float sceneIOR = 1.0f; // assume the scenes will be in AIR ie IOR = 1.0
+
+        pathSegment.ray.direction = glm::normalize(pathSegment.ray.direction);
+        normal = glm::normalize(normal);
+        float cosThetaI = glm::dot(normal, -pathSegment.ray.direction);
+
+        // Schlick approximation
+        float reflectivityAtNormal =
+            powf((m.indexOfRefraction - sceneIOR) / (m.indexOfRefraction + sceneIOR), 2.f);
+        float reflectivityAtRay = reflectivityAtNormal + (1.f - reflectivityAtNormal) * powf(1.f - cosThetaI, 5.f);
+
+        thrust::uniform_real_distribution<float> u01(0, 1); // [a, b)
+        if (u01(rng) < reflectivityAtRay) { // reflect
+            pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+        }
+        else { // refraction. code adapted from PBRT refract bsdf
+            float eta = outside ? sceneIOR / m.indexOfRefraction : m.indexOfRefraction / sceneIOR;
+
+            float sin2ThetaI = glm::max(0.f, 1.f - cosThetaI * cosThetaI);
+            float sin2ThetaT = eta * eta * sin2ThetaI;
+            if (sin2ThetaT >= 1.0) { // total internal reflection
+                pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+            }
+            else {
+                float cosThetaT = std::sqrt(1 - sin2ThetaT);
+                pathSegment.ray.direction = eta * pathSegment.ray.direction +
+                    (eta * cosThetaI - cosThetaT) * normal;
+            }
+        }
     }
     // TODO: more types
+
+    // bias origin to avoid shadow acne.
+    // use ray direction over normal, since some rays are trying to "pass" the material barrier
+    pathSegment.ray.origin = intersect + ACNE_BIAS * pathSegment.ray.direction;
+    pathSegment.color *= m.color;
+    //pathSegment.ray.direction = glm::normalize(pathSegment.ray.direction);
+
 }

@@ -32,8 +32,19 @@ How might this feature be optimized beyond your current implementation?
 
 ## Performance Analysis
 
+### Refractions
 
+Material types can be specified in the scene text files. Dielectric describes a nonconducting material(e.g., glass). Here, a type of DIELECTRIC simply means it both reflects and refracts light according to a specified "index of refraction". For simpler calculations, I used the [Schlick approximation](https://en.wikipedia.org/wiki/Schlick%27s_approximation), of the Fresnel equations since it achieves results at up to 32x speed for less than 1% average error (further reading: References - Ray Tracing Gems II).    
+This refractive BSDF is an inherent part of the ray tracing evaluation; any CPU path tracer that tries to implement the same thing will be orders of magnitude slower.  
+Theoretically, adding other approximations could be faster, at the cost of physical accuracy.
 
+The speed/FPS of this material is comparable to diffuse or mirrored. 
+| Material | Diffuse | Mirrored | Dielectric | 
+| :------- | :-------: | :-------: | :-------: |
+| Frames per second | 51.8 | 52.6 | 52.1 |
+| Scene | <img src="img/diffuse_bench.png"> | <img src="img/mirror_bench.png"> | <img src="img/dielectric_bench.png"> |
+
+Note the subtle reflection of the light on the dielectric spheres; that is the light reflection contribution.   
 
 ### Core Feature Benchmarks
 
@@ -63,4 +74,6 @@ The first intersection of rays is static, as it is initiated by the static ray c
 Curiously, the difference is negligible, though weighed toward the caching. The simplicity of the Cornell box scene makes it difficult to ascertain clear winners when it comes to different rendering options.
 
 ## References
-[Ray Tracing in One Weekend](https://raytracing.github.io/)
+[Ray Tracing Gems II](http://www.realtimerendering.com/raytracinggems/rtg2/)
+[Ray Tracing in One Weekend](https://raytracing.github.io/)     
+[Fresnel Equations, Schlick Approximation, Metals, and Dielectrics](http://psgraphics.blogspot.com/2020/03/fresnel-equations-schlick-approximation.html)

@@ -12,6 +12,12 @@ enum GeomType {
     CUBE,
 };
 
+enum class MatType {
+    DIFFUSE,
+    MIRROR,
+    DIELECTRIC
+};
+
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
@@ -34,8 +40,7 @@ struct Material {
         float exponent;
         glm::vec3 color;
     } specular;
-    float hasReflective;
-    float hasRefractive;
+    MatType matType;
     float indexOfRefraction;
     float emittance;
 };
@@ -73,4 +78,5 @@ struct ShadeableIntersection {
   float t;
   glm::vec3 surfaceNormal;
   int materialId;
+  bool outside;
 };

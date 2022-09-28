@@ -86,12 +86,15 @@ static ShadeableIntersection* dev_intersections = NULL;
 static ShadeableIntersection* dev_first_isecs = NULL;
 #endif
 
+#if _STREAM_COMPACTION_
 // predicate for thrust::remove_if stream compaction
 struct partition_terminated_paths {
 	__host__ __device__
 	bool operator()(const PathSegment& p) { return p.remainingBounces > 0; }
 };
+#endif
 
+#if _GROUP_RAYS_BY_MATERIAL_
 // _GROUP_RAYS_BY_MATERIAL_ sorting comparison
 struct compare_intersection_mat {
 	__host__ __device__
@@ -99,6 +102,7 @@ struct compare_intersection_mat {
 		return i1.materialId < i2.materialId;
 	}
 };
+#endif
 
 void InitDataContainer(GuiDataContainer* imGuiData) { guiData = imGuiData; }
 
@@ -194,16 +198,17 @@ __global__ void computeIntersections(
 
 		glm::vec3 tmp_intersect;
 		glm::vec3 tmp_normal;
+		bool tmp_outside;
 
 		// naive parse through global geoms
 		for (int i = 0; i < geoms_size; i++) {
 			Geom& geom = geoms[i];
 
 			if (geom.type == CUBE) {
-				t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, tmp_outside);
 			}
 			else if (geom.type == SPHERE) {
-				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, tmp_outside);
 			}
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 
@@ -214,6 +219,7 @@ __global__ void computeIntersections(
 				hit_geom_index = i;
 				intersect_point = tmp_intersect;
 				normal = tmp_normal;
+				outside = tmp_outside;
 			}
 		}
 
@@ -225,6 +231,7 @@ __global__ void computeIntersections(
 			intersections[path_index].t = t_min;
 			intersections[path_index].materialId = geoms[hit_geom_index].materialid;
 			intersections[path_index].surfaceNormal = normal;
+			intersections[path_index].outside = outside;
 		}
 	}
 }
@@ -254,6 +261,7 @@ __global__ void shadeMaterial (
 				scatterRay(pathSegments[idx],
 					pathSegments[idx].ray.origin + intersection.t * pathSegments[idx].ray.direction, // where ray intersects material
 					intersection.surfaceNormal,
+					intersection.outside,
 					material,
 					makeSeededRandomEngine(iter, idx, depth));
 				if (--pathSegments[idx].remainingBounces == 0) {
@@ -317,7 +325,6 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	while (!iterationComplete) {
 		// clean shading chunks
 		cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
-		
 		// --- start compute intersection ---
 	//   * Compute an intersection in the scene for each path ray.
 	//     Currently, intersection distance is recorded as a parametric distance,
