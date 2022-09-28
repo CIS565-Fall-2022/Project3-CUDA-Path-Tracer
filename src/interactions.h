@@ -113,13 +113,7 @@ void scatterRay(    // similar to sample_f, calculate the new wi and f
             wi_scatteredRayDir = glm::normalize(glm::refract(glm::normalize(wo), normal, eta));
         }
         color = m.specular.color;
-        //intersect += 0.001f * glm::normalize(wi_scatteredRayDir);
-        //bool entering = (glm::dot(wo, normal) > 0);
-        //float etaI = entering ? etaA : etaB;
-        //float etaT = entering ? etaB : etaA;
-        //wi_scatteredRayDir = glm::normalize(glm::reframe ct(wo, normal, etaT / etaI));
     }
-    // if costheta(eta) > 1, then reflect dir about normal else refract, set new color to current color * specular color
     else {
         wi_scatteredRayDir = calculateRandomDirectionInHemisphere(normal, rng);  // for pure diffused material
     }
