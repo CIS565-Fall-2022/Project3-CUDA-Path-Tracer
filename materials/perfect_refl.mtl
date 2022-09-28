@@ -1,6 +1,8 @@
 newmtl specular_white
 Kd 0.98 0.98 0.98
 Ks 0.98 0.98 0.98
+Tr 0
 Ni 1.6
 Ns 5
 Pm 1
+Pr 0

@@ -114,6 +114,7 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r, ShadeableIntersec
  */
 __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r, ShadeableIntersection& inters) {
     float radius = .5;
+#ifdef USE_GLM_RAY_SPHERE
 
     glm::vec3 ro = multiplyMV(sphere.inverseTransform, glm::vec4(r.origin, 1.0f));
     glm::vec3 rd = glm::normalize(multiplyMV(sphere.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -126,10 +127,55 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r, ShadeableIn
         return -1;
     }
 
-    glm::vec3 objspaceIntersection = getPointOnRay(rt, t);
-    inters.hitPoint = multiplyMV(sphere.transform, glm::vec4(objspaceIntersection, 1.f));
-    inters.surfaceNormal = glm::normalize(multiplyMV(sphere.invTranspose, glm::vec4(objspaceIntersection, 0.f)));
+    glm::vec3 point = getPointOnRay(rt, t);
+
+    inters.hitPoint = multiplyMV(sphere.transform, glm::vec4(point, 1.f));
+    inters.surfaceNormal = glm::normalize(multiplyMV(sphere.invTranspose, glm::vec4(point, 0.f)));
     inters.materialId = sphere.materialid;
+
+#else
+    glm::vec3 ro = multiplyMV(sphere.inverseTransform, glm::vec4(r.origin, 1.0f));
+    glm::vec3 rd = glm::normalize(multiplyMV(sphere.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+    Ray rt;
+    rt.origin = ro;
+    rt.direction = rd;
+
+    float vDotDirection = glm::dot(rt.origin, rt.direction);
+    float radicand = vDotDirection * vDotDirection - (glm::dot(rt.origin, rt.origin) - powf(radius, 2));
+    if (radicand < 0) {
+        return -1;
+    }
+
+    float squareRoot = sqrt(radicand);
+    float firstTerm = -vDotDirection;
+    float t1 = firstTerm + squareRoot;
+    float t2 = firstTerm - squareRoot;
+
+    float t = 0;
+    bool outside;
+    if (t1 < 0 && t2 < 0) {
+        return -1;
+    } else if (t1 > 0 && t2 > 0) {
+        t = min(t1, t2);
+        outside = true;
+    } else {
+        t = max(t1, t2);
+        outside = false;
+    }
+
+    glm::vec3 objspaceIntersection = getPointOnRay(rt, t);
+
+    glm::vec3 intersectionPoint = multiplyMV(sphere.transform, glm::vec4(objspaceIntersection, 1.f));
+    glm::vec3 normal = glm::normalize(multiplyMV(sphere.invTranspose, glm::vec4(objspaceIntersection, 0.f)));
+    if (!outside) {
+        normal = -normal;
+    }
+
+    inters.hitPoint = intersectionPoint;
+    inters.surfaceNormal = normal;
+    inters.materialId = sphere.materialid;
+#endif // USE_GLM_RAY_SPHERE
 
     return glm::length(r.origin - inters.hitPoint);
 }

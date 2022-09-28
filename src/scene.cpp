@@ -63,12 +63,36 @@ static bool initMaterial(
             if (!data) {
                 return false;
             }
-
-
+            
         }
     }
 
     // TODO deduce material type
+    if(mat.hasReflective > 0 && mat.hasRefractive > 0) {
+        mat.type = Material::Type::GLOSSY;
+        if (mat.roughness <= EPSILON && mat.roughness >= -EPSILON) {
+            mat.roughness = 1; // force roughness for glossy material
+        }
+    } else if (mat.hasReflective > 0) {
+        mat.type = Material::Type::REFL;
+    } else if (mat.hasRefractive > 0) {
+        mat.type = Material::Type::REFR;
+    } else {
+        mat.type = Material::Type::DIFFUSE;
+        if (mat.roughness <= EPSILON && mat.roughness >= -EPSILON) {
+            mat.roughness = 1; // force roughness for diffuse material
+        }
+    }
+
+    cout << "loaded material " << tinyobj_mat.name << endl
+        << "diffuse =   {" << mat.diffuse[0] << "," << mat.diffuse[1] << "," << mat.diffuse[2] << "}\n"
+        << "emittance =  " << mat.emittance << "\n"
+        << "ior =        " << mat.ior << "\n"
+        << "refl =       " << mat.hasReflective << "\n"
+        << "refr =       " << mat.hasRefractive << "\n"
+        << "roughness =  " << mat.roughness << "\n"
+        << "spec_color= {" << mat.specular.color[0] << "," << mat.specular.color[1] << "," << mat.specular.color[2] << "}\n"
+        << "spec_exp   = " << mat.specular.exponent << "\n\n";
 
     ret = move(mat);
     return true;

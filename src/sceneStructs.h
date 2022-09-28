@@ -35,10 +35,42 @@ struct Geom {
 };
 
 struct Texture {
-    Texture(int pixel_width, int pixel_height, unsigned char* raw_pixel) : 
+    __host__ __device__ 
+    Texture() : pixel_width(0), pixel_height(0), pixels(nullptr) {}
+    __host__ __device__
+    Texture(Texture const& o) = default;
+    __host__ __device__
+    Texture(Texture&& o) = default;
+    __host__
+    Texture(int pixel_width, int pixel_height, int channel, unsigned char* raw_pixel) : 
         pixel_width(pixel_width), pixel_height(pixel_height) {
 
+        assert(channel > 0);
+
+        size_t tot = (size_t) pixel_width * pixel_height;
+        pixels = new color_t[tot];
+
+        for (size_t i = 0; i < tot; ++i) {
+            pixels[i] = { 
+                raw_pixel[i * channel],
+                channel > 1 ? raw_pixel[i * channel + 1] : 0,
+                channel > 2 ? raw_pixel[i * channel + 2] : 0,
+            };
+        }
     }
+    __host__
+    ~Texture() { delete[] pixels; }
+    
+    Texture to_device() const {
+        Texture ret;
+        ret.pixel_width = pixel_width;
+        ret.pixel_height = pixel_height;
+
+        size_t tot = (size_t)pixel_width * pixel_height;
+        ALLOC(ret.pixels, tot);
+        H2D(ret.pixels, pixels, tot);
+    }
+
     int pixel_width;
     int pixel_height;
     color_t* pixels;

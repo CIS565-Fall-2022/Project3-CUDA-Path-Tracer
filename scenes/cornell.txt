@@ -60,7 +60,23 @@ SCALE       .01 10 10
 // Sphere
 OBJECT
 sphere
-material    ../materials/specular_white.mtl
-TRANS       -1 4 -1
+material    ../materials/diffuse_white.mtl
+TRANS       3 4 -2
 ROTAT       0 0 0
 SCALE       3 3 3
+
+// Sphere
+OBJECT
+sphere
+material    ../materials/perfect_refr.mtl
+TRANS       -3 1.5 2
+ROTAT       0 0 0
+SCALE       3 3 3
+
+// // Sphere
+// OBJECT
+// sphere
+// material    ../materials/diffuse_white.mtl
+// TRANS       -3 4 2
+// ROTAT       0 0 0
+// SCALE       3 3 3

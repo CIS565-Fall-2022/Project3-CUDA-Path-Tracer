@@ -1,60 +1,39 @@
 #pragma once
 
+
 #include "intersections.h"
 #include "utilities.h"
 #include <thrust/random.h>
 #include <glm/gtc/epsilon.hpp>
 #include "scene.h"
 
-#define PBRT
-
-// Reference: https://www.pbr-book.org/3ed-2018/Reflection_Models/Microfacet_Models#MicrofacetDistribution::D
-// BeckmannDistribution for microfacet modeling
-struct BeckmannDistribution {
-    __device__
-    BeckmannDistribution(float alphax, float alphay) {
-
-    }
-    __device__
-    float roughness_to_alpha(float roughness) {
-        roughness = glm::max(roughness, 1e-3f);
-        float x = glm::log(roughness);
-        return 1.62142f + 0.819955f * x + 0.1734f * x * x +
-            0.0171201f * x * x * x + 0.000640711f * x * x * x * x;
-    }
-    __device__
-    float D(glm::vec3 const& wh) const {
-        return;
-    }
-    __device__
-    glm::vec3 sample_wh(glm::vec3 const& wo, glm::vec2& u) const {
-        return glm::vec3(0);
-    }
-};
-
-__device__
-bool feq(float a, float b) {
+__device__ bool feq(float a, float b) {
     a -= b;
     return a <= EPSILON && a >= -EPSILON;
 }
 
-__device__
-bool is_zero(glm::vec3 const& vec) {
+__device__ bool is_zero(glm::vec3 const& vec) {
     return glm::length2(vec) <= glm::epsilon<float>() * glm::epsilon<float>();
 }
 
-__device__
-glm::vec3 randomVecInUnitSphere(thrust::default_random_engine& rng) {
-    thrust::uniform_real_distribution<float> u01(0, 1);
-    glm::vec3 ret(u01(rng), u01(rng), u01(rng));
-    return ret / glm::length(ret);
+__device__ __forceinline__
+glm::vec3 face_forward(glm::vec3 const& N, glm::vec3 const& dir) {
+    return glm::dot(N, dir) < 0 ? -N : N;
 }
+
+template<typename T>
+__device__ __forceinline__
+void dev_swap(T& a, T& b) {
+    T tmp = a;
+    a = b;
+    b = tmp;
+}
+
 /**
  * Computes a cosine-weighted random direction in a hemisphere.
  * Used for diffuse lighting.
  */
-__device__
-glm::vec3 calculateRandomDirectionInHemisphere(
+__device__ glm::vec3 calculateRandomDirectionInHemisphere(
     glm::vec3 normal, thrust::default_random_engine& rng) {
     thrust::uniform_real_distribution<float> u01(0, 1);
 
@@ -89,242 +68,201 @@ glm::vec3 calculateRandomDirectionInHemisphere(
 
 
 __device__
-float schlick_frensnel(glm::vec3 const& wo, glm::vec3 const& up_norm, float eta) {
+float schlick_frensnel(float cosine, float eta) {
     // Schlick's approximation
     // Taken from: https://raytracing.github.io/books/RayTracingInOneWeekend.html
-    float cosine = glm::clamp(glm::dot(wo, up_norm), 0.0f, 1.0f);
+    cosine = glm::min(cosine, 1.0f);
     float r0 = (1 - eta) / (1 + eta);
     r0 = r0 * r0;
     return r0 + (1 - r0) * powf((1 - cosine), 5);
 }
-__device__
-float fresnel_dielectric(glm::vec3 const& wo, glm::vec3 const& up_norm, float eta) {
-    // Reference:
-    // https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
-    // https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#FresnelReflectance
-    
-    float cosine = glm::clamp(glm::dot(wo, up_norm), 0.0f, 1.0f);
-    float sin2 = 1 - cosine * cosine;
-    float eta2 = eta * eta;
-    float T0 = 1 - sin2 / (eta * eta);
-    if (T0 < 0) return 1;
-    T0 = sqrtf(T0);
-    float T1 = eta * T0;
-    float T2 = eta * cosine;
 
-    float Rs = (cosine - T1) / (cosine + T1);
-    float Rp = (T0 - T2) / (T0 + T2);
-    return 0.5f * (Rs * Rs + Rp * Rp);
+// taken from https://github.com/mmp/pbrt-v3/blob/master/src/core/reflection.cpp
+__device__ color_t fresnel_conductor(float cosThetaI, color_t const& eta, color_t const& etak) {
+    cosThetaI = glm::clamp(cosThetaI, -1.0f, 1.0f);
+
+    float cosThetaI2 = cosThetaI * cosThetaI;
+    float sinThetaI2 = 1. - cosThetaI2;
+    color_t eta2 = eta * eta;
+    color_t etak2 = etak * etak;
+
+    color_t t0 = eta2 - etak2 - sinThetaI2;
+    color_t a2plusb2 = glm::sqrt(t0 * t0 + 4.0f * eta2 * etak2);
+    color_t t1 = a2plusb2 + cosThetaI2;
+    color_t a = glm::sqrt(0.5f * (a2plusb2 + t0));
+    color_t t2 = 2.0f * cosThetaI * a;
+    color_t Rs = (t1 - t2) / (t1 + t2);
+
+    color_t t3 = cosThetaI2 * a2plusb2 + sinThetaI2 * sinThetaI2;
+    color_t t4 = t2 * sinThetaI2;
+    color_t Rp = Rs * (t3 - t4) / (t3 + t4);
+
+    return 0.5f * (Rp + Rs);
 }
-__device__
-glm::vec3 get_microfacet_vector(float roughness, glm::vec3 const& normal, float rng1, float rng2) {
-    // Reference: 
-    // https://agraphicsguy.wordpress.com/2015/11/01/sampling-microfacet-brdf/
-    // https://www.pbr-book.org/3ed-2018/Reflection_Models/Microfacet_Models
-    // Uses the GGX normal distribution function 
-    float phi = 2 * PI * rng1;
-    float theta = atan(roughness * sqrt(rng2 / (1 - rng2)));
-    // TODO
-    return glm::vec3(0);
+// taken from https://github.com/mmp/pbrt-v3/blob/master/src/core/reflection.cpp
+__device__ float fresnel_dielectric(float cosThetaI, float etaI, float etaT) {
+    cosThetaI = glm::clamp(cosThetaI, -1.0f, 1.0f);
+    // Potentially swap indices of refraction
+    bool entering = cosThetaI > 0.f;
+    if (!entering) {
+        float tmp = etaI;
+        etaI = etaT;
+        etaT = tmp;
+        cosThetaI = glm::abs(cosThetaI);
+    }
+    // using Snell's law
+    float sinThetaI = glm::sqrt(glm::max((float)0, 1 - cosThetaI * cosThetaI));
+    float sinThetaT = etaI / etaT * sinThetaI;
+
+    // Handle total internal reflection
+    if (sinThetaT >= 1) return 1;
+    float cosThetaT = glm::sqrt(glm::max((float)0, 1 - sinThetaT * sinThetaT));
+    float Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
+        ((etaT * cosThetaI) + (etaI * cosThetaT));
+    float Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
+        ((etaI * cosThetaI) + (etaT * cosThetaT));
+    return (Rparl * Rparl + Rperp * Rperp) / 2;
 }
 
-#ifdef PBRT
-/// <summary>
-/// calculates wi given wo for a material
-/// </summary>
-/// <returns> wi </returns>
+
+// taken from https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#Refract
+__device__ bool refract(glm::vec3& wt, glm::vec3 const& wi, glm::vec3 const& n, float eta) {
+    float cosThetaI = glm::dot(n, wi);
+    float sin2ThetaI = glm::max(0.0f, 1.0f - cosThetaI * cosThetaI);
+    float sin2ThetaT = eta * eta * sin2ThetaI;
+    if (sin2ThetaT >= 1) return false;
+
+    float cosThetaT = std::sqrt(1 - sin2ThetaT);
+
+    wt = eta * -wi + (eta * cosThetaI - cosThetaT) * n;
+    return true;
+}
+
+struct SamplePointSpace {
+    glm::mat3x3 l2w, w2l; // local to world
+
+    __device__ SamplePointSpace(glm::vec3 const& n) {
+        // constructs a world to local matrix
+        glm::vec3 z = n;
+        glm::vec3 h = z;
+        if (fabs(h.x) <= fabs(h.y) && fabs(h.x) <= fabs(h.z)) {
+            h.x = 1.0f;
+        } else if (fabs(h.y) <= fabs(h.x) && fabs(h.y) <= fabs(h.z)) {
+            h.y = 1.0f;
+        } else {
+            h.z = 1.0f;
+        }
+        glm::vec3 y = glm::cross(h, z);
+        l2w = glm::mat3x3(
+            glm::normalize(glm::cross(z, y)),
+            glm::normalize(glm::cross(h, z)),
+            glm::normalize(n)
+        );
+        // inverse same as transpose
+        w2l = glm::transpose(l2w);
+    }
+    __device__ __forceinline__ glm::vec3 world_to_local(glm::vec3 const& v) {
+        return w2l * v;
+    }
+    __device__ __forceinline__ glm::vec3 local_to_world(glm::vec3 const& v) {
+        return l2w * v;
+    }
+};
 __device__
-glm::vec3 calc_wi(
-    bool perfect_smooth,
-    Material const& m, 
-    bool leaving,
-    glm::vec3 const& normal,
-    glm::vec3 const& wo, // - ray.dir
-    thrust::default_random_engine& rng
-) {
-    glm::vec3 up_norm = leaving ? -normal : normal;
-    thrust::uniform_real_distribution<float> u01;
-    float eta;
+glm::vec3 DielectricScatter(glm::vec3 wo, const Material& m, glm::vec3 normal, thrust::default_random_engine& rng) {
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    float etaI = 1, etaT = m.ior;
+    if (glm::dot(wo, normal) < 0) {
+        dev_swap(etaI, etaT);
+    }
 
-    if (perfect_smooth) {
-        switch (m.type) {
-            case Material::Type::REFL:
-                return glm::reflect(-wo, up_norm);
+    double cos_theta = fmin(glm::dot(wo, normal), 1.0f);
 
-            case Material::Type::REFR:
-                if (feq(m.ior, 1)) {
-                    return -wo;
-                }
-                eta = leaving ? m.ior : 1 / m.ior;
-                if (u01(rng) < fresnel_dielectric(wo, up_norm, eta)) {
-                    return glm::reflect(-wo, up_norm);
+    if (fresnel_dielectric(cos_theta, etaI, etaT) > u01(rng)) {
+        return glm::reflect(-wo, normal);
+    } else {
+        glm::vec3 wi;
+        refract(wi, wo, normal, etaI / etaT);
+        return wi;
+    }
+}
+
+// encapsulates the BSDF functions for all sort of materials
+// note: all operations in local space
+struct BSDF {
+    Material::Type type;
+    bool is_delta;
+    Material const& m;
+    thrust::default_random_engine& rng;
+    color_t reflectance;
+
+    __device__ BSDF(Material const& m, thrust::default_random_engine& rng)
+        : m(m), type(m.type), is_delta(feq(m.roughness, 0)), reflectance(m.diffuse), rng(rng) {}
+
+    __device__ __forceinline__ float abs_cos_theta(glm::vec3 const& wi) const {
+        return glm::abs(wi.z);
+    }
+    __device__ __forceinline__ float cos_theta(glm::vec3 const& wi) const {
+        return wi.z;
+    }
+    __device__ __forceinline__ float same_hemisphere(glm::vec3 const& w, glm::vec3 const& wp) const {
+        return w.z * wp.z > 0;
+    }
+    __device__ color_t sample_f(glm::vec3 const& wo, glm::vec3& wi, float& pdf) const {
+        float etaI = 1, etaT = m.ior, eta, F;
+        thrust::uniform_real_distribution<float> u01;
+        if (is_delta) {
+            switch (type) {
+            case Material::Type::REFL: // Perfect Reflection
+                wi = glm::vec3(-wo.x, -wo.y, wo.z);
+                pdf = 1;
+                return fresnel_conductor(abs_cos_theta(wi), (1.0f + sqrt(reflectance)) / (1.0f - sqrt(reflectance)), { 0,0,0 })
+                    * reflectance / abs_cos_theta(wi);
+
+            case Material::Type::REFR: // Fresnel-Modulated Specular Reflection and Transmission
+                F = fresnel_dielectric(glm::min(wo.z, 1.0f), etaI, etaT);
+
+                if (u01(rng) < F) {
+                    wi = glm::vec3(-wo.x, -wo.y, wo.z);
+                    pdf = F;
+                    return F * reflectance / abs_cos_theta(wi);
                 } else {
-                    return glm::refract(-wo, up_norm, eta);
-                }
+                    if (wo.z < 0) {
+                        dev_swap(etaI, etaT);
+                    }
+                    wi = glm::refract(-wo, face_forward({0,0,1}, wo), etaI / etaT);
+                    if (feq(glm::length(wi), 0)) {
+                        break;
+                    }
 
+                    pdf = 1 - F;
+                    return (1 - F) * reflectance / abs_cos_theta(wi);
+                }
+                
             case Material::Type::TRANSPARENT:
-            
-            default:
-                return glm::vec3(0);
-        }
-    } else {
-        switch (m.type) {
-        case Material::Type::DIFFUSE:
-            return calculateRandomDirectionInHemisphere(normal, rng);
-
-        case Material::Type::GLOSSY:
-            glm::vec3 rands(u01(rng), u01(rng), u01(rng));
-            eta = leaving ? m.ior : 1 / m.ior;
-            if (rands[0] < fresnel_dielectric(wo, up_norm, eta)) {
-                return glm::reflect(-wo, get_microfacet_vector(m.roughness, up_norm, rands[1], rands[2]));
-            } else {
-                return calculateRandomDirectionInHemisphere(normal, rng);
+                break;
             }
-        case Material::Type::REFL:
-        case Material::Type::REFR:
-        case Material::Type::SUBSURFACE:
-        case Material::Type::TRANSPARENT:
-        
-        default:
-            return glm::vec3(0);
-        }
-    }
-}
+        } else {
+            switch (m.type) {
+            case Material::Type::DIFFUSE:
+                wi = calculateRandomDirectionInHemisphere(glm::vec3(0, 0, 1), rng);
+                pdf = same_hemisphere(wo, wi) ? abs_cos_theta(wi) * INV_PI : 0;
+                return reflectance * INV_PI;
 
-/// <summary>
-/// samples the probability density function for the bsdf of a material
-/// </summary>
-/// <returns>probability</returns>
-__device__
-float calc_bsdf_pdf(
-    bool perfect_smooth,
-    Material const& m,
-    bool leaving,
-    glm::vec3 const& normal,
-    glm::vec3 const& wo,
-    glm::vec3 const& wi
-) {
-    glm::vec3 up_norm = leaving ? -normal : normal;
-    float eta;
-    float refr;
-
-    if (perfect_smooth) {
-        switch (m.type) {
-        case Material::Type::REFL:
-            return 1;
-        case Material::Type::REFR:
-            refr = glm::dot(normal, wi) * glm::dot(normal, wo);
-            if (feq(m.ior, 1)) {
-                return refr >= 0 ? 0 : 1;
+            case Material::Type::GLOSSY:
+            case Material::Type::REFL:
+            case Material::Type::REFR:
+            case Material::Type::SUBSURFACE:
+            case Material::Type::TRANSPARENT:
+                break;
             }
-            eta = leaving ? m.ior : 1 / m.ior;
-            if (refr >= 0) {
-                return fresnel_dielectric(wo, up_norm, eta);
-            } else {
-                return 1 - fresnel_dielectric(wo, up_norm, eta);
-            }
-        case Material::Type::TRANSPARENT:
-        default:
-            return 0;
         }
-    } else {
-        switch (m.type) {
-        case Material::Type::DIFFUSE:
-            return glm::max(glm::dot(up_norm, wi) * INV_PI, 0.0f);
-        case Material::Type::GLOSSY:
-        case Material::Type::REFL:
-        case Material::Type::REFR:
-        case Material::Type::SUBSURFACE:
-        case Material::Type::TRANSPARENT:
-        default:
-            return 0;
-        }
+
+        wi = glm::vec3(0);
+        pdf = 0;
+        return glm::vec3(1);
     }
-}
-
-/// <summary>
-/// evaluates radiance given a material
-/// </summary>
-/// <returns> sampled radiance </returns>
-__device__
-glm::vec3 cacl_bsdf_factor(
-    bool perfect_smooth,
-    Material const& m,
-    bool leaving,
-    glm::vec3 const& normal,
-    glm::vec3 const& wo,
-    glm::vec3 const& wi
-){
-    glm::vec3 up_norm = leaving ? -normal : normal;
-    float eta;
-    float refr;
-    glm::vec3 ret;
-
-    if (perfect_smooth) {
-        switch (m.type) {
-        case Material::Type::REFL:
-#pragma unroll
-            for (int i = 0; i < 3; ++i) {
-                ret[i] = schlick_frensnel(wo, up_norm, (1 + sqrt(m.diffuse[i]) / (1 - sqrt(m.diffuse[i]))));
-            }
-            break;
-        case Material::Type::REFR:
-            refr = glm::dot(normal, wi) * glm::dot(normal, wo);
-            if (feq(m.ior, 1)) {
-                ret = refr >= 0 ? glm::vec3(0) : glm::vec3(1);
-            } else {
-                eta = leaving ? m.ior : 1 / m.ior;
-                if (refr >= 0) {
-                    ret = glm::vec3(1, 1, 1) * fresnel_dielectric(wo, up_norm, eta);
-                } else {
-                    //TODO fix this case
-                    ret = glm::vec3(1, 1, 1) * (1 / (eta * eta)) * (1 - fresnel_dielectric(wo, up_norm, eta));
-                }
-            }
-
-            break;
-        case Material::Type::TRANSPARENT:
-        default:
-            return glm::vec3(0);
-        }
-    } else {
-        switch (m.type) {
-        case Material::Type::DIFFUSE:
-            ret = m.diffuse * INV_PI * glm::abs(glm::dot(normal, wi));
-            break;
-        case Material::Type::GLOSSY:
-        case Material::Type::REFL:
-        case Material::Type::REFR:
-        case Material::Type::SUBSURFACE:
-        case Material::Type::TRANSPARENT:
-        default:
-            return glm::vec3(0);
-        }
-    }
-    if (is_zero(ret)) {
-        return ret;
-    }
-    return ret / calc_bsdf_pdf(perfect_smooth, m, leaving, normal, wo, wi);
-}
-
-#else
-
-/// <summary>
-/// classic phong reflectance model
-/// </summary>
-/// <returns></returns>
-__device__
-float phong(glm::vec3 p, glm::vec3 wi, glm::vec3 wo, glm::vec3 normal, Material const& m) {
-    float kd = 1 - m.hasReflective;
-    float ks = m.hasReflective;
-
-    float specular = 0;
-    if (ks > 0) {
-        specular = ks * powf(glm::dot(wi, glm::reflect(-wo, normal)), m.specular.exponent);
-    }
-    return glm::clamp(kd + specular / glm::dot(wi, normal), 0.0f, 1.0f);
-}
-#endif
+};
 
 
 /**
@@ -353,7 +291,7 @@ float phong(glm::vec3 p, glm::vec3 wi, glm::vec3 wo, glm::vec3 normal, Material 
  * You may need to change the parameter list for your purposes!
  */
 
-#define OFFSET_EPS 0.0001f
+#define OFFSET_EPS 0.001f
 __device__
 void scatterRay(
     PathSegment& path,
@@ -366,16 +304,14 @@ void scatterRay(
     glm::vec3 intersect = inters.hitPoint;
     Ray& ray = path.ray;
 
-    glm::vec3 wi;
-    glm::vec3 wo = -ray.direction;
-    bool leaving = glm::dot(wo, normal) < 0;
-    glm::vec3 up_norm = leaving ? -normal : normal;
+    bool ray_hit_front_face = glm::dot(ray.direction, normal) < 0;
+    glm::vec3 up_norm = ray_hit_front_face ? normal : -normal;
 
     assert(path.remainingBounces > 0);
     assert(feq(m.emittance, 0));
     assert(feq(glm::length(normal), 1));
     assert(feq(glm::length(path.ray.direction), 1));
-    if (glm::dot(wo, up_norm) < 0) {
+    if (glm::dot(-ray.direction, up_norm) < 0) {
 #ifndef NDEBUG
         printf("glm::dot(wo, up_norm) < 0\n");
 #endif // !NDEBUG
@@ -383,93 +319,37 @@ void scatterRay(
         return;
     }
 
-#ifdef PBRT
-    color_t color (1,1,1);
-    --path.remainingBounces;
+    color_t color(1, 1, 1);
 
-    bool is_smooth = feq(m.roughness, 0);
-    wi = calc_wi(is_smooth, m, leaving, normal, wo, rng);
-    if (is_zero(wi)) {
-        path.terminate();
-    } else {
-        color = cacl_bsdf_factor(is_smooth, m, leaving, normal, wo, wi);
-    }
+    float pdf;
+    glm::vec3 wi;
 
-    if (is_zero(color)) {
-        path.terminate();
-    }
+    SamplePointSpace space(normal);
+    {
+        glm::vec3 wo = space.world_to_local(-ray.direction);
+        BSDF bsdf(m, rng);
+        color = bsdf.sample_f(wo, wi, pdf);
 
-    // update path segment
-    path.color *= color;
-    ray.origin = intersect + OFFSET_EPS * up_norm;
-    ray.direction = glm::normalize(wi);
-#else // not strictly PBRT but looks alright
-    /*
-    ** Heavily based on
-    *  https://raytracing.github.io/books/RayTracingInOneWeekend.html
-    */
-
-    color_t color = m.diffuse;
-    thrust::uniform_real_distribution<float> u01(0, 1);
-
-
-    enum {
-        LAMBERT,
-        METAL,
-        DIELECTRIC,
-    } type;
-
-    if (m.hasReflective > 0) {
-        if (m.hasRefractive > 0 && m.ior > 0) {
-            type = DIELECTRIC;
+        if (is_zero(wi) || feq(pdf, 0)) {
+            color = glm::vec3(1);
+            path.terminate();
+            return;
         } else {
-            type = METAL;
+            color = color * bsdf.cos_theta(wi) / pdf;
         }
-    } else {
-        type = LAMBERT;
+
+        // terminate low energy paths
+        if (is_zero(color)) {
+            path.terminate();
+            return;
+        }
     }
-
-    bool finish;
-    do {
-        finish = true;
-        float eta, cos_theta, sin_theta;
-
-        // NOTE: m.hasReflective controls how "fuzzy" the reflection is
-        //       m.hasRefractive controls how likely the ray is refracted
-
-        switch (type) {
-        case METAL:
-            wi = glm::reflect(ray.direction, up_norm);
-            wi += fmax(1 - m.hasReflective, 0.0f) * randomVecInUnitSphere(rng);
-            break;
-        case DIELECTRIC:
-            // eta = source / dest
-            // so entering ==> air / idx of refraction
-            //    leaving ==> idx of refraction / air = idx of refraction
-            eta = leaving ? m.ior : 1 / m.ior;
-            cos_theta = fmin(glm::dot(wo, up_norm), 1.0f);
-            sin_theta = sqrtf(1 - cos_theta * cos_theta);
-
-            // divide reflection/refraction based on how significant the factor is
-            if (eta * sin_theta > 1 || schlick_frensnel(wo, up_norm, eta) > u01(rng)) {
-                type = METAL;
-                finish = false;
-            } else {
-                wi = glm::refract(ray.direction, up_norm, eta);
-            }
-            break;
-        case LAMBERT:
-        default:
-            wi = calculateRandomDirectionInHemisphere(normal, rng);
-            break;
-        }
-    } while (!finish);
+    wi = space.local_to_world(wi);
 
     // update path segment
+
     --path.remainingBounces;
-    wi = glm::normalize(wi);
-    path.color *= color * phong(ray.origin, wi, wo, normal, m);
-    ray.origin = intersect + OFFSET_EPS * normal;
-    ray.direction = wi;
-#endif // PBRT
+    path.color *= color;
+    ray.origin = intersect + OFFSET_EPS * wi;
+    ray.direction = glm::normalize(wi);
 }

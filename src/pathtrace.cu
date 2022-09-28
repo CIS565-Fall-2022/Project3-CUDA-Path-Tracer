@@ -238,27 +238,23 @@ __global__ void computeIntersections(
 
 	assert(pathSegment.remainingBounces > 0);
 
-	float t;
-	glm::vec3 intersect_point;
-	glm::vec3 normal;
-	glm::vec2 uv;
-	int mat_id;
-
 	float t_min = FLT_MAX;
-	int hit_geom_index = -1;
 
 	// naive parse through global geoms
-	auto& inters = intersections[path_index];
+	ShadeableIntersection& inters = intersections[path_index];
+	inters.t = -1;
 
 	for (int i = 0; i < geoms.size(); i++) {
 		Geom& geom = geoms[i];
+		float t;
+		ShadeableIntersection tmp;
 
 		if (geom.type == CUBE) {
-			t = boxIntersectionTest(geom, pathSegment.ray, inters);
+			t = boxIntersectionTest(geom, pathSegment.ray, tmp);
 		} else if (geom.type == SPHERE) {
-			t = sphereIntersectionTest(geom, pathSegment.ray, inters);
+			t = sphereIntersectionTest(geom, pathSegment.ray, tmp);
 		} else if (geom.type == MESH) {
-			t = meshIntersectionTest(geom, pathSegment.ray, meshInfo, inters);
+			t = meshIntersectionTest(geom, pathSegment.ray, meshInfo, tmp);
 		}
 		// add more intersection tests here... triangle? metaball? CSG?
 
@@ -266,23 +262,9 @@ __global__ void computeIntersections(
 		// scene geometry object was hit first.
 		if (t > 0.0f && t_min > t) {
 			t_min = t;
-			hit_geom_index = i;
-			intersect_point = inters.hitPoint;
-			normal = inters.surfaceNormal;
-			mat_id = inters.materialId;
-			uv = inters.uv;
+			inters = tmp;
+			inters.t = t;
 		}
-	}
-
-	if (hit_geom_index == -1) {
-		inters.t = -1.0f;
-	} else {
-		//The ray hits something
-		inters.t = t_min;
-		inters.hitPoint = intersect_point;
-		inters.surfaceNormal = normal;
-		inters.materialId = mat_id;
-		inters.uv = uv;
 	}
 }
 
