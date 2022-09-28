@@ -80,9 +80,30 @@ void scatterRay(    // similar to sample_f, calculate the new wi and f
         return;
     }
 
-    glm::vec3 wi_scatteredRayDir = calculateRandomDirectionInHemisphere(normal, rng);  // for pure diffused material
+    glm::vec3 wi_scatteredRayDir = glm::vec3(0.f, 0.f, 0.f);
+    glm::vec3 wo = pathSegment.ray.direction;
+    float eta = m.indexOfRefraction;
+    //float etaA = 1.f;
+    //float etaB = m.indexOfRefraction;
+    if (m.hasReflective) {
+        wi_scatteredRayDir = glm::reflect(wo, normal);
+    }
+    else if (m.hasRefractive) {
+        bool entering = (glm::dot(wo, normal) < 0);
+        eta = entering ? 1.f/m.indexOfRefraction : m.indexOfRefraction;
+        wi_scatteredRayDir = glm::refract(glm::normalize(wo), normal, eta);
+        //intersect += 0.001f * glm::normalize(wi_scatteredRayDir);
+        //bool entering = (glm::dot(wo, normal) > 0);
+        //float etaI = entering ? etaA : etaB;
+        //float etaT = entering ? etaB : etaA;
+        //wi_scatteredRayDir = glm::normalize(glm::reframe ct(wo, normal, etaT / etaI));
+    }
+    else {
+        wi_scatteredRayDir = calculateRandomDirectionInHemisphere(normal, rng);  // for pure diffused material
+    }
+    
     pathSegment.ray.direction = wi_scatteredRayDir;
-    pathSegment.ray.origin = intersect;
+    pathSegment.ray.origin = intersect + 0.001f * glm::normalize(wi_scatteredRayDir);
     pathSegment.color *= m.color;
     pathSegment.remainingBounces--;
 }

@@ -455,7 +455,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		// path segments that have been reshuffled to be contiguous in memory.
 
 		// 1. Sort ray by material
-		//thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + new_num_paths, dev_paths, compareMaterialId());
+		thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + new_num_paths, dev_paths, compareMaterialId());
 
 		// 2. Ideal diffused shading and bounce and // 3. Perfect specular reflection
 		shadeWithMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
@@ -467,23 +467,15 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			);
 
 		// 4. Stream compaction
-		//dev_thrust_paths = thrust::device_ptr<PathSegment>(dev_paths);
-		//dev_new_end_path = thrust::device_ptr<PathSegment>(thrust::remove_if(dev_thrust_paths, dev_thrust_paths + new_num_paths, is_Terminated()));
-		//dev_thrust_paths = thrust::device_ptr<PathSegment>(dev_paths);
 		dev_path_end = thrust::partition(thrust::device, dev_paths, dev_paths + new_num_paths, is_Terminated());
 		new_num_paths = dev_path_end - dev_paths;
 
-
-		//int count = StreamCompaction::Efficient::compact(num_paths, dev_paths, dev_paths);
-		// 
 		// 5. Cache first bounce
 
 		if (new_num_paths == 0){
-		//if (depth == 3) {
-			iterationComplete = true; // TODO: should be based off stream compaction results.
+			iterationComplete = true;
 		}
 
-		//iterationComplete = true; // TODO: should be based off stream compaction results.
 		if (guiData != NULL)
 		{
 			guiData->TracedDepth = depth;
