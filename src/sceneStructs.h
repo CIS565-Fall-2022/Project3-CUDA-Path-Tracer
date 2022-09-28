@@ -66,6 +66,7 @@ struct PathSegment {
     int remainingBounces;
 };
 
+
 // Use with a corresponding PathSegment to do:
 // 1) color contribution computation
 // 2) BSDF evaluation: generate a new ray

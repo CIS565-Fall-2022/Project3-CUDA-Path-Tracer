@@ -5,6 +5,7 @@
 #include <thrust/random.h>
 #include <thrust/remove.h>
 #include <thrust/partition.h>
+#include <thrust/sort.h>
 #include <thrust/device_ptr.h>
 #include <thrust/device_vector.h>
 
@@ -18,6 +19,8 @@
 #include "interactions.h"
 
 #define ERRORCHECK 1
+#define SORT_MATERIAL 0
+#define CACHE_INTERSECTION 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -79,6 +82,7 @@ static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
+static ShadeableIntersection* dev_cache_intersections = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -106,6 +110,8 @@ void pathtraceInit(Scene* scene) {
 	cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
 	// TODO: initialize any extra device memeory you need
+	cudaMalloc(&dev_cache_intersections, pixelcount * sizeof(ShadeableIntersection));
+	cudaMemset(dev_cache_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
 	checkCUDAError("pathtraceInit");
 }
@@ -353,17 +359,19 @@ struct isPathCompleted
 {
 	__host__ __device__
 		bool operator()(const PathSegment& pathSegment) {
-		return pathSegment.remainingBounces != 0;
+		return pathSegment.remainingBounces > 0;
 	}
 };
-struct is_nonzero
+
+struct sortMaterialsID
 {
-	__host__ __device__
-		bool operator()(const PathSegment p)
+	__host__ __device__ 
+		bool operator()(ShadeableIntersection& intersect1, const ShadeableIntersection& intersect2)
 	{
-		return glm::length(p.color) < 0.0001f; // TODO: create an epsilon
+		return intersect1.materialId < intersect2.materialId;
 	}
 };
+
 /**
  * Wrapper for the __global__ call that sets up the kernel calls and does a ton
  * of memory management
@@ -431,6 +439,41 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 		// tracing
 		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
+		std::cout << "depth: " << depth << "\n";
+
+#if CACHE_INTERSECTION
+		if (depth == 0 && iter == 1) {
+			computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+				depth
+				, num_paths
+				, dev_paths
+				, dev_geoms
+				, hst_scene->geoms.size()
+				, dev_intersections
+				);
+			checkCUDAError("trace one bounce");
+			cudaDeviceSynchronize();
+			cudaMemcpy(dev_cache_intersections, dev_intersections,
+				pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
+
+		}
+		else if (depth == 0) {
+			cudaMemcpy(dev_intersections, dev_cache_intersections, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
+
+		}
+		else {
+			computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+				depth
+				, num_paths
+				, dev_paths
+				, dev_geoms
+				, hst_scene->geoms.size()
+				, dev_intersections
+				);
+			checkCUDAError("trace one bounce");
+			cudaDeviceSynchronize();
+		}
+#else
 		computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
 			depth
 			, num_paths
@@ -441,16 +484,25 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			);
 		checkCUDAError("trace one bounce");
 		cudaDeviceSynchronize();
+		
+#endif // CACHE_INTERSECTION
 		depth++;
-
 		// TODO:
 		// --- Shading Stage ---
 		// Shade path segments based on intersections and generate new rays by
-	  // evaluating the BSDF.
-	  // Start off with just a big kernel that handles all the different
-	  // materials you have in the scenefile.
-	  // TODO: compare between directly shading the path segments and shading
-	  // path segments that have been reshuffled to be contiguous in memory.
+		// evaluating the BSDF.
+		// Start off with just a big kernel that handles all the different
+		// materials you have in the scenefile.
+		// TODO: compare between directly shading the path segments and shading
+		// path segments that have been reshuffled to be contiguous in memory.
+
+
+#ifdef SORT_MATERIAL
+
+			// sort by material type,  thrust::stable_sort_by_key(thrust::host, keys, keys + N, values, predicate);
+			thrust::stable_sort_by_key(thrust::device, dev_intersections, dev_intersections + num_paths, dev_paths, sortMaterialsID());
+
+#endif // SORT_MATERIAL
 
 		shadeBSDFMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
 			iter,
@@ -461,11 +513,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			);
 
 		// stream compaction
-
-		// stream compaction
 		dev_path_end = thrust::stable_partition(thrust::device, dev_paths, dev_path_end, isPathCompleted());
 		num_paths = dev_path_end - dev_paths;
-		std::cout << "depth: " << depth << "\n";
 
 		//std::cout << num_paths << "\n";
 		iterationComplete = (num_paths == 0);
