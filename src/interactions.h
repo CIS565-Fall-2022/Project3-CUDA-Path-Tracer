@@ -106,10 +106,10 @@ void scatterRay(
     else if (randGen <= m.hasReflective + m.hasRefractive) {
         // take a refractive ray
         float airIOR = 1.0f;
-        float eta = m.indexOfRefraction / airIOR;
+        float eta = airIOR / m.indexOfRefraction;
 
         // then entering
-        float cosTheta = glm::min(glm::dot(pathSegment.ray.direction, normal), 1.f);
+        float cosTheta = glm::dot(-1.f * pathSegment.ray.direction, normal);
 
         bool entering = cosTheta > 0;
 
@@ -123,8 +123,8 @@ void scatterRay(
         glm::vec3 newDirection = pathSegment.ray.direction;
 
         // if total internal reflection
-        if (sinThetaT > 1) {
-            newDirection = glm::normalize(glm::reflect(glm::normalize(pathSegment.ray.direction), normal));
+        if (sinThetaT >= 1) {
+            newDirection = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
         }
         else {
             newDirection = glm::normalize(glm::refract(pathSegment.ray.direction, normal, eta));

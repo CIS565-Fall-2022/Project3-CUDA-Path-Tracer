@@ -20,7 +20,11 @@
 #include "intersections.h"
 #include "interactions.h"
 
+#include <device_launch_parameters.h>
+
 #define ERRORCHECK 1
+#define SORT_MATERIALS 0
+#define CACHE_FIRST_BOUNCE 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -82,6 +86,9 @@ static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
+#if CACHE_FIRST_BOUNCE
+static ShadeableIntersection* dev_cached_intersections = NULL;
+#endif
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -108,6 +115,10 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_intersections, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
+#if CACHE_FIRST_BOUNCE
+	cudaMalloc(&dev_cached_intersections, pixelcount * sizeof(ShadeableIntersection));
+	cudaMemset(dev_cached_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
+#endif
 	checkCUDAError("pathtraceInit");
 }
 
@@ -213,10 +224,7 @@ __global__ void computeIntersections(
 
 		if (hit_geom_index == -1)
 		{
-			//printf("hit nothing \n");
-			//pathSegment.remainingBounces = 0;
 			pathSegments[path_index].remainingBounces = 0;
-			// printf("hit nothing: %i \n", pathSegments[path_index].remainingBounces);
 			intersections[path_index].t = -1.0f;
 		}
 		else
@@ -226,9 +234,7 @@ __global__ void computeIntersections(
 			intersections[path_index].materialId = geoms[hit_geom_index].materialid;
 			intersections[path_index].surfaceNormal = normal;
 
-			// pathSegment.remainingBounces--;
 			pathSegments[path_index].remainingBounces--;
-			// printf("hit SOMEthing: %i \n", pathSegments[path_index].remainingBounces);
 		}
 	}
 }
@@ -319,7 +325,6 @@ struct invalid_intersection
 struct path_cmp {
 	__host__ __device__
 		bool operator()(ShadeableIntersection& inter1, ShadeableIntersection& inter2) {
-		// todo fix this not correct
 		return inter1.materialId < inter2.materialId;
 	}
 };
@@ -451,6 +456,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			);
 		checkCUDAError("trace one bounce");
 		cudaDeviceSynchronize();
+
 		depth++;
 
 		// TODO:
@@ -462,14 +468,11 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		// TODO: compare between directly shading the path segments and shading
 		// path segments that have been reshuffled to be contiguous in memory.
 
-		//// Based on the output of the threads
-		//// sort by materials
-		//// compute bsdf for shading and generating new intersections
-		//// remove any intersections that don't hit anything.
-
 		// 1. sort pathSegments by material type
-		// thrust::sort_by_key(dev_intersections, dev_intersections + currNumPaths, dev_paths, path_cmp());
-		
+		// This becomes very slow?
+#if SORT_MATERIALS
+		thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + currNumPaths, dev_paths, path_cmp());
+#endif	
 		// 2. shade the ray and spawn new path segments using BSDF
 		// this function generates a new ray to replace the old one using BSDF
 		kernComputeShade << <numblocksPathSegmentTracing, blockSize1d >> > (
@@ -494,6 +497,11 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		if (currNumPaths < 1) 
 		{
 			iterationComplete = true;
+		}
+
+		// cache the first set of intersections
+		if (depth == 0) {
+
 		}
 
 		if (guiData != NULL)
