@@ -104,9 +104,6 @@ int main(int argc, char** argv) {
 
 	const char* sceneFile = argv[1];
 
-	testDiscreteSampler();
-	exit(0);
-
 	// Load scene file
 	scene = new Scene(sceneFile);
 

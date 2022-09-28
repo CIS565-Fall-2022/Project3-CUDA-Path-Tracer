@@ -185,9 +185,16 @@ __global__ void pathIntegSampleSurface(
 	PathSegment& segment = segments[idx];
 	thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 4 + iter * SamplesConsumedOneIter);
 	Material material = scene->devMaterials[intersec.materialId];
+	bool deltaBSDF = material.type == Material::Type::Dielectric;
 
-	// TODO
-	// Perform light area sampling and MIS
+	if (!deltaBSDF) {
+		glm::vec3 radiance;
+		glm::vec3 wi;
+		float lightPdf = scene->sampleDirectLight(intersec.position, sample4D(rng), radiance, wi);
+		float BSDFPdf = material.pdf(intersec.normal, intersec.incomingDir, wi);
+		segment.radiance += segment.throughput * material.BSDF(intersec.normal, intersec.incomingDir, wi) *
+			radiance * glm::dot(intersec.normal, wi) * Math::powerHeuristic(lightPdf, BSDFPdf) / lightPdf;
+	}
 	 
 #if BVH_DEBUG_VISUALIZATION
 	float logDepth = 0.f;
@@ -218,7 +225,7 @@ __global__ void pathIntegSampleSurface(
 		}
 
 		BSDFSample sample;
-		materialSample(intersec.normal, intersec.incomingDir, material, sample3D(rng), sample);
+		material.sample(intersec.normal, intersec.incomingDir, sample3D(rng), sample);
 
 		if (sample.type == BSDFSampleType::Invalid) {
 			// Terminate path if sampling fails

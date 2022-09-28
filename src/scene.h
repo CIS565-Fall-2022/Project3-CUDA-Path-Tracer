@@ -21,13 +21,13 @@
 
 #define DEV_SCENE_PASS_BY_CONST_MEM false
 
-struct Triangle {
-    glm::vec3 vertex[3];
-    glm::vec3 normal[3];
-    glm::vec2 texcoord[3];
-};
-
 struct MeshData {
+    void clear() {
+        vertices.clear();
+        normals.clear();
+        texcoords.clear();
+    }
+
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> normals;
     std::vector<glm::vec2> texcoords;
@@ -66,7 +66,7 @@ private:
 class Scene;
 
 struct DevScene {
-    void create(Scene& scene);
+    void create(const Scene& scene);
     void destroy();
 
     __device__ int getMTBVHId(glm::vec3 dir) {
@@ -87,6 +87,13 @@ struct DevScene {
                 return dir.z > 0 ? 4 : 5;
             }
         }
+    }
+
+    __device__ glm::vec3 getPrimitivePlainNormal(int primId) {
+        glm::vec3 v0 = devVertices[primId * 3 + 0];
+        glm::vec3 v1 = devVertices[primId * 3 + 1];
+        glm::vec3 v2 = devVertices[primId * 3 + 2];
+        return glm::normalize(glm::cross(v1 - v0, v2 - v0));
     }
 
     __device__ void getIntersecGeomInfo(int primId, glm::vec2 bary, Intersection& intersec) {
@@ -274,6 +281,34 @@ struct DevScene {
         intersec.primitive = maxDepth;
     }
 
+    /**
+    * Returns solid angle probability
+    */
+    __device__ float sampleDirectLight(glm::vec3 pos, glm::vec4 r, glm::vec3& radiance, glm::vec3& wi) {
+        int passId = int(float(numLightPrims) * r.x);
+        BinomialDistrib<float> distrib = devLightDistrib[passId];
+        int lightId = (r.y < distrib.prob) ? passId : distrib.failId;
+        int primId = devLightPrimIds[lightId];
+
+        glm::vec3 v0 = devVertices[primId * 3 + 0];
+        glm::vec3 v1 = devVertices[primId * 3 + 1];
+        glm::vec3 v2 = devVertices[primId * 3 + 2];
+        glm::vec3 sampled = Math::sampleTriangleUniform(v0, v1, v2, r.z, r.w);
+
+        if (testOcclusion(pos, sampled)) {
+            return InvalidPdf;
+        }
+        glm::vec3 normal = Math::triangleNormal(v0, v1, v2);
+        glm::vec3 posToSampled = sampled - pos;
+
+        if (glm::dot(normal, posToSampled) > 0.f) {
+            return InvalidPdf;
+        }
+        radiance = devLightUnitRadiance[lightId];
+        wi = glm::normalize(posToSampled);
+        return Math::pdfAreaToSolidAngle(Math::luminance(radiance) / sumLightPower, pos, sampled, normal);
+    }
+
     glm::vec3* devVertices = nullptr;
     glm::vec3* devNormals = nullptr;
     glm::vec2* devTexcoords = nullptr;
@@ -287,7 +322,10 @@ struct DevScene {
     DevTextureObj* devTextureObjs = nullptr;
 
     int* devLightPrimIds = nullptr;
-    float sumLightPower = 0.f;
+    glm::vec3* devLightUnitRadiance = nullptr;
+    BinomialDistrib<float>* devLightDistrib;
+    int numLightPrims;
+    float sumLightPower;
 };
 
 class Scene {
@@ -301,6 +339,8 @@ public:
     void clear();
 
 private:
+    void createLightSampler();
+
     void loadModel(const std::string& objectId);
     void loadMaterial(const std::string& materialId);
     void loadCamera();
@@ -316,6 +356,13 @@ public:
     std::vector<AABB> boundingBoxes;
     std::vector<std::vector<MTBVHNode>> BVHNodes;
     MeshData meshData;
+
+    std::vector<int> lightPrimIds;
+    std::vector<float> lightPower;
+    std::vector<glm::vec3> lightUnitRadiance;
+    DiscreteSampler<float> lightSampler;
+    int numLightPrims = 0;
+    float sumLightPower = 0.f;
 
     DevScene hstScene;
     DevScene* devScene = nullptr;

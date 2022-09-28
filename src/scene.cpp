@@ -58,7 +58,6 @@ MeshData* Resource::loadOBJMesh(const std::string& filename) {
         for (auto idx : shape.mesh.indices) {
             model->vertices.push_back(*((glm::vec3*)attrib.vertices.data() + idx.vertex_index));
             model->normals.push_back(*((glm::vec3*)attrib.normals.data() + idx.normal_index));
-
             model->texcoords.push_back(hasTexcoord ?
                 *((glm::vec2*)attrib.texcoords.data() + idx.texcoord_index) :
                 glm::vec2(0.f)
@@ -137,26 +136,61 @@ Scene::Scene(const std::string& filename) {
 Scene::~Scene() {
 }
 
+void Scene::createLightSampler() {
+    lightSampler = DiscreteSampler<float>(lightPower);
+    std::cout << "[Light sampler size = " << lightPower.size() << "]" << std::endl;
+}
+
 void Scene::buildDevData() {
 #if MESH_DATA_INDEXED
 #else
+    int primId = 0;
     for (const auto& inst : modelInstances) {
+        const auto& material = materials[inst.materialId];
+        glm::vec3 radianceUnitArea = material.baseColor * material.emittance;
+        float powerUnitArea = Math::luminance(radianceUnitArea);
+
         for (size_t i = 0; i < inst.meshData->vertices.size(); i++) {
             meshData.vertices.push_back(glm::vec3(inst.transform * glm::vec4(inst.meshData->vertices[i], 1.f)));
             meshData.normals.push_back(glm::normalize(inst.normalMat * inst.meshData->normals[i]));
             meshData.texcoords.push_back(inst.meshData->texcoords[i]);
+
             if (i % 3 == 0) {
                 materialIds.push_back(inst.materialId);
             }
+            else if (i % 3 == 2 && material.type == Material::Light) {
+                glm::vec3 v0 = meshData.vertices[i - 2];
+                glm::vec3 v1 = meshData.vertices[i - 1];
+                glm::vec3 v2 = meshData.vertices[i - 0];
+                float area = Math::triangleArea(v0, v1, v2);
+                float power = powerUnitArea * area;
+
+                lightPrimIds.push_back(primId);
+                lightUnitRadiance.push_back(radianceUnitArea);
+                lightPower.push_back(power);
+                sumLightPower += power;
+                numLightPrims++;
+            }
+            primId++;
         }
     }
 #endif
+    createLightSampler();
     BVHSize = BVHBuilder::build(meshData.vertices, boundingBoxes, BVHNodes);
     checkCUDAError("BVH Build");
+
     hstScene.create(*this);
     cudaMalloc(&devScene, sizeof(DevScene));
     cudaMemcpyHostToDev(devScene, &hstScene, sizeof(DevScene));
     checkCUDAError("Dev Scene");
+
+    meshData.clear();
+    boundingBoxes.clear();
+    BVHNodes.clear();
+
+    lightPrimIds.clear();
+    lightPower.clear();
+    lightSampler.binomDistribs.clear();
 }
 
 void Scene::clear() {
@@ -313,7 +347,7 @@ void Scene::loadMaterial(const std::string& matId) {
     materials.push_back(material);
 }
 
-void DevScene::create(Scene& scene) {
+void DevScene::create(const Scene& scene) {
     // Put all texture devData in a big buffer
     // and setup device texture objects to manage
     std::vector<DevTextureObj> textureObjs;
@@ -358,6 +392,19 @@ void DevScene::create(Scene& scene) {
         cudaMemcpyHostToDev(devBVHNodes[i], scene.BVHNodes[i].data(), byteSizeOf(scene.BVHNodes[i]));
     }
     BVHSize = scene.BVHSize;
+
+    cudaMalloc(&devLightPrimIds, byteSizeOf(scene.lightPrimIds));
+    cudaMemcpyHostToDev(devLightPrimIds, scene.lightPrimIds.data(), byteSizeOf(scene.lightPrimIds));
+    numLightPrims = scene.numLightPrims;
+
+    cudaMalloc(&devLightUnitRadiance, byteSizeOf(scene.lightUnitRadiance));
+    cudaMemcpyHostToDev(devLightUnitRadiance, scene.lightPower.data(), byteSizeOf(scene.lightUnitRadiance));
+
+    cudaMalloc(&devLightDistrib, byteSizeOf(scene.lightSampler.binomDistribs));
+    cudaMemcpyHostToDev(devLightDistrib, scene.lightSampler.binomDistribs.data(),
+        byteSizeOf(scene.lightSampler.binomDistribs));
+    sumLightPower = scene.sumLightPower;
+
     checkCUDAError("DevScene::meshData");
 }
 
@@ -375,4 +422,8 @@ void DevScene::destroy() {
     for (int i = 0; i < 6; i++) {
         cudaSafeFree(devBVHNodes[i]);
     }
+
+    cudaSafeFree(devLightPrimIds);
+    cudaSafeFree(devLightPower);
+    cudaSafeFree(devLightDistrib);
 }

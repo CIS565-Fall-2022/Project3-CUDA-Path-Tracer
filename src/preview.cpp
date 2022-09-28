@@ -160,7 +160,7 @@ bool init() {
 	if (glewInit() != GLEW_OK) {
 		return false;
 	}
-	printf("Opengl Version:%s\n", glGetString(GL_VERSION));
+	//printf("Opengl Version:%s\n", glGetString(GL_VERSION));
 	//Set up ImGui
 
 	IMGUI_CHECKVERSION();
