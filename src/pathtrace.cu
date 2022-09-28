@@ -147,7 +147,7 @@ __global__ void computeIntersections(
 
 	if (pathIdx < numPaths) {
 #if BVH_DEBUG_VISUALIZATION
-	scene->debugIntersect(pathSegments[pathIdx].ray, intersections[pathIdx]);
+	scene->visualizedIntersect(pathSegments[pathIdx].ray, intersections[pathIdx]);
 #else
 	scene->intersect(pathSegments[pathIdx].ray, intersections[pathIdx]);
 	/*AABB box;
@@ -213,6 +213,10 @@ __global__ void pathIntegSampleSurface(
 		segment.remainingBounces = 0;
 	}
 	else {
+		if (material.type != Material::Type::Dielectric && glm::dot(intersec.normal, intersec.incomingDir) < 0.f) {
+			intersec.normal = -intersec.normal;
+		}
+
 		BSDFSample sample;
 		materialSample(intersec.normal, intersec.incomingDir, material, sample3D(rng), sample);
 

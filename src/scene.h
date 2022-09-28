@@ -14,9 +14,12 @@
 #include "material.h"
 #include "image.h"
 #include "bvh.h"
+#include "sampler.h"
 
 #define MESH_DATA_STRUCT_OF_ARRAY false
 #define MESH_DATA_INDEXED false
+
+#define DEV_SCENE_PASS_BY_CONST_MEM false
 
 struct Triangle {
     glm::vec3 vertex[3];
@@ -63,14 +66,14 @@ private:
 class Scene;
 
 struct DevScene {
-    void createDevData(Scene& scene);
-    void freeDevData();
+    void create(Scene& scene);
+    void destroy();
 
     __device__ int getMTBVHId(glm::vec3 dir) {
         glm::vec3 absDir = glm::abs(dir);
         if (absDir.x > absDir.y) {
             if (absDir.x > absDir.z) {
-                return dir.x > 0 ? 1 : 0;
+                return dir.x > 0 ? 0 : 1;
             }
             else {
                 return dir.z > 0 ? 4 : 5;
@@ -114,6 +117,16 @@ struct DevScene {
         }
         glm::vec3 hitPoint = vb * bary.x + vc * bary.y + va * (1.f - bary.x - bary.y);
         return true;
+    }
+
+    __device__ bool intersectPrimitive(int primId, Ray ray, float distRange) {
+        glm::vec3 va = devVertices[primId * 3 + 0];
+        glm::vec3 vb = devVertices[primId * 3 + 1];
+        glm::vec3 vc = devVertices[primId * 3 + 2];
+        glm::vec2 bary;
+        float dist;
+        bool hit = intersectTriangle(ray, va, vb, vc, bary, dist);
+        return (hit && dist < distRange);
     }
 
     __device__ bool intersectPrimitiveDetailed(int primId, Ray ray, Intersection& intersec) {
@@ -186,7 +199,39 @@ struct DevScene {
         }
     }
 
-    __device__ void debugIntersect(Ray ray, Intersection& intersec) {
+    __device__ bool testOcclusion(glm::vec3 x, glm::vec3 y) {
+        const float Eps = 1e-5f;
+
+        glm::vec3 dir = y - x;
+        float dist = glm::length(dir);
+        dir /= dist;
+        dist -= Eps;
+
+        Ray ray = makeOffsetedRay(x, dir);
+        bool hit = false;
+
+        MTBVHNode* nodes = devBVHNodes[getMTBVHId(-ray.direction)];
+        int node = 0;
+        while (node != BVHSize) {
+            AABB& bound = devBoundingBoxes[nodes[node].boundingBoxId];
+            float boundDist;
+            bool boundHit = bound.intersect(ray, boundDist);
+
+            if (boundHit && boundDist < dist) {
+                int primId = nodes[node].primitiveId;
+                if (primId != NullPrimitive) {
+                    hit |= intersectPrimitive(primId, ray, dist);
+                }
+                node++;
+            }
+            else {
+                node = nodes[node].nextNodeIfMiss;
+            }
+        }
+        return hit;
+    }
+
+    __device__ void visualizedIntersect(Ray ray, Intersection& intersec) {
         float closestDist = FLT_MAX;
         int closestPrimId = NullPrimitive;
         glm::vec2 closestBary;
@@ -240,6 +285,9 @@ struct DevScene {
     Material* devMaterials = nullptr;
     glm::vec3* devTextureData = nullptr;
     DevTextureObj* devTextureObjs = nullptr;
+
+    int* devLightPrimIds = nullptr;
+    float sumLightPower = 0.f;
 };
 
 class Scene {

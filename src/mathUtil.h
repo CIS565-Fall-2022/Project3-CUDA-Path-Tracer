@@ -24,6 +24,11 @@ namespace Math {
     bool epsilonCheck(float a, float b);
     glm::mat4 buildTransformationMatrix(glm::vec3 translation, glm::vec3 rotation, glm::vec3 scale);
 
+    template<typename T>
+    bool between(const T& x, const T& min, const T& max) {
+        return x >= min && x <= max;
+    }
+
     __host__ __device__ inline float satDot(glm::vec3 a, glm::vec3 b) {
         return glm::max(glm::dot(a, b), 0.f);
     }

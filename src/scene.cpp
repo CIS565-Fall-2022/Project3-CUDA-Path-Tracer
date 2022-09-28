@@ -153,14 +153,14 @@ void Scene::buildDevData() {
 #endif
     BVHSize = BVHBuilder::build(meshData.vertices, boundingBoxes, BVHNodes);
     checkCUDAError("BVH Build");
-    hstScene.createDevData(*this);
+    hstScene.create(*this);
     cudaMalloc(&devScene, sizeof(DevScene));
     cudaMemcpyHostToDev(devScene, &hstScene, sizeof(DevScene));
     checkCUDAError("Dev Scene");
 }
 
 void Scene::clear() {
-    hstScene.freeDevData();
+    hstScene.destroy();
     cudaSafeFree(devScene);
 }
 
@@ -313,7 +313,7 @@ void Scene::loadMaterial(const std::string& matId) {
     materials.push_back(material);
 }
 
-void DevScene::createDevData(Scene& scene) {
+void DevScene::create(Scene& scene) {
     // Put all texture devData in a big buffer
     // and setup device texture objects to manage
     std::vector<DevTextureObj> textureObjs;
@@ -361,7 +361,7 @@ void DevScene::createDevData(Scene& scene) {
     checkCUDAError("DevScene::meshData");
 }
 
-void DevScene::freeDevData() {
+void DevScene::destroy() {
     cudaSafeFree(devTextureData);
     cudaSafeFree(devTextureObjs);
     cudaSafeFree(devMaterials);

@@ -2,6 +2,7 @@
 #include "preview.h"
 #include "intersections.h"
 #include <cstring>
+#include <random>
 
 static std::string startTimeString;
 
@@ -73,6 +74,26 @@ void testTriangle() {
 	std::cout << hit << " " << vec3ToString(glm::vec3(1.f - bary.x - bary.y, bary)) << "\n";
 }
 
+void testDiscreteSampler() {
+	std::vector<float> distrib = { .1f, .2f, .3f, .4f, 2.f, 3.f, 4.f };
+	DiscreteSampler<float> sp(distrib);
+
+	int stat[7] = { 0 };
+
+	std::default_random_engine rng(time(nullptr));
+
+	for (int i = 0; i < 100000; i++) {
+		float r1 = std::uniform_real_distribution<float>(0.f, 1.f)(rng);
+		float r2 = std::uniform_real_distribution<float>(0.f, 1.f)(rng);
+		stat[sp.sample(r1, r2)]++;
+	}
+
+	for (auto i : stat) {
+		std::cout << i << " ";
+	}
+	std::cout << "\n";
+}
+
 int main(int argc, char** argv) {
 	startTimeString = currentTimeString();
 
@@ -82,6 +103,9 @@ int main(int argc, char** argv) {
 	}
 
 	const char* sceneFile = argv[1];
+
+	testDiscreteSampler();
+	exit(0);
 
 	// Load scene file
 	scene = new Scene(sceneFile);
