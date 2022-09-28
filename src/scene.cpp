@@ -4,6 +4,9 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;
@@ -45,12 +48,20 @@ int Scene::loadGeom(string objectid) {
         //load object type
         utilityCore::safeGetline(fp_in, line);
         if (!line.empty() && fp_in.good()) {
-            if (strcmp(line.c_str(), "sphere") == 0) {
+            vector<string> tokens = utilityCore::tokenizeString(line);
+            if (strcmp(tokens[0].c_str(), "sphere") == 0) {
                 cout << "Creating new sphere..." << endl;
                 newGeom.type = SPHERE;
-            } else if (strcmp(line.c_str(), "cube") == 0) {
+                //newGeom.tri = glm::vec3(-1.0, -1.0, -1.0);
+            } else if (strcmp(tokens[0].c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
+                //newGeom.tri = glm::vec3(-1.0, -1.0, -1.0);
+            }
+            else if (strcmp(tokens[0].c_str(), "mesh") == 0) {
+                cout << "Creating new mesh..." << endl;
+                loadOBJ(tokens[1], id);
+                return 1;
             }
         }
 
@@ -96,7 +107,7 @@ int Scene::loadCamera() {
     float fovy;
 
     //load static properties
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 7; i++) {
         string line;
         utilityCore::safeGetline(fp_in, line);
         vector<string> tokens = utilityCore::tokenizeString(line);
@@ -111,6 +122,10 @@ int Scene::loadCamera() {
             state.traceDepth = atoi(tokens[1].c_str());
         } else if (strcmp(tokens[0].c_str(), "FILE") == 0) {
             state.imageName = tokens[1];
+        } else if (strcmp(tokens[0].c_str(), "LENS_RADIUS") == 0) {
+            camera.lens_radius = atof(tokens[1].c_str());
+        } else if (strcmp(tokens[0].c_str(), "FOCAL_DIST") == 0) {
+            camera.focal_dist = atof(tokens[1].c_str());
         }
     }
 
@@ -185,4 +200,85 @@ int Scene::loadMaterial(string materialid) {
         materials.push_back(newMaterial);
         return 1;
     }
+}
+
+int Scene::loadOBJ(string filename, int objectid)
+{
+    int materialid = -1;
+    glm::vec3 translation = glm::vec3(0.0, 0.0, 0.0);
+    glm::vec3 rotation = glm::vec3(0.0, 0.0, 0.0);
+    glm::vec3 scale = glm::vec3(1.0, 1.0, 1.0);
+    string line;
+
+    // Get material id (same for entire mesh)
+    utilityCore::safeGetline(fp_in, line);
+    if (!line.empty() && fp_in.good()) {
+        vector<string> tokens = utilityCore::tokenizeString(line);
+        materialid = atoi(tokens[1].c_str());
+        cout << "Connecting Geom " << objectid << " to Material " << materialid << "..." << endl;
+    }
+
+    // Get transformations (default for all triangles)
+    glm::mat4 transform = utilityCore::buildTransformationMatrix(translation, rotation, scale);
+    glm::mat4 inverseTransform = glm::inverse(transform);
+    glm::mat4 invTranspose = glm::inverseTranspose(transform);
+
+    // Load obj using tinyobjloader
+    std::string inputfile = "../obj/" + filename;
+    tinyobj::ObjReaderConfig reader_config;
+    tinyobj::ObjReader reader;
+
+    if (!reader.ParseFromFile(inputfile, reader_config)) {
+        if (!reader.Error().empty()) {
+            std::cerr << "TinyObjReader: " << reader.Error();
+        }
+        exit(1);
+    }
+
+    if (!reader.Warning().empty()) {
+        std::cout << "TinyObjReader: " << reader.Warning();
+    }
+
+    auto& attrib = reader.GetAttrib();
+    auto& shapes = reader.GetShapes();
+    auto& materials = reader.GetMaterials();
+
+    for (size_t s = 0; s < shapes.size(); s++) {
+        // Loop over faces(polygon)
+        size_t index_offset = 0;
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+            size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+
+            // Loop over vertices in the face.
+            Triangle tri;
+            int i = 0;
+            for (size_t v = 0; v < fv; v++) {
+                // access to vertex
+                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+
+                tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
+                tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
+                tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+
+                tri.verts[i]= glm::vec3((float)vx, (float)vy, (float)vz);
+                i++;
+            }
+
+            // Initialize new triangle
+            Geom newGeom;
+            newGeom.type = TRIANGLE;
+            newGeom.materialid = materialid;
+            newGeom.tri = tri;
+            newGeom.translation = translation;
+            newGeom.rotation = rotation;
+            newGeom.scale = scale;
+            newGeom.transform = transform;
+            newGeom.inverseTransform = inverseTransform;
+            newGeom.invTranspose = invTranspose;
+            geoms.push_back(newGeom);
+
+            index_offset += fv;
+        }
+    }
+    return 1;
 }

@@ -16,8 +16,17 @@
 #include "intersections.h"
 #include "interactions.h"
 
+// Turn on anti-aliasing to removed jagged edges on shapes
+#define ANTIALIASING
+
+// Turn on to sort by material (keeps same materials contiguous in memory)
 #define MATERIAL_SORT
-//#define CACHE_FIRST_BOUNCE
+
+// Turn off cache first bouncing when anti-aliasing is enabled
+#ifndef ANTIALIASING
+	#define CACHE_FIRST_BOUNCE
+#endif
+
 #define ERRORCHECK 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
@@ -42,6 +51,7 @@ void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #endif
 }
 
+// Returns true if a path still has bounces left
 struct not_zero
 {
 	__host__ __device__
@@ -51,6 +61,7 @@ struct not_zero
 	}
 };
 
+// Compares the material ids of two materials to sort them in ascending order
 struct mat_id
 {
 	__host__ __device__
@@ -93,11 +104,12 @@ static Scene* hst_scene = NULL;
 static GuiDataContainer* guiData = NULL;
 static glm::vec3* dev_image = NULL;
 static Geom* dev_geoms = NULL;
+// OBJTODO: static glm::vec3* dev_tri_verts = NULL; --> storing all vertices read in from obj file
 static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
-// TODO: static variables for device memory, any extra info you need, etc
-// ...
+
+// For saving first-bounce intersections
 static ShadeableIntersection* dev_first_bounce_intersections = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
@@ -145,6 +157,35 @@ void pathtraceFree() {
 }
 
 /**
+* Concentric Disk Sampling from PBRT Chapter 13.6.2
+*/
+__host__ __device__ glm::vec3 concentricSampleDisk(glm::vec2 &sample)
+{
+	// Map sample point (uniform random numbers) to range [-1, 1]^2
+	glm::vec2 mappedSample = 2.f * sample - glm::vec2(1.f, 1.f);
+
+	// Handle origin
+	if (mappedSample.x == 0.f && mappedSample.y == 0.f) {
+		return glm::vec3(0.f);
+	}
+
+	// Apply concentric mapping to the adjusted sample point
+	float r = 0.f;
+	float theta = 0.f;
+	// Find r and theta depending on x and y coords of mapped point
+	if (std::abs(mappedSample.x) > std::abs(mappedSample.y)) {
+		r = mappedSample.x;
+		theta = PI_OVER_FOUR * (mappedSample.y / mappedSample.x);
+	}
+	else {
+		r = mappedSample.y;
+		theta = PI_OVER_TWO - PI_OVER_FOUR * (mappedSample.x / mappedSample.y);
+	}
+
+	return glm::vec3(r * cos(theta), r * sin(theta), 0);
+}
+
+/**
 * Generate PathSegments with rays from the camera through the screen into the
 * scene, which is the first bounce of rays.
 *
@@ -157,6 +198,16 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
 
+	// Add jitter to x and y
+	thrust::default_random_engine rng = makeSeededRandomEngine(iter, x + y * cam.resolution.x, 0);
+	thrust::uniform_real_distribution<float> u01(0, 1);
+	float jitterX = 0.0;
+	float jitterY = 0.0;
+#ifdef ANTIALIASING
+	jitterX = u01(rng);
+	jitterY = u01(rng);
+#endif 
+
 	if (x < cam.resolution.x && y < cam.resolution.y) {
 		int index = x + (y * cam.resolution.x);
 		PathSegment& segment = pathSegments[index];
@@ -167,10 +218,22 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 
 		// TODO: implement antialiasing by jittering the ray
 		segment.ray.direction = glm::normalize(cam.view
-			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
+			- cam.right * cam.pixelLength.x * ((float)(x + jitterX) - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)(y + jitterY) - (float)cam.resolution.y * 0.5f)
 		);
 
+		if (cam.lens_radius > 0.0f) {
+			// Get sample on lens
+			glm::vec3 samplePoint = cam.lens_radius * concentricSampleDisk(glm::vec2(u01(rng), u01(rng)));
+
+			// Focal point
+			float ft = glm::length(cam.lookAt - cam.position);
+			glm::vec3 focalPoint = getPointOnRay(segment.ray, ft);
+
+			// Update ray
+			segment.ray.origin += samplePoint;
+			segment.ray.direction = glm::normalize(focalPoint - segment.ray.origin);
+		}
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
 	}
@@ -210,7 +273,7 @@ __global__ void computeIntersections(
 		glm::vec3 tmp_normal;
 
 		// naive parse through global geoms
-
+		//int j = 0;
 		for (int i = 0; i < geoms_size; i++)
 		{
 			Geom& geom = geoms[i];
@@ -224,7 +287,15 @@ __global__ void computeIntersections(
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
+			else if (geom.type == TRIANGLE)
+			{
+				//j++;
+				glm::vec3 barycenter;
+				glm::intersectRayTriangle(pathSegment.ray.origin, pathSegment.ray.direction,
+											  geom.tri.verts[0], geom.tri.verts[1], geom.tri.verts[2],
+											  barycenter);
 
+			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
 			if (t > 0.0f && t_min > t)
