@@ -82,28 +82,50 @@ void scatterRay(    // similar to sample_f, calculate the new wi and f
 
     glm::vec3 wi_scatteredRayDir = glm::vec3(0.f, 0.f, 0.f);
     glm::vec3 wo = pathSegment.ray.direction;
-    float eta = m.indexOfRefraction;
+    glm::vec3 color = m.color;
+    float airIOR = 1.0f;
+    float eta = m.indexOfRefraction / airIOR;
+
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    float random = u01(rng);
+
     //float etaA = 1.f;
     //float etaB = m.indexOfRefraction;
-    if (m.hasReflective) {
+
+
+    if (random <= m.hasReflective) {
         wi_scatteredRayDir = glm::reflect(wo, normal);
+
     }
-    else if (m.hasRefractive) {
-        bool entering = (glm::dot(wo, normal) < 0);
-        eta = entering ? 1.f/m.indexOfRefraction : m.indexOfRefraction;
-        wi_scatteredRayDir = glm::refract(glm::normalize(wo), normal, eta);
+    else if (random <= m.hasReflective + m.hasRefractive) {
+        float cosTheta = glm::dot(wo, normal);
+        float sinThetaI = sqrt(1 - pow(cosTheta, 2));
+        float sinThetaT = eta * sinThetaI;
+
+        bool entering = cosTheta > 0;
+        eta = entering ? m.indexOfRefraction : 1.f/m.indexOfRefraction;
+        
+        if (sinThetaT > 1) {
+            wi_scatteredRayDir = glm::reflect(wo, normal);
+        }
+        else {
+            wi_scatteredRayDir = glm::refract(glm::normalize(wo), normal, eta);
+        }
+        
+
         //intersect += 0.001f * glm::normalize(wi_scatteredRayDir);
         //bool entering = (glm::dot(wo, normal) > 0);
         //float etaI = entering ? etaA : etaB;
         //float etaT = entering ? etaB : etaA;
         //wi_scatteredRayDir = glm::normalize(glm::reframe ct(wo, normal, etaT / etaI));
     }
+    // if costheta(eta) > 1, then reflect dir about normal else refract, set new color to current color * specular color
     else {
         wi_scatteredRayDir = calculateRandomDirectionInHemisphere(normal, rng);  // for pure diffused material
     }
     
     pathSegment.ray.direction = wi_scatteredRayDir;
     pathSegment.ray.origin = intersect + 0.001f * glm::normalize(wi_scatteredRayDir);
-    pathSegment.color *= m.color;
+    pathSegment.color *= color;
     pathSegment.remainingBounces--;
 }
