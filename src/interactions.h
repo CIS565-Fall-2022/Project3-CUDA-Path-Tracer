@@ -110,7 +110,6 @@ __device__ float fresnel_dielectric(float cosThetaI, float etaI, float etaT) {
         etaT = tmp;
         cosThetaI = glm::abs(cosThetaI);
     }
-    // using Snell's law
     float sinThetaI = glm::sqrt(glm::max((float)0, 1 - cosThetaI * cosThetaI));
     float sinThetaT = etaI / etaT * sinThetaI;
 
@@ -124,27 +123,12 @@ __device__ float fresnel_dielectric(float cosThetaI, float etaI, float etaT) {
     return (Rparl * Rparl + Rperp * Rperp) / 2;
 }
 
-
-// taken from https://www.pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission#Refract
-__device__ bool refract(glm::vec3& wt, glm::vec3 const& wi, glm::vec3 const& n, float eta) {
-    float cosThetaI = glm::dot(n, wi);
-    float sin2ThetaI = glm::max(0.0f, 1.0f - cosThetaI * cosThetaI);
-    float sin2ThetaT = eta * eta * sin2ThetaI;
-    if (sin2ThetaT >= 1) return false;
-
-    float cosThetaT = std::sqrt(1 - sin2ThetaT);
-
-    wt = eta * -wi + (eta * cosThetaI - cosThetaT) * n;
-    return true;
-}
-
 struct SamplePointSpace {
     glm::mat3x3 l2w, w2l; // local to world
 
     __device__ SamplePointSpace(glm::vec3 const& n) {
         // constructs a world to local matrix
-        glm::vec3 z = n;
-        glm::vec3 h = z;
+        glm::vec3 h = n;
         if (fabs(h.x) <= fabs(h.y) && fabs(h.x) <= fabs(h.z)) {
             h.x = 1.0f;
         } else if (fabs(h.y) <= fabs(h.x) && fabs(h.y) <= fabs(h.z)) {
@@ -152,10 +136,10 @@ struct SamplePointSpace {
         } else {
             h.z = 1.0f;
         }
-        glm::vec3 y = glm::cross(h, z);
+        glm::vec3 y = glm::cross(h, n);
         l2w = glm::mat3x3(
-            glm::normalize(glm::cross(z, y)),
-            glm::normalize(glm::cross(h, z)),
+            glm::normalize(glm::cross(n, y)),
+            glm::normalize(glm::cross(h, n)),
             glm::normalize(n)
         );
         // inverse same as transpose

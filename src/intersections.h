@@ -281,12 +281,11 @@ __device__ float meshIntersectionTest(Geom mesh, Ray r, Material* materials, Mes
         inters.materialId = mesh.materialid;
     } else {
         inters.materialId = mat_id;
-    }
-
-    // use texture color if applicable
-    Material const& mat = materials[mat_id];
-    if (mat.textures.diffuse != -1) {
-        inters.tex_color = meshInfo.texs[mat.textures.diffuse].sample(uv);
+        // use texture color if applicable
+        Material const& mat = materials[mat_id];
+        if (mat.textures.diffuse != -1) {
+            inters.tex_color = meshInfo.texs[mat.textures.diffuse].sample(uv);
+        }
     }
 
     return glm::length(r.origin - inters.hitPoint);
