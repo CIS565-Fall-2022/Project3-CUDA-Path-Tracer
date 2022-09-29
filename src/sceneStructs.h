@@ -25,8 +25,8 @@ struct Primitive {
     int primIndex;
     glm::vec3 pos[3];
     glm::vec3 normal[3];
-    glm::vec2 uv[2];
-    glm::vec4 tangent[4];
+    glm::vec2 uv[3];
+    glm::vec4 tangent[3];
 };
 struct Geom {
     enum GeomType type;
