@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "intersections.h"
 
@@ -41,6 +41,12 @@ glm::vec3 calculateRandomDirectionInHemisphere(
         + sin(around) * over * perpendicularDirection2;
 }
 
+__host__ __device__
+float schlickEquation(float n1, float n2, float costheta) {
+    float r0 = (n1 - n2) / (n1 + n2);
+    r0 = r0 * r0;
+    return r0 + (1.f - r0) * glm::pow(1.f - costheta, 5.f);
+}
 /**
  * Scatter a ray with some probabilities according to the material properties.
  * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
@@ -78,15 +84,58 @@ void scatterRay(
     // calculateRandomDirectionInHemisphere defined above.
     glm::vec3 newDir = glm::vec3(0, 0, 0);
     if (m.hasReflective) {
-        newDir = glm::reflect(pathSegment.ray.direction, normal);
+        newDir = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+        pathSegment.ray.origin = intersect;
+        pathSegment.ray.direction = newDir;
     }
     else if (m.hasRefractive) {
+        thrust::uniform_real_distribution<float> u01(0, 1);
+        float ior;
+        float etaA = 1.0, etaB = m.indexOfRefraction;
+        // Check whether the ray is entering or leaving the object with which it has intersected by
+        // comparing the direction of ωi to the direction of the normal
+        float costheta = glm::clamp(glm::dot(pathSegment.ray.direction, normal), -1.f, 1.f);
+        float sintheta = glm::sqrt(glm::max(0.f, 1.f - costheta * costheta));
+        bool entering = costheta < 0.f;
+        if (!entering) {
+            // here, m.idexOfRefraction is set as etaB, which is the eta of material
+            // we assume etaA = 1.0, which is the eta of air
+            // if entering, ior = etaA / etaB = 1.0 / m.indexOfRefraction;
+            // if leaving, ior = etaB / etaA = m.indexOfRefraction;
+            etaB = 1.0;
+            etaA = m.indexOfRefraction;
+            ior = etaA / etaB;
+            normal = -normal;
+        }
+        else {
+            ior = etaA / etaB;
+            costheta = glm::abs(costheta);
+        }
 
+        glm::vec3 reflectDir = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+        glm::vec3 refractDir = glm::normalize(glm::refract(pathSegment.ray.direction, normal, ior));
+        
+        // if the incoming angle is larger than a value, the ray can only be reflected
+        bool canRefract = ior * sintheta < 1.f;
+
+        if (canRefract) {
+            if (u01(rng) < schlickEquation(etaB, etaA, costheta)) {
+                pathSegment.ray.direction = reflectDir;
+                pathSegment.ray.origin = intersect + 0.001f * glm::normalize(normal);
+            }
+            else {
+                pathSegment.ray.direction = refractDir;
+                pathSegment.ray.origin = intersect + 0.001f * glm::normalize(refractDir);
+            }
+        }
+        else {
+            pathSegment.ray.direction = reflectDir;
+            pathSegment.ray.origin = intersect + 0.001f * glm::normalize(normal);
+        }
     }
     else {
         newDir = calculateRandomDirectionInHemisphere(normal, rng);
+        pathSegment.ray.origin = intersect;
+        pathSegment.ray.direction = newDir;
     }
-    pathSegment.ray.origin = intersect;
-    pathSegment.ray.direction = newDir;
-
 }
