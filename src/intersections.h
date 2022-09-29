@@ -202,35 +202,57 @@ __host__ __device__ glm::vec3 interpolatedNormal(Vertex v[3], glm::vec3 p, float
 
 __host__ __device__ float triangleIntersectionTest(Geom geom, Ray r,
     glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
-    float radius = .5;
 
-    glm::vec3 ro = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
-    glm::vec3 rd = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));
+    /*glm::vec3 ro = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
+    glm::vec3 rd = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));*/
+    glm::vec3 ro = r.origin;
+    glm::vec3 rd = r.direction;
 
     Ray rt;
     rt.origin = ro;
     rt.direction = rd;
-    float t = 0;
-    glm::vec3 P = geom.triangle.vertices[0].pos;    // P is some point on the plane
-    glm::vec3 N = geom.triangle.vertices[0].nor;
-    //float z = zInterpolate(geom.triangle.vertices, P);
-    //glm::vec3 N = interpolatedNormal(geom.triangle.vertices, P, z);
 
-    t = dot(N, (P - ro)) / dot(N, rd);
+    glm::vec3 intersectResult;
+    glm::intersectRayTriangle(ro, rd,
+        geom.triangle.vertices[0].pos, geom.triangle.vertices[1].pos, geom.triangle.vertices[2].pos,
+        intersectResult);
+    float t = intersectResult.z;
     glm::vec3 objspaceIntersection = getPointOnRay(rt, t);
+    //printf("%f", &t);
+    
+    /*intersectionPoint = multiplyMV(geom.transform, glm::vec4(objspaceIntersection, 1.f));
+    normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(objspaceIntersection, 0.f)));*/
 
-    // check if objectspaceIntersection is within area of triangle using barycentric coordinates
-    glm::vec3 S = barycentricInterpolation(geom.triangle.vertices, objspaceIntersection);
-    if ((S[0] >= 0 && S[0] <= 1)
-        && (S[1] >= 0 && S[1] <= 1)
-        && (S[2] >= 0 && S[2] <= 1)
-        && (S[0] + S[1] + S[2] == 1.f)) {
-        
-        intersectionPoint = multiplyMV(geom.transform, glm::vec4(objspaceIntersection, 1.f));
-        normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(objspaceIntersection, 0.f)));
-        return glm::length(r.origin - intersectionPoint);
-    }
-    else {
-        return -1.f;
-    }
+    intersectionPoint = objspaceIntersection;
+    normal = geom.triangle.vertices[0].nor;
+    
+    return t;
+
+    //return glm::length(r.origin - intersectionPoint);
+    //Ray rt;
+    //rt.origin = ro;
+    //rt.direction = rd;
+    //float t = 0;
+    //glm::vec3 P = geom.triangle.vertices[0].pos;    // P is some point on the plane
+    //glm::vec3 N = geom.triangle.vertices[0].nor;
+    ////float z = zInterpolate(geom.triangle.vertices, P);
+    ////glm::vec3 N = interpolatedNormal(geom.triangle.vertices, P, z);
+
+    //t = dot(N, (P - ro)) / dot(N, rd);
+    //glm::vec3 objspaceIntersection = getPointOnRay(rt, t);
+
+    //// check if objectspaceIntersection is within area of triangle using barycentric coordinates
+    //glm::vec3 S = barycentricInterpolation(geom.triangle.vertices, objspaceIntersection);
+    //if ((S[0] >= 0 && S[0] <= 1)
+    //    && (S[1] >= 0 && S[1] <= 1)
+    //    && (S[2] >= 0 && S[2] <= 1)
+    //    && (S[0] + S[1] + S[2] == 1.f)) {
+    //    
+    //    intersectionPoint = multiplyMV(geom.transform, glm::vec4(objspaceIntersection, 1.f));
+    //    normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(objspaceIntersection, 0.f)));
+    //    return glm::length(r.origin - intersectionPoint);
+    //}
+    //else {
+    //    return -1.f;
+    //}
 }
