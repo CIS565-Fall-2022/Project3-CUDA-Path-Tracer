@@ -45,11 +45,11 @@ EMITTANCE   0
 
 // Sphere mat
 MATERIAL 5
-MAT_TYPE    DIELECTRIC
+MAT_TYPE    SPECULAR
 RGB         .98 .98 .98
-SPECEX      0
+SPECEX      80
 SPECRGB     .98 .98 .98
-REFRIOR     1.52 // diamond ior
+REFRIOR     1.52  // only used for dielectric
 EMITTANCE   0
 
 

@@ -14,7 +14,7 @@ enum GeomType {
 
 enum class MatType {
     DIFFUSE,
-    MIRROR,
+    SPECULAR,
     DIELECTRIC
 };
 

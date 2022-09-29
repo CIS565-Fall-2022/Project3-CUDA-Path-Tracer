@@ -39,28 +39,7 @@ glm::vec3 calculateRandomDirectionInHemisphere(
         + sin(around) * over * perpendicularDirection2;
 }
 
-/**
- * Scatter a ray with some probabilities according to the material properties.
- * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
- * A perfect specular surface scatters in the reflected ray direction.
- * In order to apply multiple effects to one surface, probabilistically choose
- * between them.
- *
- * The visual effect you want is to straight-up add the diffuse and specular
- * components. You can do this in a few ways. This logic also applies to
- * combining other types of materias (such as refractive).
- *
- * - Always take an even (50/50) split between a each effect (a diffuse bounce
- *   and a specular bounce), but divide the resulting color of either branch
- *   by its probability (0.5), to counteract the chance (0.5) of the branch
- *   being taken.
- *   - This way is inefficient, but serves as a good starting point - it
- *     converges slowly, especially for pure-diffuse or pure-specular.
- * - Pick the split based on the intensity of each material color, and divide
- *   branch result by that branch's probability (whatever probability you use).
- *
- * You may need to change the parameter list for your purposes!
- */
+// Scatter a ray with some probabilities according to the material properties
 //__host__
 __device__
 void scatterRay(
@@ -71,21 +50,35 @@ void scatterRay(
         const Material &m,
         thrust::default_random_engine &rng) {
     const float ACNE_BIAS = 3e-3f; //TODO: this is a very annoying parameter to tune. solutions?
+    thrust::uniform_real_distribution<float> u01(0, 1); // [a, b)
 
-    // currently using the given hasReflective, hasRefractive as the probability of the ray
-    // reflecting or refracting. fresnel's is more physically accurate, but less user control
+    // normalizes might not be necesary (?)
+    pathSegment.ray.direction = glm::normalize(pathSegment.ray.direction);
+    normal = glm::normalize(normal);
+
     if (m.matType == MatType::DIFFUSE) {
         pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
-    } else if (m.matType == MatType::MIRROR) { // rand < m.hasReflective
-        pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
-    } else if (m.matType == MatType::DIELECTRIC) { // Fresnel eqns
+    }
+    else if (m.matType == MatType::SPECULAR) {
+        // from gpu gems 3 ch 20, eq 7, 8 & 9
+        float theta = acos(powf(u01(rng), 1.0 / (m.specular.exponent + 1)));
+        float phi = 2.f * PI * u01(rng);
+        glm::vec3 untransformedRef(
+            cos(phi) * sin(theta),
+            sin(phi) * sin(theta),
+            cos(theta));
+
+        glm::vec3 tangent = (normal.z == 0 && normal.y == 0) ? 
+            glm::vec3(-normal.z, 0.f, normal.x) : 
+            glm::vec3(0.f, normal.z, -normal.y);
+        glm::mat3 transform(tangent, glm::cross(normal, tangent), normal);
+        pathSegment.ray.direction = transform * untransformedRef;
+    }
+    else if (m.matType == MatType::DIELECTRIC) { // Fresnel eqns
         // use below to check if normal is against ray direction; traps if not.
         // intersections.h should take care of all need to align normals and whatnot
         // if (glm::dot(normal, pathSegment.ray.direction) >= 0.f) { __trap(); }
         const float sceneIOR = 1.0f; // assume the scenes will be in AIR ie IOR = 1.0
-
-        pathSegment.ray.direction = glm::normalize(pathSegment.ray.direction);
-        normal = glm::normalize(normal);
         float cosThetaI = glm::dot(normal, -pathSegment.ray.direction);
 
         // Schlick approximation
@@ -93,7 +86,6 @@ void scatterRay(
             powf((m.indexOfRefraction - sceneIOR) / (m.indexOfRefraction + sceneIOR), 2.f);
         float reflectivityAtRay = reflectivityAtNormal + (1.f - reflectivityAtNormal) * powf(1.f - cosThetaI, 5.f);
 
-        thrust::uniform_real_distribution<float> u01(0, 1); // [a, b)
         if (u01(rng) < reflectivityAtRay) { // reflect
             pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
         }
@@ -104,8 +96,7 @@ void scatterRay(
             float sin2ThetaT = eta * eta * sin2ThetaI;
             if (sin2ThetaT >= 1.0) { // total internal reflection
                 pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
-            }
-            else {
+            } else {
                 float cosThetaT = std::sqrt(1 - sin2ThetaT);
                 pathSegment.ray.direction = eta * pathSegment.ray.direction +
                     (eta * cosThetaI - cosThetaT) * normal;
@@ -118,6 +109,4 @@ void scatterRay(
     // use ray direction over normal, since some rays are trying to "pass" the material barrier
     pathSegment.ray.origin = intersect + ACNE_BIAS * pathSegment.ray.direction;
     pathSegment.color *= m.color;
-    //pathSegment.ray.direction = glm::normalize(pathSegment.ray.direction);
-
 }

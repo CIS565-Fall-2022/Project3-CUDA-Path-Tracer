@@ -9,42 +9,49 @@ CUDA Path Tracer
 * Tested on: Strix G15: Windows 10, Ryzen 7 4800H @ 2.9 GHz, GTX 3050 (Laptop)
 
 ## Background
-This program takes in a text file describing a scene and renders it with the canonical path tracing algorithm. It supports pure specular and pure diffuse materials.   
+This program takes in a text file describing a scene(objects, locations, materials) and renders it with the canonical path tracing algorithm. 
 
-Other supported toggle-ables include:
-
-
-For each extra feature, you must provide the following analysis:
-
-Overview write-up of the feature along with before/after images.
-Performance impact of the feature
-If you did something to accelerate the feature, what did you do and why?
-Compare your GPU version of the feature to a HYPOTHETICAL CPU version (you don't have to implement it!)? Does it benefit or suffer from being implemented on the GPU?
-How might this feature be optimized beyond your current implementation?
-
-
-
-
-
+Features:
+* Different materials
+	* Diffusive (DIFFUSE)
+	* Reflective (SPECULAR)
+		* SPECEX determines "glossy" appearance 
+	* Refractive (DIELECTRIC), with Schlick approximation
+		* IOR determines degree of refraction
 * Stream compaction
 * Sorting rays by intersected material type
 * Caching first intersection
 
-## Performance Analysis
+## Feature Breakdown and Performance Analysis
 
-### Refractions
+### Notable Material Types
 
-Material types can be specified in the scene text files. Dielectric describes a nonconducting material(e.g., glass). Here, a type of DIELECTRIC simply means it both reflects and refracts light according to a specified "index of refraction". For simpler calculations, I used the [Schlick approximation](https://en.wikipedia.org/wiki/Schlick%27s_approximation), of the Fresnel equations since it achieves results at up to 32x speed for less than 1% average error (further reading: References - Ray Tracing Gems II).    
-This refractive BSDF is an inherent part of the ray tracing evaluation; any CPU path tracer that tries to implement the same thing will be orders of magnitude slower.  
-Theoretically, adding other approximations could be faster, at the cost of physical accuracy.
+Material types can be specified in the scene text files.   
+Implementing a new material type is essentially incorporating a different BSDF, and is an inherent part of the ray tracing evaluation; any CPU path tracer that tries to implement the same thing will be orders of magnitude slower.  
+Theoretically, adding other approximations to respective material types could improve performance, at the cost of physical accuracy.
 
-The speed/FPS of this material is comparable to diffuse or mirrored. 
-| Material | Diffuse | Mirrored | Dielectric | 
+#### Refraction
+
+Dielectric describes a nonconducting material(e.g., glass). Here, a type of DIELECTRIC simply means it both reflects and refracts light according to a specified "index of refraction". For simpler calculations, I used the [Schlick approximation](https://en.wikipedia.org/wiki/Schlick%27s_approximation), of the Fresnel equations since it achieves results at up to 32x speed for less than 1% average error (see Ray Tracing Gems II).    
+
+The speed/FPS of this material is comparable to diffuse or specular. 
+| Material | Diffuse | Specular | Dielectric(IOR = 1.52) | 
 | :------- | :-------: | :-------: | :-------: |
 | Frames per second | 51.8 | 52.6 | 52.1 |
 | Scene | <img src="img/diffuse_bench.png"> | <img src="img/mirror_bench.png"> | <img src="img/dielectric_bench.png"> |
 
 Note the subtle reflection of the light on the dielectric spheres; that is the light reflection contribution.   
+
+#### Imperfect Specular
+
+Imperfect specular is the same type of material as specular. The specular exponent(SPECEX) attribute determines the "mirror"-like quality of specular surfaces; higher is more mirror-like(indistinguishable past 3000), while lower gives it a somewhat specular, somewhat diffusive appearance.
+
+| Material | Diffuse | Specular | Imperfect(SPECEX = 80) | 
+| :------- | :-------: | :-------: | :-------: |
+| Frames per second | 51.8 | 52.6 | 52.6 |
+| Scene | <img src="img/diffuse_bench.png"> | <img src="img/mirror_bench.png"> | <img src="img/imperfect_bench.png"> |
+
+Note the way the reflections look muddled, like a dirty mirror as a consequence of the lower SPECEX.
 
 ### Core Feature Benchmarks
 
@@ -74,6 +81,7 @@ The first intersection of rays is static, as it is initiated by the static ray c
 Curiously, the difference is negligible, though weighed toward the caching. The simplicity of the Cornell box scene makes it difficult to ascertain clear winners when it comes to different rendering options.
 
 ## References
-[Ray Tracing Gems II](http://www.realtimerendering.com/raytracinggems/rtg2/)
-[Ray Tracing in One Weekend](https://raytracing.github.io/)     
-[Fresnel Equations, Schlick Approximation, Metals, and Dielectrics](http://psgraphics.blogspot.com/2020/03/fresnel-equations-schlick-approximation.html)
+[Ray Tracing Gems II](http://www.realtimerendering.com/raytracinggems/rtg2/)     
+[Ray Tracing in One Weekend](https://raytracing.github.io/)      
+[Fresnel Equations, Schlick Approximation, Metals, and Dielectrics](http://psgraphics.blogspot.com/2020/03/fresnel-equations-schlick-approximation.html)      
+[GPU Gems III](https://developer.nvidia.com/gpugems/gpugems3/part-iii-rendering/chapter-20-gpu-based-importance-sampling)     

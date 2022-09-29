@@ -176,8 +176,8 @@ int Scene::loadMaterial(string materialid) {
             if (strcmp(tokens[0].c_str(), "MAT_TYPE") == 0) {
                 if (strcmp(tokens[1].c_str(), "DIFFUSE") == 0) {
                     newMaterial.matType = MatType::DIFFUSE;
-                } else if (strcmp(tokens[1].c_str(), "MIRROR") == 0) {
-                    newMaterial.matType = MatType::MIRROR;
+                } else if (strcmp(tokens[1].c_str(), "SPECULAR") == 0) {
+                    newMaterial.matType = MatType::SPECULAR;
                 } else if (strcmp(tokens[1].c_str(), "DIELECTRIC") == 0) {
                     newMaterial.matType = MatType::DIELECTRIC;
                 }
