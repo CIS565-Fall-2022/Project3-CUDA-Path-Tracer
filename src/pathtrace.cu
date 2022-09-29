@@ -197,6 +197,8 @@ __global__ void computeIntersections(
 
 		// naive parse through global geoms
 
+		// test intersection with big obj box and set a boolean for whether triangle should be checked based on this ray.
+
 		for (int i = 0; i < geoms_size; i++)
 		{
 			Geom& geom = geoms[i];
@@ -210,6 +212,10 @@ __global__ void computeIntersections(
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
+			else if (geom.type == TRIANGLE) {
+				// test intersection with big box.
+				t = triangleIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+			}
 
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.

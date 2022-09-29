@@ -140,10 +140,10 @@ SCALE       .01 10 10
 
 // Sphere
 OBJECT 6
-sphere
+cube
 material 4
-TRANS       -1 4 -1
-ROTAT       0 0 0
+TRANS       -2 4 -1
+ROTAT       0 45 0
 SCALE       3 3 3
 
 // Glass cube
@@ -163,9 +163,9 @@ ROTAT       0 0 0
 SCALE       3 3 3
 
 // diffuse cat
-OBJECT 8
-../objs/cat.obj
+OBJECT 9
+../Project3-CUDA-Path-Tracer/objs/cat.obj
 material 1
-TRANS		1 2 1
+TRANS		0 0 0
 ROTAT		0 0 0
 SCALE		1 1 1

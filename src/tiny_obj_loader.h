@@ -3348,6 +3348,7 @@ namespace tinyobj {
             mtl_search_path = config.mtl_search_path;
         }
 
+        // try
         valid_ = LoadObj(&attrib_, &shapes_, &materials_, &warning_, &error_,
             filename.c_str(), mtl_search_path.c_str(),
             config.triangulate, config.vertex_color);

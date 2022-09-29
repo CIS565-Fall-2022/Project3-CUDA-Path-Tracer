@@ -3,9 +3,10 @@
 #include <cstring>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
+
 #include "tiny_obj_loader.h"
 
-#define LOAD_OBJ 0
+#define LOAD_OBJ 1
 
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
@@ -36,35 +37,138 @@ Scene::Scene(string filename) {
 }
 
 #if LOAD_OBJ
-// https://github.com/tinyobjloader/tinyobjloader/blob/master/loader_example.cc 
-int Scene::loadObj(const char* filename, const char* basepath = NULL,
+// example code taken from https://github.com/tinyobjloader/tinyobjloader
+int Scene::loadObj(const char* filename, glm::mat4 transform, 
+    glm::vec3 translate, glm::vec3 rotate, glm::vec3 scale, int matId,
+    std::vector<Geom>* triangleArray, const char* basepath = NULL,
     bool triangulate = true) 
 {
-    std::cout << "Loading " << filename << std::endl;
-
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
     std::string warn;
     std::string err;
 
-    /*bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filename,
-        basepath, triangulate);*/
+    tinyobj::ObjReaderConfig reader_config;
+    tinyobj::ObjReader reader;
 
-    if (!warn.empty()) {
-        std::cout << "WARN: " << warn << std::endl;
+    // bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filename,
+    // basepath, triangulate);
+
+    if (!reader.ParseFromFile(filename, reader_config)) {
+        if (!reader.Error().empty()) {
+            std::cerr << "TinyObjReader error: " << reader.Error();
+        }
+        exit(1);
     }
 
-    if (!err.empty()) {
-        std::cerr << "ERR: " << err << std::endl;
+    if (!reader.Warning().empty()) {
+        std::cout << "TinyObjReader warning: " << reader.Warning();
     }
 
-    if (!ret) {
-        printf("Failed to load/parse .obj.\n");
-        return false;
-    }
+    attrib = reader.GetAttrib();
+    shapes = reader.GetShapes();
+    // materials = reader.GetMaterials();
 
-    //PrintInfo(attrib, shapes, materials);
+    glm::mat4 invTransform = glm::inverse(transform);
+    glm::mat4 invTranspose = glm::inverseTranspose(transform);
+
+    // Loop over shapes and load each attrib
+    for (size_t s = 0; s < shapes.size(); s++) {
+
+        // Loop over faces(polygon)
+        size_t index_offset = 0;
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+            std::cout << "face: " << f << std::endl;
+            size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+            // Loop over vertices in the face.
+            for (size_t v = 0; v < fv - 1; v++) {
+                // access to vertex
+
+                // idxa is the primary vertex's idx
+                tinyobj::index_t idxa = shapes[s].mesh.indices[index_offset];
+                tinyobj::index_t idxb = shapes[s].mesh.indices[index_offset + v];
+                tinyobj::index_t idxc = shapes[s].mesh.indices[index_offset + v + 1];
+
+                tinyobj::real_t vxa = attrib.vertices[3 * size_t(idxa.vertex_index) + 0];
+                tinyobj::real_t vya = attrib.vertices[3 * size_t(idxa.vertex_index) + 1];
+                tinyobj::real_t vza = attrib.vertices[3 * size_t(idxa.vertex_index) + 2];
+
+                tinyobj::real_t vxb = attrib.vertices[3 * size_t(idxb.vertex_index) + 0];
+                tinyobj::real_t vyb = attrib.vertices[3 * size_t(idxb.vertex_index) + 1];
+                tinyobj::real_t vzb = attrib.vertices[3 * size_t(idxb.vertex_index) + 2];
+
+                tinyobj::real_t vxc = attrib.vertices[3 * size_t(idxc.vertex_index) + 0];
+                tinyobj::real_t vyc = attrib.vertices[3 * size_t(idxc.vertex_index) + 1];
+                tinyobj::real_t vzc = attrib.vertices[3 * size_t(idxc.vertex_index) + 2];
+
+                // Check if `normal_index` is zero or positive. negative = no normal data
+                    // if (idxa.normal_index >= 0) {
+                tinyobj::real_t nxa = attrib.normals[3 * size_t(idxa.normal_index) + 0];
+                tinyobj::real_t nya = attrib.normals[3 * size_t(idxa.normal_index) + 1];
+                tinyobj::real_t nza = attrib.normals[3 * size_t(idxa.normal_index) + 2];
+
+                tinyobj::real_t nxb = attrib.normals[3 * size_t(idxb.normal_index) + 0];
+                tinyobj::real_t nyb = attrib.normals[3 * size_t(idxb.normal_index) + 1];
+                tinyobj::real_t nzb = attrib.normals[3 * size_t(idxb.normal_index) + 2];
+
+                tinyobj::real_t nxc = attrib.normals[3 * size_t(idxc.normal_index) + 0];
+                tinyobj::real_t nyc = attrib.normals[3 * size_t(idxc.normal_index) + 1];
+                tinyobj::real_t nzc = attrib.normals[3 * size_t(idxc.normal_index) + 2];
+                //}
+
+
+
+                // Check if `texcoord_index` is zero or positive. negative = no texcoord data
+                // don't texture yet
+                /*if (idx.texcoord_index >= 0) {
+                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+                    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+                }*/
+
+                // Optional: vertex colors
+                // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
+                // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
+                // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
+
+                Vertex vertA = {
+                    glm::vec4(vxa, vya, vza, 1),
+                    glm::vec4(nxa, nya, nza, 0)
+                };
+
+                Vertex vertB = {
+                    glm::vec4(vxb, vyb, vzb, 1),
+                    glm::vec4(nxb, nyb, nzb, 0)
+                };
+
+                Vertex vertC = {
+                    glm::vec4(vxc, vyc, vzc, 1),
+                    glm::vec4(nxc, nyc, nzc, 0)
+                };
+
+                Triangle triangle = {
+                    vertA,
+                    vertB,
+                    vertC
+                };
+
+                Geom triangleGeom = {
+                    TRIANGLE,
+                    matId,
+                    translate,
+                    rotate,
+                    scale,
+                    transform,
+                    invTransform,
+                    invTranspose,
+                    triangle
+                };
+
+                triangleArray->push_back(triangleGeom);
+            }
+            index_offset += fv;
+        }
+    }
 
     return true;
 }
@@ -80,6 +184,7 @@ int Scene::loadGeom(string objectid) {
         Geom newGeom;
         string line;
 
+        bool hasObj = false;
         string objFileName;
 
         //load object from obj file
@@ -93,9 +198,13 @@ int Scene::loadGeom(string objectid) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
             }
-            else if (strstr(line.c_str(), "obj") == 0) {
+            else if (strstr(line.c_str(), ".obj") != NULL) {
                 cout << "Creating some obj..." << endl;
+                hasObj = true;
                 objFileName = line;
+            }
+            else {
+                cout << "wtf is this??" << std::endl;
             }
         }
 
@@ -125,15 +234,25 @@ int Scene::loadGeom(string objectid) {
 
             utilityCore::safeGetline(fp_in, line);
         }
-
-        //loadObj(objFileName);
-
+        
         newGeom.transform = utilityCore::buildTransformationMatrix(
             newGeom.translation, newGeom.rotation, newGeom.scale);
         newGeom.inverseTransform = glm::inverse(newGeom.transform);
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
 
-        geoms.push_back(newGeom);
+        if (hasObj) {
+            std::vector<Geom> triangleArray;
+            loadObj(objFileName.c_str(), newGeom.transform, newGeom.translation, newGeom.rotation, newGeom.scale, newGeom.materialid, &triangleArray);
+
+            // load triangles into the geoms scene.
+            for (int i = 0; i < triangleArray.size(); i++) {
+                // std::cout << "tri: " << i << std::endl;
+                geoms.push_back(triangleArray[i]);
+            }
+        }
+        else {
+            geoms.push_back(newGeom);
+        }
         return 1;
     }
 }

@@ -142,3 +142,49 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 
     return glm::length(r.origin - intersectionPoint);
 }
+
+__host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
+    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+
+    // todo insert bounding box intersection first for acceleration
+    
+    // transform triangle from world space to screen space
+    Triangle tri = triangle.tri;
+  
+    glm::vec3 screenPA = glm::vec3(triangle.transform * tri.pointA.pos);
+    glm::vec3 screenPB = glm::vec3(triangle.transform * tri.pointB.pos);
+    glm::vec3 screenPC = glm::vec3(triangle.transform * tri.pointC.pos);
+
+    glm::vec3 baryPosition; // the same as intersection point
+
+    bool doesIntersect = glm::intersectRayTriangle(r.origin, r.direction, glm::vec3(screenPA), glm::vec3(screenPB), glm::vec3(screenPC), baryPosition);
+
+    if (!doesIntersect) {
+        return -1.0f; 
+    }
+
+    intersectionPoint = getPointOnRay(r, glm::distance(baryPosition, r.origin));
+
+    // BARYCENTRIC INTERPOLATIONNN
+    float sA = glm::length(glm::cross(baryPosition - screenPC, baryPosition - screenPB)) / 2.f;
+    float sB = glm::length(glm::cross(baryPosition - screenPA, baryPosition - screenPC)) / 2.f;
+    float sC = glm::length(glm::cross(baryPosition - screenPA, baryPosition - screenPB)) / 2.f;
+
+    float s = glm::length(glm::cross(screenPC - screenPA, screenPB - screenPA)) / 2.f;
+
+    float zinv = (sA) / (screenPA[2] * s) + (sB) / (screenPB[2] * s) + (sC) / (screenPC[2] * s);
+    float z = 1.0f / zinv;
+
+    intersectionPoint = baryPosition.r * screenPA + baryPosition.g * screenPB + baryPosition.b * screenPC;
+    normal = glm::vec3(z * (
+            (tri.pointA.nor * sA) / (screenPA[2] * s) + 
+            (tri.pointB.nor * sB) / (screenPB[2] * s) + 
+            (tri.pointC.nor * sC) / (screenPC[2] * s)));
+
+    if (!outside) {
+        normal *= -1.f;
+    }
+
+    return baryPosition.z; //glm::length(r.origin - intersectionPoint);
+
+}

@@ -130,7 +130,7 @@ void scatterRay(
             newDirection = glm::normalize(glm::refract(pathSegment.ray.direction, normal, eta));
         }
 
-        glm::vec3 newColor = pathSegment.color * m.specular.color;
+        glm::vec3 newColor = pathSegment.color * m.color * m.specular.color;
 
         Ray newRay = {
             intersect + 0.001f * pathSegment.ray.direction,
