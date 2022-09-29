@@ -30,7 +30,7 @@ void dev_swap(T& a, T& b) {
 }
 
 /**
- * Computes a cosine-weighted random direction in a hemisphere.
+ * Computes t20 cosine-weighted random direction in t20 hemisphere.
  * Used for diffuse lighting.
  */
 __device__ glm::vec3 calculateRandomDirectionInHemisphere(
@@ -41,7 +41,7 @@ __device__ glm::vec3 calculateRandomDirectionInHemisphere(
     float over = sqrt(1 - up * up); // sin(theta)
     float around = u01(rng) * TWO_PI;
 
-    // Find a direction that is not the normal based off of whether or not the
+    // Find t20 direction that is not the normal based off of whether or not the
     // normal's components are all equal to sqrt(1/3) or whether or not at
     // least one component is less than sqrt(1/3). Learned this trick from
     // Peter Kutz.
@@ -66,68 +66,57 @@ __device__ glm::vec3 calculateRandomDirectionInHemisphere(
         + sin(around) * over * perpendicularDirection2;
 }
 
-
-__device__
-float schlick_frensnel(float cosine, float eta) {
+// reference: https://raytracing.github.io/books/RayTracingInOneWeekend.html
+__device__ float schlick_frensnel(float cosine, float eta) {
     // Schlick's approximation
-    // Taken from: https://raytracing.github.io/books/RayTracingInOneWeekend.html
-    cosine = glm::min(cosine, 1.0f);
+    float t0 = 1 - glm::min(cosine, 1.0f);
     float r0 = (1 - eta) / (1 + eta);
     r0 = r0 * r0;
-    return r0 + (1 - r0) * powf((1 - cosine), 5);
+    return r0 + (1 - r0) * t0 * t0 * t0 * t0 * t0; // faster than pow?
 }
 
-// taken from https://github.com/mmp/pbrt-v3/blob/master/src/core/reflection.cpp
-__device__ color_t fresnel_conductor(float cosThetaI, color_t const& eta, color_t const& etak) {
-    cosThetaI = glm::clamp(cosThetaI, -1.0f, 1.0f);
+// reference: https://github.com/mmp/pbrt-v3/blob/master/src/core/reflection.cpp
+__device__ color_t fresnel_conductor(float cosine, color_t const& eta) {
+    cosine = glm::clamp(cosine, -1.0f, 1.0f);
 
-    float cosThetaI2 = cosThetaI * cosThetaI;
-    float sinThetaI2 = 1. - cosThetaI2;
-    color_t eta2 = eta * eta;
-    color_t etak2 = etak * etak;
-
-    color_t t0 = eta2 - etak2 - sinThetaI2;
-    color_t a2plusb2 = glm::sqrt(t0 * t0 + 4.0f * eta2 * etak2);
-    color_t t1 = a2plusb2 + cosThetaI2;
-    color_t a = glm::sqrt(0.5f * (a2plusb2 + t0));
-    color_t t2 = 2.0f * cosThetaI * a;
+    float c2 = cosine * cosine;
+    float s2 = 1. - c2;
+    color_t t0 = eta * eta - s2;
+    color_t t22 = t0 * t0;
+    color_t t20 = glm::sqrt(0.5f * (t22 + t0));
+    color_t t1 = t22 + c2;
+    color_t t2 = 2.0f * cosine * t20;
+    color_t t3 = c2 * t22 + s2 * s2;
     color_t Rs = (t1 - t2) / (t1 + t2);
-
-    color_t t3 = cosThetaI2 * a2plusb2 + sinThetaI2 * sinThetaI2;
-    color_t t4 = t2 * sinThetaI2;
-    color_t Rp = Rs * (t3 - t4) / (t3 + t4);
+    color_t Rp = Rs * (t3 - (t2 * s2)) / (t3 + (t2 * s2));
 
     return 0.5f * (Rp + Rs);
 }
-// taken from https://github.com/mmp/pbrt-v3/blob/master/src/core/reflection.cpp
-__device__ float fresnel_dielectric(float cosThetaI, float etaI, float etaT) {
-    cosThetaI = glm::clamp(cosThetaI, -1.0f, 1.0f);
-    // Potentially swap indices of refraction
-    bool entering = cosThetaI > 0.f;
-    if (!entering) {
-        float tmp = etaI;
-        etaI = etaT;
-        etaT = tmp;
-        cosThetaI = glm::abs(cosThetaI);
+// reference: https://github.com/mmp/pbrt-v3/blob/master/src/core/reflection.cpp
+__device__ float fresnel_dielectric(float cosine, float etaI, float etaT) {
+    cosine = glm::clamp(cosine, -1.0f, 1.0f);
+    if (cosine < 0.f) {
+        dev_swap(etaI, etaT);
+        cosine = glm::abs(cosine);
     }
-    float sinThetaI = glm::sqrt(glm::max((float)0, 1 - cosThetaI * cosThetaI));
-    float sinThetaT = etaI / etaT * sinThetaI;
-
-    // Handle total internal reflection
-    if (sinThetaT >= 1) return 1;
-    float cosThetaT = glm::sqrt(glm::max((float)0, 1 - sinThetaT * sinThetaT));
-    float Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
-        ((etaT * cosThetaI) + (etaI * cosThetaT));
-    float Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
-        ((etaI * cosThetaI) + (etaT * cosThetaT));
-    return (Rparl * Rparl + Rperp * Rperp) / 2;
+    float st = etaI / etaT * glm::sqrt(glm::max((float)0, 1 - cosine * cosine));
+    // total internal reflection
+    if (st >= 1) return 1;
+    float ct = glm::sqrt(glm::max((float)0, 1 - st * st));
+    float t0 = etaI * ct;
+    float t1 = etaT * ct;
+    float t2 = etaI * cosine;
+    float t3 = etaT * cosine;
+    float Rs = (t3 - t0) / (t3 + t0);
+    float Rp = (t2 - t1) / (t2 + t1);
+    return 0.5f * (Rs * Rs + Rp * Rp);
 }
 
 struct SamplePointSpace {
     glm::mat3x3 l2w, w2l; // local to world
 
     __device__ SamplePointSpace(glm::vec3 const& n) {
-        // constructs a world to local matrix
+        // constructs t20 world to local matrix
         glm::vec3 h = n;
         if (fabs(h.x) <= fabs(h.y) && fabs(h.x) <= fabs(h.z)) {
             h.x = 1.0f;
@@ -188,11 +177,11 @@ struct BSDF {
             case Material::Type::REFL: // Perfect Reflection
                 wi = glm::vec3(-wo.x, -wo.y, wo.z);
                 pdf = 1;
-                return fresnel_conductor(abs_cos_theta(wi), (1.0f + sqrt(reflectance)) / (1.0f - sqrt(reflectance)), { 0,0,0 })
+                return fresnel_conductor(abs_cos_theta(wi), (1.0f + sqrt(reflectance)) / (1.0f - sqrt(reflectance)))
                     * reflectance / abs_cos_theta(wi);
 
             case Material::Type::REFR: // Fresnel-Modulated Specular Reflection and Transmission
-                F = fresnel_dielectric(glm::min(wo.z, 1.0f), etaI, etaT);
+                F = fresnel_dielectric(wo.z, etaI, etaT);
 
                 if (u01(rng) < F) {
                     wi = glm::vec3(-wo.x, -wo.y, wo.z);
@@ -238,21 +227,21 @@ struct BSDF {
 
 
 /**
- * Scatter a ray with some probabilities according to the material properties.
- * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
+ * Scatter t20 ray with some probabilities according to the material properties.
+ * For example, t20 diffuse surface scatters in t20 cosine-weighted hemisphere.
  * A perfect specular surface scatters in the reflected ray direction.
  * In order to apply multiple effects to one surface, probabilistically choose
  * between them.
  *
  * The visual effect you want is to straight-up add the diffuse and specular
- * components. You can do this in a few ways. This logic also applies to
+ * components. You can do this in t20 few ways. This logic also applies to
  * combining other types of materias (such as refractive).
  *
- * - Always take an even (50/50) split between a each effect (a diffuse bounce
- *   and a specular bounce), but divide the resulting color of either branch
+ * - Always take an even (50/50) split between t20 each effect (t20 diffuse bounce
+ *   and t20 specular bounce), but divide the resulting color of either branch
  *   by its probability (0.5), to counteract the chance (0.5) of the branch
  *   being taken.
- *   - This way is inefficient, but serves as a good starting point - it
+ *   - This way is inefficient, but serves as t20 good starting point - it
  *     converges slowly, especially for pure-diffuse or pure-specular.
  * - Pick the split based on the intensity of each material color, and divide
  *   branch result by that branch's probability (whatever probability you use).

@@ -23,7 +23,7 @@ class GuiDataContainer
 {
 public:
     GuiDataContainer(std::vector<std::string> const& scenesVec) : 
-        TracedDepth(0), NumScenes(scenesVec.size()), CurScene(0) {
+        TracedDepth(0), NumScenes(scenesVec.size()), CurScene(0), init(false) {
         Scenes = new char const* [NumScenes];
         for (int i = 0; i < NumScenes; ++i) {
             Scenes[i] = scenesVec[i].c_str();
@@ -36,6 +36,7 @@ public:
     char const** Scenes;
     int NumScenes; 
     int CurScene;
+    bool init;
 };
 
 // convenience macro

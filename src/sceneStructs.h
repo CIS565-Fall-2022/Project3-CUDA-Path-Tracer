@@ -10,6 +10,8 @@
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 #define NUM_TEX_CHANNEL 4
+
+
 enum GeomType {
     SPHERE,
     CUBE,

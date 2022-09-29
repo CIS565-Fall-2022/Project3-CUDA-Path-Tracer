@@ -71,18 +71,22 @@ int main(int argc, char** argv) {
 	startTimeString = currentTimeString();
 
 	scene_files = getFilesInDir(scene_files_dir);
-	if (!switchScene(0)) {
-		return EXIT_FAILURE;
-	}
+	height = width = 800;
 
 	//Create Instance for ImGUIData
 	guiData = new GuiDataContainer(scene_files);
 
-	// Initialize CUDA and GL components
-	init();
-
 	// Initialize ImGui Data
 	InitImguiData(guiData);
+	// Initialize CUDA and GL components
+	if (!initImguiGL()) {
+		return EXIT_FAILURE;
+	}
+
+	// preload
+	DoPreloadMenu();
+
+	init();
 	InitDataContainer(guiData);
 
 	// GLFW main loop
@@ -196,8 +200,7 @@ void runCuda() {
 
 		// unmap buffer object
 		cudaGLUnmapBufferObject(pbo);
-	}
-	else {
+	} else {
 		saveImage();
 		pathtraceFree();
 		cudaDeviceReset();

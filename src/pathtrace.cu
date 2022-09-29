@@ -19,7 +19,7 @@
 #define COMPACTION
 #define SORT_MAT
 #define ANTI_ALIAS_JITTER
-#define FAKE_SHADE
+// #define FAKE_SHADE
 
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
