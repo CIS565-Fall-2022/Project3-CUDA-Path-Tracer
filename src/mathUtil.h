@@ -137,7 +137,7 @@ namespace Math {
 
     __device__ inline float pdfAreaToSolidAngle(float pdf, glm::vec3 x, glm::vec3 y, glm::vec3 ny) {
         glm::vec3 yx = x - y;
-        return pdf * absDot(ny, glm::normalize(yx)) / glm::dot(yx, yx);
+        return pdf * glm::dot(yx, yx) / absDot(ny, glm::normalize(yx));
     }
 
     /**

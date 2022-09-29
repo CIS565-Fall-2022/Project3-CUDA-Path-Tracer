@@ -20,21 +20,32 @@
 
 #define BVH_DEBUG_VISUALIZATION false
 
+int ToneMapping::method = ToneMapping::ACES;
+
 //Kernel that writes the image to the OpenGL PBO directly.
 __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
-	int iter, glm::vec3* Image) {
+	int iter, glm::vec3* Image, int toneMapping) {
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
 
 	if (x < resolution.x && y < resolution.y) {
 		int index = x + (y * resolution.x);
 
-		// ACES tonemapping and gamma correction
+		// Tonemapping and gamma correction
 		glm::vec3 color = Image[index] / float(iter);
-		glm::vec3 mapped = Math::ACES(color);
-		mapped = color;
-		mapped = Math::correctGamma(mapped);
-		glm::ivec3 iColor = glm::clamp(glm::ivec3(mapped * 255.f), glm::ivec3(0), glm::ivec3(255));
+
+		switch (toneMapping) {
+		case ToneMapping::Filmic:
+			color = Math::filmic(color);
+			break;
+		case ToneMapping::ACES:
+			color = Math::ACES(color);
+			break;
+		case ToneMapping::None:
+			break;
+		}
+		color = Math::correctGamma(color);
+		glm::ivec3 iColor = glm::clamp(glm::ivec3(color * 255.f), glm::ivec3(0), glm::ivec3(255));
 
 		// Each thread writes one pixel location in the texture (textel)
 		pbo[index].w = 0;
@@ -149,20 +160,50 @@ __global__ void computeIntersections(
 #if BVH_DEBUG_VISUALIZATION
 	scene->visualizedIntersect(pathSegments[pathIdx].ray, intersections[pathIdx]);
 #else
-	scene->intersect(pathSegments[pathIdx].ray, intersections[pathIdx]);
-	/*AABB box;
-	box.pMin = glm::vec3(-3.f);
-	box.pMax = glm::vec3(3.f);
-	float dist;
-	bool hit = box.intersect(pathSegments[pathIdx].ray, dist);
-	intersections[pathIdx].primitive = hit ? 1 : NullPrimitive;
-	intersections[pathIdx].position = pathSegments[pathIdx].ray.getPoint(dist);*/
+	Intersection intersec;
+	PathSegment segment = pathSegments[pathIdx];
+	scene->intersect(segment.ray, intersec);
+
+	if (intersec.primId != NullPrimitive) {
+		if (scene->devMaterials[intersec.matId].type == Material::Type::Light) {
+#if SCENE_LIGHT_SINGLE_SIDED
+			if (glm::dot(intersec.norm, segment.ray.direction) < 0.f) {
+				intersec.primId = NullPrimitive;
+			}
+			else
 #endif
+			if (depth != 0) {
+				// If not first ray, preserve previous sampling information for
+				// MIS calculation
+				intersec.prevPos = segment.ray.origin;
+				// intersec.prevBSDFPdf = segment.BSDFPdf;
+			}
+		}
+		else {
+			intersec.wo = -segment.ray.direction;
+		}
+	}
+	intersections[pathIdx] = intersec;
+#endif
+	}
+}
+
+__global__ void computeTerminatedRays(
+	int depth,
+	PathSegment* segments,
+	Intersection* intersections,
+	DevScene* scene,
+	int numPaths
+) {
+	int idx = blockDim.x * blockIdx.x + threadIdx.x;
+	if (idx >= numPaths) {
+		return;
 	}
 }
 
 __global__ void pathIntegSampleSurface(
 	int iter,
+	int depth,
 	PathSegment* segments,
 	Intersection* intersections,
 	DevScene* scene,
@@ -175,27 +216,19 @@ __global__ void pathIntegSampleSurface(
 		return;
 	}
 	Intersection intersec = intersections[idx];
-	if (intersec.primitive == NullPrimitive) {
+
+	if (intersec.primId == NullPrimitive) {
 		// TODO
 		// Environment map
-		segments[idx].pixelIndex = PixelIdxForTerminated;
+		if (Math::luminance(segments[idx].radiance) < 1e-4f) {
+			segments[idx].pixelIndex = PixelIdxForTerminated;
+		}
+		else {
+			segments[idx].remainingBounces = 0;
+		}
 		return;
 	}
 
-	PathSegment& segment = segments[idx];
-	thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 4 + iter * SamplesConsumedOneIter);
-	Material material = scene->devMaterials[intersec.materialId];
-	bool deltaBSDF = material.type == Material::Type::Dielectric;
-
-	if (!deltaBSDF) {
-		glm::vec3 radiance;
-		glm::vec3 wi;
-		float lightPdf = scene->sampleDirectLight(intersec.position, sample4D(rng), radiance, wi);
-		float BSDFPdf = material.pdf(intersec.normal, intersec.incomingDir, wi);
-		segment.radiance += segment.throughput * material.BSDF(intersec.normal, intersec.incomingDir, wi) *
-			radiance * glm::dot(intersec.normal, wi) * Math::powerHeuristic(lightPdf, BSDFPdf) / lightPdf;
-	}
-	 
 #if BVH_DEBUG_VISUALIZATION
 	float logDepth = 0.f;
 	int size = scene->BVHSize;
@@ -203,65 +236,94 @@ __global__ void pathIntegSampleSurface(
 		logDepth += 1.f;
 		size >>= 1;
 	}
-	segment.radiance = glm::vec3(float(intersec.primitive) / logDepth * .1f);
+	segment.radiance = glm::vec3(float(intersec.primId) / logDepth * .1f);
 	//segment.radiance = intersec.primitive > 16 ? glm::vec3(1.f) : glm::vec3(0.f);
 	segment.remainingBounces = 0;
 	return;
 #endif
-	/*segment.radiance = intersec.position;
-	segment.remainingBounces = 0;
-	return;*/
+
+	PathSegment& segment = segments[idx];
+	thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 4 + depth * SamplesConsumedOneIter);
+
+	Material material = scene->devMaterials[intersec.matId];
+	glm::vec3 accRadiance(0.f);
 
 	if (material.type == Material::Type::Light) {
-		// TODO
-		// MIS
-
-		segment.radiance += segment.throughput * material.baseColor * material.emittance;
+		glm::vec3 radiance = material.baseColor * material.emittance;
+		if (depth == 0) {
+			accRadiance += radiance;
+		}
+		else if (segment.deltaSample) {
+			accRadiance += radiance * segment.throughput;
+		}
+		else {
+			float lightPdf = Math::pdfAreaToSolidAngle(Math::luminance(radiance) * scene->sumLightPowerInv,
+				intersec.prevPos, intersec.pos, intersec.norm);
+			float BSDFPdf = segment.BSDFPdf;
+			accRadiance += radiance * segment.throughput * Math::powerHeuristic(BSDFPdf, lightPdf);
+		}
 		segment.remainingBounces = 0;
 	}
 	else {
-		if (material.type != Material::Type::Dielectric && glm::dot(intersec.normal, intersec.incomingDir) < 0.f) {
-			intersec.normal = -intersec.normal;
+		bool deltaBSDF = (material.type == Material::Type::Dielectric);
+		if (material.type != Material::Type::Dielectric && glm::dot(intersec.norm, intersec.wo) < 0.f) {
+			intersec.norm = -intersec.norm;
+		}
+
+		if (!deltaBSDF) {
+			glm::vec3 radiance;
+			glm::vec3 wi;
+			float lightPdf = scene->sampleDirectLight(intersec.pos, sample4D(rng), radiance, wi);
+
+			if (lightPdf > 0.f) {
+				float BSDFPdf = material.pdf(intersec.norm, intersec.wo, wi);
+				accRadiance += segment.throughput * material.BSDF(intersec.norm, intersec.wo, wi) *
+					radiance * Math::satDot(intersec.norm, wi) / lightPdf * Math::powerHeuristic(lightPdf, BSDFPdf);
+			}
 		}
 
 		BSDFSample sample;
-		material.sample(intersec.normal, intersec.incomingDir, sample3D(rng), sample);
+		material.sample(intersec.norm, intersec.wo, sample3D(rng), sample);
 
 		if (sample.type == BSDFSampleType::Invalid) {
 			// Terminate path if sampling fails
 			segment.remainingBounces = 0;
 		}
 		else {
-			bool isSampleDelta = (sample.type & BSDFSampleType::Specular);
+			bool deltaSample = (sample.type & BSDFSampleType::Specular);
 			segment.throughput *= sample.bsdf / sample.pdf *
-				(isSampleDelta ? 1.f : Math::absDot(intersec.normal, sample.dir));
-			segment.ray = makeOffsetedRay(intersec.position, sample.dir);
+				(deltaSample ? 1.f : Math::absDot(intersec.norm, sample.dir));
+			segment.ray = makeOffsetedRay(intersec.pos, sample.dir);
+			segment.BSDFPdf = sample.pdf;
+			segment.deltaSample = deltaSample;
 			segment.remainingBounces--;
 		}
 	}
+	//if (depth == 1)
+	segment.radiance += accRadiance;
 }
 
 // Add the current iteration's output to the overall image
-__global__ void finalGather(int nPaths, glm::vec3* Image, PathSegment* iterationPaths) {
+__global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iterationPaths) {
 	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
 
 	if (index < nPaths) {
 		PathSegment iterationPath = iterationPaths[index];
-		if (iterationPath.pixelIndex >= 0 && iterationPath.remainingBounces == 0) {
-			Image[iterationPath.pixelIndex] += iterationPath.radiance;
+		if (iterationPath.pixelIndex >= 0 && iterationPath.remainingBounces <= 0) {
+			image[iterationPath.pixelIndex] += iterationPath.radiance;
 		}
 	}
 }
 
 struct CompactTerminatedPaths {
 	__host__ __device__ bool operator() (const PathSegment& segment) {
-		return !(segment.pixelIndex >= 0 && segment.remainingBounces == 0);
+		return !(segment.pixelIndex >= 0 && segment.remainingBounces <= 0);
 	}
 };
 
 struct RemoveInvalidPaths {
 	__host__ __device__ bool operator() (const PathSegment& segment) {
-		return segment.pixelIndex < 0 || segment.remainingBounces == 0;
+		return segment.pixelIndex < 0 || segment.remainingBounces <= 0;
 	}
 };
 
@@ -335,7 +397,7 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 		// tracing
 		dim3 numBlocksPathSegmentTracing = (numPaths + blockSize1D - 1) / blockSize1D;
 		computeIntersections<<<numBlocksPathSegmentTracing, blockSize1D>>>(
-			depth, 
+			depth,
 			numPaths,
 			devPaths,
 			hstScene->devScene,
@@ -343,13 +405,12 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 		);
 		checkCUDAError("PT::computeInteractions");
 		cudaDeviceSynchronize();
-		depth++;
 
 		// TODO: compare between directly shading the path segments and shading
 		// path segments that have been reshuffled to be contiguous in memory.
 
 		pathIntegSampleSurface<<<numBlocksPathSegmentTracing, blockSize1D>>>(
-			iter, devPaths, devIntersections, hstScene->devScene, numPaths
+			iter, depth, devPaths, devIntersections, hstScene->devScene, numPaths
 		);
 		checkCUDAError("PT::sampleSurface");
 		cudaDeviceSynchronize();
@@ -361,7 +422,8 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 		numPaths = end - devPathsThr;
 		//std::cout << "Remaining paths: " << numPaths << "\n";
 
-		iterationComplete = numPaths == 0;
+		iterationComplete = (numPaths == 0);
+		depth++;
 
 		if (guiData != nullptr) {
 			guiData->TracedDepth = depth;
@@ -376,7 +438,7 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 	///////////////////////////////////////////////////////////////////////////
 
 	// Send results to OpenGL buffer for rendering
-	sendImageToPBO<<<blocksPerGrid2D, blockSize2D>>>(pbo, cam.resolution, iter, devImage);
+	sendImageToPBO<<<blocksPerGrid2D, blockSize2D>>>(pbo, cam.resolution, iter, devImage, ToneMapping::method);
 
 	// Retrieve image from GPU
 	cudaMemcpy(hstScene->state.image.data(), devImage,

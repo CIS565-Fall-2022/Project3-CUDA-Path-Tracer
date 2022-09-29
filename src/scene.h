@@ -21,6 +21,8 @@
 
 #define DEV_SCENE_PASS_BY_CONST_MEM false
 
+#define SCENE_LIGHT_SINGLE_SIDED true
+
 struct MeshData {
     void clear() {
         vertices.clear();
@@ -109,9 +111,9 @@ struct DevScene {
         glm::vec2 tb = devTexcoords[primId * 3 + 1];
         glm::vec2 tc = devTexcoords[primId * 3 + 2];
 
-        intersec.position = vb * bary.x + vc * bary.y + va * (1.f - bary.x - bary.y);
-        intersec.normal = nb * bary.x + nc * bary.y + na * (1.f - bary.x - bary.y);
-        intersec.texcoord = tb * bary.x + tc * bary.y + ta * (1.f - bary.x - bary.y);
+        intersec.pos = vb * bary.x + vc * bary.y + va * (1.f - bary.x - bary.y);
+        intersec.norm = nb * bary.x + nc * bary.y + na * (1.f - bary.x - bary.y);
+        intersec.uv = tb * bary.x + tc * bary.y + ta * (1.f - bary.x - bary.y);
     }
 
     __device__ bool intersectPrimitive(int primId, Ray ray, float& dist, glm::vec2& bary) {
@@ -155,9 +157,9 @@ struct DevScene {
         glm::vec2 tb = devTexcoords[primId * 3 + 1];
         glm::vec2 tc = devTexcoords[primId * 3 + 2];
 
-        intersec.position = vb * bary.x + vc * bary.y + va * (1.f - bary.x - bary.y);
-        intersec.normal = nb * bary.x + nc * bary.y + na * (1.f - bary.x - bary.y);
-        intersec.texcoord = tb * bary.x + tc * bary.y + ta * (1.f - bary.x - bary.y);
+        intersec.pos = vb * bary.x + vc * bary.y + va * (1.f - bary.x - bary.y);
+        intersec.norm = nb * bary.x + nc * bary.y + na * (1.f - bary.x - bary.y);
+        intersec.uv = tb * bary.x + tc * bary.y + ta * (1.f - bary.x - bary.y);
         return true;
     }
 
@@ -197,17 +199,16 @@ struct DevScene {
         }
         if (closestPrimId != NullPrimitive) {
             getIntersecGeomInfo(closestPrimId, closestBary, intersec);
-            intersec.primitive = closestPrimId;
-            intersec.incomingDir = -ray.direction;
-            intersec.materialId = devMaterialIds[closestPrimId];
+            intersec.primId = closestPrimId;
+            intersec.matId = devMaterialIds[closestPrimId];
         }
         else {
-            intersec.primitive = NullPrimitive;
+            intersec.primId = NullPrimitive;
         }
     }
 
     __device__ bool testOcclusion(glm::vec3 x, glm::vec3 y) {
-        const float Eps = 1e-5f;
+        const float Eps = 1e-4f;
 
         glm::vec3 dir = y - x;
         float dist = glm::length(dir);
@@ -278,7 +279,7 @@ struct DevScene {
         if (closestPrimId == 0) {
             maxDepth = 100.f;
         }
-        intersec.primitive = maxDepth;
+        intersec.primId = maxDepth;
     }
 
     /**
@@ -301,12 +302,14 @@ struct DevScene {
         glm::vec3 normal = Math::triangleNormal(v0, v1, v2);
         glm::vec3 posToSampled = sampled - pos;
 
+#if SCENE_LIGHT_SINGLE_SIDED
         if (glm::dot(normal, posToSampled) > 0.f) {
             return InvalidPdf;
         }
+#endif
         radiance = devLightUnitRadiance[lightId];
         wi = glm::normalize(posToSampled);
-        return Math::pdfAreaToSolidAngle(Math::luminance(radiance) / sumLightPower, pos, sampled, normal);
+        return Math::pdfAreaToSolidAngle(Math::luminance(radiance) * sumLightPowerInv, pos, sampled, normal);
     }
 
     glm::vec3* devVertices = nullptr;
@@ -325,7 +328,7 @@ struct DevScene {
     glm::vec3* devLightUnitRadiance = nullptr;
     BinomialDistrib<float>* devLightDistrib;
     int numLightPrims;
-    float sumLightPower;
+    float sumLightPowerInv;
 };
 
 class Scene {
