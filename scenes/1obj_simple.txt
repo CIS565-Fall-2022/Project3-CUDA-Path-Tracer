@@ -4,7 +4,7 @@ RES         800 800
 FOVY        45
 ITERATIONS  5000
 DEPTH       8
-FILE        obj_complex
+FILE        obj_simple
 EYE         0.0 5 10.5
 LOOKAT      0 5 0
 UP          0 1 0
@@ -57,10 +57,16 @@ TRANS       5 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
-// Sphere
 OBJECT
-obj         ../meshes/Capsule/capsule.obj
+obj         ../meshes/Simple/box.obj
 material    ../materials/diffuse_white.mtl
-TRANS       -1 4 0
-ROTAT       90 0 0
+TRANS       -2 2 2
+ROTAT       0 45 0
 SCALE       2 2 2
+
+OBJECT
+obj         ../meshes/Toy/camion_jugete.obj
+material    ../materials/diffuse_white.mtl
+TRANS       3 0 4
+ROTAT       0 45 0
+SCALE       7 7 7

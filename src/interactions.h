@@ -168,24 +168,6 @@ struct SamplePointSpace {
         return l2w * v;
     }
 };
-__device__
-glm::vec3 DielectricScatter(glm::vec3 wo, const Material& m, glm::vec3 normal, thrust::default_random_engine& rng) {
-    thrust::uniform_real_distribution<float> u01(0, 1);
-    float etaI = 1, etaT = m.ior;
-    if (glm::dot(wo, normal) < 0) {
-        dev_swap(etaI, etaT);
-    }
-
-    double cos_theta = fmin(glm::dot(wo, normal), 1.0f);
-
-    if (fresnel_dielectric(cos_theta, etaI, etaT) > u01(rng)) {
-        return glm::reflect(-wo, normal);
-    } else {
-        glm::vec3 wi;
-        refract(wi, wo, normal, etaI / etaT);
-        return wi;
-    }
-}
 
 // encapsulates the BSDF functions for all sort of materials
 // note: all operations in local space
@@ -196,8 +178,14 @@ struct BSDF {
     thrust::default_random_engine& rng;
     color_t reflectance;
 
-    __device__ BSDF(Material const& m, thrust::default_random_engine& rng)
-        : m(m), type(m.type), is_delta(feq(m.roughness, 0)), reflectance(m.diffuse), rng(rng) {}
+    __device__ BSDF(Material const& m, ShadeableIntersection const& inters, thrust::default_random_engine& rng)
+        : m(m), type(m.type), is_delta(feq(m.roughness, 0)), rng(rng) {
+        if (m.textures.diffuse != -1) {
+            reflectance = inters.tex_color;
+        } else {
+            reflectance = m.diffuse;
+        }
+    }
 
     __device__ __forceinline__ float abs_cos_theta(glm::vec3 const& wi) const {
         return glm::abs(wi.z);
@@ -327,7 +315,7 @@ void scatterRay(
     SamplePointSpace space(normal);
     {
         glm::vec3 wo = space.world_to_local(-ray.direction);
-        BSDF bsdf(m, rng);
+        BSDF bsdf(m, inters, rng);
         color = bsdf.sample_f(wo, wi, pdf);
 
         if (is_zero(wi) || feq(pdf, 0)) {

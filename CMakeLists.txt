@@ -85,6 +85,7 @@ set(headers
     src/ImGui/imstb_truetype.h 
     src/intellisense.h
     src/TinyObjLoader/tiny_obj_loader.h
+    src/ColorConsole/color.hpp
     )
 
 set(sources

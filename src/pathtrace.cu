@@ -19,7 +19,7 @@
 #define COMPACTION
 #define SORT_MAT
 #define ANTI_ALIAS_JITTER
-// #define FAKE_SHADE
+#define FAKE_SHADE
 
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
@@ -130,6 +130,8 @@ static MeshInfo dev_mesh_info;
 
 static thrust::device_ptr<PathSegment> dev_thrust_paths;
 static thrust::device_ptr<ShadeableIntersection> dev_thrust_inters;
+std::vector<TextureGPU> dev_texs;
+
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -155,7 +157,12 @@ void pathtraceInit(Scene* scene) {
 	dev_mesh_info.uvs = make_span(scene->uvs);
 	dev_mesh_info.tris = make_span(scene->triangles);
 	dev_mesh_info.meshes = make_span(scene->meshes);
-	
+	for (Texture const& hst_tex : scene->textures) {
+		TextureGPU dev_tex(hst_tex);
+		dev_texs.push_back(dev_tex);
+	}
+	dev_mesh_info.texs = make_span(dev_texs);
+
 	dev_thrust_paths = thrust::device_ptr<PathSegment>((PathSegment*)dev_paths);
 	dev_thrust_inters = thrust::device_ptr<ShadeableIntersection>((ShadeableIntersection*)dev_intersections);
     checkCUDAError("pathtraceInit");
@@ -173,6 +180,12 @@ void pathtraceFree() {
 	FREE(dev_mesh_info.uvs);
 	FREE(dev_mesh_info.tris);
 	FREE(dev_mesh_info.meshes);
+	for (TextureGPU& tex : dev_texs) {
+		tex.free();
+	}
+	dev_texs.clear();
+	FREE(dev_mesh_info.texs);
+
     checkCUDAError("pathtraceFree");
 }
 
@@ -221,7 +234,8 @@ __global__ void computeIntersections(
 	int depth,
 	Span<PathSegment> paths,
 	Span<Geom> geoms,
-	ShadeableIntersection* intersections, 
+	ShadeableIntersection* intersections,
+	Material* materials,
 	MeshInfo meshInfo)
 {
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -254,7 +268,7 @@ __global__ void computeIntersections(
 		} else if (geom.type == SPHERE) {
 			t = sphereIntersectionTest(geom, pathSegment.ray, tmp);
 		} else if (geom.type == MESH) {
-			t = meshIntersectionTest(geom, pathSegment.ray, meshInfo, tmp);
+			t = meshIntersectionTest(geom, pathSegment.ray, materials, meshInfo, tmp);
 		}
 		// add more intersection tests here... triangle? metaball? CSG?
 
@@ -303,7 +317,6 @@ __global__ void shadeMaterial(
 			path.color *= (materialColor * material.emittance);
 			path.terminate();
 		} else {
-			// glm::vec3 hit = intersection.t * path.ray.direction + path.ray.origin;
 			scatterRay(path, intersection, material, lights, rng);
 		}
 	} else {
@@ -344,7 +357,12 @@ __global__ void shadeFakeMaterial(
 			thrust::uniform_real_distribution<float> u01(0, 1);
 
 			Material material = materials[intersection.materialId];
-			glm::vec3 materialColor = material.diffuse;
+			glm::vec3 materialColor;
+			if (material.textures.diffuse != -1) {
+				materialColor = intersection.tex_color;
+			} else {
+				materialColor = material.diffuse;
+			}
 
 			// If the material indicates that the object was a light, "light" the ray
 			if (material.emittance > 0.0f) {
@@ -356,7 +374,6 @@ __global__ void shadeFakeMaterial(
 			else {
 				float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));
 				path.color *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f;
-				path.color *= u01(rng); // apply some noise because why not
 			}
 			// If there was no intersection, color the ray black.
 			// Lots of renderers use 4 channel color, RGBA, where A = alpha, often
@@ -446,6 +463,7 @@ void pathtrace(uchar4 *pbo, int const frame, int const iter) {
 			dev_paths.subspan(0, num_paths),
 			dev_geoms,
 			dev_intersections,
+			dev_materials,
 			dev_mesh_info
 		);
 

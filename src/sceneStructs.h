@@ -5,9 +5,11 @@
 #include <cuda_runtime.h>
 #include "glm/glm.hpp"
 #include "utilities.h"
+#include "texture_types.h"
+#include <texture_fetch_functions.h>
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
-
+#define NUM_TEX_CHANNEL 4
 enum GeomType {
     SPHERE,
     CUBE,
@@ -34,46 +36,65 @@ struct Geom {
     glm::mat4 invTranspose;
 };
 
+
+
 struct Texture {
-    __host__ __device__ 
-    Texture() : pixel_width(0), pixel_height(0), pixels(nullptr) {}
-    __host__ __device__
-    Texture(Texture const& o) = default;
-    __host__ __device__
-    Texture(Texture&& o) = default;
     __host__
-    Texture(int pixel_width, int pixel_height, int channel, unsigned char* raw_pixel) : 
-        pixel_width(pixel_width), pixel_height(pixel_height) {
+    Texture(int pixel_width, int pixel_height, unsigned char* raw_pixel) : 
+        pixel_width(pixel_width), pixel_height(pixel_height), channel(NUM_TEX_CHANNEL) {
+        size_t tot = (size_t) pixel_width * pixel_height * channel;
+        pixels.assign(raw_pixel, raw_pixel + tot);
+    }
+    int channel;
+    int pixel_width;
+    int pixel_height;
+    std::vector<unsigned char> pixels;
+};
 
-        assert(channel > 0);
+struct TextureGPU {
+    __host__
+    TextureGPU(Texture const& hst_tex) :
+        pixel_width(hst_tex.pixel_width), pixel_height(hst_tex.pixel_height), dev_arr(nullptr), tex(0) {
+        //reference: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#texture-object-api
 
-        size_t tot = (size_t) pixel_width * pixel_height;
-        pixels = new color_t[tot];
+        cudaChannelFormatDesc desc = cudaCreateChannelDesc<uchar4>();
+        CHECK_CUDA(cudaMallocArray(&dev_arr, &desc, pixel_width, pixel_height));
+        CHECK_CUDA(cudaMemcpyToArray(dev_arr, 0, 0, hst_tex.pixels.data(), (size_t)pixel_width * pixel_height * hst_tex.channel * sizeof(unsigned char), cudaMemcpyHostToDevice));
+        cudaResourceDesc res_desc;
+        memset(&res_desc, 0, sizeof(res_desc));
+        res_desc.resType = cudaResourceTypeArray;
+        res_desc.res.array.array = dev_arr;
 
-        for (size_t i = 0; i < tot; ++i) {
-            pixels[i] = { 
-                raw_pixel[i * channel],
-                channel > 1 ? raw_pixel[i * channel + 1] : 0,
-                channel > 2 ? raw_pixel[i * channel + 2] : 0,
-            };
-        }
+        cudaTextureDesc tex_desc;
+        memset(&tex_desc, 0, sizeof(tex_desc));
+        tex_desc.addressMode[0] = cudaAddressModeWrap;
+        tex_desc.addressMode[1] = cudaAddressModeWrap;
+        tex_desc.filterMode = cudaFilterModeLinear;
+        tex_desc.readMode = cudaReadModeNormalizedFloat;
+        tex_desc.normalizedCoords = 1;
+
+        CHECK_CUDA(cudaCreateTextureObject(&tex, &res_desc, &tex_desc, 0));
     }
     __host__
-    ~Texture() { delete[] pixels; }
-    
-    Texture to_device() const {
-        Texture ret;
-        ret.pixel_width = pixel_width;
-        ret.pixel_height = pixel_height;
+    void free() {
+        CHECK_CUDA(cudaFreeArray(dev_arr));
+        CHECK_CUDA(cudaDestroyTextureObject(tex));
+    }
 
-        size_t tot = (size_t)pixel_width * pixel_height;
-        ALLOC(ret.pixels, tot);
-        H2D(ret.pixels, pixels, tot);
+    __device__ color_t sample(glm::vec2 const& uv) {
+#ifndef __CUDA_ARCH__
+#define f(x,y,z) color_t(1,0,0)
+#else
+#define f(x,y,z) tex2D<float4>(x,y,z)
+#endif
+        auto col = f(tex, uv.x, uv.y);
+        return color_t(col.x, col.y, col.z);
     }
 
     int pixel_width;
     int pixel_height;
-    color_t* pixels;
+    cudaArray_t dev_arr;
+    cudaTextureObject_t tex;
 };
 
 struct Material {
@@ -99,11 +120,17 @@ struct Material {
     };
     
     struct {
-        int tex_idx;
+        int diffuse;
     } textures;      // optional: invalid = -1
 
     Type type;       // optional: default = DIFFUSE
     float roughness; // optional: default = 1
+
+    __host__ __device__ Material() : diffuse(BACKGROUND_COLOR), roughness(1) {
+        type = DIFFUSE;
+        textures.diffuse = -1;
+    }
+
     static Type str_to_mat_type(std::string str) {
 #define CHK(x) if(str == #x) return x
         CHK(DIFFUSE);
@@ -176,8 +203,12 @@ struct ShadeableIntersection {
     glm::vec3 hitPoint;
     int materialId;
 
-    // only used by mesh
+    // only used by textured points
     glm::vec2 uv;
+    color_t tex_color;
+
+    __host__ __device__ ShadeableIntersection() 
+        : t(-1), surfaceNormal(0), hitPoint(0), materialId(-1), uv(-1), tex_color(-1) { }
 
     __host__ __device__ friend bool operator<(ShadeableIntersection const& a, ShadeableIntersection const& b) {
         return a.materialId < b.materialId;
@@ -197,6 +228,8 @@ struct Light {
 struct Triangle {
     glm::ivec3 verts;
     glm::ivec3 norms;
+    
+    // only used by textured faces
     glm::ivec3 uvs;
     int mat_id;
 
@@ -218,10 +251,10 @@ struct Mesh {
 /// this is basically GPU counterpart of the mesh vectors
 /// </summary>
 struct MeshInfo {
-    Span<Vertex> vertices;
-    Span<Normal> normals;
-    Span<TexCoord> uvs;
-    Span<Texture> texs;
-    Span<Triangle> tris;
-    Span<Mesh> meshes;
+    Vertex* vertices;
+    Normal* normals;
+    TexCoord* uvs;
+    TextureGPU* texs; //array of textures pointers
+    Triangle* tris;
+    Mesh* meshes;
 };

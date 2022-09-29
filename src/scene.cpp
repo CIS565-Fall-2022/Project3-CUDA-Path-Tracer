@@ -5,6 +5,7 @@
 #include <glm/gtx/string_cast.hpp>
 #include "TinyObjLoader/tiny_obj_loader.h"
 #include "stb_image.h"
+#include "ColorConsole/color.hpp"
 
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
@@ -36,9 +37,9 @@ Scene::~Scene() {
 }
 
 static bool initMaterial(
+    Scene& self,
     Material& ret,
     string const& obj_dir,
-    unordered_map<string, int>& tex_name_to_id, 
     tinyobj::material_t const& tinyobj_mat
 ) {
     Material mat;
@@ -53,18 +54,24 @@ static bool initMaterial(
 
     string const& texname = tinyobj_mat.diffuse_texname;
     if (!texname.empty()) {
-        if (tex_name_to_id.count(texname)) {
-            mat.textures.tex_idx = tex_name_to_id[texname];
+        if (self.tex_name_to_id.count(texname)) {
+            mat.textures.diffuse = self.tex_name_to_id[texname];
         } else {
-            // TODO load texture
             int x, y, n;
             string texpath = obj_dir + '/' + texname;
-            unsigned char* data = stbi_load(texpath.c_str(), &x, &y, &n, 0);
+
+            unsigned char* data = stbi_load(texpath.c_str(), &x, &y, &n, NUM_TEX_CHANNEL);
             if (!data) {
                 return false;
             }
             
+            self.textures.emplace_back(x, y, data);
+            stbi_image_free(data);
+
+            mat.textures.diffuse = self.tex_name_to_id[texname] = self.textures.size() - 1;
         }
+    } else {
+        mat.textures.diffuse = -1;
     }
 
     // TODO deduce material type
@@ -85,14 +92,17 @@ static bool initMaterial(
     }
 
     cout << "loaded material " << tinyobj_mat.name << endl
-        << "diffuse =   {" << mat.diffuse[0] << "," << mat.diffuse[1] << "," << mat.diffuse[2] << "}\n"
-        << "emittance =  " << mat.emittance << "\n"
-        << "ior =        " << mat.ior << "\n"
-        << "refl =       " << mat.hasReflective << "\n"
-        << "refr =       " << mat.hasRefractive << "\n"
-        << "roughness =  " << mat.roughness << "\n"
-        << "spec_color= {" << mat.specular.color[0] << "," << mat.specular.color[1] << "," << mat.specular.color[2] << "}\n"
-        << "spec_exp   = " << mat.specular.exponent << "\n\n";
+        << "diffuse =     {" << mat.diffuse[0] << "," << mat.diffuse[1] << "," << mat.diffuse[2] << "}\n"
+        << "emittance =    " << mat.emittance << "\n"
+        << "ior =          " << mat.ior << "\n"
+        << "refl =         " << mat.hasReflective << "\n"
+        << "refr =         " << mat.hasRefractive << "\n"
+        << "roughness =    " << mat.roughness << "\n"
+        << "spec_color=   {" << mat.specular.color[0] << "," << mat.specular.color[1] << "," << mat.specular.color[2] << "}\n"
+        << "spec_exp   =   " << mat.specular.exponent << "\n\n";
+
+    if(mat.textures.diffuse != -1)
+        cout << "diffuse tex = {" << " id = " << mat.textures.diffuse << ", npixels = " << self.textures[mat.textures.diffuse].pixels.size() << "}\n\n";
 
     ret = move(mat);
     return true;
@@ -119,14 +129,14 @@ int Scene::loadGeom() {
             // mesh objects are in the fomat: [file type] [path to file]
             vector<string> tokens = utilityCore::tokenizeString(line);
             if (tokens.size() != 2) {
-                cerr << "ERROR: unrecognized object type\nat line: " << line << endl;
+                cerr << dye::red("ERROR: unrecognized object type\nat line: ") << line << endl;
                 return -1;
             }
             if (tokens[0] == "obj") {
                 cout << "Loading obj mesh " << tokens[1] << endl;
                 size_t pos = tokens[1].find_last_of('/');
                 if (pos == string::npos) {
-                    cerr << "ERROR: invalid obj file path: " << tokens[1] << endl;
+                    cerr << dye::red("ERROR: invalid obj file path: " + tokens[1]) << endl;
                     return -1;
                 }
                 
@@ -139,16 +149,16 @@ int Scene::loadGeom() {
                 tinyobj::ObjReader reader;
                 if (!reader.ParseFromFile(tokens[1], config)) {
                     if (!reader.Error().empty()) {
-                        cerr << "TinyObjReader: ERROR: \n";
-                        cerr << reader.Error() << endl;
+                        cerr << dye::red("TinyObjReader: ERROR: \n");
+                        cerr << dye::red(reader.Error()) << endl;
                     } else {
-                        cerr << "no idea what the hell is happening\n";
+                        cerr << dye::red("no idea what the hell is happening\n");
                     }
                     return -1;
                 }
                 if (!reader.Warning().empty()) {
-                    cerr << "TinyObjReader: WARNING: \n";
-                    cerr << reader.Warning() << endl;
+                    cerr << dye::yellow("TinyObjReader: WARNING: \n");
+                    cerr << dye::yellow(reader.Warning()) << endl;
                 }
 
                 size_t vert_offset = vertices.size();
@@ -162,7 +172,10 @@ int Scene::loadGeom() {
                 // fill materials
                 for (auto const& mat : mats) {
                     Material material;
-                    if (!initMaterial(material, config.mtl_search_path, tex_name_to_id, mat)) {
+                    if (!initMaterial(*this, material, config.mtl_search_path, mat)) {
+                        cerr << dye::red("FATAL ERROR: mesh " + tokens[1] + " is missing some texture files:\n" +
+                           mat.diffuse_texname + "\nresulting in an incomplete state of the loader, exiting...\n");
+                        exit(EXIT_FAILURE);
                         return -1;
                     }
                     materials.emplace_back(material);
@@ -203,27 +216,22 @@ int Scene::loadGeom() {
                             indices[3 * i + 1].vertex_index + vert_offset,
                             indices[3 * i + 2].vertex_index + vert_offset,
                         };
-                        glm::ivec3 norms;
-                        if (indices[3*i].normal_index >= 0) {
-                            norms = {
-                                indices[3 * i + 0].normal_index + norm_offset,
-                                indices[3 * i + 1].normal_index + norm_offset,
-                                indices[3 * i + 2].normal_index + norm_offset,
-                            };
-                        } else {
-                            missing_norm = true;
-                            norms = { -1,-1,-1 };
-                        }
-                        glm::ivec3 uvs;
-                        if (indices[3 * i].texcoord_index >= 0) {
-                            uvs = {
-                                indices[3 * i + 0].texcoord_index + uv_offset,
-                                indices[3 * i + 1].texcoord_index + uv_offset,
-                                indices[3 * i + 2].texcoord_index + uv_offset,
-                            };
-                        } else {
-                            missing_uv = true;
-                            uvs = { -1,-1,-1 };
+
+                        glm::ivec3 norms, uvs;
+                        for (int x = 0; x < 3; ++x) {
+                            if (indices[3 * i + x].normal_index == -1) {
+                                missing_norm = true;
+                                norms[x] = -1;
+                            } else {
+                                norms[x] = indices[3 * i + x].normal_index;
+                            }
+
+                            if (indices[3 * i + x].texcoord_index == -1) {
+                                missing_uv = true;
+                                uvs[x] = -1;
+                            } else {
+                                uvs[x] = indices[3 * i + x].texcoord_index;
+                            }
                         }
 
                         int mat_id;
@@ -240,12 +248,20 @@ int Scene::loadGeom() {
                 newGeom.meshid = meshes.size();
                 meshes.emplace_back(triangles_start, triangles.size());
 
-                cout << "Loaded:\n"
+                cout << dye::green("Loaded:\n")
                     << triangles.size() << " triangles\n"
                     << vertices.size() << " vertices\n"
                     << normals.size() << " normals\n"
                     << uvs.size() << " uvs\n"
                     << meshes.size() << " meshes\n";
+
+                if (missing_uv) {
+                    cout << dye::red("missing uv for " + tokens[1]) << endl;
+                }
+                if (missing_norm) {
+                    cout << dye::red("missing norm for " + tokens[1]) << endl;
+                }
+
             } else {
                 cerr << "unknown object format" << endl;
                 return -1;
@@ -376,7 +392,7 @@ int Scene::loadMaterial(string mtl_file) {
     } else {
         ifstream fin(mtl_file);
         if (!fin) {
-            cerr << "cannot find mtl file: " << mtl_file << endl;
+            cerr << dye::red("cannot find mtl file: ") << dye::red(mtl_file) << endl;
             return -1;
         }
 
@@ -386,19 +402,19 @@ int Scene::loadMaterial(string mtl_file) {
 
         tinyobj::LoadMtl(&mat_mp, &mats, &fin, &warn, &err);
         if (!err.empty()) {
-            cerr << "Tiny obj loader: ERROR:\n" << err << endl;
+            cerr << dye::red("Tiny obj loader: ERROR:\n") << dye::red(err) << endl;
             return -1;
         }
         if (!warn.empty()) {
-            cerr << "Tiny obj loader: WARNING:\n" << err << endl;
+            cerr << dye::yellow("Tiny obj loader: WARNING:\n") << dye::yellow(warn) << endl;
         }
 
         if (mat_mp.size() > 1) {
-            cerr << "WARNING: " << mat_mp.size()-1 << "materials discarded in " << mtl_file << endl;
+            cerr << dye::yellow("WARNING: ") << dye::yellow(mat_mp.size()-1) << dye::yellow("materials discarded in ") << mtl_file << endl;
         }
 
         Material material;
-        if (!initMaterial(material, mtl_file.substr(0, mtl_file.find_last_of('/')), tex_name_to_id, mats[0])) {
+        if (!initMaterial(*this, material, mtl_file.substr(0, mtl_file.find_last_of('/')), mats[0])) {
             return -1;
         }
         materials.emplace_back(material);

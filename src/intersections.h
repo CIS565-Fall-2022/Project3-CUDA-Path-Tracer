@@ -188,7 +188,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r, ShadeableIn
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__device__ float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo, ShadeableIntersection& inters) {
+__device__ float meshIntersectionTest(Geom mesh, Ray r, Material* materials, MeshInfo meshInfo, ShadeableIntersection& inters) {
     
     glm::vec3 ro = multiplyMV(mesh.inverseTransform, glm::vec4(r.origin, 1.0f));
     glm::vec3 rd = glm::normalize(multiplyMV(mesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -214,16 +214,28 @@ __device__ float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo, Shade
             verts[tris[i].verts[1]],
             verts[tris[i].verts[2]]
         };
-        glm::vec3 triangle_norms[3]{
-            norms[tris[i].norms[0]],
-            norms[tris[i].norms[1]],
-            norms[tris[i].norms[2]]
-        };
-        glm::vec2 triangle_uvs[3]{
-            uvs[tris[i].uvs[0]],
-            uvs[tris[i].uvs[1]],
-            uvs[tris[i].uvs[2]]
-        };
+
+        bool has_norm = true, has_uv = true;
+        glm::vec3 triangle_norms[3];
+        glm::vec2 triangle_uvs[3];
+
+        for (int x = 0; x < 3; ++x) {
+            if (tris[i].norms[x] != -1) {
+                triangle_norms[x] = norms[tris[i].norms[x]];
+            } else {
+                has_norm = false;
+                break;
+            }
+        }
+        for (int x = 0; x < 3; ++x) {
+            if (tris[i].uvs[x] != -1) {
+                triangle_uvs[x] = uvs[tris[i].uvs[x]];
+            } else {
+                has_uv = false;
+                break;
+            }
+        }
+
         if (glm::intersectRayTriangle(ro, rd, triangle_verts[0], triangle_verts[1], triangle_verts[2], barycoord)) {
             intersect = true;
             if (barycoord.z > t_min) {
@@ -231,8 +243,22 @@ __device__ float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo, Shade
             }
             
             t_min = barycoord.z;
-            normal = lerpBarycentric(barycoord, &triangle_norms);
-            uv = lerpBarycentric(barycoord, &triangle_uvs);
+
+            if (has_norm) {
+                normal = lerpBarycentric(barycoord, &triangle_norms);
+            } else {
+                glm::vec3 v0v1 = triangle_verts[1] - triangle_verts[0];
+                glm::vec3 v0v2 = triangle_verts[2] - triangle_verts[0];
+                normal = glm::cross(v0v1, v0v2);
+            }
+            normal = glm::normalize(normal);
+
+            if (has_uv) {
+                uv = lerpBarycentric(barycoord, &triangle_uvs);
+            } else {
+                uv = glm::vec2(-1);
+            }
+
             mat_id = tris[i].mat_id;
         }
     }
@@ -251,7 +277,17 @@ __device__ float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo, Shade
     inters.uv = uv;
 
     // use per-mesh material if per-face material is missing
-    inters.materialId = mat_id < 0 ? mesh.materialid : mat_id;
+    if (mat_id == -1) {
+        inters.materialId = mesh.materialid;
+    } else {
+        inters.materialId = mat_id;
+    }
+
+    // use texture color if applicable
+    Material const& mat = materials[mat_id];
+    if (mat.textures.diffuse != -1) {
+        inters.tex_color = meshInfo.texs[mat.textures.diffuse].sample(uv);
+    }
 
     return glm::length(r.origin - inters.hitPoint);
 }
