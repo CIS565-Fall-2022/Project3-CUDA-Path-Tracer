@@ -34,7 +34,44 @@ Scene::Scene(string filename) {
     }
 }
 
-int Scene::loadObjFile(string objectPath, Geom *newGeom)
+int Scene::linkMaterial(Geom * newGeom) {
+    string line;
+    utilityCore::safeGetline(fp_in, line);
+    if (!line.empty() && fp_in.good()) {
+        vector<string> tokens = utilityCore::tokenizeString(line);
+        newGeom->materialid = atoi(tokens[1].c_str());
+        return 1;
+    }
+    return 0;
+}
+
+int Scene::loadTransformations(Geom* newGeom) {
+    string line;
+    utilityCore::safeGetline(fp_in, line);
+    while (!line.empty() && fp_in.good()) {
+        vector<string> tokens = utilityCore::tokenizeString(line);
+
+        //load tranformations
+        if (strcmp(tokens[0].c_str(), "TRANS") == 0) {
+            newGeom->translation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        }
+        else if (strcmp(tokens[0].c_str(), "ROTAT") == 0) {
+            newGeom->rotation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        }
+        else if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
+            newGeom->scale = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        }
+
+        utilityCore::safeGetline(fp_in, line);
+    }
+
+    newGeom->transform = utilityCore::buildTransformationMatrix(
+        newGeom->translation, newGeom->rotation, newGeom->scale);
+    newGeom->inverseTransform = glm::inverse(newGeom->transform);
+    newGeom->invTranspose = glm::inverseTranspose(newGeom->transform);
+}
+
+int Scene::loadObjFile(string objectPath)
 {
     tinyobj::ObjReaderConfig reader_config;
     reader_config.mtl_search_path = "./"; // Path to material files
@@ -63,7 +100,8 @@ int Scene::loadObjFile(string objectPath, Geom *newGeom)
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
             size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
 
-            Triangle triangle;
+            Geom newGeomTriangle;
+            newGeomTriangle.type = TRIANGLE;
             int vertCnt = 0;
             // Loop over vertices in the face.
             for (size_t v = 0; v < fv; v++) {
@@ -73,7 +111,7 @@ int Scene::loadObjFile(string objectPath, Geom *newGeom)
                 tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
                 tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
 
-                triangle.vertices[vertCnt].pos = glm::vec3(vx, vy, vz);
+                newGeomTriangle.triangle.vertices[vertCnt].pos = glm::vec3(vx, vy, vz);
 
                 // Check if `normal_index` is zero or positive. negative = no normal data
                 if (idx.normal_index >= 0) {
@@ -81,7 +119,7 @@ int Scene::loadObjFile(string objectPath, Geom *newGeom)
                     tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
                     tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
 
-                    triangle.vertices[vertCnt].nor = glm::vec3(nx, ny, nz);
+                    newGeomTriangle.triangle.vertices[vertCnt].nor = glm::vec3(nx, ny, nz);
                 }
 
                 // Check if `texcoord_index` is zero or positive. negative = no texcoord data
@@ -89,7 +127,7 @@ int Scene::loadObjFile(string objectPath, Geom *newGeom)
                     tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
                     tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
 
-                    triangle.vertices[vertCnt].uv = glm::vec2(tx, ty);
+                    newGeomTriangle.triangle.vertices[vertCnt].uv = glm::vec2(tx, ty);
                 }
 
                 // Optional: vertex colors
@@ -98,13 +136,18 @@ int Scene::loadObjFile(string objectPath, Geom *newGeom)
                 // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
 
                 vertCnt++;
+                if (vertCnt == 3) { break; }
             }
 
-            newGeom->triangles.push_back(triangle);
+            //newGeomTriangle->triangles.push_back(triangle);
+            linkMaterial(&newGeomTriangle);
+            loadTransformations(&newGeomTriangle);
+            geoms.push_back(newGeomTriangle);
+
             index_offset += fv;
 
             // per-face material
-            shapes[s].mesh.material_ids[f];
+            //shapes[s].mesh.material_ids[f];
         }
     }
 }
@@ -128,7 +171,7 @@ int Scene::loadGeom(string objectid) {
                 newGeom.type = OBJ;
                 utilityCore::safeGetline(fp_in, line);
                 if (!line.empty() && fp_in.good()) {
-                    return loadObjFile(line.c_str(), &newGeom);
+                    return loadObjFile(line.c_str());
                 }
             } else if (strcmp(line.c_str(), "sphere") == 0) {
                 cout << "Creating new sphere..." << endl;
@@ -140,35 +183,12 @@ int Scene::loadGeom(string objectid) {
         }
 
         //link material
-        utilityCore::safeGetline(fp_in, line);
-        if (!line.empty() && fp_in.good()) {
-            vector<string> tokens = utilityCore::tokenizeString(line);
-            newGeom.materialid = atoi(tokens[1].c_str());
-            cout << "Connecting Geom " << objectid << " to Material " << newGeom.materialid << "..." << endl;
-        }
+        linkMaterial(&newGeom);
+        cout << "Connecting Geom " << objectid << " to Material " << newGeom.materialid << "..." << endl;
 
         //load transformations
-        utilityCore::safeGetline(fp_in, line);
-        while (!line.empty() && fp_in.good()) {
-            vector<string> tokens = utilityCore::tokenizeString(line);
-
-            //load tranformations
-            if (strcmp(tokens[0].c_str(), "TRANS") == 0) {
-                newGeom.translation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-            } else if (strcmp(tokens[0].c_str(), "ROTAT") == 0) {
-                newGeom.rotation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-            } else if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
-                newGeom.scale = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-            }
-
-            utilityCore::safeGetline(fp_in, line);
-        }
-
-        newGeom.transform = utilityCore::buildTransformationMatrix(
-                newGeom.translation, newGeom.rotation, newGeom.scale);
-        newGeom.inverseTransform = glm::inverse(newGeom.transform);
-        newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
-
+        loadTransformations(&newGeom);
+        
         geoms.push_back(newGeom);
         return 1;
     }
