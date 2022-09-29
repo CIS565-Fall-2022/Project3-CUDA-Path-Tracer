@@ -19,6 +19,7 @@
 
 #define ERRORCHECK 1
 #define RAYCACHE 1
+#define MEMSORT 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -350,6 +351,14 @@ struct is_terminated
 		return p.remainingBounces <= 0;
 	}
 };
+
+struct compare_materials
+{
+	__host__ __device__
+		bool operator()(const ShadeableIntersection& i1, const ShadeableIntersection& i2) {
+		return i1.materialId > i2.materialId;
+	}
+};
 /**
  * Wrapper for the __global__ call that sets up the kernel calls and does a ton
  * of memory management
@@ -421,7 +430,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	while (!iterationComplete) {
 
 #if RAYCACHE
-		if (iter == 1 && depth == 0) {
+		if (iter == 0 && depth == 0) {
 			numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
 			computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
 				depth
@@ -507,7 +516,10 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	  // TODO: compare between directly shading the path segments and shading
 	  // path segments that have been reshuffled to be contiguous in memory.
 
-		
+#if MEMSORT
+		thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + num_paths, dev_paths, compare_materials());
+
+#endif
 		dev_paths = thrust::stable_partition(thrust::device, dev_paths, dev_paths + num_paths, is_terminated());
 		num_paths = dev_path_end - dev_paths;
 		if (num_paths == 0){
