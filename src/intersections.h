@@ -142,3 +142,69 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 
     return glm::length(r.origin - intersectionPoint);
 }
+
+//// Reimplementation of glm::intersectRayTriangle
+//__host__ __device__ float intersectRayTriangle(glm::vec3 const& orig, glm::vec3 const& dir,
+//    glm::vec3 const& v0, glm::vec3 const& v1, glm::vec3 const& v2, glm::vec3& baryPosition) 
+//{
+//    glm::vec3 e1 = v1 - v0;
+//    glm::vec3 e2 = v2 - v0;
+//
+//    glm::vec3 p = glm::cross(dir, e2);
+//
+//    float a = glm::dot(e1, p);
+//
+//    float Epsilon = std::numeric_limits<float>::epsilon();
+//    if (a < Epsilon)
+//        return false;
+//
+//    float f = 1.0f / a;
+//
+//    glm::vec3 s = orig - v0;
+//    baryPosition.x = f * glm::dot(s, p);
+//    if (baryPosition.x < 0.0f)
+//        return false;
+//    if (baryPosition.x > 1.0f)
+//        return false;
+//
+//    glm::vec3 q = glm::cross(s, e1);
+//    baryPosition.y = f * glm::dot(dir, q);
+//    if (baryPosition.y < 0.0f)
+//        return false;
+//    if (baryPosition.y + baryPosition.x > 1.0f)
+//        return false;
+//
+//    baryPosition.z = f * glm::dot(e2, q);
+//
+//    return baryPosition.z >= 0.0f;
+//}
+
+/**
+ * Test intersection between a ray and a transformed triangle.
+ *
+ * @param intersectionPoint  Output parameter for point of intersection.
+ * @param normal             Output parameter for surface normal.
+ * @param outside            Output param for whether the ray came from outside.
+ * @return                   Ray parameter `t` value. -1 if no intersection.
+ */
+__host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
+    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+
+    glm::vec3 geom1 = triangle.tri.verts[0];
+    glm::vec3 geom2 = triangle.tri.verts[1];
+    glm::vec3 geom3 = triangle.tri.verts[2];
+
+    glm::vec3 barycenter = glm::vec3(0.0, 0.0, 0.0);
+    bool intersect = glm::intersectRayTriangle(r.origin, r.direction,
+                                               triangle.tri.verts[0], triangle.tri.verts[1], triangle.tri.verts[2],
+                                               barycenter);
+    if (!intersect) return -1.f;
+
+    float u = barycenter.x;
+    float v = barycenter.y;
+    float w = 1.f - u - v;
+    intersectionPoint = u * triangle.tri.verts[0] + v * triangle.tri.verts[1] + w * triangle.tri.verts[2];
+    normal = glm::cross(triangle.tri.verts[1] - triangle.tri.verts[0], triangle.tri.verts[2] - triangle.tri.verts[0]);
+
+    return barycenter.z;
+}

@@ -273,7 +273,6 @@ __global__ void computeIntersections(
 		glm::vec3 tmp_normal;
 
 		// naive parse through global geoms
-		//int j = 0;
 		for (int i = 0; i < geoms_size; i++)
 		{
 			Geom& geom = geoms[i];
@@ -289,12 +288,7 @@ __global__ void computeIntersections(
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 			else if (geom.type == TRIANGLE)
 			{
-				//j++;
-				glm::vec3 barycenter;
-				glm::intersectRayTriangle(pathSegment.ray.origin, pathSegment.ray.direction,
-											  geom.tri.verts[0], geom.tri.verts[1], geom.tri.verts[2],
-											  barycenter);
-
+				t = triangleIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.

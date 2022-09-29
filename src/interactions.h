@@ -41,6 +41,13 @@ glm::vec3 calculateRandomDirectionInHemisphere(
         + sin(around) * over * perpendicularDirection2;
 }
 
+__host__ __device__
+glm::vec3 sample_diffuse(
+    glm::vec3 normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 &wi) {
+    
+    wi = calculateRandomDirectionInHemisphere(normal, rng);
+    return m.color;
+}
 /**
  * Scatter a ray with some probabilities according to the material properties.
  * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
@@ -89,13 +96,24 @@ void scatterRay(
     float diffuseProbability = diffuseIntensity / totalIntensity;
     float specularProbability = specularIntensity / totalIntensity;
 
+    //glm::vec3 wi;
     if (xi > diffuseProbability) {
-        glm::vec3 wi = glm::reflect(pathSegment.ray.direction, normal);
+        float entering = (glm::dot(pathSegment.ray.direction, normal) < 0);
+        float eta = (entering) ? 1.f /m.indexOfRefraction : m.indexOfRefraction;
+        glm::vec3 wi = glm::refract(pathSegment.ray.direction, normal, eta);
         pathSegment.ray.direction = wi;
-        pathSegment.ray.origin = intersect;
         pathSegment.throughput *= m.specular.color / specularProbability;
+        pathSegment.ray.origin = intersect + 0.01f * pathSegment.ray.direction;
     }
+
+    //if (xi > diffuseProbability) {
+    //    glm::vec3 wi = glm::reflect(pathSegment.ray.direction, normal);
+    //    pathSegment.ray.direction = wi;
+    //    pathSegment.ray.origin = intersect;
+    //    pathSegment.throughput *= m.specular.color / specularProbability;
+    //}
     else {
+        //glm::vec3 f = sample_diffuse(normal, m, rng, wi);
         glm::vec3 wi = calculateRandomDirectionInHemisphere(normal, rng);
         pathSegment.ray.direction = wi;
         pathSegment.ray.origin = intersect;
