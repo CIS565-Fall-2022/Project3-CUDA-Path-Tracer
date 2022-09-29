@@ -129,7 +129,7 @@ ROTAT       0 0 0
 SCALE       .01 10 10
 
 // Sphere
-OBJECT 7
+OBJECT 6
 sphere
 material 5
 TRANS       2 4 -1
@@ -137,7 +137,7 @@ ROTAT       0 0 0
 SCALE       3 3 3
 
 // Cube
-OBJECT 8
+OBJECT 7
 cube
 material 6
 TRANS       2 8 -1
@@ -145,7 +145,7 @@ ROTAT       0 0 0
 SCALE       3 3 3
 
 // Obj
-OBJECT 9
+OBJECT 8
 obj
 ../obj/cube.obj
 material 5

@@ -69,6 +69,7 @@ int Scene::loadTransformations(Geom* newGeom) {
         newGeom->translation, newGeom->rotation, newGeom->scale);
     newGeom->inverseTransform = glm::inverse(newGeom->transform);
     newGeom->invTranspose = glm::inverseTranspose(newGeom->transform);
+    return 0;
 }
 
 int Scene::loadObjFile(string objectPath)
@@ -168,7 +169,7 @@ int Scene::loadGeom(string objectid) {
         if (!line.empty() && fp_in.good()) {
             if (strcmp(line.c_str(), "obj") == 0) {
                 cout << "Loading new obj..." << endl;
-                newGeom.type = OBJ;
+                //newGeom.type = OBJ;
                 utilityCore::safeGetline(fp_in, line);
                 if (!line.empty() && fp_in.good()) {
                     return loadObjFile(line.c_str());
