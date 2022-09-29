@@ -163,6 +163,33 @@ struct DevScene {
         return true;
     }
 
+    __device__ void naiveIntersect(Ray ray, Intersection& intersec) {
+        float closestDist = FLT_MAX;
+        int closestPrimId = NullPrimitive;
+        glm::vec2 closestBary;
+
+        for (int i = 0; i < (BVHSize + 1) / 2; i++) {
+            float dist;
+            glm::vec2 bary;
+            bool hit = intersectPrimitive(i, ray, dist, bary);
+
+            if (hit && dist < closestDist) {
+                closestDist = dist;
+                closestBary = bary;
+                closestPrimId = i;
+            }
+        }
+
+        if (closestPrimId != NullPrimitive) {
+            getIntersecGeomInfo(closestPrimId, closestBary, intersec);
+            intersec.primId = closestPrimId;
+            intersec.matId = devMaterialIds[closestPrimId];
+        }
+        else {
+            intersec.primId = NullPrimitive;
+        }
+    }
+
     __device__ void intersect(Ray ray, Intersection& intersec) {
         float closestDist = FLT_MAX;
         int closestPrimId = NullPrimitive;

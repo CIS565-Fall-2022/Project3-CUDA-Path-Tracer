@@ -88,6 +88,7 @@ set(headers
     src/ImGui/imstb_rectpack.h 
     src/ImGui/imstb_textedit.h 
     src/ImGui/imstb_truetype.h 
+    src/common.h
     )
 
 set(sources
@@ -110,6 +111,7 @@ set(sources
     src/ImGui/imgui_tables.cpp 
     src/ImGui/imgui_widgets.cpp
     src/tiny_obj_loader.cpp
+    src/common.cpp
     )
 
 list(SORT headers)
