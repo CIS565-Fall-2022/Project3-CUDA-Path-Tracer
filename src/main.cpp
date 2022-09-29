@@ -1,6 +1,8 @@
+#define TINYOBJLOADER_IMPLEMENTATION
 #include "main.h"
 #include "preview.h"
 #include <cstring>
+#include "tiny_obj_loader.h"
 
 static std::string startTimeString;
 
