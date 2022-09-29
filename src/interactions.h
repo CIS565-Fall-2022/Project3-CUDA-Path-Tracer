@@ -1,6 +1,7 @@
 #pragma once
 
 #include "intersections.h"
+#include <math.h>
 
 // CHECKITOUT
 /**
@@ -66,6 +67,13 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  *
  * You may need to change the parameter list for your purposes!
  */
+
+__host__ __device__ 
+void FresnelDielectric()
+{
+
+}
+
 __host__ __device__
 void scatterRay(
         PathSegment & pathSegment,
@@ -76,4 +84,29 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    //use this act as pdf
+    glm::vec3 dir = pathSegment.ray.direction;
+    float eta;
+   // Specular BRDF/BTDF here
+    if (m.hasRefractive)
+    {
+      
+    }
+    else if (m.hasReflective)
+    {
+
+    }
+    else
+    {
+        //diffuse
+        pathSegment.ray.origin = intersect;
+        pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
+        pathSegment.color *= m.color;
+    }
+   
+
+ 
 }
+
+

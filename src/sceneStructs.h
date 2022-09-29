@@ -71,6 +71,28 @@ struct PathSegment {
 // 2) BSDF evaluation: generate a new ray
 struct ShadeableIntersection {
   float t;
+  glm::vec3 intersectionPoint;
   glm::vec3 surfaceNormal;
+  bool outSide;
   int materialId;
+};
+
+//Add for string compaction
+
+struct isPathCompleted
+{
+    __host__ __device__
+    bool operator()(const PathSegment& path)
+    {
+        return path.remainingBounces <= 0;
+    }
+};
+
+struct compareIntersection
+{
+    __host__ __device__
+    bool operator()(const ShadeableIntersection& a,const ShadeableIntersection& b)
+    {
+       return a.materialId > b.materialId;
+    }
 };
