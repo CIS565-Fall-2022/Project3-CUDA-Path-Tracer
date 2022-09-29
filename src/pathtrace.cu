@@ -176,7 +176,6 @@ __global__ void computeIntersections(
 				// If not first ray, preserve previous sampling information for
 				// MIS calculation
 				intersec.prevPos = segment.ray.origin;
-				// intersec.prevBSDFPdf = segment.BSDFPdf;
 			}
 		}
 		else {
@@ -299,7 +298,6 @@ __global__ void pathIntegSampleSurface(
 			segment.remainingBounces--;
 		}
 	}
-	//if (depth == 1)
 	segment.radiance += accRadiance;
 }
 
@@ -310,7 +308,11 @@ __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iteration
 	if (index < nPaths) {
 		PathSegment iterationPath = iterationPaths[index];
 		if (iterationPath.pixelIndex >= 0 && iterationPath.remainingBounces <= 0) {
-			image[iterationPath.pixelIndex] += iterationPath.radiance;
+			glm::vec3 r = iterationPath.radiance;
+			if (isnan(r.x) || isnan(r.y) || isnan(r.z) || isinf(r.x) || isinf(r.y) || isinf(r.z)) {
+				return;
+			}
+			image[iterationPath.pixelIndex] += glm::clamp(r, glm::vec3(0.f), glm::vec3(FLT_MAX / 10.f));
 		}
 	}
 }
