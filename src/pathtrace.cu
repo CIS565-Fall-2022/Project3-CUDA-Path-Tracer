@@ -24,6 +24,8 @@
 #define ERRORCHECK 1
 #define CACHE_INTERSECTION 1
 #define SORT_RAY 1
+#define ANTI_ALIASING 1
+#define DOF 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -157,12 +159,37 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 
         segment.ray.origin = cam.position;
         segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
-
+        thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+        thrust::uniform_real_distribution<float> u01(0, 1);
         // TODO: implement antialiasing by jittering the ray
+#if ANTI_ALIASING
+        segment.ray.direction = glm::normalize(cam.view
+            - cam.right * cam.pixelLength.x * ((float)x + u01(rng) - (float)cam.resolution.x * 0.5f)
+            - cam.up * cam.pixelLength.y * ((float)y + u01(rng) - (float)cam.resolution.y * 0.5f)
+        );
+#else 
         segment.ray.direction = glm::normalize(cam.view
             - cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
             - cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
-            );
+        );
+#endif // ANTI_ALIASING
+
+#ifdef DOF//Will Modify and test later but mark done for now
+        cam.focal_length = 10.0f;
+        cam.aperture_radius = 0.2f;
+
+        //float ft = glm::abs((cam.focal_length) / segment.ray.direction.z);
+        glm::vec3 focalPoint = segment.ray.direction * cam.focal_length;
+        //two steps: shift ray.origin and change ray.direction
+
+        glm::vec3 shiftIdx = glm::vec3(u01(rng) - 0.5f, u01(rng) - 0.5f, 0.f);
+        shiftIdx *= cam.aperture_radius;
+        segment.ray.origin += shiftIdx;
+        segment.ray.direction = glm::normalize(focalPoint - glm::vec3(shiftIdx.x, shiftIdx.y, 0.f));
+
+#endif // DOF
+
+        
 
         segment.pixelIndex = index;
         segment.remainingBounces = traceDepth;
@@ -211,6 +238,9 @@ __global__ void computeIntersections(
             else if (geom.type == SPHERE)
             {
                 t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+            }
+            else if (geom.type == MESH) {
+               //t = primitiveIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, )
             }
             // TODO: add more intersection tests here... triangle? metaball? CSG?
 

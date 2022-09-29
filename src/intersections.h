@@ -142,3 +142,21 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 
     return glm::length(r.origin - intersectionPoint);
 }
+
+__host__ __device__ float primitiveIntersectionTest(Geom geom, Ray r,
+    glm::vec3& intersectionPoint, glm::vec3& normal, Primitive prim, const Material& mat) {
+    
+    Ray q;
+    q.origin = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
+    q.direction = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+    glm::vec3 bary;
+    if (glm::intersectRayTriangle(q.origin, q.direction, prim.pos[0], prim.pos[1], prim.pos[2], bary)) {
+        return -1;
+    }
+    //very confused of how to move on
+
+
+}
+
+

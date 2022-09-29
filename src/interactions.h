@@ -87,23 +87,31 @@ void scatterRay(
         pathSegment.ray.origin = intersect;
     }
     else if (m.hasReflective && m.hasRefractive) {//both and we will use the equation
+        float n1, n2;
         glm::vec3 incident = pathSegment.ray.direction;//incident vector
-        float rayDir = glm::dot(incident, normal);
-        if (rayDir > 0) {
-            normal = -normal;
+        float cosineR = glm::dot(incident, normal);//outside or inside
+        if (cosineR > 0) {
+            normal = -normal;//reverse the normal if outside
+            n1 = 1.0f;
+            n2 = m.indexOfRefraction;
+            cosineR = glm::dot(incident, normal);
         }
-        //We will use 50/50 first to scrum; >0.5 refraction <0.5 reflection
-        if (u01(rng) > 0.5) {
-            //inside? outside?
-
-            
+        else {//inside
+            n1 = m.indexOfRefraction;
+            n2 = 1.0f;
+        }//what if both of the surface is not air?(TODO)
+        float R0 = glm::pow((n1 - n2) / (n1 + n2), 2.0f);
+        float Rtheta = R0 + (1 - R0) * glm::pow(1 - cosineR, 5.0f);
+        //I use 50/50 before but thats history
+        //now I use R value from Schlink approximation and fresnel equations to decide whether reflect or refract
+        // > Rtheta then refraction, else reflection
+        if (u01(rng) > Rtheta) {
             pathSegment.ray.direction = glm::normalize(glm::refract(incident, normal, m.indexOfRefraction));
             pathSegment.ray.origin = intersect;
-            pathSegment.color *= m.specular.color * 0.5f;
+            pathSegment.color *= m.specular.color;
         }
         else {
-            
-            pathSegment.color *= m.specular.color * 0.5f;
+            pathSegment.color *= m.specular.color;
             pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
             pathSegment.ray.origin = intersect;
         }
@@ -114,12 +122,6 @@ void scatterRay(
         pathSegment.color *= m.specular.color;
         pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
         pathSegment.ray.origin = intersect;
-    }
-    else {//refraction only
-        glm::vec3 incident = pathSegment.ray.direction;//incident vector
-        pathSegment.ray.direction = glm::normalize(glm::refract(incident, normal, m.indexOfRefraction));
-        pathSegment.ray.origin = intersect;
-        pathSegment.color *= m.specular.color;
     }
 
     pathSegment.remainingBounces--;
