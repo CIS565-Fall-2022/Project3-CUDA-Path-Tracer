@@ -222,15 +222,25 @@ __global__ void computeIntersections(
 //#if USE_BOUND_BOX
 			else if (geom.type == BOUND_BOX) {
 				// only true if bound box is on
-				//float boxT = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
-				//if (boxT != -1) {
+				float boxT = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				if (boxT != -1) {
 					// printf("intersect bound box \n");
 					// printf("num tris: %i \n", geom.numTris);
-				for (int j = 0; j < geom.numTris; j++) {
-					// if not using bound box, should only be one triangle.
-					t = triangleIntersectionTest(&geom, geom.device_tris + j, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				//float triangleMinT = FLT_MAX;
+					for (int j = 0; j < geom.numTris; j++) {
+						// if not using bound box, should only be one triangle.
+						// printf("J: %i, tri x: %f, y: %f, z: %f \n", j, geom.device_tris[j].pointA.pos[0], geom.device_tris[j].pointA.pos[1], geom.device_tris[j].pointA.pos[2]);
+						t = triangleIntersectionTest(&geom, &geom.device_tris[j], pathSegment.ray, tmp_intersect, tmp_normal, outside);
+					
+						if (t > 0.0f && t_min > t)
+						{
+							t_min = t;
+							hit_geom_index = i;
+							intersect_point = tmp_intersect;
+							normal = tmp_normal;
+						}
+					}
 				}
-				//}
 			}
 //#else
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
@@ -239,7 +249,8 @@ __global__ void computeIntersections(
 				// only true if bound box is off
 				for (int j = 0; j < geom.numTris; j++) {
 					// if not using bound box, should only be one triangle.
-					t = triangleIntersectionTest(&geom, geom.device_tris + j, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+					//printf("GEOMIDX: %i, tri x: %f, y: %f, z: %f \n", i, geom.device_tris[j].pointA.pos[0], geom.device_tris[j].pointA.pos[1], geom.device_tris[j].pointA.pos[2]);
+					t = triangleIntersectionTest(&geom, &geom.device_tris[j], pathSegment.ray, tmp_intersect, tmp_normal, outside);
 				}
 			}
 //#endif

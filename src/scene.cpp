@@ -85,7 +85,7 @@ int Scene::loadObj(const char* filename, glm::mat4 transform,
             // std::cout << "face: " << f << std::endl;
             size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
             // Loop over vertices in the face.
-            for (size_t v = 0; v < fv - 1; v++) {
+            for (size_t v = 1; v < fv - 1; v++) {
                 // access to vertex
 
                 // idxa is the primary vertex's idx
@@ -279,25 +279,14 @@ int Scene::loadGeom(string objectid) {
 
             //geoms.push_back(newGeom);
 
-            newGeom.type = TRIANGLE;
-            newGeom.materialid = 1;
-            newGeom.translation = newGeom.translation;
-            newGeom.rotation = newGeom.rotation;
-            newGeom.scale = newGeom.scale;
-            newGeom.transform = newGeom.transform;
-            newGeom.inverseTransform = newGeom.inverseTransform;
-            newGeom.invTranspose = newGeom.invTranspose;
-            newGeom.tris = new Triangle[1464];//triangleArray.size()];
+
+            newGeom.tris = new Triangle[triangleArray.size()];//triangleArray.size()];
             newGeom.device_tris = NULL;
-            newGeom.numTris = 1464;
+            newGeom.numTris = triangleArray.size();
 
             for (int i = 0; i < triangleArray.size(); i++) {
-                // there should only be 1 triangle
-                newGeom.tris[i] = Triangle {
-                    triangleArray[i].pointA, 
-                    triangleArray[i].pointB,
-                    triangleArray[i].pointC
-                };
+                newGeom.tris[i] = triangleArray[i];
+                //printf("tri x: %f, y: %f, z: %f \n", newGeom.tris[i].pointA.pos[0], newGeom.tris[i].pointA.pos[1], newGeom.tris[i].pointA.pos[2]);
             }
 
             //for (int i = 0; i < triangleArray.size(); i++) {
@@ -311,9 +300,13 @@ int Scene::loadGeom(string objectid) {
 #else 
             // create geoms from triangles using newGeom properties
             // load triangles into the geoms scene.
-            for (int i = 0; i < triangleArray.size(); i++) {
+            for (int i = 0; i < triangleArray.size(); i ++) {
                 // there should only be 1 triangle
                 Triangle* trisInGeom = new Triangle(triangleArray[i]);
+
+                if (i % 2 != 0) continue;
+
+                printf("i %i \n", i);
 
                 // just a single triangle
                 Geom newTriGeom = {
@@ -329,6 +322,8 @@ int Scene::loadGeom(string objectid) {
                     NULL, // device pointer is not yet allocated
                     1,
                 };
+
+                //printf("tri x: %f, y: %f, z: %f \n", trisInGeom->pointA.pos[0], trisInGeom->pointA.pos[1], trisInGeom->pointA.pos[2]);
 
                 geoms.push_back(newTriGeom);
             }
