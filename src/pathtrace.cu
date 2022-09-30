@@ -102,26 +102,37 @@ void pathtraceInit(Scene* scene) {
 	const int pixelcount = cam.resolution.x * cam.resolution.y;
 
 	cudaMalloc(&dev_image, pixelcount * sizeof(glm::vec3));
+	checkCUDAError("cudaMalloc dev_image failed");
 	cudaMemset(dev_image, 0, pixelcount * sizeof(glm::vec3));
+	checkCUDAError("cudaMemsetd dev_image failed");
 
 	cudaMalloc(&dev_paths, pixelcount * sizeof(PathSegment));
+	checkCUDAError("cudaMalloc dev_paths failed");
 
 	for (int i = 0; i < scene->geoms.size(); i++) {
 		// cout << "numTris: " << scene->geoms[i].numTris;
 		if (scene->geoms[i].numTris) {
 			cudaMalloc(&(scene->geoms[i].device_tris), scene->geoms[i].numTris * sizeof(Triangle));
+			checkCUDAError("cudaMalloc device_tris failed");
 			cudaMemcpy(scene->geoms[i].device_tris, scene->geoms[i].tris, scene->geoms[i].numTris * sizeof(Triangle), cudaMemcpyHostToDevice);
+			checkCUDAError("cudaMemcpy device_tris failed");
 		}
 	}
 
 	cudaMalloc(&dev_geoms, scene->geoms.size() * sizeof(Geom));
+	checkCUDAError("cudaMalloc dev_geoms failed");
 	cudaMemcpy(dev_geoms, scene->geoms.data(), scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
+	checkCUDAError("cudaMemcpy gev_geoms failed");
 
 	cudaMalloc(&dev_materials, scene->materials.size() * sizeof(Material));
+	checkCUDAError("cudaMalloc dev_materials failed");
 	cudaMemcpy(dev_materials, scene->materials.data(), scene->materials.size() * sizeof(Material), cudaMemcpyHostToDevice);
+	checkCUDAError("cudaMemcpy dev_materials failed");
 
 	cudaMalloc(&dev_intersections, pixelcount * sizeof(ShadeableIntersection));
+	checkCUDAError("cudaMalloc dev_intersections failed");
 	cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
+	checkCUDAError("cudaMemcpy dev_intersectionsf ailed");
 
 #if CACHE_FIRST_BOUNCE
 	cudaMalloc(&dev_cached_intersections, pixelcount * sizeof(ShadeableIntersection));
@@ -221,7 +232,7 @@ __global__ void computeIntersections(
 			}
 			else if (geom.type == BOUND_BOX) {
 				// only true if bound box is on
-				float boxT = boundBoxIntersectionTest(&geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				float boxT = boundBoxIntersectionTest(&geom, pathSegment.ray, tmp_intersect, outside);
 				if (boxT != -1) {
 					for (int j = 0; j < geom.numTris; j++) {
 						t = triangleIntersectionTest(&geom, &geom.device_tris[j], pathSegment.ray, tmp_intersect, tmp_normal, outside);
