@@ -112,6 +112,7 @@ set(sources
     src/ImGui/imgui_widgets.cpp
     src/tiny_obj_loader.cpp
     src/common.cpp
+    src/tiny_gltf.cpp
     )
 
 list(SORT headers)
