@@ -16,11 +16,19 @@
 #include "interactions.h"
 
 #define ERRORCHECK 1
+
 #define SORT_BY_MATERIAL 0
 #define CACHE_FIRST_INTERSECTION 0
+
 #define ANTIALIASING 0
-#define MOTION_BLUR 1
+
+#define MOTION_BLUR 0
 #define MOTION_VELOCITY glm::vec3(0.0f, 1.75f, 0.0f)
+
+#define DEPTH_OF_FIELD 1
+#define LENS_RADIUS 3.f
+#define FOCAL_DISTANCE 8.5f
+#define PI 3.141592654f
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -75,6 +83,61 @@ struct sortByMaterial
 		return intersection1.materialId > intersection2.materialId;
 	}
 };
+
+// https://sci-hub.se/10.1080/10867651.1997.10487479
+__host__ __device__
+glm::vec3 squareToDiskConcentric(const glm::vec2& sample)
+{
+	float a = 2.f * sample.x - 1.f;
+	float b = 2.f * sample.y - 1.f;
+	float r;
+	float theta;
+	float pi = PI / 4.f;
+	if (a > -b) {
+		if (a > b) {
+			r = a;
+			theta = pi * (b / a);
+		}
+		else {
+			r = b;
+			theta = pi * (2.f - (a / b));
+		}
+	}
+	else
+	{
+		if (a < b) {
+			r = -a;
+			theta = pi * (4.f + (b / a));
+		}
+		else {
+			r = -b;
+			if (b != 0) {
+				theta = pi * (6.f - (a / b));
+			}
+			else {
+				theta = 0.f;
+			}
+		}
+	}
+	float x = r * cos(theta);
+	float y = r * sin(theta);
+	return glm::vec3(x, y, 0.f);
+}
+
+__host__ __device__
+float heartFunction(const glm::vec2& sample) {
+	float tmp = (sample.x * sample.x + sample.y * sample.y - 1.0f);
+	return (tmp * tmp * tmp + sample.x * sample.x * sample.y * sample.y * sample.y);
+}
+__host__ __device__
+glm::vec3 squareToHeart(const glm::vec2& sample)
+{
+	float isHeart = heartFunction(sample);
+	if (isHeart < 0.0f) {
+		return glm::vec3(sample.x, sample.y, 0.f);
+	}
+	return glm::vec3(0.f, 0.f, 0.f);
+}
 
 
 //Kernel that writes the image to the OpenGL PBO directly.
@@ -175,13 +238,26 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		int index = x + (y * cam.resolution.x);
 		PathSegment& segment = pathSegments[index];
 
+		// calculate ray origin
+#if DEPTH_OF_FIELD
+		// random a sample point on the disk as a point on lens
+		// added it to the camera origin
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
+		//thrust::uniform_real_distribution<float> u01(0, 1);
+		//glm::vec3 pointOnLens = squareToDiskConcentric(glm::vec2(u01(rng), u01(rng))) * LENS_RADIUS;
+		thrust::uniform_real_distribution<float> u01(-1.4, 1.4);
+		glm::vec3 pointOnLens = squareToHeart(glm::vec2(u01(rng), u01(rng))) * LENS_RADIUS;
+		glm::vec3 origin =  cam.position + glm::mat3(cam.right, cam.up, cam.view) * pointOnLens;
+		segment.ray.origin = origin;
+#else
 		segment.ray.origin = cam.position;
-		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
+#endif
 
 		// TODO: implement antialiasing by jittering the ray
 		// if antialiasing, pointing the ray to different position around the original reference point 
 		// to blur the result
 
+		// calculate ray direction
 #if ANTIALIASING
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
 		thrust::uniform_real_distribution<float> u01(-0.5, 0.5);
@@ -192,13 +268,31 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f + xOffset)
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f + yOffset)
 		);
+#elif DEPTH_OF_FIELD
+		// calculate new ref point
+		float ndc_x = 1.f - ((float)x / cam.resolution.x) * 2.f;
+		float ndc_y = 1.f - ((float)y / cam.resolution.y) * 2.f;
+
+		glm::vec3 ref = cam.position + FOCAL_DISTANCE * cam.view;
+
+		float angle = glm::radians(cam.fov.y);
+		float tan_fovy = tan(angle);
+		float len = glm::length(ref - cam.position);
+
+		float aspect = (float)cam.resolution.x / (float)cam.resolution.y;
+		glm::vec3 V = cam.up * len * tan_fovy;
+		glm::vec3 H = cam.right * len * aspect * tan_fovy;
+
+		glm::vec3 P = ref + ndc_x * H + ndc_y * V;
+		glm::vec3 direction = glm::normalize(P - segment.ray.origin);
+		segment.ray.direction = direction;
 #else
 		segment.ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
 		);
 #endif
-
+		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
 	}
