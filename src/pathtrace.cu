@@ -19,11 +19,11 @@
 #define CACHE_FIRST_BOUNCE 0
 #define ANTI_ALIASING 0
 
-#define DOF 0
-#define LENS_RADIUS 0.2
-#define FOCAL_DISTANCE 8.0
+#define DOF 1
+#define LENS_RADIUS 0.4
+#define FOCAL_DISTANCE 9.0
 
-#define MOTION_BLUR 1
+#define MOTION_BLUR 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -207,12 +207,32 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
 		);
 #if DOF
-		glm::vec3 lens = concentricSampleDisk(glm::vec2(u01(rng), u01(rng))) * (float)LENS_RADIUS;
+		/*glm::vec3 lens = concentricSampleDisk(glm::vec2(u01(rng), u01(rng))) * (float)LENS_RADIUS;
 		glm::vec3 point = segment.ray.origin + lens;
 		glm::vec3 pFocus = segment.ray.origin + (float)FOCAL_DISTANCE * segment.ray.direction;
 
 		segment.ray.origin = point;
-		segment.ray.direction = glm::normalize(pFocus - point);
+		segment.ray.direction = glm::normalize(pFocus - point);*/
+
+		//Sample point on lens
+		glm::vec3 point = concentricSampleDisk(glm::vec2(u01(rng), u01(rng))) * (float)LENS_RADIUS;
+
+		glm::vec3 ref = cam.position + (cam.view * (float)FOCAL_DISTANCE);
+
+		float aspect = ((float)cam.resolution.x / (float)cam.resolution.y);
+		float angle = glm::radians(cam.fov.y);
+		glm::vec3 V = cam.up * (float)FOCAL_DISTANCE * tan(angle);
+		glm::vec3 H = cam.right * (float)FOCAL_DISTANCE * aspect * tan(angle);
+
+		float ndc_x = 1.f - ((float)x / cam.resolution.x) * 2.f;
+		float ndc_y = 1.f - ((float)y / cam.resolution.y) * 2.f;
+
+		//Compute point on plane of focus
+		glm::vec3 pFocus = ref + ndc_x * H + ndc_y * V;
+
+		//Update ray for effect of lens
+		segment.ray.origin = cam.position + (cam.up * point.y) + (cam.right * point.x);
+		segment.ray.direction = glm::normalize(pFocus - segment.ray.origin);
 #endif
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
