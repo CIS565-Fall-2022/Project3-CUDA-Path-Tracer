@@ -15,6 +15,11 @@ enum GeomType {
     BOUND_BOX
 };
 
+struct BoundBox {
+    glm::vec3 minCorner;
+    glm::vec3 maxCorner;
+};
+
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
@@ -23,7 +28,6 @@ struct Ray {
 struct Vertex {
     glm::vec4 pos;
     glm::vec4 nor;
-    //glm::vec4 col; // might be UV later, should be useless for now
 };
 
 struct Triangle {
@@ -43,6 +47,7 @@ struct Geom {
     glm::mat4 invTranspose;
     Triangle* tris;
     Triangle* device_tris;
+    BoundBox bound;
     int numTris;
 };
 

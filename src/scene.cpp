@@ -82,7 +82,6 @@ int Scene::loadObj(const char* filename, glm::mat4 transform,
         // Loop over faces(polygon)
         size_t index_offset = 0;
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-            // std::cout << "face: " << f << std::endl;
             size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
             // Loop over vertices in the face.
             for (size_t v = 1; v < fv - 1; v++) {
@@ -105,8 +104,7 @@ int Scene::loadObj(const char* filename, glm::mat4 transform,
                 tinyobj::real_t vyc = attrib.vertices[3 * size_t(idxc.vertex_index) + 1];
                 tinyobj::real_t vzc = attrib.vertices[3 * size_t(idxc.vertex_index) + 2];
 
-                // Check if `normal_index` is zero or positive. negative = no normal data
-                    // if (idxa.normal_index >= 0) {
+
                 tinyobj::real_t nxa = attrib.normals[3 * size_t(idxa.normal_index) + 0];
                 tinyobj::real_t nya = attrib.normals[3 * size_t(idxa.normal_index) + 1];
                 tinyobj::real_t nza = attrib.normals[3 * size_t(idxa.normal_index) + 2];
@@ -118,9 +116,6 @@ int Scene::loadObj(const char* filename, glm::mat4 transform,
                 tinyobj::real_t nxc = attrib.normals[3 * size_t(idxc.normal_index) + 0];
                 tinyobj::real_t nyc = attrib.normals[3 * size_t(idxc.normal_index) + 1];
                 tinyobj::real_t nzc = attrib.normals[3 * size_t(idxc.normal_index) + 2];
-                //}
-
-
 
                 // Check if `texcoord_index` is zero or positive. negative = no texcoord data
                 // don't texture yet
@@ -134,6 +129,7 @@ int Scene::loadObj(const char* filename, glm::mat4 transform,
                 // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
                 // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
 
+                // construct triangle object
                 Vertex vertA = {
                     glm::vec4(vxa, vya, vza, 1),
                     glm::vec4(nxa, nya, nza, 0)
@@ -242,42 +238,32 @@ int Scene::loadGeom(string objectid) {
             std::vector<Triangle> triangleArray;
             loadObj(objFileName.c_str(), newGeom.transform, newGeom.translation, newGeom.rotation, newGeom.scale, newGeom.materialid, &triangleArray);
 #if USE_BOUND_BOX
-            //newGeom.tris = new Triangle[triangleArray.size()];
-            //float xMin = std::numeric_limits<float>::infinity();
-            //float yMin = std::numeric_limits<float>::infinity();
-            //float zMin = std::numeric_limits<float>::infinity();
-            //float xMax = -1.f * std::numeric_limits<float>::infinity();
-            //float yMax = -1.f * std::numeric_limits<float>::infinity();
-            //float zMax = -1.f * std::numeric_limits<float>::infinity();
+            float xMin = FLT_MAX;
+            float yMin = FLT_MAX;
+            float zMin = FLT_MAX;
+            float xMax = FLT_MIN;
+            float yMax = FLT_MIN;
+            float zMax = FLT_MIN;
 
-            //for (int i = 0; i < triangleArray.size(); i++) {
+            for (int i = 0; i < triangleArray.size(); i++) {
                 // jank code to find the min and max of the box
-                //Triangle tri = triangleArray[i];
-                //xMin = std::min(std::min(tri.pointA.pos[0], tri.pointB.pos[0]), std::min(tri.pointC.pos[0], xMin));
-                //xMax = std::max(std::max(tri.pointA.pos[0], tri.pointB.pos[0]), std::max(tri.pointC.pos[0], xMax));
+                Triangle tri = triangleArray[i];
+                xMin = std::min(std::min(tri.pointA.pos[0], tri.pointB.pos[0]), std::min(tri.pointC.pos[0], xMin));
+                xMax = std::max(std::max(tri.pointA.pos[0], tri.pointB.pos[0]), std::max(tri.pointC.pos[0], xMax));
 
-                //yMin = std::min(std::min(tri.pointA.pos[1], tri.pointB.pos[1]), std::min(tri.pointC.pos[1], yMin));
-                //yMax = std::max(std::max(tri.pointA.pos[1], tri.pointB.pos[1]), std::max(tri.pointC.pos[1], yMax));
+                yMin = std::min(std::min(tri.pointA.pos[1], tri.pointB.pos[1]), std::min(tri.pointC.pos[1], yMin));
+                yMax = std::max(std::max(tri.pointA.pos[1], tri.pointB.pos[1]), std::max(tri.pointC.pos[1], yMax));
 
-                //zMin = std::min(std::min(tri.pointA.pos[2], tri.pointB.pos[2]), std::min(tri.pointC.pos[2], zMin));
-                //zMax = std::max(std::max(tri.pointA.pos[2], tri.pointB.pos[2]), std::min(tri.pointC.pos[2], zMax));
-                //newGeom.tris[i] = Triangle(triangleArray[i]);
-            //}
+                zMin = std::min(std::min(tri.pointA.pos[2], tri.pointB.pos[2]), std::min(tri.pointC.pos[2], zMin));
+                zMax = std::max(std::max(tri.pointA.pos[2], tri.pointB.pos[2]), std::min(tri.pointC.pos[2], zMax));
+            }
 
-            // according to stack overflow, this is the way. The spec now guarantees vectors store their elements contiguously.
+            BoundBox box = {
+                glm::vec3(xMin, yMin, zMin),
+                glm::vec3(xMax, yMax, zMax)
+            };
 
-
-            //newGeom.numTris = triangleArray.size();
-            //BoundBox box = {
-            //    glm::vec3(xMin, yMin, zMin),
-            //    glm::vec3(xMax, yMax, zMax)
-            //};
-
-            //newGeom.boundBox = box;
-
-            //cout << "xMin: " << xMin << " xMax: " << xMax << endl;
-
-            //geoms.push_back(newGeom);
+            newGeom.bound = box;
 
 
             newGeom.tris = new Triangle[triangleArray.size()];//triangleArray.size()];
@@ -286,14 +272,7 @@ int Scene::loadGeom(string objectid) {
 
             for (int i = 0; i < triangleArray.size(); i++) {
                 newGeom.tris[i] = triangleArray[i];
-                //printf("tri x: %f, y: %f, z: %f \n", newGeom.tris[i].pointA.pos[0], newGeom.tris[i].pointA.pos[1], newGeom.tris[i].pointA.pos[2]);
             }
-
-            //for (int i = 0; i < triangleArray.size(); i++) {
-            //    // there should only be 1 triangle
-            //    cout << "tri X: " << newGeom.tris[i].pointA.pos[0] << " Y: " << newGeom.tris[i].pointA.pos[1] << " Z: " << newGeom.tris[i].pointB.pos[2] << endl;
-            //}
-            //// just a single triangle
 
             geoms.push_back(newGeom);
 
@@ -303,10 +282,6 @@ int Scene::loadGeom(string objectid) {
             for (int i = 0; i < triangleArray.size(); i ++) {
                 // there should only be 1 triangle
                 Triangle* trisInGeom = new Triangle(triangleArray[i]);
-
-                if (i % 2 != 0) continue;
-
-                printf("i %i \n", i);
 
                 // just a single triangle
                 Geom newTriGeom = {
@@ -320,6 +295,8 @@ int Scene::loadGeom(string objectid) {
                     newGeom.invTranspose,
                     trisInGeom,
                     NULL, // device pointer is not yet allocated
+                    BoundBox {
+                        },
                     1,
                 };
 

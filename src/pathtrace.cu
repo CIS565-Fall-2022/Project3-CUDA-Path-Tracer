@@ -219,17 +219,11 @@ __global__ void computeIntersections(
 			{
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
-//#if USE_BOUND_BOX
 			else if (geom.type == BOUND_BOX) {
 				// only true if bound box is on
-				float boxT = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				float boxT = boundBoxIntersectionTest(&geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 				if (boxT != -1) {
-					// printf("intersect bound box \n");
-					// printf("num tris: %i \n", geom.numTris);
-				//float triangleMinT = FLT_MAX;
 					for (int j = 0; j < geom.numTris; j++) {
-						// if not using bound box, should only be one triangle.
-						// printf("J: %i, tri x: %f, y: %f, z: %f \n", j, geom.device_tris[j].pointA.pos[0], geom.device_tris[j].pointA.pos[1], geom.device_tris[j].pointA.pos[2]);
 						t = triangleIntersectionTest(&geom, &geom.device_tris[j], pathSegment.ray, tmp_intersect, tmp_normal, outside);
 					
 						if (t > 0.0f && t_min > t)
@@ -242,18 +236,13 @@ __global__ void computeIntersections(
 					}
 				}
 			}
-//#else
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 			else if (geom.type == TRIANGLE) {
-				// printf("found tri \n");
-				// only true if bound box is off
 				for (int j = 0; j < geom.numTris; j++) {
 					// if not using bound box, should only be one triangle.
-					//printf("GEOMIDX: %i, tri x: %f, y: %f, z: %f \n", i, geom.device_tris[j].pointA.pos[0], geom.device_tris[j].pointA.pos[1], geom.device_tris[j].pointA.pos[2]);
 					t = triangleIntersectionTest(&geom, &geom.device_tris[j], pathSegment.ray, tmp_intersect, tmp_normal, outside);
 				}
 			}
-//#endif
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
 			if (t > 0.0f && t_min > t)
