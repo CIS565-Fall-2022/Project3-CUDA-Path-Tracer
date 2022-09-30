@@ -3,9 +3,6 @@
 #include <cmath>
 #include <thrust/execution_policy.h>
 #include <thrust/random.h>
-//#include <thrust/remove.h>
-//#include <thrust/sort.h>
-//#include <thrust/device_vector.h>
 #include <thrust/partition.h>
 
 #include "sceneStructs.h"
@@ -78,8 +75,6 @@ static glm::vec3* dev_image = NULL;
 static Geom* dev_geoms = NULL;
 static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
-
-
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
@@ -102,6 +97,14 @@ void pathtraceInit(Scene* scene) {
 
 	cudaMalloc(&dev_paths, pixelcount * sizeof(PathSegment));
 
+	for (auto& geom : scene->geoms) {
+		if (geom.type == OBJ)
+		{
+			cudaMalloc(&geom.dev_triangles, geom.triCount * sizeof(Triangle));
+			cudaMemcpy(geom.dev_triangles, geom.triangles, geom.triCount * sizeof(Triangle), cudaMemcpyHostToDevice);
+		}
+	}
+	
 	cudaMalloc(&dev_geoms, scene->geoms.size() * sizeof(Geom));
 	cudaMemcpy(dev_geoms, scene->geoms.data(), scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
 
@@ -118,14 +121,23 @@ void pathtraceInit(Scene* scene) {
 	checkCUDAError("pathtraceInit");
 }
 
-void pathtraceFree() {
+void pathtraceFree(Scene* scene) {
 	cudaFree(dev_image);  // no-op if dev_image is null
 	cudaFree(dev_paths);
+
+	/*for (auto& geom : scene->geoms) {
+		for (int i = 0; i < geom.triCount; i++) {
+			delete(geom.triangles);
+			cudaFree(geom.dev_triangles);
+		}
+	}*/
+
 	cudaFree(dev_geoms);
 	cudaFree(dev_materials);
 	cudaFree(dev_intersections);
 	// TODO: clean up any extra device memory you created
 	cudaFree(dev_cache_intersections);
+
 	checkCUDAError("pathtraceFree");
 }
 
@@ -207,9 +219,9 @@ __global__ void computeIntersections(
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
-			else if (geom.type == TRIANGLE)
+			else if (geom.type == OBJ)
 			{
-				t = triangleIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				t = objIntersectionTest(geom, geom.dev_triangles, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
 
 			// Compute the minimum t from the intersection tests to determine what
@@ -325,14 +337,9 @@ __global__ void shadeWithMaterial(
 			// TODO: replace this! you should be able to start with basically a one-liner
 			else {
 				// 2. Ideal diffused shading and bounce
+				// 3. Perfect specular reflection
 				glm::vec3 pointOfIntersection = getPointOnRay(pathSegments[idx].ray, intersection.t);
 				scatterRay(pathSegments[idx], pointOfIntersection, intersection.surfaceNormal, material, rng);
-				//pathSegments[idx].color /= iter;
-
-				//float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));
-				//pathSegments[idx].color *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f;
-				//pathSegments[idx].color *= u01(rng); // apply some noise because why not
-				// 3. Perfect specular reflection
 			}
 			// If there was no intersection, color the ray black.
 			// Lots of renderers use 4 channel color, RGBA, where A = alpha, often

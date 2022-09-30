@@ -72,7 +72,7 @@ int Scene::loadTransformations(Geom* newGeom) {
     return 0;
 }
 
-int Scene::loadObjFile(string objectPath)
+int Scene::loadObjFile(string objectPath, Geom *newGeom)
 {
     tinyobj::ObjReaderConfig reader_config;
     reader_config.mtl_search_path = "./"; // Path to material files
@@ -93,16 +93,15 @@ int Scene::loadObjFile(string objectPath)
     auto& attrib = reader.GetAttrib();
     auto& shapes = reader.GetShapes();
     auto& materials = reader.GetMaterials();
-
+    std::vector<Triangle> triangles;
     // Loop over shapes
     for (size_t s = 0; s < shapes.size(); s++) {
         // Loop over faces(polygon)
         size_t index_offset = 0;
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
             size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+            Triangle triangle;
 
-            Geom newGeomTriangle;
-            newGeomTriangle.type = TRIANGLE;
             int vertCnt = 0;
             // Loop over vertices in the face.
             for (size_t v = 0; v < fv; v++) {
@@ -112,7 +111,7 @@ int Scene::loadObjFile(string objectPath)
                 tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
                 tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
 
-                newGeomTriangle.triangle.vertices[vertCnt].pos = glm::vec3(vx, vy, vz);
+                triangle.pos[vertCnt] = glm::vec3(vx, vy, vz);
 
                 // Check if `normal_index` is zero or positive. negative = no normal data
                 if (idx.normal_index >= 0) {
@@ -120,7 +119,7 @@ int Scene::loadObjFile(string objectPath)
                     tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
                     tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
 
-                    newGeomTriangle.triangle.vertices[vertCnt].nor = glm::vec3(nx, ny, nz);
+                    triangle.nor[vertCnt] = glm::vec3(nx, ny, nz);
                 }
 
                 // Check if `texcoord_index` is zero or positive. negative = no texcoord data
@@ -128,7 +127,7 @@ int Scene::loadObjFile(string objectPath)
                     tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
                     tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
 
-                    newGeomTriangle.triangle.vertices[vertCnt].uv = glm::vec2(tx, ty);
+                    triangle.uv[vertCnt] = glm::vec2(tx, ty);
                 }
 
                 // Optional: vertex colors
@@ -140,16 +139,16 @@ int Scene::loadObjFile(string objectPath)
                 if (vertCnt == 3) { break; }
             }
 
-            //newGeomTriangle->triangles.push_back(triangle);
-            linkMaterial(&newGeomTriangle);
-            loadTransformations(&newGeomTriangle);
-            geoms.push_back(newGeomTriangle);
-
+            triangles.push_back(triangle);
             index_offset += fv;
-
-            // per-face material
-            //shapes[s].mesh.material_ids[f];
         }
+    }
+    newGeom->triCount = triangles.size();
+    newGeom->triangles = new Triangle[triangles.size()];
+    Triangle* t = newGeom->triangles;
+    for (int i = 0; i < triangles.size(); i++) {
+        *t = triangles[i];
+        t++;
     }
 }
 
@@ -169,16 +168,22 @@ int Scene::loadGeom(string objectid) {
         if (!line.empty() && fp_in.good()) {
             if (strcmp(line.c_str(), "obj") == 0) {
                 cout << "Loading new obj..." << endl;
-                //newGeom.type = OBJ;
+                newGeom.type = OBJ;
                 utilityCore::safeGetline(fp_in, line);
                 if (!line.empty() && fp_in.good()) {
-                    return loadObjFile(line.c_str());
+                    int retVal =  loadObjFile(line.c_str(), &newGeom);
                 }
             } else if (strcmp(line.c_str(), "sphere") == 0) {
                 cout << "Creating new sphere..." << endl;
                 newGeom.type = SPHERE;
+                newGeom.triCount = 0;
+                newGeom.triangles = NULL;
+                newGeom.dev_triangles = NULL;
             } else if (strcmp(line.c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
+                newGeom.triCount = 0;
+                newGeom.triangles = NULL;
+                newGeom.dev_triangles = NULL;
                 newGeom.type = CUBE;
             }
         }
@@ -186,7 +191,6 @@ int Scene::loadGeom(string objectid) {
         //link material
         linkMaterial(&newGeom);
         cout << "Connecting Geom " << objectid << " to Material " << newGeom.materialid << "..." << endl;
-
         //load transformations
         loadTransformations(&newGeom);
         
