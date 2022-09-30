@@ -6,6 +6,8 @@
 #include <map>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <tiny_obj_loader.h>
+#include <tiny_gltf.h>
 
 std::map<std::string, int> MaterialTypeTokenMap = {
     { "Lambertian", Material::Type::Lambertian },
@@ -72,7 +74,11 @@ MeshData* Resource::loadOBJMesh(const std::string& filename) {
 }
 
 MeshData* Resource::loadGLTFMesh(const std::string& filename) {
-    return nullptr;
+    auto find = meshDataPool.find(filename);
+    if (find != meshDataPool.end()) {
+        return find->second;
+    }
+    auto model = new MeshData;
 }
 
 MeshData* Resource::loadModelMeshData(const std::string& filename) {

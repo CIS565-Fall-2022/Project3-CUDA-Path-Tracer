@@ -5,7 +5,6 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
-#include <tiny_obj_loader.h>
 #include "glm/glm.hpp"
 #include "utilities.h"
 #include "cudaUtil.h"
