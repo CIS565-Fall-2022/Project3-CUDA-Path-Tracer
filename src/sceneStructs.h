@@ -56,6 +56,7 @@ struct Camera {
     glm::vec2 pixelLength;
     float lensRad;
     float focalDist;
+    bool antialias;
 };
 
 struct RenderState {

@@ -1,14 +1,14 @@
 // Emissive material (light)
-MATERIAL 0
+MATERIAL	0
 MAT_TYPE    N/A
 RGB         1 1 1
 SPECEX      0
 SPECRGB     0 0 0
 REFRIOR     0
-EMITTANCE   6
+EMITTANCE   10
 
 // Diffuse white
-MATERIAL 1
+MATERIAL	1
 MAT_TYPE    DIFFUSE
 RGB         .98 .98 .98
 SPECEX      0
@@ -17,7 +17,7 @@ REFRIOR     0
 EMITTANCE   0
 
 // Diffuse red
-MATERIAL 2
+MATERIAL	2
 MAT_TYPE    DIFFUSE
 RGB         .85 .35 .35
 SPECEX      0
@@ -26,7 +26,7 @@ REFRIOR     0
 EMITTANCE   0
 
 // Diffuse green
-MATERIAL 3
+MATERIAL	3
 MAT_TYPE    DIFFUSE
 RGB         .35 .85 .35
 SPECEX      0
@@ -34,31 +34,13 @@ SPECRGB     0 0 0
 REFRIOR     0
 EMITTANCE   0
 
-// Specular white
-MATERIAL 4
-MAT_TYPE    DIFFUSE
-RGB         .98 .98 .98
-SPECEX      0
-SPECRGB     .98 .98 .98
-REFRIOR     0
-EMITTANCE   0
-
-// Diffuse dark
-MATERIAL 5
-MAT_TYPE    DIFFUSE
-RGB         .5 .5 .5
-SPECEX      0
-SPECRGB     .98 .98 .98
-REFRIOR     0 
-EMITTANCE   0
-
 // Sphere mat
-MATERIAL 6
-MAT_TYPE    DIELECTRIC
+MATERIAL	4
+MAT_TYPE    SPECULAR
 RGB         .98 .98 .98
-SPECEX      80
+SPECEX      30
 SPECRGB     .98 .98 .98
-REFRIOR     2.42  // only used for dielectric
+REFRIOR     1.52  // only used for dielectric
 EMITTANCE   0
 
 
@@ -68,8 +50,9 @@ EMITTANCE   0
 // Camera
 CAMERA
 RES         800 800
-LENS_RAD	1
+LENS_RAD	-1
 FOCAL_DIST	12.5
+ANTIALIAS	0
 FOVY        45
 ITERATIONS  5000
 DEPTH       8
@@ -78,9 +61,8 @@ EYE         0.0 5 10.5
 LOOKAT      0 5 0
 UP          0 1 0
 
-
 // Ceiling light
-OBJECT 0
+OBJECT
 cube
 material 0
 TRANS       0 12 1.5
@@ -88,7 +70,7 @@ ROTAT       0 0 0
 SCALE       7 .3 3
 
 // Floor
-OBJECT 1
+OBJECT
 cube
 material 1
 TRANS       0 0 0
@@ -96,7 +78,7 @@ ROTAT       0 0 0
 SCALE       20 .01 30
 
 // Ceiling
-OBJECT 2
+OBJECT
 cube
 material 1
 TRANS       0 12 0
@@ -104,7 +86,7 @@ ROTAT       0 0 90
 SCALE       .01 20 30
 
 // Left wall
-OBJECT 3
+OBJECT
 cube
 material 2
 TRANS       -10 5 0
@@ -112,7 +94,7 @@ ROTAT       0 0 0
 SCALE       .01 20 30
 
 // Right wall
-OBJECT 4
+OBJECT
 cube
 material 3
 TRANS       10 5 0
@@ -120,49 +102,49 @@ ROTAT       0 0 0
 SCALE       .01 20 30
 
 // Back walls
-OBJECT 5
+OBJECT
 cube
 material 1
 TRANS       0 6 -8
 ROTAT       0 90 0
 SCALE       .01 4 4
 
-OBJECT 6
+OBJECT
 cube
 material 1
 TRANS       -4 2 -8
 ROTAT       0 90 0
 SCALE       .01 4 4
 
-OBJECT 7
+OBJECT
 cube
 material 1
 TRANS       -4 10 -8
 ROTAT       0 90 0
 SCALE       .01 4 4
 
-OBJECT 8
+OBJECT
 cube
 material 1
 TRANS       -8 6 -8
 ROTAT       0 90 0
 SCALE       .01 4 4
 
-OBJECT 9
+OBJECT
 cube
 material 1
 TRANS       4 2 -8
 ROTAT       0 90 0
 SCALE       .01 4 4
 
-OBJECT 10
+OBJECT
 cube
 material 1
 TRANS       4 10 -8
 ROTAT       0 90 0
 SCALE       .01 4 4
 
-OBJECT 11
+OBJECT
 cube
 material 1
 TRANS       8 6 -8
@@ -171,47 +153,31 @@ SCALE       .01 4 4
 
 
 
-
-// refractive sphere
-OBJECT 12
+// objects
+OBJECT
 sphere
-material 6
-TRANS       -4 2.5 2
+material 	4
+TRANS       4 2.5 3.5
 ROTAT       0 0 0
 SCALE       4 4 4
 
-OBJECT 13
-sphere
-material 6
-TRANS       -2 6.5 -2
-ROTAT       0 0 0
-SCALE       3 3 3
-
-OBJECT 14
+OBJECT
 cube
-material 6
-TRANS       8 1 -5
-ROTAT       0 0 0
-SCALE       4 2 8
+material 	4
+TRANS       -2 6.5 5
+ROTAT       60 40 30
+SCALE       5 5 5
 
-OBJECT 15
+OBJECT
 sphere
-material 6
+material 	4
 TRANS       3 3 -3
 ROTAT       0 0 0
 SCALE       1 1 1
 
-OBJECT 16
+OBJECT
 cube
-material 6
+material	4
 TRANS       -8 5 2
 ROTAT       0 0 0
 SCALE       2.5 1 2
-
-// Side light
-OBJECT 17
-cube
-material 0
-TRANS       10 4 -4
-ROTAT       0 0 0
-SCALE       .3 3 3
