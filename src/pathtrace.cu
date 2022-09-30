@@ -70,6 +70,9 @@ static thrust::device_ptr<PathSegment> devTerminatedPathsThr;
 static thrust::device_ptr<Intersection> devIntersectionsThr;
 static thrust::device_ptr<int> devIntersecMatKeysThr;
 static thrust::device_ptr<int> devSegmentMatKeysThr;
+
+static glm::vec3* devGBufferPos = nullptr;
+static glm::vec3* devGBufferNorm = nullptr;
  
 void InitDataContainer(GuiDataContainer* imGuiData) {
 	guiData = imGuiData;
@@ -153,6 +156,35 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.radiance = glm::vec3(0.f);
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
+	}
+}
+
+__global__ void previewGBuffer(
+	int iter, 
+	DevScene* scene, Camera cam, 
+	glm::vec3* image, int width, int height,
+	int kind
+) {
+	int x = blockDim.x * blockIdx.x + threadIdx.x;
+	int y = blockDim.y * blockIdx.y + threadIdx.y;
+	if (x >= width || y >= height) {
+		return;
+	}
+	int index = y * width + x;
+	thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+
+	Ray ray = sampleCamera(cam, x, y, sample4D(rng));
+	Intersection intersec;
+	scene->intersect(ray, intersec);
+
+	if (kind == 0) {
+		image[index] += intersec.pos;
+	}
+	else if (kind == 1) {
+		image[index] += (intersec.norm + 1.f) * .5f;
+	}
+	else if (kind == 2) {
+		image[index] += glm::vec3(intersec.uv, 1.f);
 	}
 }
 
@@ -244,10 +276,7 @@ __global__ void pathIntegSampleSurface(
 	PathSegment& segment = segments[idx];
 	thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 4 + depth * SamplesConsumedOneIter);
 
-	Material material = scene->devMaterials[intersec.matId];
-	if (material.baseColorMapId > NullTextureId) {
-		material.baseColor = scene->devTextureObjs->linearSample(intersec.uv);
-	}
+	Material material = scene->getMaterialWithTexture(intersec);
 
 	glm::vec3 accRadiance(0.f);
 
@@ -339,7 +368,6 @@ __global__ void singleKernelPT(
 	thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
 
 	Ray ray = sampleCamera(cam, x, y, sample4D(rng));
-
 	Intersection intersec;
 	scene->intersect(ray, intersec);
 
@@ -347,14 +375,11 @@ __global__ void singleKernelPT(
 		goto WriteRadiance;
 	}
 
-	Material material = scene->devMaterials[intersec.matId];
+	Material material = scene->getMaterialWithTexture(intersec);
+
 	if (material.type == Material::Type::Light) {
 		accRadiance = material.baseColor * material.emittance;
 		goto WriteRadiance;
-	}
-
-	if (material.baseColorMapId > NullTextureId) {
-		material.baseColor = scene->devTextureObjs->linearSample(intersec.uv);
 	}
 
 	glm::vec3 throughput(1.f);
@@ -400,7 +425,7 @@ __global__ void singleKernelPT(
 		if (intersec.primId == NullPrimitive) {
 			break;
 		}
-		material = scene->devMaterials[intersec.matId];
+		material = scene->getMaterialWithTexture(intersec);
 
 		if (material.type == Material::Type::Light) {
 #if SCENE_LIGHT_SINGLE_SIDED
@@ -547,9 +572,14 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 			singleKernelPT<<<singlePTBlockNum, singlePTBlockSize>>>(
 				iter, Settings::traceDepth, hstScene->devScene, cam, devImage, cam.resolution.x, cam.resolution.y);
 		}
-		else {
+		else if (Settings::tracer == Tracer::BVHVisualize) {
 			BVHVisualize<<<singlePTBlockNum, singlePTBlockSize>>>(
 				iter, hstScene->devScene, cam, devImage, cam.resolution.x, cam.resolution.y);
+		}
+		else {
+			previewGBuffer<<<singlePTBlockNum, singlePTBlockSize>>>(
+				iter, hstScene->devScene, cam, devImage, cam.resolution.x, cam.resolution.y,
+				Settings::GBufferPreviewOpt);
 		}
 
 		if (guiData != nullptr) {

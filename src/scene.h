@@ -64,6 +64,14 @@ struct DevScene {
     void create(const Scene& scene);
     void destroy();
 
+    __device__ Material getMaterialWithTexture(const Intersection& intersec) {
+        Material mat = devMaterials[intersec.matId];
+        if (mat.baseColorMapId > NullTextureId) {
+            mat.baseColor = devTextureObjs[mat.baseColorMapId].linearSample(intersec.uv);
+        }
+        return mat;
+    }
+
     __device__ int getMTBVHId(glm::vec3 dir) {
         glm::vec3 absDir = glm::abs(dir);
         if (absDir.x > absDir.y) {

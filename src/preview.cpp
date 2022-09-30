@@ -211,7 +211,15 @@ void RenderImGui()
 	static float f = 0.0f;
 	static int counter = 0;
 
-	ImGui::Begin("Path Tracer Analytics"); {
+	
+
+	ImGui::Begin("Path Tracer Analytics", nullptr,
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoDecoration |
+		ImGuiWindowFlags_AlwaysAutoResize |
+		ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_NoFocusOnAppearing |
+		ImGuiWindowFlags_NoNav); {
 		ImGui::Text("Traced Depth %d", imguiData->TracedDepth);
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
@@ -219,13 +227,19 @@ void RenderImGui()
 	}
 
 	ImGui::Begin("Options"); {
-		const char* Tracers[] = { "Streamed", "Single Kernel", "BVH Visualize" };
+		const char* Tracers[] = { "Streamed", "Single Kernel", "BVH Visualize", "GBuffer Preview" };
 		if (ImGui::Combo("Tracer", &Settings::tracer, Tracers, IM_ARRAYSIZE(Tracers))) {
 			State::camChanged = true;
 		}
 
 		if (Settings::tracer == Tracer::Streamed) {
 			ImGui::Checkbox("Sort Material", &Settings::sortMaterial);
+		}
+		else if (Settings::tracer == Tracer::GBufferPreview) {
+			const char* Modes[] = { "Position", "Normal", "Texcoord" };
+			if (ImGui::Combo("Mode", &Settings::GBufferPreviewOpt, Modes, IM_ARRAYSIZE(Modes))) {
+				State::camChanged = true;
+			}
 		}
 
 		if (ImGui::InputInt("Max Depth", &Settings::traceDepth, 1, 1)) {
