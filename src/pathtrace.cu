@@ -106,6 +106,14 @@ void pathtraceInit(Scene* scene) {
 
 	cudaMalloc(&dev_paths, pixelcount * sizeof(PathSegment));
 
+	for (int i = 0; i < scene->geoms.size(); i++) {
+		// cout << "numTris: " << scene->geoms[i].numTris;
+		if (scene->geoms[i].numTris) {
+			cudaMalloc(&(scene->geoms[i].device_tris), scene->geoms[i].numTris * sizeof(Triangle));
+			cudaMemcpy(scene->geoms[i].device_tris, scene->geoms[i].tris, scene->geoms[i].numTris * sizeof(Triangle), cudaMemcpyHostToDevice);
+		}
+	}
+
 	cudaMalloc(&dev_geoms, scene->geoms.size() * sizeof(Geom));
 	cudaMemcpy(dev_geoms, scene->geoms.data(), scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
 
@@ -211,12 +219,30 @@ __global__ void computeIntersections(
 			{
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
+//#if USE_BOUND_BOX
+			else if (geom.type == BOUND_BOX) {
+				// only true if bound box is on
+				//float boxT = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				//if (boxT != -1) {
+					// printf("intersect bound box \n");
+					// printf("num tris: %i \n", geom.numTris);
+				for (int j = 0; j < geom.numTris; j++) {
+					// if not using bound box, should only be one triangle.
+					t = triangleIntersectionTest(&geom, geom.device_tris + j, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				}
+				//}
+			}
+//#else
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 			else if (geom.type == TRIANGLE) {
-				// test intersection with big box.
-				t = triangleIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				// printf("found tri \n");
+				// only true if bound box is off
+				for (int j = 0; j < geom.numTris; j++) {
+					// if not using bound box, should only be one triangle.
+					t = triangleIntersectionTest(&geom, geom.device_tris + j, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				}
 			}
-
+//#endif
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
 			if (t > 0.0f && t_min > t)

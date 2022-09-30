@@ -6,11 +6,13 @@
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
+#define USE_BOUND_BOX 1
 
 enum GeomType {
     SPHERE,
     CUBE,
-    TRIANGLE
+    TRIANGLE,
+    BOUND_BOX
 };
 
 struct Ray {
@@ -39,7 +41,9 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
-    Triangle tri;
+    Triangle* tris;
+    Triangle* device_tris;
+    int numTris;
 };
 
 struct Material {
@@ -84,7 +88,7 @@ struct PathSegment {
 // 1) color contribution computation
 // 2) BSDF evaluation: generate a new ray
 struct ShadeableIntersection {
-  float t;
-  glm::vec3 surfaceNormal;
-  int materialId;
+    float t;
+    glm::vec3 surfaceNormal;
+    int materialId;
 };

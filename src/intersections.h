@@ -143,17 +143,17 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     return glm::length(r.origin - intersectionPoint);
 }
 
-__host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
+__host__ __device__ float triangleIntersectionTest(Geom *geom, Triangle *triangle, Ray r,
     glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
 
     // todo insert bounding box intersection first for acceleration
     
     // transform triangle from world space to screen space
-    Triangle tri = triangle.tri;
+    // Triangle tri = triangle.tri;
   
-    glm::vec3 screenPA = glm::vec3(triangle.transform * tri.pointA.pos);
-    glm::vec3 screenPB = glm::vec3(triangle.transform * tri.pointB.pos);
-    glm::vec3 screenPC = glm::vec3(triangle.transform * tri.pointC.pos);
+    glm::vec3 screenPA = glm::vec3(geom->transform * triangle->pointA.pos);
+    glm::vec3 screenPB = glm::vec3(geom->transform * triangle->pointB.pos);
+    glm::vec3 screenPC = glm::vec3(geom->transform * triangle->pointC.pos);
 
     glm::vec3 baryPosition; // the same as intersection point
 
@@ -177,13 +177,15 @@ __host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
 
     intersectionPoint = baryPosition.r * screenPA + baryPosition.g * screenPB + baryPosition.b * screenPC;
     normal = glm::vec3(z * (
-            (tri.pointA.nor * sA) / (screenPA[2] * s) + 
-            (tri.pointB.nor * sB) / (screenPB[2] * s) + 
-            (tri.pointC.nor * sC) / (screenPC[2] * s)));
+            (triangle->pointA.nor * sA) / (screenPA[2] * s) + 
+            (triangle->pointB.nor * sB) / (screenPB[2] * s) + 
+            (triangle->pointC.nor * sC) / (screenPC[2] * s)));
 
     if (!outside) {
         normal *= -1.f;
     }
+
+    //printf("%f \n", baryPosition.z);
 
     return baryPosition.z; //glm::length(r.origin - intersectionPoint);
 
