@@ -159,6 +159,13 @@ struct Camera {
     glm::vec2 pixelLength;
 };
 
+// the result of 0 sanity
+struct JunksFromMain {
+    float zoom, theta, phi;
+    glm::vec3 cameraPosition;
+    glm::vec3 ogLookAt;
+};
+
 struct RenderState {
     Camera camera;
     unsigned int iterations;

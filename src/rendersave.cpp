@@ -4,6 +4,10 @@
 #include <glm/glm.hpp>
 
 #define SEP " "
+
+// I don't have time to refactor the camera code, so here we are ...
+extern JunksFromMain g_mainJunks;
+
 template<typename T, glm::precision P>
 std::ostream& operator<< (std::ostream& out, glm::tvec2<T,P> const& v) {
 	out << v.x << SEP << v.y;
@@ -48,6 +52,13 @@ bool save_state(int iter, RenderState const& state, Scene const& scene, char con
 	if (!fout) {
 		return false;
 	}
+
+	fout << g_mainJunks.phi << SEP;
+	fout << g_mainJunks.theta << SEP;
+	fout << g_mainJunks.zoom << SEP;
+	fout << g_mainJunks.cameraPosition << SEP;
+	fout << g_mainJunks.ogLookAt << SEP;
+
 	fout << iter << SEP;
 	fout << scene.filename << SEP;
 	fout << state.camera.fov << SEP;
@@ -72,9 +83,14 @@ bool read_state(char const* filename, int& iter, Scene*& scene) {
 		return false;
 	}
 
-	std::string scene_file;
+	fin >> g_mainJunks.phi;
+	fin >> g_mainJunks.theta;
+	fin >> g_mainJunks.zoom;
+	fin >> g_mainJunks.cameraPosition;
+	fin >> g_mainJunks.ogLookAt;
 
 	fin >> iter;
+	std::string scene_file;
 	fin >> scene_file;
 	scene = new Scene(scene_file, false);
 

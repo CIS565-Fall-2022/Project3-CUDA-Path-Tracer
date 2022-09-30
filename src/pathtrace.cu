@@ -19,8 +19,16 @@
 // impl switches
 #define COMPACTION
 #define SORT_MAT
-#define ANTI_ALIAS_JITTER
+// #define ANTI_ALIAS_JITTER
+// #define DEPTH_OF_FIELD
 // #define FAKE_SHADE
+
+#define CACHE_FIRST_BOUNCE
+#if (defined(CACHE_FIRST_BOUNCE) && defined(ANTI_ALIAS_JITTER)) || (defined(CACHE_FIRST_BOUNCE) && defined(DEPTH_OF_FIELD)) 
+#error "ANTI_ALIAS_JITTER or CACHE_FIRST_BOUNCE cannot be used with CACHE_FIRST_BOUNCE"
+#endif
+
+
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #ifndef NDEBUG
@@ -126,12 +134,12 @@ static Span<ShadeableIntersection> dev_intersections;
 
 // static variables for device memory, any extra info you need, etc
 // ...
+static Span<ShadeableIntersection> dev_cached_intersections;
 static Span<Light> dev_lights;
 static MeshInfo dev_mesh_info;
 
 static thrust::device_ptr<PathSegment> dev_thrust_paths;
-static thrust::device_ptr<ShadeableIntersection> dev_thrust_inters;
-std::vector<TextureGPU> dev_texs;
+static std::vector<TextureGPU> dev_texs;
 
 // pathtracer state
 static bool render_paused = false;
@@ -157,6 +165,10 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state) {
 	dev_geoms = make_span(scene->geoms);
 	dev_lights = make_span(scene->lights);
 
+#ifdef CACHE_FIRST_BOUNCE
+	dev_cached_intersections = make_span<ShadeableIntersection>(pixelcount);
+#endif // CACHE_FIRST_BOUNCE
+
 	dev_mesh_info.vertices = make_span(scene->vertices);
 	dev_mesh_info.normals = make_span(scene->normals);
 	dev_mesh_info.uvs = make_span(scene->uvs);
@@ -167,9 +179,7 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state) {
 		dev_texs.push_back(dev_tex);
 	}
 	dev_mesh_info.texs = make_span(dev_texs);
-
 	dev_thrust_paths = thrust::device_ptr<PathSegment>((PathSegment*)dev_paths);
-	dev_thrust_inters = thrust::device_ptr<ShadeableIntersection>((ShadeableIntersection*)dev_intersections);
     checkCUDAError("pathtraceInit");
 }
 
@@ -240,7 +250,8 @@ __global__ void computeIntersections(
 	Span<Geom> geoms,
 	ShadeableIntersection* intersections,
 	Material* materials,
-	MeshInfo meshInfo)
+	MeshInfo meshInfo,
+	ShadeableIntersection* cache_intersections)
 {
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
 	if (path_index >= paths.size()) {
@@ -283,6 +294,10 @@ __global__ void computeIntersections(
 			inters = tmp;
 			inters.t = t;
 		}
+	}
+
+	if (cache_intersections) {
+		cache_intersections[path_index] = inters;
 	}
 }
 
@@ -467,15 +482,37 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 		// clean shading chunks
 		MEMSET(dev_intersections, 0, num_paths);
 
-		// tracing
+		ShadeableIntersection* dev_cached_inters;
+		ShadeableIntersection* dev_inters;
 		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
+
+		// tracing
+#ifdef CACHE_FIRST_BOUNCE
+		if (!depth && !iter) {
+			// fill the cache
+			dev_inters = dev_intersections;
+			dev_cached_inters = dev_cached_intersections;
+		} else if (!depth) {
+			// use cached bounces for the first depth
+			dev_inters = dev_cached_intersections;
+			dev_cached_inters = nullptr;
+		} else {
+			// intersect as usual
+			dev_inters = dev_intersections;
+			dev_cached_inters = nullptr;
+		}
+#else
+		dev_inters = dev_intersections;
+		dev_cached_inters = nullptr;
+#endif
 		computeIntersections KERN_PARAM(numblocksPathSegmentTracing, blockSize1d) (
 			depth,
 			dev_paths.subspan(0, num_paths),
 			dev_geoms,
-			dev_intersections,
+			dev_inters,
 			dev_materials,
-			dev_mesh_info
+			dev_mesh_info,
+			dev_cached_inters
 		);
 
 		checkCUDAError("trace one bounce");
@@ -489,6 +526,7 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 		// TODO: compare between directly shading the path segments and shading
 		// path segments that have been reshuffled to be contiguous in memory.
 #ifdef SORT_MAT
+		thrust::device_ptr<ShadeableIntersection> dev_thrust_inters(dev_inters);
 		thrust::sort_by_key(dev_thrust_inters, dev_thrust_inters + num_paths, dev_thrust_paths);
 #endif
 
@@ -499,7 +537,7 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 			iter,
 			dev_paths.subspan(0, num_paths),
 			dev_lights,
-			dev_intersections,
+			dev_inters,
 			dev_materials
 		);
 

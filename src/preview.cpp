@@ -308,7 +308,7 @@ void Preview::DoPreloadMenu() {
 			if (guiData->num_saves > 0) {
 				int iter;
 				if (read_state(guiData->save_file_names[guiData->cur_save], iter, scene)) {
-					switchScene(scene, iter);
+					switchScene(scene, iter, true);
 				}
 			} else {
 				cout << "No Saves Found !!" << endl;

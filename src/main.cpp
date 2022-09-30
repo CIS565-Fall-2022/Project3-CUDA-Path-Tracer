@@ -16,9 +16,7 @@ static bool camchanged = true;
 static float dtheta = 0, dphi = 0;
 static glm::vec3 cammove;
 
-float zoom, theta, phi;
-glm::vec3 cameraPosition;
-glm::vec3 ogLookAt; // for recentering the camera
+JunksFromMain g_mainJunks;
 
 Scene* scene;
 RenderState* renderState;
@@ -55,29 +53,40 @@ int main(int argc, char** argv) {
 	return EXIT_SUCCESS;
 }
 
-bool switchScene(Scene* scene, int start_iter) {
+bool switchScene(Scene* scene, int start_iter, bool from_save) {
 	// Set up camera stuff from loaded path tracer settings
+	auto& phi = g_mainJunks.phi;
+	auto& theta = g_mainJunks.theta;
+	auto& zoom = g_mainJunks.zoom;
+	auto& cameraPosition = g_mainJunks.cameraPosition;
+	auto& ogLookAt = g_mainJunks.ogLookAt;
+
 	iteration = start_iter;
 	renderState = &scene->state;
-	Camera const& cam = renderState->camera;
-	width = cam.resolution.x;
-	height = cam.resolution.y;
 
-	glm::vec3 view = cam.view;
-	glm::vec3 up = cam.up;
-	glm::vec3 right = glm::cross(view, up);
-	up = glm::cross(right, view);
+	if (!from_save) {
+		Camera const& cam = renderState->camera;
+		width = cam.resolution.x;
+		height = cam.resolution.y;
 
-	cameraPosition = cam.position;
+		glm::vec3 view = cam.view;
+		glm::vec3 up = cam.up;
+		glm::vec3 right = glm::cross(view, up);
+		up = glm::cross(right, view);
 
-	// compute phi (horizontal) and theta (vertical) relative 3D axis
-	// so, (0 0 1) is forward, (0 1 0) is up
-	glm::vec3 viewXZ = glm::vec3(view.x, 0.0f, view.z);
-	glm::vec3 viewZY = glm::vec3(0.0f, view.y, view.z);
-	phi = glm::acos(glm::dot(glm::normalize(viewXZ), glm::vec3(0, 0, -1)));
-	theta = glm::acos(glm::dot(glm::normalize(viewZY), glm::vec3(0, 1, 0)));
-	ogLookAt = cam.lookAt;
-	zoom = glm::length(cam.position - ogLookAt);
+
+		// compute phi (horizontal) and theta (vertical) relative 3D axis
+		// so, (0 0 1) is forward, (0 1 0) is up
+		glm::vec3 viewXZ = glm::vec3(view.x, 0.0f, view.z);
+		glm::vec3 viewZY = glm::vec3(0.0f, view.y, view.z);
+
+		cameraPosition = cam.position;
+		phi = glm::acos(glm::dot(glm::normalize(viewXZ), glm::vec3(0, 0, -1)));
+		theta = glm::acos(glm::dot(glm::normalize(viewZY), glm::vec3(0, 1, 0)));
+		ogLookAt = cam.lookAt;
+		zoom = glm::length(cam.position - ogLookAt);
+	}
+
 
 	camchanged = true;
 	leftMousePressed = rightMousePressed = middleMousePressed = false;
@@ -87,13 +96,13 @@ bool switchScene(Scene* scene, int start_iter) {
 	return true;
 }
 
-bool switchScene(char const* path, int start_iter) {
+bool switchScene(char const* path) {
 	// Load scene file
 	if (scene) {
 		delete scene;
 	}
 	scene = new Scene(path);
-	return switchScene(scene, start_iter);
+	return switchScene(scene, 0, false);
 }
 
 void saveImage() {
@@ -120,9 +129,19 @@ void saveImage() {
 }
 
 void runCuda(bool init) {
+	auto& cameraPosition = g_mainJunks.cameraPosition;
+	auto& zoom = g_mainJunks.zoom;
+	auto& phi = g_mainJunks.phi;
+	auto& theta = g_mainJunks.theta;
+
 	if (camchanged) {
-		if(!init) iteration = 0;
+		if (!init) {
+			iteration = 0;
+			// clear image buffer
+			std::fill(renderState->image.begin(), renderState->image.end(), glm::vec3(0));
+		}
 		Camera& cam = renderState->camera;
+
 		cameraPosition.x = zoom * sin(phi) * sin(theta);
 		cameraPosition.y = zoom * cos(theta);
 		cameraPosition.z = zoom * cos(phi) * sin(theta);
@@ -167,6 +186,8 @@ void runCuda(bool init) {
 }
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	auto& ogLookAt = g_mainJunks.ogLookAt;
+
 	if (action == GLFW_PRESS) {
 		switch (key) {
 		case GLFW_KEY_ESCAPE:
@@ -198,20 +219,24 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 }
 
 void mousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
-	if (xpos == lastX || ypos == lastY) return; // otherwise, clicking back into window causes re-start
+	if (abs(xpos-lastX) < EPSILON || abs(ypos-lastY) < EPSILON)
+		return; // otherwise, clicking back into window causes re-start
+
+	auto& zoom = g_mainJunks.zoom;
+	auto& phi = g_mainJunks.phi;
+	auto& theta = g_mainJunks.theta;
+
 	if (leftMousePressed) {
 		// compute new camera parameters
 		phi -= (xpos - lastX) / width;
 		theta -= (ypos - lastY) / height;
 		theta = std::fmax(0.001f, std::fmin(theta, PI));
 		camchanged = true;
-	}
-	else if (rightMousePressed) {
+	} else if (rightMousePressed) {
 		zoom += (ypos - lastY) / height;
 		zoom = std::fmax(0.1f, zoom);
 		camchanged = true;
-	}
-	else if (middleMousePressed) {
+	}  else if (middleMousePressed) {
 		renderState = &scene->state;
 		Camera& cam = renderState->camera;
 		glm::vec3 forward = cam.view;
