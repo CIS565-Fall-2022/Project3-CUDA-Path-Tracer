@@ -73,6 +73,8 @@ set(headers
     src/sceneStructs.h
     src/preview.h
     src/utilities.h
+    src/rendersave.h
+
     src/ImGui/imconfig.h
 	src/ImGui/imgui.h
     src/ImGui/imconfig.h
@@ -84,6 +86,7 @@ set(headers
     src/ImGui/imstb_textedit.h 
     src/ImGui/imstb_truetype.h 
     src/intellisense.h
+
     src/TinyObjLoader/tiny_obj_loader.h
     src/ColorConsole/color.hpp
     )
@@ -97,6 +100,8 @@ set(sources
     src/scene.cpp
     src/preview.cpp
     src/utilities.cpp
+    src/rendersave.cpp
+
     src/ImGui/imgui.cpp 
     src/ImGui/imgui_demo.cpp 
     src/ImGui/imgui_draw.cpp 

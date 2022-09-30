@@ -73,10 +73,10 @@ TRANS       -3 1.5 2
 ROTAT       0 0 0
 SCALE       3 3 3
 
-// // Sphere
-// OBJECT
-// sphere
-// material    ../materials/diffuse_white.mtl
-// TRANS       -3 4 2
-// ROTAT       0 0 0
-// SCALE       3 3 3
+// Sphere
+OBJECT
+sphere
+material    ../materials/transparent.mtl
+TRANS       0 2.5 5
+ROTAT       0 0 0
+SCALE       3 3 3

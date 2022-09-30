@@ -13,6 +13,7 @@
 #include <sstream>
 #include <stdlib.h>
 #include <string>
+#include <vector>
 
 #include "sceneStructs.h"
 #include "image.h"
@@ -26,13 +27,16 @@ using namespace std;
 //----------PATH TRACER----------
 //-------------------------------
 
+constexpr char const* scene_files_dir = "../scenes/";
+constexpr char const* save_files_dir = "../saves/";
+
 extern Scene* scene;
 extern int iteration;
 
 extern int width;
 extern int height;
 
-bool switchScene(int idx);
+bool switchScene(char const*);
 void runCuda();
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
 void mousePositionCallback(GLFWwindow* window, double xpos, double ypos);

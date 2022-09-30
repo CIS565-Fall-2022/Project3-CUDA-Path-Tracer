@@ -1,6 +1,10 @@
 newmtl emissive_white
-Ka 0    0    0
-Kd 1    1    1
-Ks 0    0    0
-Ke 8    0    0
-Tr 0
+Kd 1 1 1
+Ks 1 1 1
+Ns 0
+
+ior 1
+refl 0
+refr 0
+emit 7
+rough 0

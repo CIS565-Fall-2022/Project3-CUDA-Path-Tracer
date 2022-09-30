@@ -1,8 +1,10 @@
-newmtl specular_white
+newmtl perfect_refl
 Kd 0.98 0.98 0.98
 Ks 0.98 0.98 0.98
-Tr 0
-Ni 1.6
 Ns 5
-Pm 1
-Pr 0
+
+ior 1
+refl 1
+refr 0
+emit 0
+rough 0

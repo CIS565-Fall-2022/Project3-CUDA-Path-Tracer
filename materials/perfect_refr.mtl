@@ -1,4 +1,10 @@
 newmtl perfect_refr
 Kd 1 1 1
-Ni 1.5
-Tr 1
+Ks 1 1 1
+Ns 0
+
+ior 1.5
+refl 0
+refr 0.7
+emit 0
+rough 0

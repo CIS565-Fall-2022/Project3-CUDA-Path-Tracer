@@ -2,9 +2,6 @@
 #include "preview.h"
 #include <cstring>
 
-#ifdef _WIN32
-#include <Windows.h>
-#endif // _WIN32
 
 static std::string startTimeString;
 
@@ -24,44 +21,12 @@ glm::vec3 cameraPosition;
 glm::vec3 ogLookAt; // for recentering the camera
 
 Scene* scene;
-constexpr char const* scene_files_dir = "../scenes/";
-std::vector<std::string> scene_files;
 GuiDataContainer* guiData;
 RenderState* renderState;
 int iteration;
 
 int width;
 int height;
-
-/// <summary>
-/// gets all files in a directory
-/// from https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
-/// </summary>
-/// <param name="dir">path to the directory</param>
-static std::vector<std::string> getFilesInDir(char const* dir) {
-	std::vector<std::string> names;
-#ifdef _WIN32
-	std::string search_pattern(dir);
-	std::string search_path(dir);
-	search_pattern += "*.*";
-
-	WIN32_FIND_DATA fd;
-	HANDLE hFind = ::FindFirstFile(search_pattern.c_str(), &fd);
-	if (hFind != INVALID_HANDLE_VALUE) {
-		do {
-			// read all (real) files in current folder
-			// , delete '!' read other 2 default folder . and ..
-			if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-				names.emplace_back(search_path + fd.cFileName);
-			}
-		} while (::FindNextFile(hFind, &fd));
-		::FindClose(hFind);
-	}
-#else
-	assert(!"unsupported platform")
-#endif
-	return names;
-}
 
 //-------------------------------
 //-------------MAIN--------------
@@ -70,11 +35,10 @@ static std::vector<std::string> getFilesInDir(char const* dir) {
 int main(int argc, char** argv) {
 	startTimeString = currentTimeString();
 
-	scene_files = getFilesInDir(scene_files_dir);
 	height = width = 800;
 
 	//Create Instance for ImGUIData
-	guiData = new GuiDataContainer(scene_files);
+	guiData = new GuiDataContainer();
 
 	// Initialize ImGui Data
 	InitImguiData(guiData);
@@ -95,16 +59,12 @@ int main(int argc, char** argv) {
 	return EXIT_SUCCESS;
 }
 
-bool switchScene(int i) {
-	if (i < 0 || i >= scene_files.size()) {
-		return false;
-	}
-	
+bool switchScene(char const* path) {
 	// Load scene file
 	if (scene) {
 		delete scene;
 	}
-	scene = new Scene(scene_files[i]);
+	scene = new Scene(path);
 
 	// Set up camera stuff from loaded path tracer settings
 	iteration = 0;

@@ -1,2 +1,10 @@
 newmtl diffuse_green
 Kd 0.35 0.85 0.35
+Ks 1 1 1
+Ns 0
+
+ior 1
+refl 0
+refr 0
+emit 0
+rough 0

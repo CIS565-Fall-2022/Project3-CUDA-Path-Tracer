@@ -44,13 +44,25 @@ static bool initMaterial(
 ) {
     Material mat;
     mat.diffuse = color_t(tinyobj_mat.diffuse[0], tinyobj_mat.diffuse[1], tinyobj_mat.diffuse[2]);
-    mat.emittance = tinyobj_mat.emission[0];
-    mat.ior = tinyobj_mat.ior;
-    mat.hasReflective = tinyobj_mat.metallic;
-    mat.hasRefractive = 1 - tinyobj_mat.dissolve;
-    mat.roughness = tinyobj_mat.roughness;
     mat.specular.color = color_t(tinyobj_mat.specular[0], tinyobj_mat.specular[1], tinyobj_mat.specular[2]);
     mat.specular.exponent = tinyobj_mat.shininess;
+    
+    auto& params = tinyobj_mat.unknown_parameter;
+
+#define PARSE_F(name_str, field, default_val)\
+    do {\
+    if (params.count(name_str)) field = stod(params.find(name_str)->second);\
+    else field = default_val;\
+    } while(0)
+
+    PARSE_F("refl", mat.hasReflective, 0);
+    PARSE_F("refr", mat.hasRefractive, 0);
+    PARSE_F("ior", mat.ior, 1);
+    PARSE_F("emit", mat.emittance, 0);
+    PARSE_F("rough", mat.roughness, 0);
+    
+
+#undef PARSE_F
 
     string const& texname = tinyobj_mat.diffuse_texname;
     if (!texname.empty()) {
@@ -75,19 +87,27 @@ static bool initMaterial(
     }
 
     // TODO deduce material type
+#ifdef TRANSPARENT
+#undef TRANSPARENT
+#endif
+
     if(mat.hasReflective > 0 && mat.hasRefractive > 0) {
         mat.type = Material::Type::GLOSSY;
-        if (mat.roughness <= EPSILON && mat.roughness >= -EPSILON) {
-            mat.roughness = 1; // force roughness for glossy material
-        }
     } else if (mat.hasReflective > 0) {
         mat.type = Material::Type::REFL;
     } else if (mat.hasRefractive > 0) {
-        mat.type = Material::Type::REFR;
+        if (abs(mat.hasRefractive - 1) <= EPSILON) {
+            mat.type = Material::Type::TRANSPARENT;
+        } else {
+            mat.type = Material::Type::REFR;
+        }
     } else {
         mat.type = Material::Type::DIFFUSE;
+    }
+
+    if (mat.type == Material::Type::DIFFUSE || mat.type == Material::Type::GLOSSY) {
         if (mat.roughness <= EPSILON && mat.roughness >= -EPSILON) {
-            mat.roughness = 1; // force roughness for diffuse material
+            mat.roughness = 1; // force roughness for diffuse and glossy material
         }
     }
 

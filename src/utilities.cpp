@@ -8,9 +8,57 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <iostream>
 #include <cstdio>
-
+#include "main.h"
 #include "utilities.h"
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif // _WIN32
+
+static std::vector<std::string> getFilesInDir(char const* dir) {
+    // credit: https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
+
+    std::vector<std::string> names;
+#ifdef _WIN32
+    std::string search_pattern(dir);
+    std::string search_path(dir);
+    search_pattern += "*.*";
+
+    WIN32_FIND_DATA fd;
+    HANDLE hFind = ::FindFirstFile(search_pattern.c_str(), &fd);
+    if (hFind != INVALID_HANDLE_VALUE) {
+        do {
+            // read all (real) files in current folder
+            // , delete '!' read other 2 default folder . and ..
+            if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+                names.emplace_back(search_path + fd.cFileName);
+            }
+        } while (::FindNextFile(hFind, &fd));
+        ::FindClose(hFind);
+    }
+#else
+    assert(!"unsupported platform")
+#endif
+    return names;
+}
+
+GuiDataContainer::GuiDataContainer() :
+    traced_depth(0), cur_scene(0), cur_save(0), init(false) {
+    auto scene_files = getFilesInDir(scene_files_dir);
+    num_scenes = scene_files.size();
+
+    scene_file_names = new char* [num_scenes];
+    for (int i = 0; i < num_scenes; ++i) {
+        scene_file_names[i] = new char[scene_files[i].size()];
+        strcpy(scene_file_names[i], scene_files[i].c_str());
+    }
+}
+GuiDataContainer::~GuiDataContainer() {
+    for (int i = 0; i < num_scenes; ++i) {
+        delete scene_file_names[i];
+    }
+    delete[] scene_file_names;
+}
 float utilityCore::clamp(float f, float min, float max) {
     if (f < min) {
         return min;

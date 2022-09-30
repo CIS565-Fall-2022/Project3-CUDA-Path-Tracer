@@ -13,29 +13,25 @@
 #include <string>
 #include <vector>
 
+
 #define INV_PI            0.3183098861837907f
 #define PI                3.1415926535897932384626422832795028841971f
 #define TWO_PI            6.2831853071795864769252867665590057683943f
 #define SQRT_OF_ONE_THIRD 0.5773502691896257645091487805019574556476f
 #define EPSILON           0.00001f
 
+
+
 class GuiDataContainer
 {
 public:
-    GuiDataContainer(std::vector<std::string> const& scenesVec) : 
-        TracedDepth(0), NumScenes(scenesVec.size()), CurScene(0), init(false) {
-        Scenes = new char const* [NumScenes];
-        for (int i = 0; i < NumScenes; ++i) {
-            Scenes[i] = scenesVec[i].c_str();
-        }
-    }
-    ~GuiDataContainer() {
-        delete[] Scenes;
-    }
-    int TracedDepth;
-    char const** Scenes;
-    int NumScenes; 
-    int CurScene;
+    GuiDataContainer();
+    ~GuiDataContainer();
+    int traced_depth;
+    char** scene_file_names;
+    int num_scenes; 
+    int cur_scene;
+    int cur_save;
     bool init;
 };
 

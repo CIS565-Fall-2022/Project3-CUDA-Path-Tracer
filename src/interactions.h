@@ -116,19 +116,18 @@ struct SamplePointSpace {
     glm::mat3x3 l2w, w2l; // local to world
 
     __device__ SamplePointSpace(glm::vec3 const& n) {
-        // constructs t20 world to local matrix
-        glm::vec3 h = n;
-        if (fabs(h.x) <= fabs(h.y) && fabs(h.x) <= fabs(h.z)) {
-            h.x = 1.0f;
-        } else if (fabs(h.y) <= fabs(h.x) && fabs(h.y) <= fabs(h.z)) {
-            h.y = 1.0f;
+        // constructs sampling point coordinate system tr matrix
+        glm::vec3 y, x;
+        if (fabs(n.x) <= fabs(n.y) && fabs(n.x) <= fabs(n.z)) {
+            y = glm::cross(glm::vec3(1, n.y, n.z), n);
+        } else if (fabs(n.y) <= fabs(n.x) && fabs(n.y) <= fabs(n.z)) {
+            y = glm::cross(glm::vec3(n.x, 1, n.z), n);
         } else {
-            h.z = 1.0f;
+            y = glm::cross(glm::vec3(n.x, n.y, 1), n);
         }
-        glm::vec3 y = glm::cross(h, n);
         l2w = glm::mat3x3(
             glm::normalize(glm::cross(n, y)),
-            glm::normalize(glm::cross(h, n)),
+            glm::normalize(y),
             glm::normalize(n)
         );
         // inverse same as transpose
@@ -201,7 +200,16 @@ struct BSDF {
                 }
                 
             case Material::Type::TRANSPARENT:
-                break;
+                F = fresnel_dielectric(wo.z, etaI, etaT);
+                if (u01(rng) < F) {
+                    wi = glm::vec3(-wo.x, -wo.y, wo.z);
+                    pdf = F;
+                    return F * reflectance / abs_cos_theta(wi);
+                } else {
+                    wi = -wo;
+                    pdf = 1 - F;
+                    return (1 - F) * reflectance / abs_cos_theta(wi);
+                }
             }
         } else {
             switch (m.type) {
