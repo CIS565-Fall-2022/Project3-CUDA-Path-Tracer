@@ -17,8 +17,10 @@
 
 #define ERRORCHECK 1
 #define SORT_BY_MATERIAL 0
-#define CACHE_FIRST_INTERSECTION 1
+#define CACHE_FIRST_INTERSECTION 0
 #define ANTIALIASING 0
+#define MOTION_BLUR 1
+#define MOTION_VELOCITY glm::vec3(0.0f, 1.75f, 0.0f)
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -177,10 +179,12 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		// TODO: implement antialiasing by jittering the ray
+		// if antialiasing, pointing the ray to different position around the original reference point 
+		// to blur the result
+
 #if ANTIALIASING
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
 		thrust::uniform_real_distribution<float> u01(-0.5, 0.5);
-
 		float xOffset = u01(rng);
 		float yOffset = u01(rng);
 
@@ -210,7 +214,8 @@ __global__ void computeIntersections(
 	, PathSegment* pathSegments
 	, Geom* geoms
 	, int geoms_size
-	, ShadeableIntersection* intersections
+	, ShadeableIntersection* intersections,
+	int iter
 )
 {
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -241,7 +246,16 @@ __global__ void computeIntersections(
 			}
 			else if (geom.type == SPHERE)
 			{
+#if MOTION_BLUR
+				thrust::default_random_engine rng = makeSeededRandomEngine(iter, path_index, 0);
+				thrust::uniform_real_distribution<float> u01(0, 1);
+				Ray motionBlurRay = pathSegment.ray;
+				glm::vec3 motionBlurRayOrigin = u01(rng) * MOTION_VELOCITY;
+				motionBlurRay.origin += motionBlurRayOrigin;
+				t = sphereIntersectionTest(geom, motionBlurRay, tmp_intersect, tmp_normal, outside);
+#else
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+#endif
 			}
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 
@@ -467,7 +481,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_paths
 				, dev_geoms
 				, hst_scene->geoms.size()
-				, dev_intersections
+				, dev_intersections,
+				iter
 				);
 			cudaMemcpy(dev_first_intersections, dev_intersections,  pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
 			checkCUDAError("trace one bounce");
@@ -484,7 +499,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_paths
 				, dev_geoms
 				, hst_scene->geoms.size()
-				, dev_intersections
+				, dev_intersections,
+				iter
 				);
 			checkCUDAError("trace one bounce");
 		}
@@ -524,6 +540,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			iterationComplete = true; // TODO: should be based off stream compaction results.
 			//std::cout << "iteration complete!" << std::endl;
 		}
+
+
 		if (guiData != NULL)
 		{
 			guiData->TracedDepth = depth;
