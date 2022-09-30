@@ -18,10 +18,12 @@
 #define SORT_BY_MATERIAL 1
 #define CACHE_FIRST_BOUNCE 0
 #define ANTI_ALIASING 0
-#define DOF 1
 
+#define DOF 0
 #define LENS_RADIUS 0.2
 #define FOCAL_DISTANCE 8.0
+
+#define MOTION_BLUR 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -228,6 +230,7 @@ __global__ void computeIntersections(
 	, Geom* geoms
 	, int geoms_size
 	, ShadeableIntersection* intersections
+	, int iter
 )
 {
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -258,7 +261,16 @@ __global__ void computeIntersections(
 			}
 			else if (geom.type == SPHERE)
 			{
+#if MOTION_BLUR
+				thrust::default_random_engine rng = makeSeededRandomEngine(iter, path_index, 0);
+				thrust::uniform_real_distribution<float> u01(0, 1);
+				//Jitter the ray randomly about any axes 
+				Ray jittered = pathSegment.ray;
+				jittered.origin += u01(rng) * glm::vec3(0.25f, 0.75f, 0.f);
+				t = sphereIntersectionTest(geom, jittered, tmp_intersect, tmp_normal, outside);
+#else
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+#endif
 			}
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 
@@ -425,6 +437,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_geoms
 				, hst_scene->geoms.size()
 				, dev_intersections
+				, iter
 				);
 			checkCUDAError("trace one bounce");
 			cudaDeviceSynchronize();
