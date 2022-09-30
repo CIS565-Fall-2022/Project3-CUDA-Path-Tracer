@@ -241,19 +241,6 @@ __global__ void pathIntegSampleSurface(
 		return;
 	}
 
-#if BVH_DEBUG_VISUALIZATION
-	float logDepth = 0.f;
-	int size = scene->BVHSize;
-	while (size) {
-		logDepth += 1.f;
-		size >>= 1;
-	}
-	segment.radiance = glm::vec3(float(intersec.primId) / logDepth * .1f);
-	//segment.radiance = intersec.primitive > 16 ? glm::vec3(1.f) : glm::vec3(0.f);
-	segment.remainingBounces = 0;
-	return;
-#endif
-
 	PathSegment& segment = segments[idx];
 	thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 4 + depth * SamplesConsumedOneIter);
 
@@ -430,6 +417,29 @@ WriteRadiance:
 	image[index] += accRadiance;
 }
 
+__global__ void BVHVisualize(int iter, DevScene* scene, Camera cam, glm::vec3* image, int width, int height) {
+	int x = blockDim.x * blockIdx.x + threadIdx.x;
+	int y = blockDim.y * blockIdx.y + threadIdx.y;
+	if (x >= width || y >= height) {
+		return;
+	}
+	int index = y * width + x;
+
+	thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+	Ray ray = sampleCamera(cam, x, y, sample4D(rng));
+
+	Intersection intersec;
+	scene->visualizedIntersect(ray, intersec);
+
+	float logDepth = 0.f;
+	int size = scene->BVHSize;
+	while (size) {
+		logDepth += 1.f;
+		size >>= 1;
+	}
+	image[index] += glm::vec3(float(intersec.primId) / logDepth * .1f);
+}
+
 struct CompactTerminatedPaths {
 	__host__ __device__ bool operator() (const PathSegment& segment) {
 		return !(segment.pixelIndex >= 0 && segment.remainingBounces <= 0);
@@ -465,22 +475,7 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 
 	auto devTerminatedThr = devTerminatedPathsThr;
 
-	if (Settings::singleKernel) {
-		const int BlockSizeSinglePTX = 8;
-		const int BlockSizeSinglePTY = 8;
-		int blockNumSinglePTX = (cam.resolution.x + BlockSizeSinglePTX - 1) / BlockSizeSinglePTX;
-		int blockNumSinglePTY = (cam.resolution.y + BlockSizeSinglePTY - 1) / BlockSizeSinglePTY;
-
-		dim3 singlePTBlockNum(blockNumSinglePTX, blockNumSinglePTY);
-		dim3 singlePTBlockSize(BlockSizeSinglePTX, BlockSizeSinglePTY);
-
-		singleKernelPT<<<singlePTBlockNum, singlePTBlockSize>>>(
-			iter, Settings::traceDepth, hstScene->devScene, cam, devImage, cam.resolution.x, cam.resolution.y);
-		if (guiData != nullptr) {
-			guiData->TracedDepth = Settings::traceDepth;
-		}
-	}
-	else {
+	if (Settings::tracer == Tracer::Streamed) {
 		bool iterationComplete = false;
 		while (!iterationComplete) {
 			// clean shading chunks
@@ -530,6 +525,28 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 		dim3 numBlocksPixels = (pixelCount + BlockSizeGather - 1) / BlockSizeGather;
 		int numContributing = devTerminatedThr.get() - devTerminatedPaths;
 		finalGather<<<numBlocksPixels, BlockSizeGather>>>(numContributing, devImage, devTerminatedPaths);
+	}
+	else {
+		const int BlockSizeSinglePTX = 8;
+		const int BlockSizeSinglePTY = 8;
+		int blockNumSinglePTX = (cam.resolution.x + BlockSizeSinglePTX - 1) / BlockSizeSinglePTX;
+		int blockNumSinglePTY = (cam.resolution.y + BlockSizeSinglePTY - 1) / BlockSizeSinglePTY;
+
+		dim3 singlePTBlockNum(blockNumSinglePTX, blockNumSinglePTY);
+		dim3 singlePTBlockSize(BlockSizeSinglePTX, BlockSizeSinglePTY);
+
+		if (Settings::tracer == Tracer::SingleKernel) {
+			singleKernelPT<<<singlePTBlockNum, singlePTBlockSize>>>(
+				iter, Settings::traceDepth, hstScene->devScene, cam, devImage, cam.resolution.x, cam.resolution.y);
+		}
+		else {
+			BVHVisualize<<<singlePTBlockNum, singlePTBlockSize>>>(
+				iter, hstScene->devScene, cam, devImage, cam.resolution.x, cam.resolution.y);
+		}
+
+		if (guiData != nullptr) {
+			guiData->TracedDepth = Settings::traceDepth;
+		}
 	}
 
 	// Send results to OpenGL buffer for rendering

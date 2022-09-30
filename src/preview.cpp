@@ -152,6 +152,7 @@ bool init() {
 	}
 	glfwMakeContextCurrent(window);
 	glfwSetKeyCallback(window, keyCallback);
+	glfwSetScrollCallback(window, mouseScrollCallback);
 	glfwSetCursorPosCallback(window, mousePositionCallback);
 	glfwSetMouseButtonCallback(window, mouseButtonCallback);
 
@@ -218,10 +219,12 @@ void RenderImGui()
 	}
 
 	ImGui::Begin("Options"); {
-		if (ImGui::Checkbox("Single Kernel PT", &Settings::singleKernel)) {
+		const char* Tracers[] = { "Streamed", "Single Kernel", "BVH Visualize" };
+		if (ImGui::Combo("Tracer", &Settings::tracer, Tracers, IM_ARRAYSIZE(Tracers))) {
 			State::camChanged = true;
 		}
-		if (!Settings::singleKernel) {
+
+		if (Settings::tracer == Tracer::Streamed) {
 			ImGui::Checkbox("Sort Material", &Settings::sortMaterial);
 		}
 

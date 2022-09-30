@@ -50,8 +50,6 @@ struct RenderState {
     std::string imageName;
 };
 
-struct Material;
-
 struct Intersection {
     __device__ Intersection() {}
 

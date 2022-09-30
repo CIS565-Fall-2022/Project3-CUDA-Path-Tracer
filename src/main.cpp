@@ -232,6 +232,8 @@ void runCuda() {
 }
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	Camera& cam = renderState->camera;
+
 	if (action == GLFW_PRESS) {
 		switch (key) {
 		case GLFW_KEY_ESCAPE:
@@ -244,19 +246,29 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 		case GLFW_KEY_T:
 			Settings::toneMapping = (Settings::toneMapping + 1) % 3;
 			break;
+		case GLFW_KEY_LEFT_SHIFT:
+			cam.position += glm::vec3(0.f, -.1f, 0.f);
+			break;
 		case GLFW_KEY_SPACE:
-			State::camChanged = true;
+			cam.position += glm::vec3(0.f, .1f, 0.f);
+			break;
+		case GLFW_KEY_R:
 			renderState = &scene->state;
-			Camera& cam = renderState->camera;
 			cam.lookAt = ogLookAt;
+			State::camChanged = true;
 			break;
 		}
 	}
 }
 
+void mouseScrollCallback(GLFWwindow* window, double offsetX, double offsetY) {
+	zoom -= offsetY;
+	zoom = std::fmax(0.1f, zoom);
+	State::camChanged = true;
+}
+
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-	if (MouseOverImGuiWindow())
-	{
+	if (MouseOverImGuiWindow()) {
 		return;
 	}
 	leftMousePressed = (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS);
@@ -265,7 +277,12 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 }
 
 void mousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
-	if (xpos == lastX || ypos == lastY) return; // otherwise, clicking back into window causes re-start
+	Camera& cam = renderState->camera;
+
+	if (xpos == lastX || ypos == lastY) {
+		return; // otherwise, clicking back into window causes re-start
+	}
+
 	if (leftMousePressed) {
 		// compute new camera parameters
 		phi -= (xpos - lastX) / width;
@@ -274,13 +291,13 @@ void mousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
 		State::camChanged = true;
 	}
 	else if (rightMousePressed) {
-		zoom += (ypos - lastY) / height;
-		zoom = std::fmax(0.1f, zoom);
+		float dy = (ypos - lastY) / height;
+		cam.position.y += dy;
+		cam.lookAt.y += dy;
 		State::camChanged = true;
 	}
 	else if (middleMousePressed) {
 		renderState = &scene->state;
-		Camera& cam = renderState->camera;
 		glm::vec3 forward = cam.view;
 		forward.y = 0.0f;
 		forward = glm::normalize(forward);

@@ -115,12 +115,6 @@ struct Material {
         Light
     };
 
-    std::string toString() const {
-        std::stringstream ss;
-        ss << "[Type = " << type << ", BaseColor = " << vec3ToString(baseColor) << "]";
-        return ss.str();
-    }
-
     __device__ glm::vec3 lambertianBSDF(glm::vec3 n, glm::vec3 wo, glm::vec3 wi) {
         return baseColor * PiInv;
     }
@@ -263,5 +257,6 @@ struct Material {
     float ior;
     float emittance;
 
-    int textureId;
+    int baseColorMapId;
+    int normalMapId;
 };
