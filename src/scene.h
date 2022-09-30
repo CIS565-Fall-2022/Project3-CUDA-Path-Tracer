@@ -64,10 +64,17 @@ struct DevScene {
     void create(const Scene& scene);
     void destroy();
 
-    __device__ Material getMaterialWithTexture(const Intersection& intersec) {
+    __device__ Material getTexturedMaterialAndSurface(Intersection& intersec) {
         Material mat = devMaterials[intersec.matId];
         if (mat.baseColorMapId > NullTextureId) {
             mat.baseColor = devTextureObjs[mat.baseColorMapId].linearSample(intersec.uv);
+        }
+
+        if (mat.normalMapId > NullTextureId) {
+            glm::vec3 mapped = devTextureObjs[mat.normalMapId].linearSample(intersec.uv);
+            glm::vec3 localNorm = glm::normalize(glm::vec3(mapped.x, mapped.y, mapped.z) * 1.f - 0.5f);
+            intersec.norm = Math::localToWorld(intersec.norm, localNorm);
+            //intersec.norm = getPrimitivePlainNormal
         }
         return mat;
     }
@@ -319,9 +326,6 @@ struct DevScene {
             else {
                 node = nodes[node].nextNodeIfMiss;
             }
-        }
-        if (closestPrimId == 0) {
-            maxDepth = 100.f;
         }
         intersec.primId = maxDepth;
     }

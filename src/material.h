@@ -254,9 +254,10 @@ struct Material {
 
     int type = Type::Lambertian;
     glm::vec3 baseColor = glm::vec3(.9f);
-    int baseColorMapId = NullTextureId;
     float metallic = 0.f;
     float roughness = 1.f;
     float ior = 1.5f;
-    float emittance = 0.f;
+
+    int baseColorMapId = NullTextureId;
+    int normalMapId = NullTextureId;
 };

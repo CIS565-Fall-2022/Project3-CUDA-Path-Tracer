@@ -211,8 +211,6 @@ void RenderImGui()
 	static float f = 0.0f;
 	static int counter = 0;
 
-	
-
 	ImGui::Begin("Path Tracer Analytics", nullptr,
 		ImGuiWindowFlags_NoMove |
 		ImGuiWindowFlags_NoDecoration |

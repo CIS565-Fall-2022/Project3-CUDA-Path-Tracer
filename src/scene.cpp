@@ -154,7 +154,7 @@ void Scene::buildDevData() {
     int primId = 0;
     for (const auto& inst : modelInstances) {
         const auto& material = materials[inst.materialId];
-        glm::vec3 radianceUnitArea = material.baseColor * material.emittance;
+        glm::vec3 radianceUnitArea = material.baseColor;
         float powerUnitArea = Math::luminance(radianceUnitArea);
 
         for (size_t i = 0; i < inst.meshData->vertices.size(); i++) {
@@ -391,8 +391,11 @@ void Scene::loadMaterial(const std::string& matId) {
         else if (tokens[0] == "Ior") {
             material.ior = std::stof(tokens[1]);
         }
-        else if (tokens[0] == "Emittance") {
-            material.emittance = std::stof(tokens[1]);
+        else if (tokens[0] == "NormalMap") {
+            if (tokens[1] != "Null") {
+                material.normalMapId = addTexture(tokens[1]);
+                std::cout << "\t\t[NormalMap use texture " << tokens[1] << "]" << std::endl;
+            }
         }
     }
     materialMap[matId] = materials.size();

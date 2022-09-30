@@ -181,6 +181,9 @@ __global__ void previewGBuffer(
 		image[index] += intersec.pos;
 	}
 	else if (kind == 1) {
+		if (intersec.primId != NullPrimitive) {
+			Material m = scene->getTexturedMaterialAndSurface(intersec);
+		}
 		image[index] += (intersec.norm + 1.f) * .5f;
 	}
 	else if (kind == 2) {
@@ -276,14 +279,14 @@ __global__ void pathIntegSampleSurface(
 	PathSegment& segment = segments[idx];
 	thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 4 + depth * SamplesConsumedOneIter);
 
-	Material material = scene->getMaterialWithTexture(intersec);
+	Material material = scene->getTexturedMaterialAndSurface(intersec);
 
 	glm::vec3 accRadiance(0.f);
 
 	if (material.type == Material::Type::Light) {
 		PrevBSDFSampleInfo prev = sortMaterial ? intersec.prev : segment.prev;
 
-		glm::vec3 radiance = material.baseColor * material.emittance;
+		glm::vec3 radiance = material.baseColor;
 		if (depth == 0) {
 			accRadiance += radiance;
 		}
@@ -375,10 +378,10 @@ __global__ void singleKernelPT(
 		goto WriteRadiance;
 	}
 
-	Material material = scene->getMaterialWithTexture(intersec);
+	Material material = scene->getTexturedMaterialAndSurface(intersec);
 
 	if (material.type == Material::Type::Light) {
-		accRadiance = material.baseColor * material.emittance;
+		accRadiance = material.baseColor;
 		goto WriteRadiance;
 	}
 
@@ -425,7 +428,7 @@ __global__ void singleKernelPT(
 		if (intersec.primId == NullPrimitive) {
 			break;
 		}
-		material = scene->getMaterialWithTexture(intersec);
+		material = scene->getTexturedMaterialAndSurface(intersec);
 
 		if (material.type == Material::Type::Light) {
 #if SCENE_LIGHT_SINGLE_SIDED
@@ -433,7 +436,7 @@ __global__ void singleKernelPT(
 				break;
 			}
 #endif
-			glm::vec3 radiance = material.baseColor * material.emittance;
+			glm::vec3 radiance = material.baseColor;
 			if (deltaSample) {
 				accRadiance += radiance * throughput;
 			}
@@ -470,7 +473,7 @@ __global__ void BVHVisualize(int iter, DevScene* scene, Camera cam, glm::vec3* i
 		logDepth += 1.f;
 		size >>= 1;
 	}
-	image[index] += glm::vec3(float(intersec.primId) / logDepth * .1f);
+	image[index] += glm::vec3(float(intersec.primId) / logDepth * .06f);
 }
 
 struct CompactTerminatedPaths {
