@@ -146,6 +146,26 @@ void pathtraceFree() {
 	checkCUDAError("pathtraceFree");
 }
 
+// From PBR Book, 13.6.2
+// Concentrically maps pts from the [-1, 1) square to the disk centered at 0, 0.
+__device__ glm::vec2 sampleDisk(thrust::default_random_engine &rng) {
+	thrust::uniform_real_distribution<float> u01(-1, 1);
+	glm::vec2 t(u01(rng), u01(rng));
+	if (t.x == 0.f && t.y == 0.f) {
+		return t; // glm::vec2(0.f);
+	}
+	float theta, r;
+	if (std::abs(t.x) > std::abs(t.y)) {
+		r = t.x;
+		theta = PI / 4.f * (t.y / t.x);
+	}
+	else {
+		r = t.y;
+		theta = PI / 2.f - PI / 4.f * (t.x / t.y);
+	}
+	return r * glm::vec2(cos(theta), sin(theta));
+}
+
 /**
 * Generate PathSegments with rays from the camera through the screen into the
 * scene, which is the first bounce of rays.
@@ -168,8 +188,18 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		// TODO: implement antialiasing by jittering the ray
 		segment.ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
-		);
+			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f));
+
+		// Depth of field effects, from PBR book, 6.2.3
+		if (cam.focalDist > 0 && cam.lensRad > 0) {
+			// Set the origin ray to random place on lens (lens as disk).
+			glm::vec2 lensRand = cam.lensRad * sampleDisk(makeSeededRandomEngine(iter, index, traceDepth));
+			segment.ray.origin += glm::vec3(lensRand.x, lensRand.y, 0);
+
+			glm::vec3 pFocus = 
+				segment.ray.direction * cam.focalDist / std::abs(segment.ray.direction.z);
+			segment.ray.direction = glm::normalize(pFocus - glm::vec3(lensRand.x, lensRand.y, 0));
+		}
 
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
@@ -310,8 +340,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	///////////////////////////////////////////////////////////////////////////
 	// --- Start generate array of path rays (that come out of the camera)
-	//   * Each path ray has (ray, color) pair,
-	//   where color starts as the multiplicative identity, white = (1, 1, 1).
+	//   * Each path ray color starts as white = (1, 1, 1).
 	generateRayFromCamera<<<blocksPerGrid2d, blockSize2d>>>(cam, iter, traceDepth, dev_paths);
 	checkCUDAError("generate camera ray");
 	// --- End generate rays

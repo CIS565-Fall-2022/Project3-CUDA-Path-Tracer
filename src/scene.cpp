@@ -98,13 +98,19 @@ int Scene::loadCamera() {
     float fovy;
 
     //load static properties
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 7; i++) {
         string line;
         utilityCore::safeGetline(fp_in, line);
         vector<string> tokens = utilityCore::tokenizeString(line);
         if (strcmp(tokens[0].c_str(), "RES") == 0) {
             camera.resolution.x = atoi(tokens[1].c_str());
             camera.resolution.y = atoi(tokens[2].c_str());
+        }
+        else if (strcmp(tokens[0].c_str(), "LENS_RAD") == 0) {
+            camera.lensRad = atof(tokens[1].c_str());
+        }
+        else if (strcmp(tokens[0].c_str(), "FOCAL_DIST") == 0) {
+            camera.focalDist = atof(tokens[1].c_str());
         }
         else if (strcmp(tokens[0].c_str(), "FOVY") == 0) {
             fovy = atof(tokens[1].c_str());
