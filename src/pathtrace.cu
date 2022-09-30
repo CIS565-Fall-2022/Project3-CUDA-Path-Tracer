@@ -245,6 +245,10 @@ __global__ void pathIntegSampleSurface(
 	thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 4 + depth * SamplesConsumedOneIter);
 
 	Material material = scene->devMaterials[intersec.matId];
+	if (material.baseColorMapId > NullTextureId) {
+		material.baseColor = scene->devTextureObjs->linearSample(intersec.uv);
+	}
+
 	glm::vec3 accRadiance(0.f);
 
 	if (material.type == Material::Type::Light) {
@@ -347,6 +351,10 @@ __global__ void singleKernelPT(
 	if (material.type == Material::Type::Light) {
 		accRadiance = material.baseColor * material.emittance;
 		goto WriteRadiance;
+	}
+
+	if (material.baseColorMapId > NullTextureId) {
+		material.baseColor = scene->devTextureObjs->linearSample(intersec.uv);
 	}
 
 	glm::vec3 throughput(1.f);

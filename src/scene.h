@@ -53,7 +53,7 @@ public:
 
     static void clear();
 
-private:
+public:
     static std::map<std::string, MeshData*> meshDataPool;
     static std::map<std::string, Image*> texturePool;
 };
@@ -389,10 +389,14 @@ private:
     void loadMaterial(const std::string& materialId);
     void loadCamera();
 
+    int addMaterial(const Material& material);
+    int addTexture(const std::string& filename);
+
 public:
     RenderState state;
     std::vector<ModelInstance> modelInstances;
     std::vector<Image*> textures;
+    std::map<Image*, int> textureMap;
     std::vector<Material> materials;
     std::map<std::string, int> materialMap;
     std::vector<int> materialIds;

@@ -8,6 +8,8 @@
 
 #define MATERIAL_DIELETRIC_USE_SCHLICK_APPROX false
 
+#define NullTextureId -1
+#define ProceduralTexId -2
 #define InvalidPdf -1.f
 
 enum BSDFSampleType {
@@ -250,13 +252,11 @@ struct Material {
         }
     }
 
-    int type;
-    glm::vec3 baseColor;
-    float metallic;
-    float roughness;
-    float ior;
-    float emittance;
-
-    int baseColorMapId;
-    int normalMapId;
+    int type = Type::Lambertian;
+    glm::vec3 baseColor = glm::vec3(.9f);
+    int baseColorMapId = NullTextureId;
+    float metallic = 0.f;
+    float roughness = 1.f;
+    float ior = 1.5f;
+    float emittance = 0.f;
 };

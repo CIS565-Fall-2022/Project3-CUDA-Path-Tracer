@@ -32,7 +32,7 @@ MeshData* Resource::loadOBJMesh(const std::string& filename) {
 
     std::cout << "\t\t[Model loading " << filename << " ...]" << std::endl;
     if (!tinyobj::LoadObj(&attrib, &shapes, nullptr, &warn, &err, filename.c_str())) {
-        std::cout << "\t\t\t[Fail Error msg [" << err << "]" << std::endl;
+        std::cout << "\t\t\t[Fail Error msg " << err << "]" << std::endl;
         return nullptr;
     }
     bool hasTexcoord = !attrib.texcoords.empty();
@@ -184,6 +184,11 @@ void Scene::buildDevData() {
         }
     }
 #endif
+    if (primId == 0) {
+        std::cout << "[No mesh data loaded, quit]" << std::endl;
+        exit(-1);
+    }
+
     createLightSampler();
     BVHSize = BVHBuilder::build(meshData.vertices, boundingBoxes, BVHNodes);
     checkCUDAError("BVH Build");
@@ -219,16 +224,30 @@ void Scene::loadModel(const std::string& objId) {
     std::cout << "\t\t[File " << filename << "]" << std::endl;
     instance.meshData = Resource::loadModelMeshData(filename);
 
+    if (!instance.meshData) {
+        std::cout << "\t\t[Fail to load, skipped]" << std::endl;
+        while (!line.empty() && fpIn.good()) {
+            utilityCore::safeGetline(fpIn, line);
+        }
+        return;
+    }
+    
     //link material
     utilityCore::safeGetline(fpIn, line);
     if (!line.empty() && fpIn.good()) {
         std::vector<std::string> tokens = utilityCore::tokenizeString(line);
-        if (materialMap.find(tokens[1]) == materialMap.end()) {
-            std::cout << "\t\t[Material " << tokens[1] << " doesn't exist]" << std::endl;
-            throw;
+        if (tokens[1] == "Null") {
+            // Null material, create new one
+            instance.materialId = addMaterial(Material());
         }
-        instance.materialId = materialMap[tokens[1]];
-        std::cout << "\t\t[Link to Material " << tokens[1] << "{" << instance.materialId << "} ...]" << std::endl;
+        else {
+            if (materialMap.find(tokens[1]) == materialMap.end()) {
+                std::cout << "\t\t[Material " << tokens[1] << " doesn't exist]" << std::endl;
+                throw;
+            }
+            instance.materialId = materialMap[tokens[1]];
+            std::cout << "\t\t[Link to Material " << tokens[1] << "{" << instance.materialId << "} ...]" << std::endl;
+        }
     }
 
     //load transformations
@@ -239,7 +258,6 @@ void Scene::loadModel(const std::string& objId) {
         //load tranformations
         if (tokens[0] == "Translate") {
             instance.translation = glm::vec3(std::stof(tokens[1]), std::stof(tokens[2]), std::stof(tokens[3]));
-            std::cout << vec3ToString(instance.translation) << "\n";
         }
         else if (tokens[0] == "Rotate") {
             instance.rotation = glm::vec3(std::stof(tokens[1]), std::stof(tokens[2]), std::stof(tokens[3]));
@@ -322,6 +340,25 @@ void Scene::loadCamera() {
     std::fill(state.image.begin(), state.image.end(), glm::vec3());
 }
 
+int Scene::addMaterial(const Material& material) {
+    materials.push_back(material);
+    return materials.size() - 1;
+}
+
+int Scene::addTexture(const std::string& filename) {
+    auto texture = Resource::loadTexture(filename);
+    auto find = textureMap.find(texture);
+    if (find != textureMap.end()) {
+        return find->second;
+    }
+    else {
+        int size = textureMap.size();
+        textureMap[texture] = size;
+        textures.push_back(texture);
+        return size;
+    }
+}
+
 void Scene::loadMaterial(const std::string& matId) {
     std::cout << "\t[Material " << matId << "]" << std::endl;
     Material material;
@@ -336,8 +373,14 @@ void Scene::loadMaterial(const std::string& matId) {
             std::cout << "\t\t[Type " << tokens[1] << "]" << std::endl;
         }
         else if (tokens[0] == "BaseColor") {
-            glm::vec3 baseColor(std::stof(tokens[1]), std::stof(tokens[2]), std::stof(tokens[3]));
-            material.baseColor = baseColor;
+            if (tokens.size() > 2) {
+                glm::vec3 baseColor(std::stof(tokens[1]), std::stof(tokens[2]), std::stof(tokens[3]));
+                material.baseColor = baseColor;
+            }
+            else {
+                material.baseColorMapId = addTexture(tokens[1]);
+                std::cout << "\t\t[BaseColor use texture " << tokens[1] << "]" << std::endl;
+            }
         }
         else if (tokens[0] == "Metallic") {
             material.metallic = std::stof(tokens[1]);
@@ -366,16 +409,20 @@ void DevScene::create(const Scene& scene) {
         textureTotalSize += tex->byteSize();
     }
     cudaMalloc(&devTextureData, textureTotalSize);
+    checkCUDAError("DevScene::texture");
 
-    size_t textureOffset = 0;
+    int textureOffset = 0;
     for (auto tex : scene.textures) {
-        cudaMemcpy(devTextureData + textureOffset, tex->data(), tex->byteSize(), cudaMemcpyKind::cudaMemcpyHostToDevice);
+        cudaMemcpyHostToDev(devTextureData + textureOffset, tex->data(), tex->byteSize());
+        std::cout << tex->byteSize() << "\n";
+        checkCUDAError("DevScene::texture::copy");
         textureObjs.push_back({ tex, devTextureData + textureOffset });
-        textureOffset += tex->byteSize();
+        textureOffset += tex->byteSize() / sizeof(glm::vec3);
     }
     cudaMalloc(&devTextureObjs, textureObjs.size() * sizeof(DevTextureObj));
+    checkCUDAError("DevScene::textureObjs::malloc");
     cudaMemcpyHostToDev(devTextureObjs, textureObjs.data(), textureObjs.size() * sizeof(DevTextureObj));
-    checkCUDAError("DevScene::texture");
+    checkCUDAError("DevScene::textureObjs::copy");
 
     cudaMalloc(&devMaterials, byteSizeOf(scene.materials));
     cudaMemcpyHostToDev(devMaterials, scene.materials.data(), byteSizeOf(scene.materials));
