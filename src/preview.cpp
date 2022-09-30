@@ -218,7 +218,21 @@ void RenderImGui()
 	}
 
 	ImGui::Begin("Options"); {
-		ImGui::Checkbox("Sort material", &Settings::sortMaterial);
+		if (ImGui::Checkbox("Single Kernel PT", &Settings::singleKernel)) {
+			State::camChanged = true;
+		}
+		if (!Settings::singleKernel) {
+			ImGui::Checkbox("Sort Material", &Settings::sortMaterial);
+		}
+
+		if (ImGui::InputInt("Max Depth", &Settings::traceDepth, 1, 1)) {
+			State::camChanged = true;
+		}
+		ImGui::Separator();
+
+		ImGui::Text("Post Processing");
+		const char* ToneMappingMethods[] = { "None", "Filmic", "ACES" };
+		ImGui::Combo("Tone Mapping", &Settings::toneMapping, ToneMappingMethods, IM_ARRAYSIZE(ToneMappingMethods));
 
 		ImGui::End();
 	}

@@ -238,12 +238,9 @@ struct DevScene {
         }
         if (closestPrimId != NullPrimitive) {
             getIntersecGeomInfo(closestPrimId, closestBary, intersec);
-            intersec.primId = closestPrimId;
             intersec.matId = devMaterialIds[closestPrimId];
         }
-        else {
-            intersec.primId = NullPrimitive;
-        }
+        intersec.primId = closestPrimId;
     }
 
     __device__ bool testOcclusion(glm::vec3 x, glm::vec3 y) {

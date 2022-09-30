@@ -6,14 +6,6 @@
 #include <cuda_runtime.h>
 #include "glm/glm.hpp"
 
-#define BACKGROUND_COLOR (glm::vec3(0.0f))
-
-enum GeomType {
-    Sphere = 0,
-    Cube = 1,
-    Mesh = 2
-};
-
 struct Ray {
     __host__ __device__ glm::vec3 getPoint(float dist) {
         return origin + direction * dist;
@@ -21,17 +13,6 @@ struct Ray {
 
     glm::vec3 origin;
     glm::vec3 direction;
-};
-
-struct Geom {
-    GeomType type;
-    int materialId;
-    glm::vec3 translation;
-    glm::vec3 rotation;
-    glm::vec3 scale;
-    glm::mat4 transform;
-    glm::mat4 inverseTransform;
-    glm::mat4 invTranspose;
 };
 
 struct Camera {
@@ -48,14 +29,6 @@ struct Camera {
     float tanFovY;
 };
 
-struct RenderState {
-    Camera camera;
-    unsigned int iterations;
-    int traceDepth;
-    std::vector<glm::vec3> image;
-    std::string imageName;
-};
-
 struct PrevBSDFSampleInfo {
     float BSDFPdf;
     bool deltaSample;
@@ -70,9 +43,12 @@ struct PathSegment {
     int remainingBounces;
 };
 
-// Use with a corresponding PathSegment to do:
-// 1) color contribution computation
-// 2) BSDF evaluation: generate a new ray
+struct RenderState {
+    Camera camera;
+    unsigned int iterations;
+    std::vector<glm::vec3> image;
+    std::string imageName;
+};
 
 struct Material;
 

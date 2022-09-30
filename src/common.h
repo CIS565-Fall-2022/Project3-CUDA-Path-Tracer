@@ -11,6 +11,8 @@
 #define BVH_DEBUG_VISUALIZATION false
 #define BVH_DISABLE false
 
+#define ENABLE_GBUFFER false
+
 struct ToneMapping {
     enum {
         None = 0, Filmic = 1, ACES = 2
@@ -18,7 +20,13 @@ struct ToneMapping {
 };
 
 struct Settings {
+    static int traceDepth;
     static int toneMapping;
     static bool visualizeBVH;
     static bool sortMaterial;
+    static bool singleKernel;
+};
+
+struct State {
+    static bool camChanged;
 };
