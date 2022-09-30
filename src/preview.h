@@ -1,12 +1,17 @@
 #pragma once
 
 extern GLuint pbo;
+struct GuiDataContainer;
 
-std::string currentTimeString();
-bool initImguiGL();
-bool init();
-void mainLoop();
-void resetImguiState();
-bool MouseOverImGuiWindow();
-void InitImguiData(GuiDataContainer* guiData);
-void DoPreloadMenu();
+
+namespace Preview {
+	std::string currentTimeString();
+	GuiDataContainer* GetGUIData();
+	bool initImguiGL();
+	bool initBufs();
+	void mainLoop();
+	bool CapturingMouse();
+	bool CapturingKeyboard();
+	void InitImguiData();
+	void DoPreloadMenu();
+}

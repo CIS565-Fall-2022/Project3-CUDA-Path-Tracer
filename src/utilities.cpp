@@ -43,21 +43,37 @@ static std::vector<std::string> getFilesInDir(char const* dir) {
 }
 
 GuiDataContainer::GuiDataContainer() :
-    traced_depth(0), cur_scene(0), cur_save(0), init(false) {
+    traced_depth(0), cur_scene(0), cur_save(0), prompt_text("") {
+    memset(buf, 0, sizeof(buf));
+
     auto scene_files = getFilesInDir(scene_files_dir);
+    auto save_files = getFilesInDir(save_files_dir);
+
     num_scenes = scene_files.size();
+    num_saves = save_files.size();
 
     scene_file_names = new char* [num_scenes];
+    save_file_names = new char* [num_saves];
+
     for (int i = 0; i < num_scenes; ++i) {
-        scene_file_names[i] = new char[scene_files[i].size()];
+        scene_file_names[i] = new char[scene_files[i].size() + 1];
         strcpy(scene_file_names[i], scene_files[i].c_str());
+    }
+
+    for (int i = 0; i < num_saves; ++i) {
+        save_file_names[i] = new char[save_files[i].size() + 1];
+        strcpy(save_file_names[i], save_files[i].c_str());
     }
 }
 GuiDataContainer::~GuiDataContainer() {
     for (int i = 0; i < num_scenes; ++i) {
         delete scene_file_names[i];
     }
+    for (int i = 0; i < num_saves; ++i) {
+        delete save_file_names[i];
+    }
     delete[] scene_file_names;
+    delete[] save_file_names;
 }
 float utilityCore::clamp(float f, float min, float max) {
     if (f < min) {

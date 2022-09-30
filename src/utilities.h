@@ -29,10 +29,13 @@ public:
     ~GuiDataContainer();
     int traced_depth;
     char** scene_file_names;
+    char** save_file_names;
+    int num_saves;
     int num_scenes; 
     int cur_scene;
     int cur_save;
-    bool init;
+    char buf[256];
+    char const* prompt_text;
 };
 
 // convenience macro

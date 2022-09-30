@@ -7,24 +7,27 @@
 #include "stb_image.h"
 #include "ColorConsole/color.hpp"
 
-Scene::Scene(string filename) {
+// if load_render_state flag is true, then the camera & renderstate will be initialized from the file
+// otherwise they must be initialized manually
+Scene::Scene(string filename, bool load_render_state) : filename(filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;
-    char* fname = (char*)filename.c_str();
-    fp_in.open(fname);
+
+    fp_in.open(filename);
     if (!fp_in.is_open()) {
         cout << "Error reading from file - aborting!" << endl;
         throw;
     }
+
     while (fp_in.good()) {
         string line;
         utilityCore::safeGetline(fp_in, line);
         if (!line.empty()) {
             vector<string> tokens = utilityCore::tokenizeString(line);
-            if (strcmp(tokens[0].c_str(), "OBJECT") == 0) {
+            if (tokens[0] == "OBJECT") {
                 loadGeom();
                 cout << " " << endl;
-            } else if (strcmp(tokens[0].c_str(), "CAMERA") == 0) {
+            } else if (tokens[0] == "CAMERA" && load_render_state) {
                 loadCamera();
                 cout << " " << endl;
             }

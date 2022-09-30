@@ -5,6 +5,8 @@
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_glfw.h"
 #include "ImGui/imgui_impl_opengl3.h"
+#include "rendersave.h"
+#include "pathtrace.h"
 
 GLuint positionLocation = 0;
 GLuint texcoordsLocation = 1;
@@ -12,11 +14,11 @@ GLuint pbo;
 GLuint displayImage;
 
 GLFWwindow* window;
-GuiDataContainer* imguiData = NULL;
+GuiDataContainer* guiData = NULL;
 ImGuiIO* io = nullptr;
 bool mouseOverImGuiWinow;
 
-std::string currentTimeString() {
+std::string Preview::currentTimeString() {
 	time_t now;
 	time(&now);
 	char buf[sizeof "0000-00-00_00-00-00z"];
@@ -138,7 +140,7 @@ void errorCallback(int error, const char* description) {
 	fprintf(stderr, "%s\n", description);
 }
 
-bool initImguiGL() {
+bool Preview::initImguiGL() {
 	glfwSetErrorCallback(errorCallback);
 
 	if (!glfwInit()) {
@@ -174,7 +176,11 @@ bool initImguiGL() {
 	return true;
 }
 
-bool init() {
+GuiDataContainer* Preview::GetGUIData() {
+	return guiData;
+}
+
+bool Preview::initBufs() {
 	// Initialize other stuff
 	initVAO();
 	initTextures();
@@ -188,20 +194,15 @@ bool init() {
 	return true;
 }
 
-void InitImguiData(GuiDataContainer* guiData)
-{
-	imguiData = guiData;
-}
-
-
-void resetImguiState() {
-	mouseOverImGuiWinow = false;
+void Preview::InitImguiData() {
+	if (guiData) {
+		delete guiData;
+	}
+	guiData = new GuiDataContainer();
 }
 
 // LOOK: Un-Comment to check ImGui Usage
 void RenderImGui() {
-	mouseOverImGuiWinow = io->WantCaptureMouse;
-
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
@@ -209,29 +210,61 @@ void RenderImGui() {
 	int lastScene;
 	ImGui::Begin("Path Tracer Analytics", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 	{
-		ImGui::Text("Traced Depth %d", imguiData->traced_depth);
+		ImGui::Text("Traced Depth %d", guiData->traced_depth);
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-		lastScene = imguiData->cur_scene;
-		ImGui::Combo("Scenes", &imguiData->cur_scene, imguiData->scene_file_names, imguiData->num_scenes);
+		lastScene = guiData->cur_scene;
+		ImGui::Combo("Switch Scenes", &guiData->cur_scene, guiData->scene_file_names, guiData->num_scenes);
+
+		if (PathTracer::isPaused()) {
+			if (ImGui::Button("Resume Render")) {
+				PathTracer::togglePause();
+			}
+		} else {
+			if (ImGui::Button("Pause Render")) {
+				PathTracer::togglePause();
+			}
+		}
+		ImGui::Text(guiData->prompt_text);
+		ImGui::InputText("Save File Name", guiData->buf, sizeof(guiData->buf));
+		if (ImGui::Button("Save Render")) {
+			if (strlen(guiData->buf) == 0) {
+				guiData->prompt_text = "Please Enter a File Name";
+			} else {
+				static constexpr char const* illegals = "<>:\"/\\|?*";
+				bool has_illegal = false;
+				for (size_t i = 0; i < sizeof(illegals) && !has_illegal; ++i) {
+					if (strchr(guiData->buf, illegals[i]))
+						has_illegal = true;
+				}
+
+				if (has_illegal) {
+					guiData->prompt_text = "Please Enter a Valid File Name";
+				} else {
+					if (!PathTracer::saveRenderState(guiData->buf)) {
+						guiData->prompt_text = "Failed to Save! Some Error Occurred";
+					}
+				}
+			}
+		}
 	}
 	ImGui::End();
 
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-	if (lastScene != imguiData->cur_scene) {
-		switchScene(imguiData->scene_file_names[imguiData->cur_scene]);
+	if (lastScene != guiData->cur_scene) {
+		switchScene(guiData->scene_file_names[guiData->cur_scene]);
 	}
 }
 
 /// <summary>
 /// renders a pre-scene load menu
 /// </summary>
-void DoPreloadMenu() {
-	while (!imguiData->init && !glfwWindowShouldClose(window)) {
+void Preview::DoPreloadMenu() {
+	bool load_scene = false, load_save = false;
+	while (!load_scene && !load_save && !glfwWindowShouldClose(window)) {
 		glfwPollEvents();
-		mouseOverImGuiWinow = io->WantCaptureMouse;
 
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
@@ -239,12 +272,15 @@ void DoPreloadMenu() {
 
 		ImGui::Begin("WELCOME", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 		{
-			ImGui::Combo("Scenes", &imguiData->cur_scene, imguiData->scene_file_names, imguiData->num_scenes);
-			if (ImGui::Button("Load")) {
-				imguiData->init = true;
+			ImGui::Combo("Scenes", &guiData->cur_scene, guiData->scene_file_names, guiData->num_scenes);
+			if (ImGui::Button("Load Scene")) {
+				load_scene = true;
 			}
 
-			// ImGui::Combo("Saved Render Progress", &imguiData->cur_save, imguiData->cur_save, 0);
+			ImGui::Combo("Saved Render Progress", &guiData->cur_save, guiData->save_file_names, guiData->num_saves);
+			if (ImGui::Button("Load Saved Render")) {
+				load_save = true;
+			}
 		}
 		ImGui::End();
 
@@ -261,23 +297,40 @@ void DoPreloadMenu() {
 	}
 
 	if (!glfwWindowShouldClose(window)) {
-		if (imguiData->num_scenes > 0) {
-			switchScene(imguiData->scene_file_names[imguiData->cur_scene]);
+		if (load_scene) {
+			if (guiData->num_scenes > 0) {
+				switchScene(guiData->scene_file_names[guiData->cur_scene]);
+			} else {
+				cout << "No Scene Found !!" << endl;
+				exit(1);
+			}
 		} else {
-			cout << "No Scene Found !!" << endl;
-			exit(1);
+			if (guiData->num_saves > 0) {
+				int iter;
+				if (read_state(guiData->save_file_names[guiData->cur_save], iter, scene)) {
+					switchScene(scene, iter);
+				}
+			} else {
+				cout << "No Saves Found !!" << endl;
+				exit(1);
+			}
 		}
+	} else {
+		exit(0);
 	}
 }
 
-bool MouseOverImGuiWindow() {
-	return mouseOverImGuiWinow;
+bool Preview::CapturingMouse() {
+	return io->WantCaptureMouse;
 }
-
-void mainLoop() {
+bool Preview::CapturingKeyboard() {
+	return io->WantCaptureKeyboard;
+}
+void Preview::mainLoop() {
+	bool once = true;
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
-		runCuda();
+		runCuda(once); once = false;
 
 		string title = "CIS565 Path Tracer | " + utilityCore::convertIntToString(iteration) + " Iterations";
 		glfwSetWindowTitle(window, title.c_str());

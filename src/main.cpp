@@ -21,7 +21,6 @@ glm::vec3 cameraPosition;
 glm::vec3 ogLookAt; // for recentering the camera
 
 Scene* scene;
-GuiDataContainer* guiData;
 RenderState* renderState;
 int iteration;
 
@@ -33,43 +32,34 @@ int height;
 //-------------------------------
 
 int main(int argc, char** argv) {
-	startTimeString = currentTimeString();
+	startTimeString = Preview::currentTimeString();
 
 	height = width = 800;
 
-	//Create Instance for ImGUIData
-	guiData = new GuiDataContainer();
-
 	// Initialize ImGui Data
-	InitImguiData(guiData);
+	Preview::InitImguiData();
 	// Initialize CUDA and GL components
-	if (!initImguiGL()) {
+	if (!Preview::initImguiGL()) {
 		return EXIT_FAILURE;
 	}
 
 	// preload
-	DoPreloadMenu();
+	Preview::DoPreloadMenu();
 
-	init();
-	InitDataContainer(guiData);
+	Preview::initBufs();
+	PathTracer::InitDataContainer(Preview::GetGUIData());
 
 	// GLFW main loop
-	mainLoop();
+	Preview::mainLoop();
 
 	return EXIT_SUCCESS;
 }
 
-bool switchScene(char const* path) {
-	// Load scene file
-	if (scene) {
-		delete scene;
-	}
-	scene = new Scene(path);
-
+bool switchScene(Scene* scene, int start_iter) {
 	// Set up camera stuff from loaded path tracer settings
-	iteration = 0;
+	iteration = start_iter;
 	renderState = &scene->state;
-	Camera& cam = renderState->camera;
+	Camera const& cam = renderState->camera;
 	width = cam.resolution.x;
 	height = cam.resolution.y;
 
@@ -92,9 +82,18 @@ bool switchScene(char const* path) {
 	camchanged = true;
 	leftMousePressed = rightMousePressed = middleMousePressed = false;
 	lastX = lastY = 0;
-	resetImguiState();
+	Preview::InitImguiData();
 
 	return true;
+}
+
+bool switchScene(char const* path, int start_iter) {
+	// Load scene file
+	if (scene) {
+		delete scene;
+	}
+	scene = new Scene(path);
+	return switchScene(scene, start_iter);
 }
 
 void saveImage() {
@@ -120,9 +119,9 @@ void saveImage() {
 	//img.saveHDR(filename);  // Save a Radiance HDR file
 }
 
-void runCuda() {
+void runCuda(bool init) {
 	if (camchanged) {
-		iteration = 0;
+		if(!init) iteration = 0;
 		Camera& cam = renderState->camera;
 		cameraPosition.x = zoom * sin(phi) * sin(theta);
 		cameraPosition.y = zoom * cos(theta);
@@ -144,25 +143,24 @@ void runCuda() {
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
-	if (iteration == 0) {
-		pathtraceFree();
-		pathtraceInit(scene);
+	if (iteration == 0 || init) {
+		PathTracer::pathtraceFree();
+		PathTracer::pathtraceInit(scene, renderState);
 	}
 
 	if (iteration < renderState->iterations) {
 		uchar4* pbo_dptr = NULL;
-		iteration++;
 		cudaGLMapBufferObject((void**)&pbo_dptr, pbo);
 
 		// execute the kernel
 		int frame = 0;
-		pathtrace(pbo_dptr, frame, iteration);
+		iteration = PathTracer::pathtrace(pbo_dptr, iteration);
 
 		// unmap buffer object
 		cudaGLUnmapBufferObject(pbo);
 	} else {
 		saveImage();
-		pathtraceFree();
+		PathTracer::pathtraceFree();
 		cudaDeviceReset();
 		exit(EXIT_SUCCESS);
 	}
@@ -176,7 +174,9 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 			glfwSetWindowShouldClose(window, GL_TRUE);
 			break;
 		case GLFW_KEY_S:
-			saveImage();
+			if (!Preview::CapturingMouse() && !Preview::CapturingKeyboard()) {
+				saveImage();
+			}
 			break;
 		case GLFW_KEY_SPACE:
 			camchanged = true;
@@ -189,8 +189,7 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 }
 
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-	if (MouseOverImGuiWindow())
-	{
+	if (Preview::CapturingMouse()) {
 		return;
 	}
 	leftMousePressed = (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS);

@@ -36,8 +36,9 @@ extern int iteration;
 extern int width;
 extern int height;
 
-bool switchScene(char const*);
-void runCuda();
+bool switchScene(Scene* scene, int start_iter = 0);
+bool switchScene(char const* path, int start_iter = 0);
+void runCuda(bool init);
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
 void mousePositionCallback(GLFWwindow* window, double xpos, double ypos);
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);

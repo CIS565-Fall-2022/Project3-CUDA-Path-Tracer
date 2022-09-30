@@ -14,13 +14,13 @@
 #include "pathtrace.h"
 #include "intersections.h"
 #include "interactions.h"
+#include "rendersave.h"
 
 // impl switches
 #define COMPACTION
 #define SORT_MAT
 #define ANTI_ALIAS_JITTER
 // #define FAKE_SHADE
-
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #ifndef NDEBUG
@@ -114,8 +114,9 @@ __global__ void sendImageToPBO(int iter, glm::vec3* pixs, uchar4* pbo, glm::ivec
 	}
 }
 
-static Scene* hst_scene = NULL;
-static GuiDataContainer* guiData = NULL;
+static RenderState* renderState = nullptr;
+static Scene* hst_scene = nullptr;
+static GuiDataContainer* guiData = nullptr;
 
 static Span<glm::vec3>             dev_image;
 static Span<Geom>                  dev_geoms;
@@ -132,20 +133,24 @@ static thrust::device_ptr<PathSegment> dev_thrust_paths;
 static thrust::device_ptr<ShadeableIntersection> dev_thrust_inters;
 std::vector<TextureGPU> dev_texs;
 
+// pathtracer state
+static bool render_paused = false;
+static int cur_iter;
 
-void InitDataContainer(GuiDataContainer* imGuiData)
+void PathTracer::InitDataContainer(GuiDataContainer* imGuiData)
 {
 	unitTest();
 	guiData = imGuiData;
 }
 
-void pathtraceInit(Scene* scene) {
+void PathTracer::pathtraceInit(Scene* scene, RenderState* state) {
 	hst_scene = scene;
+	renderState = state;
 
 	const Camera& cam = hst_scene->state.camera;
 	const int pixelcount = cam.resolution.x * cam.resolution.y;
 
-	dev_image = make_span<glm::vec3>(pixelcount);
+	dev_image = make_span(state->image);
 	dev_paths = make_span<PathSegment>(pixelcount);
 	dev_materials = make_span(scene->materials);
 	dev_intersections = make_span<ShadeableIntersection>(pixelcount);
@@ -168,7 +173,7 @@ void pathtraceInit(Scene* scene) {
     checkCUDAError("pathtraceInit");
 }
 
-void pathtraceFree() {
+void PathTracer::pathtraceFree() {
 	FREE(dev_image);
 	FREE(dev_paths);
 	FREE(dev_geoms);
@@ -208,14 +213,13 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		cam_ray.origin = cam.position;
 
 #ifdef ANTI_ALIAS_JITTER
-		// randonly jitter the ray
+		// randomly jitter the ray
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
 		thrust::uniform_real_distribution<float> udist(-0.5f, 0.5f);
 		x += udist(rng);
 		y += udist(rng);
 #endif // ANTI_ALIAS
 
-		// TODO: implement antialiasing by jittering the ray
 		cam_ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
@@ -400,8 +404,15 @@ __global__ void finalGather(int numPixels, glm::vec3* image, PathSegment* iterat
 /**
  * Wrapper for the __global__ call that sets up the kernel calls and does a ton
  * of memory management
+ * 
+ * Returns the new iteration
  */
-void pathtrace(uchar4 *pbo, int const frame, int const iter) {
+int PathTracer::pathtrace(uchar4 *pbo, int iter) {
+	cur_iter = iter;
+	if (render_paused) {
+		return iter;
+	}
+
     const int traceDepth = hst_scene->state.traceDepth;
     const Camera &cam = hst_scene->state.camera;
     const int pixelcount = cam.resolution.x * cam.resolution.y;
@@ -519,4 +530,18 @@ void pathtrace(uchar4 *pbo, int const frame, int const iter) {
             pixelcount * sizeof(glm::vec3), cudaMemcpyDeviceToHost);
 
     checkCUDAError("pathtrace");
+
+	return cur_iter = iter + 1;
+}
+
+bool PathTracer::saveRenderState(char const* filename) {
+	return save_state(cur_iter, *renderState, *hst_scene, filename);
+}
+
+void PathTracer::togglePause() {
+	render_paused = !render_paused;
+}
+
+bool PathTracer::isPaused() {
+	return render_paused;
 }

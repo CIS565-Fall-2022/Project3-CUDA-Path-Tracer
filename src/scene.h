@@ -21,8 +21,10 @@ private:
     int loadGeom();
     int loadCamera();
 public:
-    Scene(string filename);
+    Scene(string filename, bool load_render_state = true);
     ~Scene();
+    
+    std::string filename;
 
     std::vector<Geom> geoms;
     std::vector<Material> materials;
