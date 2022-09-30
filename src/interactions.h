@@ -43,10 +43,58 @@ glm::vec3 calculateRandomDirectionInHemisphere(
 
 __host__ __device__
 glm::vec3 sample_diffuse(
-    glm::vec3 normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 &wi) {
-    
+    glm::vec3 &normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 wo, glm::vec3& wi) 
+{
     wi = calculateRandomDirectionInHemisphere(normal, rng);
     return m.color;
+}
+
+__host__ __device__
+glm::vec3 sample_specular_refl(
+    glm::vec3 &normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 wo, glm::vec3& wi) 
+{
+    wi = glm::reflect(wo, normal);
+    return m.specular.color;
+}
+
+__host__ __device__
+glm::vec3 sample_specular_trans(
+    glm::vec3 &normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 wo, glm::vec3& wi) 
+{
+    float entering = (glm::dot(wo, normal) < 0);
+    float eta = (entering) ? 1.f / m.indexOfRefraction : m.indexOfRefraction;
+    wi = glm::refract(wo, normal, eta);
+
+    // Flip normal to be in same hemisphere as wo
+    bool flip = (glm::dot(wo, normal) < 0.f);
+    normal = (flip) ? -normal : normal;
+
+    // Total internal reflection
+    if (glm::length(wi) < 0) {
+        wi = glm::reflect(wo, normal);
+        return glm::vec3(0.0, 0.0, 0.0);
+    }
+    return m.specular.color;
+}
+
+__host__ __device__
+glm::vec3 sample_glass(
+    glm::vec3& normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 wo, glm::vec3& wi)
+{
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    bool reflect = u01(rng) < 0.5;
+
+    /*glm::vec3 Fr = Fresnel();
+    glm::vec3 f = glm::vec3(0.0, 0.0, 0.0);
+    if (reflect) {
+        f = sample_specular_refl(normal, m, rng, wo, wi);
+        return 2.f * Fr * f;
+    }
+    else {
+        f = sample_specular_trans(normal, m, rng, wo, wi);
+        return 2.f * (glm::vec3(1.f, 1.f, 1.f) - Fr) * f;
+    }*/
+    return m.specular.color;
 }
 /**
  * Scatter a ray with some probabilities according to the material properties.
@@ -83,41 +131,38 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
-    //if (pathSegment.remainingBounces <= 0) {
-    //    return;
-    //}
-
+    if (pathSegment.remainingBounces <= 0) {
+        return;
+    }
     thrust::uniform_real_distribution<float> u01(0, 1);
     float xi = u01(rng);
 
-    float diffuseIntensity = glm::length(m.color);
+    /*float diffuseIntensity = glm::length(m.color);
     float specularIntensity = glm::length(m.specular.color);
     float totalIntensity = diffuseIntensity + specularIntensity;
     float diffuseProbability = diffuseIntensity / totalIntensity;
-    float specularProbability = specularIntensity / totalIntensity;
+    float specularProbability = specularIntensity / totalIntensity;*/
 
-    //glm::vec3 wi;
-    if (xi > diffuseProbability) {
-        float entering = (glm::dot(pathSegment.ray.direction, normal) < 0);
-        float eta = (entering) ? 1.f /m.indexOfRefraction : m.indexOfRefraction;
-        glm::vec3 wi = glm::refract(pathSegment.ray.direction, normal, eta);
-        pathSegment.ray.direction = wi;
-        pathSegment.throughput *= m.specular.color / specularProbability;
-        pathSegment.ray.origin = intersect + 0.01f * pathSegment.ray.direction;
+    /*float refl = m.hasReflective;
+    float refr = (1.0 - m.hasReflective) * m.hasRefractive;
+    float diff = (1.0 - m.hasReflective) * (1.0 - m.hasRefractive);*/
+
+    glm::vec3 wi = glm::vec3(0.0, 0.0, 0.0);
+    glm::vec3 f = glm::vec3(0.0, 0.0, 0.0);
+    if (m.hasReflective && m.hasRefractive) {
+        f = sample_glass(normal, m, rng, pathSegment.ray.direction, wi);
     }
-
-    //if (xi > diffuseProbability) {
-    //    glm::vec3 wi = glm::reflect(pathSegment.ray.direction, normal);
-    //    pathSegment.ray.direction = wi;
-    //    pathSegment.ray.origin = intersect;
-    //    pathSegment.throughput *= m.specular.color / specularProbability;
-    //}
+    if (m.hasReflective) {
+        f = sample_specular_refl(normal, m, rng, pathSegment.ray.direction, wi);
+    }
+    else if (m.hasRefractive) {
+        f = sample_specular_trans(normal, m, rng, pathSegment.ray.direction, wi);
+    }
     else {
-        //glm::vec3 f = sample_diffuse(normal, m, rng, wi);
-        glm::vec3 wi = calculateRandomDirectionInHemisphere(normal, rng);
-        pathSegment.ray.direction = wi;
-        pathSegment.ray.origin = intersect;
-        pathSegment.throughput *= m.color / diffuseProbability;
+        f = sample_diffuse(normal, m, rng, pathSegment.ray.direction, wi);
     }
+    pathSegment.throughput *= f;
+    pathSegment.ray.direction = wi;
+    pathSegment.ray.origin = intersect + 0.01f * pathSegment.ray.direction;
     pathSegment.remainingBounces--;
 }
