@@ -56,12 +56,16 @@ struct RenderState {
     std::string imageName;
 };
 
+struct PrevBSDFSampleInfo {
+    float BSDFPdf;
+    bool deltaSample;
+};
+
 struct PathSegment {
     Ray ray;
     glm::vec3 throughput;
     glm::vec3 radiance;
-    float BSDFPdf;
-    bool deltaSample;
+    PrevBSDFSampleInfo prev;
     int pixelIndex;
     int remainingBounces;
 };
@@ -86,6 +90,7 @@ struct Intersection {
         norm = rhs.norm;
         uv = rhs.uv;
         wo = rhs.wo;
+        prev = rhs.prev;
     }
 
     int primId;
@@ -99,4 +104,6 @@ struct Intersection {
         glm::vec3 wo;
         glm::vec3 prevPos;
     };
+
+    PrevBSDFSampleInfo prev;
 };

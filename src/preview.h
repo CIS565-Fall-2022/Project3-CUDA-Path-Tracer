@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common.h"
+
 extern GLuint pbo;
 
 std::string currentTimeString();

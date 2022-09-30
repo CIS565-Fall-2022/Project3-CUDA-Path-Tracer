@@ -159,7 +159,7 @@ void saveImage() {
 		for (int y = 0; y < height; y++) {
 			int index = x + (y * width);
 			glm::vec3 color = renderState->image[index] / samples;
-			switch (ToneMapping::method) {
+			switch (Settings::toneMapping) {
 			case ToneMapping::Filmic:
 				color = Math::filmic(color);
 				break;
@@ -243,7 +243,7 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 			saveImage();
 			break;
 		case GLFW_KEY_T:
-			ToneMapping::method = (ToneMapping::method + 1) % 3;
+			Settings::toneMapping = (Settings::toneMapping + 1) % 3;
 			break;
 		case GLFW_KEY_SPACE:
 			camChanged = true;

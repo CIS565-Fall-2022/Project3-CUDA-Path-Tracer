@@ -15,13 +15,7 @@
 #include "image.h"
 #include "bvh.h"
 #include "sampler.h"
-
-#define MESH_DATA_STRUCT_OF_ARRAY false
-#define MESH_DATA_INDEXED false
-
-#define DEV_SCENE_PASS_BY_CONST_MEM false
-
-#define SCENE_LIGHT_SINGLE_SIDED true
+#include "common.h"
 
 struct MeshData {
     void clear() {
@@ -190,6 +184,24 @@ struct DevScene {
         }
     }
 
+    __device__ bool naiveTestOcclusion(glm::vec3 x, glm::vec3 y) {
+        const float Eps = 1e-4f;
+
+        glm::vec3 dir = y - x;
+        float dist = glm::length(dir);
+        dir /= dist;
+        dist -= Eps;
+
+        Ray ray = makeOffsetedRay(x, dir);
+
+        for (int i = 0; i < (BVHSize + 1) / 2; i++) {
+            if (intersectPrimitive(i, ray, dist)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     __device__ void intersect(Ray ray, Intersection& intersec) {
         float closestDist = FLT_MAX;
         int closestPrimId = NullPrimitive;
@@ -243,7 +255,6 @@ struct DevScene {
         dist -= Eps;
 
         Ray ray = makeOffsetedRay(x, dir);
-        bool hit = false;
 
         MTBVHNode* nodes = devBVHNodes[getMTBVHId(-ray.direction)];
         int node = 0;
@@ -255,7 +266,9 @@ struct DevScene {
             if (boundHit && boundDist < dist) {
                 int primId = nodes[node].primitiveId;
                 if (primId != NullPrimitive) {
-                    hit |= intersectPrimitive(primId, ray, dist);
+                    if (intersectPrimitive(primId, ray, dist)) {
+                        return true;
+                    }
                 }
                 node++;
             }
@@ -263,7 +276,7 @@ struct DevScene {
                 node = nodes[node].nextNodeIfMiss;
             }
         }
-        return hit;
+        return false;
     }
 
     __device__ void visualizedIntersect(Ray ray, Intersection& intersec) {
@@ -323,7 +336,12 @@ struct DevScene {
         glm::vec3 v2 = devVertices[primId * 3 + 2];
         glm::vec3 sampled = Math::sampleTriangleUniform(v0, v1, v2, r.z, r.w);
 
-        if (testOcclusion(pos, sampled)) {
+#if BVH_DISABLE
+        bool occ = naiveTestOcclusion(pos, sampled);
+#else
+        bool occ = testOcclusion(pos, sampled);
+#endif
+        if (occ) {
             return InvalidPdf;
         }
         glm::vec3 normal = Math::triangleNormal(v0, v1, v2);

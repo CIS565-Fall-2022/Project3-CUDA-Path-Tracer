@@ -5,6 +5,7 @@
 #include <thrust/random.h>
 #include <thrust/remove.h>
 #include <thrust/device_ptr.h>
+#include <thrust/sort.h>
 
 #include "sceneStructs.h"
 #include "material.h"
@@ -17,10 +18,6 @@
 #include "interactions.h"
 #include "mathUtil.h"
 #include "sampler.h"
-
-#define BVH_DEBUG_VISUALIZATION false
-
-int ToneMapping::method = ToneMapping::ACES;
 
 //Kernel that writes the image to the OpenGL PBO directly.
 __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
@@ -63,10 +60,16 @@ static glm::vec3* devImage = nullptr;
 static PathSegment* devPaths = nullptr;
 static PathSegment* devTerminatedPaths = nullptr;
 static Intersection* devIntersections = nullptr;
+static int* devIntersecMatKeys = nullptr;
+static int* devSegmentMatKeys = nullptr;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
 static thrust::device_ptr<PathSegment> devPathsThr;
 static thrust::device_ptr<PathSegment> devTerminatedPathsThr;
+
+static thrust::device_ptr<Intersection> devIntersectionsThr;
+static thrust::device_ptr<int> devIntersecMatKeysThr;
+static thrust::device_ptr<int> devSegmentMatKeysThr;
  
 void InitDataContainer(GuiDataContainer* imGuiData) {
 	guiData = imGuiData;
@@ -88,6 +91,12 @@ void pathTraceInit(Scene* scene) {
 
 	cudaMalloc(&devIntersections, pixelcount * sizeof(Intersection));
 	cudaMemset(devIntersections, 0, pixelcount * sizeof(Intersection));
+	devIntersectionsThr = thrust::device_ptr<Intersection>(devIntersections);
+
+	cudaMalloc(&devIntersecMatKeys, pixelcount * sizeof(int));
+	cudaMalloc(&devSegmentMatKeys, pixelcount * sizeof(int));
+	devIntersecMatKeysThr = thrust::device_ptr<int>(devIntersecMatKeys);
+	devSegmentMatKeysThr = thrust::device_ptr<int>(devSegmentMatKeys);
 
 	checkCUDAError("pathTraceInit");
 }
@@ -97,6 +106,8 @@ void pathTraceFree() {
 	cudaFree(devPaths);
 	cudaFree(devTerminatedPaths);
 	cudaFree(devIntersections);
+	cudaFree(devIntersecMatKeys);
+	cudaFree(devSegmentMatKeys);
 }
 
 /**
@@ -152,17 +163,23 @@ __global__ void computeIntersections(
 	int numPaths,
 	PathSegment* pathSegments,
 	DevScene* scene,
-	Intersection* intersections
+	Intersection* intersections,
+	int* materialKeys,
+	bool sortMaterial
 ) {
 	int pathIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (pathIdx < numPaths) {
-#if BVH_DEBUG_VISUALIZATION
-	scene->visualizedIntersect(pathSegments[pathIdx].ray, intersections[pathIdx]);
-#else
+	if (pathIdx >= numPaths) {
+		return;
+	}
+
 	Intersection intersec;
 	PathSegment segment = pathSegments[pathIdx];
+#if BVH_DISABLE
+	scene->naiveIntersect(segment.ray, intersec);
+#else
 	scene->intersect(segment.ray, intersec);
+#endif
 
 	if (intersec.primId != NullPrimitive) {
 		if (scene->devMaterials[intersec.matId].type == Material::Type::Light) {
@@ -176,15 +193,20 @@ __global__ void computeIntersections(
 				// If not first ray, preserve previous sampling information for
 				// MIS calculation
 				intersec.prevPos = segment.ray.origin;
+				intersec.prev = segment.prev;
 			}
 		}
 		else {
 			intersec.wo = -segment.ray.direction;
 		}
+		if (sortMaterial) {
+			materialKeys[pathIdx] = intersec.matId;
+		}
+	}
+	else if (sortMaterial) {
+		materialKeys[pathIdx] = -1;
 	}
 	intersections[pathIdx] = intersec;
-#endif
-	}
 }
 
 __global__ void computeTerminatedRays(
@@ -248,17 +270,19 @@ __global__ void pathIntegSampleSurface(
 	glm::vec3 accRadiance(0.f);
 
 	if (material.type == Material::Type::Light) {
+		PrevBSDFSampleInfo prev = intersec.prev;
+
 		glm::vec3 radiance = material.baseColor * material.emittance;
 		if (depth == 0) {
 			accRadiance += radiance;
 		}
-		else if (segment.deltaSample) {
+		else if (prev.deltaSample) {
 			accRadiance += radiance * segment.throughput;
 		}
 		else {
 			float lightPdf = Math::pdfAreaToSolidAngle(Math::luminance(radiance) * scene->sumLightPowerInv,
 				intersec.prevPos, intersec.pos, intersec.norm);
-			float BSDFPdf = segment.BSDFPdf;
+			float BSDFPdf = prev.BSDFPdf;
 			accRadiance += radiance * segment.throughput * Math::powerHeuristic(BSDFPdf, lightPdf);
 		}
 		segment.remainingBounces = 0;
@@ -293,8 +317,7 @@ __global__ void pathIntegSampleSurface(
 			segment.throughput *= sample.bsdf / sample.pdf *
 				(deltaSample ? 1.f : Math::absDot(intersec.norm, sample.dir));
 			segment.ray = makeOffsetedRay(intersec.pos, sample.dir);
-			segment.BSDFPdf = sample.pdf;
-			segment.deltaSample = deltaSample;
+			segment.prev = { sample.pdf, deltaSample };
 			segment.remainingBounces--;
 		}
 	}
@@ -403,13 +426,21 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 			numPaths,
 			devPaths,
 			hstScene->devScene,
-			devIntersections
+			devIntersections,
+			devIntersecMatKeys,
+			Settings::sortMaterial
 		);
 		checkCUDAError("PT::computeInteractions");
 		cudaDeviceSynchronize();
 
 		// TODO: compare between directly shading the path segments and shading
 		// path segments that have been reshuffled to be contiguous in memory.
+
+		if (Settings::sortMaterial) {
+			cudaMemcpyDevToDev(devSegmentMatKeys, devIntersecMatKeys, numPaths * sizeof(int));
+			thrust::sort_by_key(devIntersecMatKeysThr, devIntersecMatKeysThr + numPaths, devIntersectionsThr);
+			thrust::sort_by_key(devSegmentMatKeysThr, devSegmentMatKeysThr + numPaths, devPathsThr);
+		}
 
 		pathIntegSampleSurface<<<numBlocksPathSegmentTracing, blockSize1D>>>(
 			iter, depth, devPaths, devIntersections, hstScene->devScene, numPaths
@@ -440,7 +471,7 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 	///////////////////////////////////////////////////////////////////////////
 
 	// Send results to OpenGL buffer for rendering
-	sendImageToPBO<<<blocksPerGrid2D, blockSize2D>>>(pbo, cam.resolution, iter, devImage, ToneMapping::method);
+	sendImageToPBO<<<blocksPerGrid2D, blockSize2D>>>(pbo, cam.resolution, iter, devImage, Settings::toneMapping);
 
 	// Retrieve image from GPU
 	cudaMemcpy(hstScene->state.image.data(), devImage,

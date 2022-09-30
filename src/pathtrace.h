@@ -3,14 +3,7 @@
 #include <device_launch_parameters.h>
 #include <vector>
 #include "scene.h"
-
-class ToneMapping {
-public:
-    enum {
-        None = 0, Filmic = 1, ACES = 2
-    };
-    static int method;
-};
+#include "common.h"
 
 void InitDataContainer(GuiDataContainer* guiData);
 void pathTraceInit(Scene *scene);
