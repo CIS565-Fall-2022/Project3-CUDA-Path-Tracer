@@ -11,8 +11,8 @@
 enum GeomType {
     SPHERE,
     CUBE,
-    TRIANGLE,
-    OBJ // name it better lol
+    TRIANGLE, // Triangle only exists in the scene if USE_BOUND_BOX 0
+    OBJ // Obj only exists in the scene if USE_BOUND_BOX 1
 };
 
 struct BoundBox {

@@ -155,20 +155,10 @@ int Scene::loadObj(const char* filename, glm::mat4 transform,
 
                 triangleArray->push_back(triangle);
 
-                //minX = std::min(std::min(vxa, vxb), std::min(vxc, minX));
-                //minY = std::min(std::min(vya, vyb), std::min(vyc, minY));
-                //minZ = std::min(std::min(vza, vzb), std::min(vzc, minZ));
-
-                //maxX = std::max(std::max(vxa, vxb), std::max(vxc, maxX));
-                //maxY = std::max(std::max(vya, vyb), std::max(vyc, maxY));
-                //maxZ = std::max(std::max(vza, vzb), std::max(vzc, maxZ));
-
             }
             index_offset += fv;
         }
     }
-
-    //cout << "maxX: " << maxX << " maxY: " << maxY << " maxZ: " << maxZ;
 
     return true;
 }
@@ -260,18 +250,6 @@ int Scene::loadGeom(string objectid) {
             for (int i = 0; i < triangleArray.size(); i++) {
                 // jank code to find the min and max of the box
                 Triangle tri = triangleArray[i];
-                //glm::vec4 transformedA = newGeom.transform * tri.pointA.pos;
-                //glm::vec4 transformedB = newGeom.transform * tri.pointB.pos;
-                //glm::vec4 transformedC = newGeom.transform * tri.pointC.pos;
-
-                //xMin = fmin(fmin(transformedA[0], transformedB[0]), fmin(transformedC[0], xMin));
-                //xMax = fmax(fmax(transformedA[0], transformedB[0]), fmax(transformedC[0], xMax));
-
-                //yMin = fmin(fmin(transformedA[1], transformedB[1]), fmin(transformedC[1], yMin));
-                //yMax = fmax(fmax(transformedA[1], transformedB[1]), fmax(transformedC[1], yMax));
-
-                //zMin = fmin(fmin(transformedA[2], transformedB[2]), fmin(transformedC[2], zMin));
-                //zMax = fmax(fmax(transformedA[2], transformedB[2]), fmin(transformedC[2], zMax));
 
                 xMin = fmin(fmin(tri.pointA.pos[0], tri.pointB.pos[0]), fmin(tri.pointC.pos[0], xMin));
                 xMax = fmax(fmax(tri.pointA.pos[0], tri.pointB.pos[0]), fmax(tri.pointC.pos[0], xMax));
@@ -282,9 +260,6 @@ int Scene::loadGeom(string objectid) {
                 zMin = fmin(fmin(tri.pointA.pos[2], tri.pointB.pos[2]), fmin(tri.pointC.pos[2], zMin));
                 zMax = fmax(fmax(tri.pointA.pos[2], tri.pointB.pos[2]), fmax(tri.pointC.pos[2], zMax));
             }
-
-           // glm::vec4 transformedBoxMin = newGeom.transform * glm::vec4(glm::vec3(xMin, yMin, zMin), 1.f);
-           // glm::vec4 transformedBoxMax = newGeom.transform * glm::vec4(glm::vec3(xMax, yMax, zMax), 1.f);
 
             BoundBox box = {
                 glm::vec3(xMin, yMin, zMin),
@@ -329,9 +304,6 @@ int Scene::loadGeom(string objectid) {
                         },
                     1,
                 };
-
-                //printf("tri x: %f, y: %f, z: %f \n", trisInGeom->pointA.pos[0], trisInGeom->pointA.pos[1], trisInGeom->pointA.pos[2]);
-
                 geoms.push_back(newTriGeom);
             }
 #endif
