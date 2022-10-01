@@ -169,6 +169,11 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 {
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+	thrust::default_random_engine rng = makeSeededRandomEngine(iter, x + y * cam.resolution.x, 0);
+	thrust::uniform_real_distribution<float> u01(0, 1);
+
+	float jitterX = u01(rng);
+	float jitterY = u01(rng);
 
 	if (x < cam.resolution.x && y < cam.resolution.y) {
 		int index = x + (y * cam.resolution.x);
@@ -179,8 +184,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 
 		// TODO: implement antialiasing by jittering the ray
 		segment.ray.direction = glm::normalize(cam.view
-			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
+			- cam.right * cam.pixelLength.x * ((float)(x + jitterX) - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)(y + jitterY) - (float)cam.resolution.y * 0.5f)
 		);
 
 		segment.pixelIndex = index;
