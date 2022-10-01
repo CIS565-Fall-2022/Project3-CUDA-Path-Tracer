@@ -6,6 +6,8 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <iostream>
 #include <cstdio>
 
@@ -67,6 +69,17 @@ glm::mat4 utilityCore::buildTransformationMatrix(glm::vec3 translation, glm::vec
     glm::mat4 rotationMat =   glm::rotate(glm::mat4(), rotation.x * (float) PI / 180, glm::vec3(1, 0, 0));
     rotationMat = rotationMat * glm::rotate(glm::mat4(), rotation.y * (float) PI / 180, glm::vec3(0, 1, 0));
     rotationMat = rotationMat * glm::rotate(glm::mat4(), rotation.z * (float) PI / 180, glm::vec3(0, 0, 1));
+    glm::mat4 scaleMat = glm::scale(glm::mat4(), scale);
+    return translationMat * rotationMat * scaleMat;
+}
+
+glm::mat4 utilityCore::buildTransformationMatrix(glm::vec3 translation, glm::quat rotation, glm::vec3 scale) 
+{
+    glm::mat4 translationMat = glm::translate(glm::mat4(), translation);
+    glm::vec3 rotationEuler = glm::eulerAngles(rotation);
+    glm::mat4 rotationMat = glm::rotate(glm::mat4(), rotationEuler.x * (float)PI / 180, glm::vec3(1, 0, 0));
+    rotationMat = rotationMat * glm::rotate(glm::mat4(), rotationEuler.y * (float)PI / 180, glm::vec3(0, 1, 0));
+    rotationMat = rotationMat * glm::rotate(glm::mat4(), rotationEuler.z * (float)PI / 180, glm::vec3(0, 0, 1));
     glm::mat4 scaleMat = glm::scale(glm::mat4(), scale);
     return translationMat * rotationMat * scaleMat;
 }

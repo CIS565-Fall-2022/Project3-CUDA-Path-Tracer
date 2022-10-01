@@ -365,7 +365,6 @@ __global__ void BSDFShading(
 				//need intersection position
 				glm::vec3 inter = getPointOnRay(pathSegments[index].ray, intersection.t);
 				scatterRay(pathSegments[index], inter, intersection.surfaceNormal, material, rng);
-
 				//Debug
 				pathSegments[index].remainingBounces -= 1;
 			}

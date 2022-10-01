@@ -8,7 +8,8 @@
  * Computes a cosine-weighted random direction in a hemisphere.
  * Used for diffuse lighting.
  */
-__host__ __device__
+
+__device__
 glm::vec3 calculateRandomDirectionInHemisphere(
         glm::vec3 normal, thrust::default_random_engine &rng) {
     thrust::uniform_real_distribution<float> u01(0, 1);
@@ -68,13 +69,66 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  * You may need to change the parameter list for your purposes!
  */
 
-__host__ __device__ 
-void FresnelDielectric()
-{
 
+//Schilick
+__device__ 
+float fresnelReflectance(double cosTheta,double ref_index)
+{
+    auto r0 = (1 - ref_index) / (1 + ref_index);
+    r0 = r0 * r0;
+    return r0 + (1 - r0) * pow((1 - cosTheta), 5);
 }
 
-__host__ __device__
+__device__ double lengthSquared(glm::vec3 vec)
+{
+    return vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2];
+}
+
+//PBRT
+__device__ glm::vec3 refractEvaluation(const glm::vec3&dir,const glm::vec3& n,float etai_over_etat)
+{
+    float cosTheta = fmin(glm::dot(-dir, n), 1.0f);
+    glm::vec3 r_out_perp = etai_over_etat * (dir + cosTheta * n);
+    glm::vec3 r_out_parallel = (float)-sqrt(fabs(1.0 - lengthSquared(r_out_perp))) * n;
+    return r_out_perp + r_out_parallel;
+}
+
+__device__ glm::vec3 dielectricEvaluation
+(PathSegment& pathSegment, glm::vec3 intersect, 
+    glm::vec3 normal, const Material& m, thrust::default_random_engine& rng)
+{
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    normal = glm::normalize(normal);
+    //dot product smaller than 0, means ray intersects with out face
+    //else: inner face
+    bool outsideFace = glm::dot(pathSegment.ray.direction, normal) < 0.0f;
+    double refract_ratio = outsideFace ? (1.0 / m.indexOfRefraction) : m.indexOfRefraction;
+
+    glm::vec3 unit_rayDir = glm::normalize(pathSegment.ray.direction);
+    double cosTheta = fmin(glm::dot(-unit_rayDir, normal), 0.0f);
+    double sinTheta = sqrt(1.0f - pow(cosTheta, 2));
+
+    bool not_refractable = (refract_ratio * sinTheta) > 1.0f;
+    glm::vec3 direction;
+    if (not_refractable || fresnelReflectance(cosTheta, refract_ratio) > u01(rng))
+    {
+        float scale = m.hasRefractive <= 0.0 ? 0.0 : 1.0/(1-m.hasRefractive);
+        direction = glm::reflect(unit_rayDir, normal);
+        pathSegment.color *= m.color;
+    }
+    else
+    {
+        //refract
+        float scale = m.hasRefractive <= 0.0 ? 0.0 : 1.0 / (1 - m.hasRefractive);
+        direction = refractEvaluation(unit_rayDir,normal,u01(rng));
+        if (m.specular.exponent > 0)
+        {
+            pathSegment.color *= m.specular.color;
+        }
+    }
+    return glm::normalize(direction);
+}
+__device__
 void scatterRay(
         PathSegment & pathSegment,
         glm::vec3 intersect,
@@ -86,27 +140,34 @@ void scatterRay(
     // calculateRandomDirectionInHemisphere defined above.
     thrust::uniform_real_distribution<float> u01(0, 1);
     //use this act as pdf
-    glm::vec3 dir = pathSegment.ray.direction;
+    glm::vec3 nextRayDir;;
     float eta;
    // Specular BRDF/BTDF here
-    if (m.hasRefractive)
+    float random = u01(rng);
+    if (random <= m.hasReflective)
     {
-      
+        nextRayDir = glm::reflect(pathSegment.ray.direction,normal);
+        if (m.specular.exponent > 0 && random>0.5)
+        {
+            pathSegment.color *= m.specular.color;
+        }
+        else
+        {
+            pathSegment.color *= m.color;
+        }
     }
-    else if (m.hasReflective)
+    else if (random <= m.hasReflective + m.hasRefractive)
     {
-
+        nextRayDir = dielectricEvaluation(pathSegment,intersect,normal,m,rng);
     }
     else
     {
-        //diffuse
-        pathSegment.ray.origin = intersect;
-        pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
+        nextRayDir = calculateRandomDirectionInHemisphere(normal, rng);
         pathSegment.color *= m.color;
     }
-   
 
- 
+    pathSegment.ray.origin = intersect + 0.0001f * nextRayDir;
+    pathSegment.ray.direction = nextRayDir;
 }
 
 

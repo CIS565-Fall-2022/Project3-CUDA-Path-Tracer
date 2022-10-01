@@ -10,7 +10,9 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    MESH
 };
+
 
 struct Ray {
     glm::vec3 origin;
@@ -20,6 +22,7 @@ struct Ray {
 struct Geom {
     enum GeomType type;
     int materialid;
+    int mesh_id;
     glm::vec3 translation;
     glm::vec3 rotation;
     glm::vec3 scale;
@@ -27,8 +30,68 @@ struct Geom {
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
 };
+//Added here
+struct Primitive
+{
+    int count;
+    int index_Offset;
+    int v_Offset;
+    int n_Offset=-1;
+    int uv_Offset=-1;
+    int t_Offset = -1;
+    int mat_id;
+    glm::vec3 boundingBoxMax;
+    glm::vec3 boundingBoxMin;
+    glm::mat4 pivotTransform;
+};
+
+struct Texture
+{
+    int size;
+    int width;
+    int height;
+    int component;
+    unsigned char* image;
+};
+
+struct TextureInfo
+{
+    int index;
+    int texCoord;
+    TextureInfo& operator=(const tinygltf::TextureInfo temp)
+    {
+        index = temp.index;
+        texCoord = temp.texCoord;
+        return *this;
+    }
+};
+
+struct NormalTextureInfo
+{
+    float scale = 1.0f;
+    int index = -1;  // required
+    int texCoord;
+    NormalTextureInfo& operator=(const tinygltf::NormalTextureInfo temp)
+    {
+        index = temp.index;
+        scale = temp.scale;
+        texCoord = temp.texCoord;
+        return *this;
+    }
+};
+struct Mesh
+{
+    int prim_count;
+    int prim_offset;
+};
+
 
 struct Material {
+
+    int texOffset = 0;
+    bool gltf = false;
+
+
     glm::vec3 color;
     struct {
         float exponent;
@@ -38,6 +101,25 @@ struct Material {
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+
+    TextureInfo emissiveTexture;
+    NormalTextureInfo normalTexture;
+    PBRShadingAttribute pbrVal;
+
+    glm::vec3 emissiveFactor;
+
+};
+
+struct PBRShadingAttribute
+{
+    glm::vec4 baseColorFactor = glm::vec4(1.0);
+
+    std::vector<double> baseColorFactor;  // len = 4. default [1,1,1,1]
+    TextureInfo baseColorTexture;
+    double metallicFactor;   // default 1
+    double roughnessFactor;  // default 1
+    TextureInfo metallicRoughnessTexture;
+
 };
 
 struct Camera {
@@ -58,6 +140,7 @@ struct RenderState {
     std::vector<glm::vec3> image;
     std::string imageName;
 };
+
 
 struct PathSegment {
     Ray ray;
