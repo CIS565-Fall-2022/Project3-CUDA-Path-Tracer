@@ -10,6 +10,7 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    MODEL
 };
 
 struct Ray {
@@ -17,9 +18,30 @@ struct Ray {
     glm::vec3 direction;
 };
 
+struct Triangle {
+    glm::vec3 v1;
+    glm::vec3 v2;
+    glm::vec3 v3;
+    glm::vec3 n1;
+    glm::vec3 n2;
+    glm::vec3 n3;
+};
+
+struct Mesh {
+    Triangle* faces;
+    //bounding box
+    glm::vec3 max{ FLT_MIN };
+    glm::vec3 min{ FLT_MAX };
+    int faceCount;
+    int facesIdOffset;
+};
+
 struct Geom {
     enum GeomType type;
     int materialid;
+    // for indexing scene->triangles indexing
+    
+    Mesh mesh;
     glm::vec3 translation;
     glm::vec3 rotation;
     glm::vec3 scale;
@@ -41,6 +63,9 @@ struct Material {
 };
 
 struct Camera {
+    float lensRadius;
+    float focalDistance;
+
     glm::ivec2 resolution;
     glm::vec3 position;
     glm::vec3 lookAt;
