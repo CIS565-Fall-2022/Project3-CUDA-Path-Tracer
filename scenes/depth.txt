@@ -50,11 +50,11 @@ EMITTANCE   0
 
 // Refractive glass
 MATERIAL 5
-RGB         .98 .50 .70
+RGB         .98 .98 .98
 SPECEX      0
 SPECRGB     .98 .98 .98
-REFL        0.3
-REFR        0.7
+REFL        0
+REFR        1
 REFRIOR     1.52
 EMITTANCE   0
 
@@ -98,50 +98,82 @@ TRANS       0 10 0
 ROTAT       0 0 0
 SCALE       3 .3 3
 
-// Floor
+// Ceiling light
 OBJECT 1
+cube
+material 0
+TRANS       -5 10 0
+ROTAT       0 0 0
+SCALE       3 .3 3
+
+// Ceiling light
+OBJECT 2
+cube
+material 0
+TRANS       5 10 0
+ROTAT       0 0 0
+SCALE       3 .3 3
+
+// Floor
+OBJECT 3
 cube
 material 1
 TRANS       0 0 0
 ROTAT       0 0 0
-SCALE       10 .01 10
+SCALE       20 .01 10
 
 // Ceiling
-OBJECT 2
+OBJECT 4
 cube
 material 1
 TRANS       0 10 0
 ROTAT       0 0 90
-SCALE       .01 10 10
+SCALE       .01 20 10
 
 // Back wall
-OBJECT 3
+OBJECT 5
 cube
 material 1
 TRANS       0 5 -5
 ROTAT       0 90 0
-SCALE       .01 10 10
+SCALE       .01 10 20
 
 // Left wall
-OBJECT 4
+OBJECT 6
 cube
 material 6
-TRANS       -5 5 0
+TRANS       -10 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
 // Right wall
-OBJECT 5
+OBJECT 7
 cube
 material 7
-TRANS       5 5 0
+TRANS       10 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
-// diffuse cat
-OBJECT 6
-../Project3-CUDA-Path-Tracer/objs/cat.obj
-material 5
-TRANS		0 0 0
-ROTAT		0 0 0
-SCALE		3 3 3
+// Sphere
+OBJECT 8
+sphere
+material 1
+TRANS       -4 4 2
+ROTAT       0 0 0
+SCALE       3 3 3
+
+// Sphere
+OBJECT 9
+sphere
+material 2
+TRANS       0 4 0
+ROTAT       0 0 0
+SCALE       3 3 3
+
+// Sphere
+OBJECT 10
+sphere
+material 3
+TRANS       4 4 -2
+ROTAT       0 0 0
+SCALE       3 3 3

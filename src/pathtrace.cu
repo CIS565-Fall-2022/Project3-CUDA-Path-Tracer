@@ -24,8 +24,9 @@
 
 #define ERRORCHECK 1
 #define SORT_MATERIALS 0
-#define CACHE_FIRST_BOUNCE 0
+#define CACHE_FIRST_BOUNCE 0 // note that Cache first bounce and antialiasing cannot be on at the same time.
 #define ANTIALIASING 0
+#define DEPTH_OF_FIELD 0 // depth of field focus defined later
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -171,12 +172,14 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		PathSegment& segment = pathSegments[index];
 
 		segment.ray.origin = cam.position;
+
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		// TODO: implement antialiasing by jittering the ray
+#if (ANTIALIASING && !CACHE_FIRST_BOUNCE)
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
 		thrust::uniform_real_distribution<float> u01(0.50, 0.503);
-#if ANTIALIASING
+
 		segment.ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * u01(rng))
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * u01(rng))
@@ -186,6 +189,69 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
 		);
+#endif
+
+#if DEPTH_OF_FIELD
+#define FOCUS 10.f // focus distance from the camera
+#define APERTURE 2.0f // how blurry will out of focus objects be? 
+
+		// if depth of field is turned on, we jitter the ray origin.
+		// Calculate the converge point C using ray.origin, ray.direction, and focal length f C = O + f(D)
+		// to blur, shift ray origin using using aperture variable and a RNG
+		// calculate new ray direction using C - (O - r)
+		// shoot multiple secondary rays and average them for pixel. SHOULD ALREADY BE DONE.
+		// segment.ray.origin = cam.position;
+
+		glm::vec3 w = glm::normalize(cam.position - cam.lookAt);
+		glm::vec3 u = glm::normalize(glm::cross(cam.up, w));
+		glm::vec3 v = glm::cross(w, u);
+
+		glm::vec3 horizontal = FOCUS * cam.resolution.x * u;
+		glm::vec3 vertical = FOCUS * cam.resolution.y * v;
+
+		glm::vec3 lower_left_corner = segment.ray.origin - horizontal / 2.f - vertical / 2.f - FOCUS * w;
+		float radius = APERTURE / 2.f;
+
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+		thrust::uniform_real_distribution<float> u01(0, 1);
+
+
+		glm::vec3 rd = radius * calculateRandomDirectionInHemisphere(cam.view, rng);
+		glm::vec3 offset = u * rd.x + v * rd.y;
+		glm::vec3 origin = cam.position + offset;
+
+		glm::vec3 focalPoint = segment.ray.origin + FOCUS * segment.ray.direction;
+
+		segment.ray.origin = origin;
+		segment.ray.direction = glm::normalize(focalPoint - origin);
+
+		//thrust::default_random_engine rng = makeSeededRandomEngine(iter, x, y);
+		//thrust::uniform_real_distribution<float> u01(0, 1);
+
+		//float aperture = 2.0;
+		//float sampleX = u01(rng);
+		//float sampleY = u01(rng);
+
+		//// warp pt to disk
+		//float r = sqrt(sampleX);
+		//float theta = 2 * 3.14159 * sampleY;
+		//glm::vec2 res = glm::vec2(cos(theta), sin(theta)) * r;
+
+		//segment.ray.origin = cam.position + glm::vec3(res.x, res.y, 0) * aperture;
+
+		//float focalLen = FOCUS;
+		//float angle = glm::radians(cam.fov.y);
+		//float aspect = ((float)cam.resolution.x / (float)cam.resolution.y);
+		//float ndc_x = 1.f - ((float)x / cam.resolution.x) * 2.f;
+		//float ndc_y = 1.f - ((float)y / cam.resolution.x) * 2.f;
+
+		//glm::vec3 ref = cam.position + cam.view * focalLen;
+		//glm::vec3 H = tan(angle) * focalLen * cam.right * aspect;
+		//glm::vec3 V = tan(angle) * focalLen * cam.up;
+		//glm::vec3 target_pt = ref + V * ndc_y + H * ndc_x;
+		//segment.ray.direction = normalize(target_pt - segment.ray.origin);
+
+
 #endif
 		segment.pixelIndex = index;
 
@@ -241,10 +307,11 @@ __global__ void computeIntersections(
 			}
 			else if (geom.type == BOUND_BOX) {
 				// only true if bound box is on
-				float boxT = boundBoxIntersectionTest(&geom, pathSegment.ray, tmp_intersect, outside);
+				float localT = boundBoxIntersectionTest(&geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				//t = boundBoxIntersectionTest(&geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 				// if hits box, make material color black
-				if (boxT != -1) {
-					// pathSegments[path_index].color = glm::vec3(0);
+				if (localT != -1) {
+					 //pathSegments[path_index].color = glm::vec3(1, 1, 0);
 					for (int j = 0; j < geom.numTris; j++) {
 						t = triangleIntersectionTest(&geom, &geom.device_tris[j], pathSegment.ray, tmp_intersect, tmp_normal, outside);
 					

@@ -76,6 +76,8 @@ int Scene::loadObj(const char* filename, glm::mat4 transform,
     glm::mat4 invTransform = glm::inverse(transform);
     glm::mat4 invTranspose = glm::inverseTranspose(transform);
 
+    // float minX, minY, minZ, maxX, maxY, maxZ;
+
     // Loop over shapes and load each attrib
     for (size_t s = 0; s < shapes.size(); s++) {
 
@@ -153,10 +155,20 @@ int Scene::loadObj(const char* filename, glm::mat4 transform,
 
                 triangleArray->push_back(triangle);
 
+                //minX = std::min(std::min(vxa, vxb), std::min(vxc, minX));
+                //minY = std::min(std::min(vya, vyb), std::min(vyc, minY));
+                //minZ = std::min(std::min(vza, vzb), std::min(vzc, minZ));
+
+                //maxX = std::max(std::max(vxa, vxb), std::max(vxc, maxX));
+                //maxY = std::max(std::max(vya, vyb), std::max(vyc, maxY));
+                //maxZ = std::max(std::max(vza, vzb), std::max(vzc, maxZ));
+
             }
             index_offset += fv;
         }
     }
+
+    //cout << "maxX: " << maxX << " maxY: " << maxY << " maxZ: " << maxZ;
 
     return true;
 }
@@ -248,14 +260,27 @@ int Scene::loadGeom(string objectid) {
             for (int i = 0; i < triangleArray.size(); i++) {
                 // jank code to find the min and max of the box
                 Triangle tri = triangleArray[i];
-                xMin = std::min(std::min(tri.pointA.pos[0], tri.pointB.pos[0]), std::min(tri.pointC.pos[0], xMin));
-                xMax = std::max(std::max(tri.pointA.pos[0], tri.pointB.pos[0]), std::max(tri.pointC.pos[0], xMax));
+                //glm::vec4 transformedA = newGeom.transform * tri.pointA.pos;
+                //glm::vec4 transformedB = newGeom.transform * tri.pointB.pos;
+                //glm::vec4 transformedC = newGeom.transform * tri.pointC.pos;
 
-                yMin = std::min(std::min(tri.pointA.pos[1], tri.pointB.pos[1]), std::min(tri.pointC.pos[1], yMin));
-                yMax = std::max(std::max(tri.pointA.pos[1], tri.pointB.pos[1]), std::max(tri.pointC.pos[1], yMax));
+                //xMin = fmin(fmin(transformedA[0], transformedB[0]), fmin(transformedC[0], xMin));
+                //xMax = fmax(fmax(transformedA[0], transformedB[0]), fmax(transformedC[0], xMax));
 
-                zMin = std::min(std::min(tri.pointA.pos[2], tri.pointB.pos[2]), std::min(tri.pointC.pos[2], zMin));
-                zMax = std::max(std::max(tri.pointA.pos[2], tri.pointB.pos[2]), std::min(tri.pointC.pos[2], zMax));
+                //yMin = fmin(fmin(transformedA[1], transformedB[1]), fmin(transformedC[1], yMin));
+                //yMax = fmax(fmax(transformedA[1], transformedB[1]), fmax(transformedC[1], yMax));
+
+                //zMin = fmin(fmin(transformedA[2], transformedB[2]), fmin(transformedC[2], zMin));
+                //zMax = fmax(fmax(transformedA[2], transformedB[2]), fmin(transformedC[2], zMax));
+
+                xMin = fmin(fmin(tri.pointA.pos[0], tri.pointB.pos[0]), fmin(tri.pointC.pos[0], xMin));
+                xMax = fmax(fmax(tri.pointA.pos[0], tri.pointB.pos[0]), fmax(tri.pointC.pos[0], xMax));
+
+                yMin = fmin(fmin(tri.pointA.pos[1], tri.pointB.pos[1]), fmin(tri.pointC.pos[1], yMin));
+                yMax = fmax(fmax(tri.pointA.pos[1], tri.pointB.pos[1]), fmax(tri.pointC.pos[1], yMax));
+
+                zMin = fmin(fmin(tri.pointA.pos[2], tri.pointB.pos[2]), fmin(tri.pointC.pos[2], zMin));
+                zMax = fmax(fmax(tri.pointA.pos[2], tri.pointB.pos[2]), fmax(tri.pointC.pos[2], zMax));
             }
 
            // glm::vec4 transformedBoxMin = newGeom.transform * glm::vec4(glm::vec3(xMin, yMin, zMin), 1.f);
@@ -266,13 +291,15 @@ int Scene::loadGeom(string objectid) {
                 glm::vec3(xMax, yMax, zMax)
             };
 
-            newGeom.bound = box;
+            cout << "xMin: " << xMin << " , " << yMin << " , " << zMin << endl;
+            cout << "xMax: " << xMax << " , " << yMax << " , " << zMax << endl;
 
 
             newGeom.tris = new Triangle[triangleArray.size()];//triangleArray.size()];
             newGeom.device_tris = NULL;
             newGeom.numTris = triangleArray.size();
 
+            newGeom.bound = box;
             for (int i = 0; i < triangleArray.size(); i++) {
                 newGeom.tris[i] = triangleArray[i];
             }

@@ -6,13 +6,13 @@
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
-#define USE_BOUND_BOX 0
+#define USE_BOUND_BOX 1
 
 enum GeomType {
     SPHERE,
     CUBE,
     TRIANGLE,
-    BOUND_BOX
+    BOUND_BOX // name it better lol
 };
 
 struct BoundBox {

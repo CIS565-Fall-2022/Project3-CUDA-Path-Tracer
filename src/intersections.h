@@ -143,7 +143,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     return glm::length(r.origin - intersectionPoint);
 }
 
-__host__ __device__ float boundBoxIntersectionTest(Geom* geom, Ray r, glm::vec3& intersectionPoint, bool& outside) {
+__host__ __device__ float boundBoxIntersectionTest(Geom* geom, Ray r, glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
     Ray q;
     q.origin = multiplyMV(geom->inverseTransform, glm::vec4(r.origin, 1.0f));
     q.direction = glm::normalize(multiplyMV(geom->inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -158,6 +158,7 @@ __host__ __device__ float boundBoxIntersectionTest(Geom* geom, Ray r, glm::vec3&
     for (int xyz = 0; xyz < 3; ++xyz) {
         float qdxyz = q.direction[xyz];
         /*if (glm::abs(qdxyz) > 0.00001f)*/ {
+            // divide by 2 if everything goes wrong
             float t1 = (bbmin[xyz] - q.origin[xyz]) / qdxyz;
             float t2 = (bbmax[xyz] - q.origin[xyz]) / qdxyz;
             float ta = glm::min(t1, t2);
@@ -183,53 +184,81 @@ __host__ __device__ float boundBoxIntersectionTest(Geom* geom, Ray r, glm::vec3&
             outside = false;
         }
         intersectionPoint = multiplyMV(geom->transform, glm::vec4(getPointOnRay(q, tmin), 1.0f));
-        //normal = glm::normalize(multiplyMV(box.invTranspose, glm::vec4(tmin_n, 0.0f)));
+        // printf("interPoint X: %f, Y: %f, Z: %f \n", intersectionPoint.x, intersectionPoint.y, intersectionPoint.z);
+        normal = glm::normalize(multiplyMV(geom->invTranspose, glm::vec4(tmin_n, 0.0f)));
+        //intersectionPoint = getPointOnRay(q, tmin);
         return glm::length(r.origin - intersectionPoint);
+        //tmin;
     }
     return -1;
+
 }
 
-__host__ __device__ float triangleIntersectionTest(Geom *geom, Triangle *triangle, Ray r,
+__host__ __device__ float triangleIntersectionTest(Geom* geom, Triangle* triangle, Ray r,
     glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
-  
+
     glm::vec3 screenPA = glm::vec3(geom->transform * triangle->pointA.pos);
     glm::vec3 screenPB = glm::vec3(geom->transform * triangle->pointB.pos);
     glm::vec3 screenPC = glm::vec3(geom->transform * triangle->pointC.pos);
 
-    glm::vec3 baryPosition; 
-    
-    // output[0] = u, output[1] = v, output[2] = t;
-    bool doesIntersect = glm::intersectRayTriangle(r.origin, r.direction, glm::vec3(screenPA), glm::vec3(screenPB), glm::vec3(screenPC), baryPosition);
-    
-    // bool doesIntersect = glm::intersectRayTriangle(r.origin, r.direction, glm::vec3(triangle->pointA.pos), glm::vec3(triangle->pointB.pos), glm::vec3(triangle->pointC.pos), baryPosition);
+    glm::vec3 baryPosition;
+
+    bool doesIntersect = glm::intersectRayTriangle(r.origin, r.direction, screenPA, screenPB, screenPC, baryPosition);
+
     float u = baryPosition.r;
     float v = baryPosition.g;
     float t = baryPosition.b;
-    
+
     if (!doesIntersect) {
-        return -1.0f; 
+        return -1.0f;
     }
 
     intersectionPoint = getPointOnRay(r, t);
 
-    // BARYCENTRIC INTERPOLATIONNN
-    //float sA = glm::length(glm::cross(baryPosition - screenPC, baryPosition - screenPB)) / 2.f;
-    //float sB = glm::length(glm::cross(baryPosition - screenPA, baryPosition - screenPC)) / 2.f;
-    //float sC = glm::length(glm::cross(baryPosition - screenPA, baryPosition - screenPB)) / 2.f;
-
-    //float s = glm::length(glm::cross(screenPC - screenPA, screenPB - screenPA)) / 2.f;
-
-    //float zinv = (sA) / (screenPA[2] * s) + (sB) / (screenPB[2] * s) + (sC) / (screenPC[2] * s);
-    //float z = 1.0f / zinv;
-
-    // intersectionPoint = u * screenPA + v * screenPB + (1 - u - v) * screenPC;
-    normal = glm::vec3( u * triangle->pointA.nor + v * triangle->pointB.nor + (1 - u - v) * triangle->pointC.nor ); 
+    normal = glm::vec3(u * triangle->pointA.nor + v * triangle->pointB.nor + (1 - u - v) * triangle->pointC.nor);
 
     if (!outside) {
         normal *= -1.f;
     }
 
 
-    return t; 
+    return t;
 
 }
+
+//__host__ __device__ float triangleIntersectionTest(Geom *geom, Triangle *triangle, Ray r,
+//    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+//
+//    //glm::vec3 screenPA = glm::vec3(triangle->pointA.pos);
+//    //glm::vec3 screenPB = glm::vec3(triangle->pointB.pos);
+//    //glm::vec3 screenPC = glm::vec3(triangle->pointC.pos);
+//
+//    Ray q;
+//    q.origin = multiplyMV(geom->inverseTransform, glm::vec4(r.origin, 1.0f));
+//    q.direction = glm::normalize(multiplyMV(geom->inverseTransform, glm::vec4(r.direction, 0.0f)));
+//
+//    glm::vec3 baryPosition; 
+//    
+//    bool doesIntersect = glm::intersectRayTriangle(q.origin, q.direction, glm::vec3(triangle->pointA.pos), glm::vec3(triangle->pointB.pos), glm::vec3(triangle->pointC.pos), baryPosition);
+//
+//    float u = baryPosition.r;
+//    float v = baryPosition.g;
+//    float t = baryPosition.b;
+//    
+//    if (!doesIntersect) {
+//        return -1.0f; 
+//    }
+//
+//    intersectionPoint = multiplyMV(geom->transform, glm::vec4(getPointOnRay(r, t), 1.0f));
+//    
+//    glm::vec4 nonTransformedNormal = glm::vec4(glm::vec3(u * triangle->pointA.nor + v * triangle->pointB.nor + (1 - u - v) * triangle->pointC.nor), 1.0f);
+//    normal = glm::normalize(multiplyMV(geom->invTranspose, nonTransformedNormal)); 
+//
+//    if (!outside) {
+//        normal *= -1.f;
+//    }
+//
+//
+//    return t; 
+
+//}
