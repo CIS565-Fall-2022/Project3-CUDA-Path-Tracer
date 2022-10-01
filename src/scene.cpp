@@ -60,7 +60,6 @@ int Scene::loadGeom(string objectid) {
             else if (strcmp(line.c_str(), "gltf") == 0) {
                 cout << "Loading new GLTF model..." << endl;
                 newGeom.type = MESH;
-                
             }
         }
         if (newGeom.type == MESH) {
@@ -228,7 +227,7 @@ int Scene::loadGLTF(string filename, Geom& geom) {
         return -1;
     }
 
-    std::cout << "loaded glTF file has:\n"
+    /*std::cout << "loaded glTF file has:\n"
         << model.accessors.size() << " accessors\n"
         << model.animations.size() << " animations\n"
         << model.buffers.size() << " buffers\n"
@@ -242,14 +241,14 @@ int Scene::loadGLTF(string filename, Geom& geom) {
         << model.samplers.size() << " samplers\n"
         << model.cameras.size() << " cameras\n"
         << model.scenes.size() << " scenes\n"
-        << model.lights.size() << " lights\n";
+        << model.lights.size() << " lights\n";*/
 
     //In this situation Node is the top hierachy, then we extract all the nodes first
     int texIndex = textures.size();
     //int matIndex = materials.size();
 
     //copy materials in model to host
-    /*for (const tinygltf::Material& material : model.materials) {
+    for (const tinygltf::Material& material : model.materials) {
         Material newMat;
         newMat.gltf = true;
         newMat.texIndex = texIndex++;
@@ -262,23 +261,33 @@ int Scene::loadGLTF(string filename, Geom& geom) {
         newMat.emissiveFactor = glm::make_vec3(material.emissiveFactor.data());
         newMat.emissiveTexture = material.emissiveTexture;
         materials.push_back(newMat);
-    }*/
+    }
     //copy textures in model to host
-    /*for (const tinygltf::Texture& texture : model.textures) {
+    for (const tinygltf::Texture& texture : model.textures) {
         Texture newTex;
         const tinygltf::Image& image = model.images[texture.source];
-
-    }*/
-
+        newTex.components = image.component;
+        newTex.width = image.width;
+        newTex.height = image.width;
+        newTex.size = image.component * image.width * image.height * sizeof(unsigned char);
+        newTex.image = new unsigned char[newTex.size];
+        memcpy(newTex.image, image.image.data(), newTex.size);
+        textures.push_back(newTex);
+    }
+    geom.primBegin = primitives.size();
+    const float* mesh_vertices = nullptr;
+    const float* mesh_uvs = nullptr;
+    const float* mesh_tangents = nullptr;
+    const float* mesh_normal = nullptr;
     //Get all mesh
     for (const tinygltf::Mesh& mesh : model.meshes) {
 
-        for (const tinygltf::Primitive& primitive : mesh.primitives) {
+        for (const tinygltf::Primitive& primitive : mesh.primitives) {\
             //Create mesh object(learnt from Syoyo's https://github.com/syoyo/tinygltf/issues/71)
             const tinygltf::Accessor& accessor = model.accessors[primitive.indices];
             const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
             const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-            const float* indices = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
+            const unsigned short* indices = reinterpret_cast<const unsigned short*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
 
             for (size_t i = 0; i < accessor.count; ++i) {
                 mesh_indices.push_back(indices[i]);
@@ -288,7 +297,8 @@ int Scene::loadGLTF(string filename, Geom& geom) {
             const tinygltf::BufferView& bufferViewPos = model.bufferViews[accessorPos.bufferView];
             const tinygltf::Buffer& bufferPos = model.buffers[bufferViewPos.buffer];
             mesh_vertices = reinterpret_cast<const float*>(&bufferPos.data[bufferViewPos.byteOffset + accessorPos.byteOffset]);
-
+            /*geom.aabb_min = glm::vec3(accessorPos.minValues[0], accessorPos.minValues[1], accessorPos.minValues[2]);
+            geom.aabb_max = glm::vec3(accessorPos.maxValues[0], accessorPos.maxValues[1], accessorPos.maxValues[2]);*/
             if (primitive.attributes.count("NORMAL")) {
                 const tinygltf::Accessor& accessorNormal = model.accessors[primitive.attributes.at("NORMAL")];
                 const tinygltf::BufferView& bufferViewNormal = model.bufferViews[accessorNormal.bufferView];
@@ -318,24 +328,41 @@ int Scene::loadGLTF(string filename, Geom& geom) {
                 for (size_t j = 0; j < 3; j++) {
                     int idx = mesh_indices[i + j] * index1;
                     prim.pos[j] = glm::vec3(mesh_vertices[idx], mesh_vertices[idx + 1], mesh_vertices[idx + 2]);
-                    //bounding box TODO
                     if (mesh_normal) {
+                        prim.hasNormal = true;
                         prim.normal[j] = glm::vec3(mesh_normal[idx], mesh_normal[idx + 1], mesh_normal[idx + 2]);
                     }
                     if (mesh_uvs) {
+                        prim.hasUV = true;
                         idx = mesh_indices[i + j] * index2;
                         prim.uv[j] = glm::vec2(mesh_uvs[idx], mesh_uvs[idx + 1]);
                     }
                     if (mesh_tangents) {
+                        prim.hasTangent = true;
                         idx = mesh_indices[i + j] * index3;
                         prim.tangent[j] = glm::vec4(mesh_uvs[idx], mesh_uvs[idx + 1], mesh_uvs[idx + 2], mesh_uvs[idx + 3]);
                     }
                     //need to do aabb here
+                    glm::vec3 currentPos(geom.transform * glm::vec4(prim.pos[j], 1.f));
+                    geom.aabb_min = glm::min(geom.aabb_min, currentPos);
+                    geom.aabb_max = glm::max(geom.aabb_max, currentPos);
+                }
+                if (!mesh_normal)//init normal if original does not have one
+                {
+                    glm::vec3 normal = glm::normalize(glm::cross(prim.pos[1] - prim.pos[0], prim.pos[2] - prim.pos[0]));
+                    for (int i = 0; i < 3; i++)
+                    {
+                        prim.normal[i] = normal;
+                    }
                 }
                 primitives.push_back(prim);
             }
         }
     }
-
+    
+    geom.primEnd = primitives.size();
+    std::cout << geom.aabb_min.x << " " << geom.aabb_min.y << " " << geom.aabb_min.z << endl;
+    std::cout << geom.aabb_max.x << " " << geom.aabb_max.y << " " << geom.aabb_max.z << endl;
+    //std::cout << primitives.size() << " " << geom.primBegin << " " << geom.primEnd << std::endl;
     return 0;
 }

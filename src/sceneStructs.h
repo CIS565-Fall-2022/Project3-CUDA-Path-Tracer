@@ -22,11 +22,14 @@ struct Ray {
 };
 
 struct Primitive {
-    int primIndex;
     glm::vec3 pos[3];
     glm::vec3 normal[3];
-    glm::vec2 uv[2];
-    glm::vec4 tangent[4];
+    glm::vec2 uv[3];
+    glm::vec4 tangent[3];
+    bool hasNormal = false;
+    bool hasUV = false;
+    bool hasTangent = false;
+    
 };
 struct Geom {
     enum GeomType type;
@@ -37,6 +40,13 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+
+    //for primitives only
+    int primBegin;
+    int primEnd;
+    //for culling
+    glm::vec3 aabb_min;
+    glm::vec3 aabb_max;
 };
 
 struct TextureInfo {
@@ -109,6 +119,9 @@ struct Texture {
     int TexIndex;
     int width;
     int height;
+    int components;
+    unsigned char* image;
+    int size;
 
 };
 struct Camera {
@@ -146,6 +159,8 @@ struct ShadeableIntersection {
   float t;
   glm::vec3 surfaceNormal;
   int materialId;
+  glm::vec2 uv;
+  glm::vec4 tangent;
 };
 
 

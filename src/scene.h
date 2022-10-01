@@ -23,12 +23,11 @@ public:
     ~Scene();
 
     std::vector<Geom> geoms;
+    std::vector<Material> materials;
+    std::vector<Texture> textures;
     std::vector<Primitive> primitives;
     std::vector<int> mesh_indices;
-    const float* mesh_vertices;
-    const float* mesh_uvs = nullptr;
-    const float* mesh_tangents = nullptr;
-    const float* mesh_normal = nullptr;
+    
 
     std::vector<Material> materials;
     std::vector<Texture> textures;

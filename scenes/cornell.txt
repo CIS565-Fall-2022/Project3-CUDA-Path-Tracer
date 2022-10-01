@@ -40,12 +40,12 @@ EMITTANCE   0
 
 // Specular white
 MATERIAL 4
-RGB         .98 .98 .98
+RGB         0 0 0
 SPECEX      0
-SPECRGB     .98 .98 .98
+SPECRGB     0 0 0
 REFL        1
 REFR        1
-REFRIOR     1
+REFRIOR     1.5
 EMITTANCE   0
 
 // Camera
@@ -115,15 +115,3 @@ material 4
 TRANS       -1 4 -1
 ROTAT       0 0 0
 SCALE       3 3 3
-
-// Sphere
-OBJECT 7
-gltf
-../scenes/models/katana.glb
-material 0
-TRANS 	    3 5 -1
-ROTAT       0 0 0
-SCALE       2 2 2
-
-
-
