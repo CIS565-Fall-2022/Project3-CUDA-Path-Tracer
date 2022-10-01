@@ -225,33 +225,6 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.ray.origin = origin;
 		segment.ray.direction = glm::normalize(focalPoint - origin);
 
-		//thrust::default_random_engine rng = makeSeededRandomEngine(iter, x, y);
-		//thrust::uniform_real_distribution<float> u01(0, 1);
-
-		//float aperture = 2.0;
-		//float sampleX = u01(rng);
-		//float sampleY = u01(rng);
-
-		//// warp pt to disk
-		//float r = sqrt(sampleX);
-		//float theta = 2 * 3.14159 * sampleY;
-		//glm::vec2 res = glm::vec2(cos(theta), sin(theta)) * r;
-
-		//segment.ray.origin = cam.position + glm::vec3(res.x, res.y, 0) * aperture;
-
-		//float focalLen = FOCUS;
-		//float angle = glm::radians(cam.fov.y);
-		//float aspect = ((float)cam.resolution.x / (float)cam.resolution.y);
-		//float ndc_x = 1.f - ((float)x / cam.resolution.x) * 2.f;
-		//float ndc_y = 1.f - ((float)y / cam.resolution.x) * 2.f;
-
-		//glm::vec3 ref = cam.position + cam.view * focalLen;
-		//glm::vec3 H = tan(angle) * focalLen * cam.right * aspect;
-		//glm::vec3 V = tan(angle) * focalLen * cam.up;
-		//glm::vec3 target_pt = ref + V * ndc_y + H * ndc_x;
-		//segment.ray.direction = normalize(target_pt - segment.ray.origin);
-
-
 #endif
 		segment.pixelIndex = index;
 
@@ -305,7 +278,7 @@ __global__ void computeIntersections(
 			{
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
-			else if (geom.type == BOUND_BOX) {
+			else if (geom.type == OBJ) {
 				// only true if bound box is on
 				float localT = boundBoxIntersectionTest(&geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 				//t = boundBoxIntersectionTest(&geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);

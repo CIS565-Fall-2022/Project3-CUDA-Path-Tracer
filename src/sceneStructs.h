@@ -12,7 +12,7 @@ enum GeomType {
     SPHERE,
     CUBE,
     TRIANGLE,
-    BOUND_BOX // name it better lol
+    OBJ // name it better lol
 };
 
 struct BoundBox {

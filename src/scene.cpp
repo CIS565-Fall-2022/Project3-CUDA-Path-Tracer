@@ -201,7 +201,7 @@ int Scene::loadGeom(string objectid) {
             else if (strstr(line.c_str(), ".obj") != NULL) {
                 cout << "Creating some obj..." << endl;
 #if USE_BOUND_BOX
-                newGeom.type = BOUND_BOX;
+                newGeom.type = OBJ;
 #else
                 newGeom.type = TRIANGLE;
 #endif
