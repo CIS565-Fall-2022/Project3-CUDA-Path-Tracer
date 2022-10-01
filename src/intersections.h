@@ -6,6 +6,8 @@
 #include "sceneStructs.h"
 #include "utilities.h"
 
+#define BB_CULLING
+
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
  */
@@ -89,6 +91,30 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
     return -1;
 }
 
+__host__ __device__ float aabbIntersectionTest(AABB aabb, Ray r) {
+    glm::vec3 invR = glm::vec3(1.0, 1.0, 1.0) / r.direction;
+
+    float x1 = (aabb.min.x - r.origin.x) * invR.x;
+    float x2 = (aabb.max.x - r.origin.x) * invR.x;
+
+    float tmin = min(x1, x2);
+    float tmax = max(x1, x2);
+
+    float y1 = (aabb.min.y - r.origin.y) * invR.y;
+    float y2 = (aabb.max.y - r.origin.y) * invR.y;
+
+    tmin = min(tmin, min(y1, y2));
+    tmax = max(tmin, max(y1, y2));
+
+    float z1 = (aabb.min.z - r.origin.z) * invR.z;
+    float z2 = (aabb.max.z - r.origin.z) * invR.z;
+
+    tmin = min(tmin, min(y1, y2));
+    tmax = max(tmin, max(y1, y2));
+
+    return tmin <= tmax;
+}
+
 // CHECKITOUT
 /**
  * Test intersection between a ray and a transformed sphere. Untransformed,
@@ -143,42 +169,6 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     return glm::length(r.origin - intersectionPoint);
 }
 
-//// Reimplementation of glm::intersectRayTriangle
-//__host__ __device__ float intersectRayTriangle(glm::vec3 const& orig, glm::vec3 const& dir,
-//    glm::vec3 const& v0, glm::vec3 const& v1, glm::vec3 const& v2, glm::vec3& baryPosition) 
-//{
-//    glm::vec3 e1 = v1 - v0;
-//    glm::vec3 e2 = v2 - v0;
-//
-//    glm::vec3 p = glm::cross(dir, e2);
-//
-//    float a = glm::dot(e1, p);
-//
-//    float Epsilon = std::numeric_limits<float>::epsilon();
-//    if (a < Epsilon)
-//        return false;
-//
-//    float f = 1.0f / a;
-//
-//    glm::vec3 s = orig - v0;
-//    baryPosition.x = f * glm::dot(s, p);
-//    if (baryPosition.x < 0.0f)
-//        return false;
-//    if (baryPosition.x > 1.0f)
-//        return false;
-//
-//    glm::vec3 q = glm::cross(s, e1);
-//    baryPosition.y = f * glm::dot(dir, q);
-//    if (baryPosition.y < 0.0f)
-//        return false;
-//    if (baryPosition.y + baryPosition.x > 1.0f)
-//        return false;
-//
-//    baryPosition.z = f * glm::dot(e2, q);
-//
-//    return baryPosition.z >= 0.0f;
-//}
-
 /**
  * Test intersection between a ray and a transformed triangle.
  *
@@ -187,24 +177,55 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
-    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+__host__ __device__ float triangleIntersectionTest(Triangle tri, Ray r,
+    glm::vec3& barycenter) {
 
-    glm::vec3 geom1 = triangle.tri.verts[0];
-    glm::vec3 geom2 = triangle.tri.verts[1];
-    glm::vec3 geom3 = triangle.tri.verts[2];
-
-    glm::vec3 barycenter = glm::vec3(0.0, 0.0, 0.0);
     bool intersect = glm::intersectRayTriangle(r.origin, r.direction,
-                                               triangle.tri.verts[0], triangle.tri.verts[1], triangle.tri.verts[2],
+                                               tri.verts[0], tri.verts[1], tri.verts[2],
                                                barycenter);
     if (!intersect) return -1.f;
 
-    float u = barycenter.x;
-    float v = barycenter.y;
-    float w = 1.f - u - v;
-    intersectionPoint = u * triangle.tri.verts[0] + v * triangle.tri.verts[1] + w * triangle.tri.verts[2];
-    normal = glm::cross(triangle.tri.verts[1] - triangle.tri.verts[0], triangle.tri.verts[2] - triangle.tri.verts[0]);
-
     return barycenter.z;
+}
+
+/**
+ * Test intersection between a ray and a triangle mesh.
+ *
+ * @param intersectionPoint  Output parameter for point of intersection.
+ * @param normal             Output parameter for surface normal.
+ * @param outside            Output param for whether the ray came from outside.
+ * @return                   Ray parameter `t` value. -1 if no intersection.
+ */
+__host__ __device__ float meshIntersectionTest(Geom mesh, Ray r,
+    const Triangle* tris, glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+
+#ifdef BB_CULLING
+    // Test ray against mesh AABB
+    bool intersectAABB = aabbIntersectionTest(mesh.aabb, r);
+    if (!intersectAABB) return -1.f;
+#endif
+
+    // If bounding box is intersected, then check for intersection with all triangles
+    Triangle min_tri;
+    glm::vec3 barycenter, min_barycenter;
+    float min_t = INFINITY;
+    for (int i = mesh.startIdx; i < mesh.startIdx + mesh.triangleCount; i++)
+    {
+        float t = triangleIntersectionTest(tris[i], r, barycenter);
+        if (t < min_t && t > 0.f)
+        {
+            min_t = t;
+            min_barycenter = barycenter;
+            min_tri = tris[i];
+        }
+    }
+
+    // Find intersection point and normal
+    float u = min_barycenter.x;
+    float v = min_barycenter.y;
+    float w = 1.f - u - v;
+    intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
+    normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
+
+    return min_t;
 }

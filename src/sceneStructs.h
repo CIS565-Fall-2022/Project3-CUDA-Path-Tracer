@@ -10,7 +10,7 @@
 enum GeomType {
     SPHERE,
     CUBE,
-    TRIANGLE
+    MESH
 };
 
 struct Ray {
@@ -22,9 +22,16 @@ struct Triangle {
     glm::vec3 verts[3];
 };
 
+struct AABB {
+    glm::vec3 min;
+    glm::vec3 max;
+};
+
 struct Geom {
     enum GeomType type;
-    Triangle tri; // --> indices into verts array i.e. {0, 1, 2}
+    AABB aabb;
+    int startIdx; 
+    int triangleCount;
     int materialid;
     glm::vec3 translation;
     glm::vec3 rotation;

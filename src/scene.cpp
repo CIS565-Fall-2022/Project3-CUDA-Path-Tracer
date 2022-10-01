@@ -243,6 +243,11 @@ int Scene::loadOBJ(string filename, int objectid)
     auto& shapes = reader.GetShapes();
     auto& materials = reader.GetMaterials();
 
+    // Track aabb
+    AABB aabb;
+    glm::vec3 min = glm::vec3(INFINITY, INFINITY, INFINITY);
+    glm::vec3 max = glm::vec3(-INFINITY, -INFINITY, -INFINITY);
+
     for (size_t s = 0; s < shapes.size(); s++) {
         // Loop over faces(polygon)
         size_t index_offset = 0;
@@ -251,6 +256,7 @@ int Scene::loadOBJ(string filename, int objectid)
 
             // Loop over vertices in the face.
             Triangle tri;
+
             int i = 0;
             for (size_t v = 0; v < fv; v++) {
                 // access to vertex
@@ -261,24 +267,37 @@ int Scene::loadOBJ(string filename, int objectid)
                 tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
 
                 tri.verts[i]= glm::vec3((float)vx, (float)vy, (float)vz);
+
+                // Determine AABB min and max
+                min = glm::min(min, tri.verts[i]);
+                max = glm::max(max, tri.verts[i]);
+
                 i++;
             }
-
-            // Initialize new triangle
-            Geom newGeom;
-            newGeom.type = TRIANGLE;
-            newGeom.materialid = materialid;
-            newGeom.tri = tri;
-            newGeom.translation = translation;
-            newGeom.rotation = rotation;
-            newGeom.scale = scale;
-            newGeom.transform = transform;
-            newGeom.inverseTransform = inverseTransform;
-            newGeom.invTranspose = invTranspose;
-            geoms.push_back(newGeom);
+            triangles.push_back(tri);
 
             index_offset += fv;
         }
     }
+
+    // Set AABB
+    aabb.min = min;
+    aabb.max = max;
+
+    // Initialize new mesh
+    Geom newGeom;
+    newGeom.type = MESH;
+    newGeom.aabb = aabb;
+    newGeom.startIdx = 0;
+    newGeom.triangleCount = triangles.size();
+    newGeom.materialid = materialid;
+    newGeom.translation = translation;
+    newGeom.rotation = rotation;
+    newGeom.scale = scale;
+    newGeom.transform = transform;
+    newGeom.inverseTransform = inverseTransform;
+    newGeom.invTranspose = invTranspose;
+    geoms.push_back(newGeom);
+
     return 1;
 }
