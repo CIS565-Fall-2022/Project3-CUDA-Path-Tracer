@@ -102,6 +102,22 @@ void pathtraceInit(Scene* scene) {
 		{
 			cudaMalloc(&geom.dev_triangles, geom.triCount * sizeof(Triangle));
 			cudaMemcpy(geom.dev_triangles, geom.triangles, geom.triCount * sizeof(Triangle), cudaMemcpyHostToDevice);
+			//printf("******CPU******");
+			//Triangle* tcpu = geom.triangles;
+			//for (int i = 0; i < geom.triCount; i++) {
+			//	printf("\n %f, %f, %f", tcpu->nor[0].x, tcpu->nor[0].y, tcpu->nor[0].z);
+			//	tcpu++;
+			//}
+			//printf("\n##########\n");
+
+			//Triangle* temp_host_tri = new Triangle[geom.triCount * sizeof(Triangle)];
+			//cudaMemcpy(temp_host_tri, geom.dev_triangles, geom.triCount * sizeof(Triangle), cudaMemcpyDeviceToHost);
+
+			//Triangle* tgpucpy = temp_host_tri;
+			//for (int i = 0; i < geom.triCount; i++) {
+			//	printf("\n %f, %f, %f", tgpucpy->nor[0].x, tgpucpy->nor[0].y, tgpucpy->nor[0].z);
+			//	tgpucpy++;
+			//}
 		}
 	}
 	

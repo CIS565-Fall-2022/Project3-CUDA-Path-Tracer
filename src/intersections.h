@@ -161,44 +161,44 @@ __host__ __device__ float getArea(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3)
     return area;
 }
 
-__host__ __device__ glm::vec3 barycentricInterpolation(Vertex v[3], glm::vec3 p)
-{
-    glm::vec3 p1, p2, p3;
-    p1 = v[0].pos;
-    p2 = v[1].pos;
-    p3 = v[2].pos;
-
-    float s, s1, s2, s3;
-    s = getArea(p1, p2, p3);
-    s1 = getArea(p, p2, p3);
-    s2 = getArea(p1, p, p3);
-    s3 = getArea(p1, p2, p);
-
-    glm::vec3 barycentric_influence(s1 / s, s2 / s, s3 / s);
-    return barycentric_influence;
-}
-
-__host__ __device__ float zInterpolate(Vertex v[3], glm::vec3 p)
-{
-    glm::vec3 weights = barycentricInterpolation(v, p);
-    float z_inverse = 0;
-    z_inverse = ((1 / (v[0].pos.z)) * weights[0]) +
-        ((1 / (v[1].pos.z)) * weights[1]) +
-        ((1 / (v[2].pos.z)) * weights[2]);
-    return 1 / z_inverse;
-}
-
-__host__ __device__ glm::vec3 interpolatedNormal(Vertex v[3], glm::vec3 p, float z)
-{
-    glm::vec3 weights = barycentricInterpolation(v, p);
-    glm::vec3 normals(0, 0, 0);
-
-    normals = (((v[0].nor) / (v[0].pos.z)) * weights[0]) +
-        (((v[1].nor) / (v[1].pos.z)) * weights[1]) +
-        (((v[2].nor) / (v[2].pos.z)) * weights[2]);
-
-    return (z * normals);
-}
+//__host__ __device__ glm::vec3 barycentricInterpolation(Vertex v[3], glm::vec3 p)
+//{
+//    glm::vec3 p1, p2, p3;
+//    p1 = v[0].pos;
+//    p2 = v[1].pos;
+//    p3 = v[2].pos;
+//
+//    float s, s1, s2, s3;
+//    s = getArea(p1, p2, p3);
+//    s1 = getArea(p, p2, p3);
+//    s2 = getArea(p1, p, p3);
+//    s3 = getArea(p1, p2, p);
+//
+//    glm::vec3 barycentric_influence(s1 / s, s2 / s, s3 / s);
+//    return barycentric_influence;
+//}
+//
+//__host__ __device__ float zInterpolate(Vertex v[3], glm::vec3 p)
+//{
+//    glm::vec3 weights = barycentricInterpolation(v, p);
+//    float z_inverse = 0;
+//    z_inverse = ((1 / (v[0].pos.z)) * weights[0]) +
+//        ((1 / (v[1].pos.z)) * weights[1]) +
+//        ((1 / (v[2].pos.z)) * weights[2]);
+//    return 1 / z_inverse;
+//}
+//
+//__host__ __device__ glm::vec3 interpolatedNormal(Vertex v[3], glm::vec3 p, float z)
+//{
+//    glm::vec3 weights = barycentricInterpolation(v, p);
+//    glm::vec3 normals(0, 0, 0);
+//
+//    normals = (((v[0].nor) / (v[0].pos.z)) * weights[0]) +
+//        (((v[1].nor) / (v[1].pos.z)) * weights[1]) +
+//        (((v[2].nor) / (v[2].pos.z)) * weights[2]);
+//
+//    return (z * normals);
+//}
 
 
 __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r,
@@ -216,6 +216,10 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
 
     for (int i = 0; i < triCount; i++, dev_triItr++) {
 
+        //printf("\n****GPU****\n");
+        ////printf("\n %f, %f, %f", dev_triItr->pos[0].x, dev_triItr->pos[0].y, dev_triItr->pos[0].z);
+        //printf("\n %f, %f, %f", dev_triItr->nor[0].x, dev_triItr->nor[0].y, dev_triItr->nor[0].z);
+
         glm::vec3 v1_pos = glm::vec3(obj.transform * glm::vec4(dev_triItr->pos[0].x, dev_triItr->pos[0].y, dev_triItr->pos[0].z, 1.0));
         glm::vec3 v2_pos = glm::vec3(obj.transform * glm::vec4(dev_triItr->pos[1].x, dev_triItr->pos[1].y, dev_triItr->pos[1].z, 1.0));
         glm::vec3 v3_pos = glm::vec3(obj.transform * glm::vec4(dev_triItr->pos[2].x, dev_triItr->pos[2].y, dev_triItr->pos[2].z, 1.0));
@@ -224,6 +228,10 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
             v1_pos, v2_pos, v3_pos, barycentric);
 
         if (isectFound) {
+
+            /*printf("\n****GPU****\n");
+            printf("\n %f, %f, %f", dev_triItr->nor[0].x, dev_triItr->nor[0].y, dev_triItr->nor[0].z);*/
+
             if (barycentric[2] >= 0 && barycentric[2] < minVal[2])
             {
                 minVal = barycentric;
@@ -231,9 +239,14 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
             /*n1 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[0].x, dev_triItr->nor[0].y, dev_triItr->nor[0].z, 1.0));
             n2 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[1].x, dev_triItr->nor[1].y, dev_triItr->nor[1].z, 1.0));
             n3 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[2].x, dev_triItr->nor[2].y, dev_triItr->nor[2].z, 1.0));*/
-            n1 = dev_tri->nor[0];
-            n2 = dev_tri->nor[1];
-            n3 = dev_tri->nor[2];
+            n1 = dev_triItr->nor[0];
+            n2 = dev_triItr->nor[1];
+            n3 = dev_triItr->nor[2];
+
+            //printf("NOR1: %f, %f, %f\n", n1.x, n1.y, n1.z);
+            //printf("NOR2: %f, %f, %f\n", n2.x, n2.y, n2.z);
+            //printf("NOR3: %f, %f, %f\n", n3.x, n3.y, n3.z);
+
             break;
         }
     }
@@ -247,6 +260,7 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
         normal = glm::vec3(u * n1 + v * n2 + (1 - u - v) * n3);
         /*intersectionPoint = isectPoint;
         normal = isectNor;*/
+        //printf("INOR: %f, %f, %f\n", normal.x, normal.y, normal.z);
         return glm::length(r.origin - intersectionPoint);
     }
     return -1;

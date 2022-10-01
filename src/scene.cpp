@@ -150,6 +150,13 @@ int Scene::loadObjFile(string objectPath, Geom *newGeom)
         *t = triangles[i];
         t++;
     }
+    Triangle* tcpu = newGeom->triangles;
+    //printf("\n*****SCENE*****\n");
+    //for (int i = 0; i < newGeom->triCount; i++) {
+    //    printf("\n %f, %f, %f", tcpu->nor[0].x, tcpu->nor[0].y, tcpu->nor[0].z);
+    //    tcpu++;
+    //}
+    //printf("\n#########\n");
 }
 
 

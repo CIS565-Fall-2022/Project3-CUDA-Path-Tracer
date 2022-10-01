@@ -96,6 +96,7 @@ void scatterRay(    // similar to sample_f, calculate the new wi and f
     if (random <= m.hasReflective) {
         wi_scatteredRayDir = glm::reflect(wo, normal);
         color = m.specular.color * m.color * m.hasReflective;
+        //color = normal;
     }
     else if (random <= m.hasReflective + m.hasRefractive) {
         float cosTheta = glm::dot(glm::normalize(wo), normal);
