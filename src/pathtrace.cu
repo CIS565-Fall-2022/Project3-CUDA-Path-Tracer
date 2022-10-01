@@ -188,13 +188,17 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
 
 		glm::vec2 jitter(0.f);
-#if _CACHE_FIRST_BOUNCE_ // do not alias if caching first bounce for obvious reasons
+		// do not alias or motion blur if caching first bounce for obvious reasons
+#if _CACHE_FIRST_BOUNCE_ 
 #else
 		if (cam.antialias) {
 			const float stochasticWeight = 0.5f; // stddev
 			thrust::normal_distribution<float> norm(0.f, stochasticWeight);
 			jitter = glm::vec2(norm(rng), norm(rng));
 		}
+
+		thrust::uniform_real_distribution<float> u01(0, 1);
+		segment.ray.time = u01(rng);
 #endif
 		segment.ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f + jitter.x)
@@ -244,16 +248,26 @@ __global__ void computeIntersections(
 		// naive parse through global geoms
 		for (int i = 0; i < geoms_size; i++) {
 			Geom& geom = geoms[i];
-
-			if (geom.type == CUBE) {
-				t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, tmp_outside);
+#if _CACHE_FIRST_BOUNCE_
+			t = intersectionTest(geom.type, geom.transform, geom.inverseTransform, geom.invTranspose,
+				pathSegment.ray, tmp_intersect, tmp_normal, tmp_outside);
+#else
+			// motion blur stuff
+			if (geom.velocity != glm::vec3(0.f)) {
+				glm::mat4 transform = dev_buildTransformationMatrix(
+					geom.translation + pathSegment.ray.time * geom.velocity, geom.rotation, geom.scale);
+				t = intersectionTest(
+					geom.type, transform, glm::inverse(transform), glm::inverseTranspose(transform),
+					pathSegment.ray, tmp_intersect, tmp_normal, tmp_outside);
 			}
-			else if (geom.type == SPHERE) {
-				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, tmp_outside);
+			else {
+				t = intersectionTest(geom.type, geom.transform, geom.inverseTransform, geom.invTranspose,
+					pathSegment.ray, tmp_intersect, tmp_normal, tmp_outside);
 			}
+#endif		
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 
-			// Compute the minimum t from the intersection tests to determine what
+			// Compute minimum t from intersection tests to determine what
 			// scene geometry object was hit first.
 			if (t > 0.0f && t_min > t) {
 				t_min = t;

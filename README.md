@@ -16,10 +16,14 @@ Features:
 	* Diffusive
 	* Reflective
 	* Refractive
-* Depth of field
-* Stream compaction
-* Sorting rays by intersected material type
-* Caching first intersection
+* Visual effects
+	* Motion blur
+	* Anti-aliasing
+	* Depth of field
+* Toggle-able performance options
+	* Stream compaction
+	* Sorting rays by intersected material type
+	* Caching first intersection
 
 This README contains many images. Click on them (on Github) to open the full size.
 
@@ -27,8 +31,18 @@ This README contains many images. Click on them (on Github) to open the full siz
 
 ### Visual Effects
 
-The following visual effects are achieved in-code by manipulating the inital raycasts. As this is done during parallelized per-pixel ray generation, this benefits from being a GPU operation. They generally have very little performance impact.   
+The following visual effects are achieved in-code by manipulating either the inital raycasts or intersection calculations. As these are parallelized, per-pixel, they benefits from being a GPU operation. They generally have very little performance impact, though some have more.   
 Nonetheless, performance could be improved at the cost of less true-to-life DOF behavior(e.g., instead of jittering rays on a circular disk to mimic a lens, which requires concentric mapping from square to circle, one could just use the square). 
+
+#### Motion Blur
+Motion blur, the effect of an object smudged across the image, is implemented by randomly giving each casted ray a particular "time" at which it is sent out. The time is multiplied by a VELOCITY given per-object in the scene file to shift the object's position in time. 
+
+| Effect | None | Motion blurred |
+| :------- | :-------: | :-------: |
+| FPS | 49.7 | 31.3 |
+| Scene | <img src="img/nomotion_bench.png"> | <img src="img/motion_bench.png"> |
+
+Note the nontrivial performance impact here as a result of needing to modify the inputs to the intersection tests, which happen per iteration at every depth(above benchmark computed with depth 8). The other visual effects (below) are performed in ray generation, which happens just once per iteration.
 
 #### Antialiasing
 Antialiasing (AA) is the process of removing artifacts (alias) that occur when representing an image on a pixelated screen. A smooth line, if crossing vertically or horizontally across a pixel, creates a stair-like artifact called "jaggies".      
