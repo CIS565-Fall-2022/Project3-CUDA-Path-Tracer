@@ -36,8 +36,9 @@ __host__ __device__ glm::vec3 getPointOnRay(Ray r, float t) {
 /// <param name="vecs">3 vectors</param>
 /// <returns>the interpolated vector</returns>
 template<typename T>
-__host__ __device__ T lerpBarycentric(glm::vec3 bary, T(*vecs)[3]) {
-    return (1.0f - bary.x - bary.y) * (*vecs)[0] + bary.x * (*vecs)[1] + bary.y * (*vecs)[2];
+__host__ __device__ T lerpBarycentric(glm::vec3 bary, T const(&vecs)[3]) {
+    float u = (1.0f - bary.x - bary.y), v = bary.x, w = bary.y;
+    return u * vecs[0] + v * vecs[1] + w * vecs[2];
 }
 
 /**
@@ -254,7 +255,7 @@ __device__ float meshIntersectionTest(Geom mesh, Ray r, Material* materials, Mes
 
     // record uv info
     if (has_uv) {
-        uv = lerpBarycentric(barycoord, &triangle_uvs);
+        uv = lerpBarycentric(barycoord, triangle_uvs);
     } else {
         uv = glm::vec2(-1);
     }
@@ -266,29 +267,28 @@ __device__ float meshIntersectionTest(Geom mesh, Ray r, Material* materials, Mes
     // use bump mapping if applicable
     if (mat_id != -1 && has_uv &&
         materials[mat_id].textures.bump != -1) {
-        glm::vec3 bump_norms[3];
+        glm::vec3 tans[3];
+        glm::vec3 bitans[3];
 
 #pragma unroll
         for (int x = 0; x < 3; ++x) {
             glm::vec4 const& tmp = meshInfo.tangents[tris[idx].tangents[x]];
-
-            glm::vec3 tangent = glm::vec3(tmp);
-            glm::vec3 bitangent = glm::cross(triangle_norms[x], tangent) * tmp.w;
-            glm::vec3 vert_norm = triangle_norms[x];
-
-            tangent = glm::normalize(tangent);
-            bitangent = glm::normalize(bitangent);
-            vert_norm = glm::normalize(vert_norm);
-
-            Material const& mat = materials[mat_id];
-            bump_norms[x] = meshInfo.texs[mat.textures.bump].sample(uv);
-            bump_norms[x] = glm::normalize(bump_norms[x] * 2.0f - 1.0f);
-            bump_norms[x] = glm::mat3x3(tangent, bitangent, vert_norm) * bump_norms[x];
+            tans[x] = glm::vec3(tmp);
+            bitans[x] = glm::cross(triangle_norms[x], tans[x]) * tmp.w;
         }
 
-        normal = lerpBarycentric(barycoord, &bump_norms);
+        glm::vec3 tan = glm::normalize(lerpBarycentric(barycoord, tans));
+        glm::vec3 anorm = glm::normalize(lerpBarycentric(barycoord, triangle_norms));
+        glm::vec3 bitan = glm::normalize(lerpBarycentric(barycoord, bitans));
+
+        // glm::vec3 bitan = glm::normalize(glm::cross(tan, anorm));
+
+        Material const& mat = materials[mat_id];
+        normal = meshInfo.texs[mat.textures.bump].sample(uv);
+        normal = glm::normalize(normal * 2.0f - 1.0f);
+        normal = glm::mat3x3(tan, bitan, anorm) * normal;
     } else {
-        normal = lerpBarycentric(barycoord, &triangle_norms);
+        normal = lerpBarycentric(barycoord, triangle_norms);
     }
 
     normal = glm::normalize(normal);

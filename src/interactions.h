@@ -13,7 +13,7 @@ __device__ bool feq(float a, float b) {
 }
 
 __device__ bool is_zero(glm::vec3 const& vec) {
-    return glm::length2(vec) <= glm::epsilon<float>() * glm::epsilon<float>();
+    return glm::length2(vec) <= EPSILON * EPSILON;
 }
 
 __device__ __forceinline__
@@ -229,7 +229,7 @@ struct BSDF {
 
         wi = glm::vec3(0);
         pdf = 0;
-        return glm::vec3(1);
+        return glm::vec3(0);
     }
 };
 
@@ -300,15 +300,15 @@ void scatterRay(
         color = bsdf.sample_f(wo, wi, pdf);
 
         if (is_zero(wi) || feq(pdf, 0)) {
-            color = glm::vec3(1);
+            path.color = glm::vec3(0);
             path.terminate();
             return;
         } else {
             color = color * bsdf.cos_theta(wi) / pdf;
         }
 
-        // terminate low energy paths
-        if (is_zero(color)) {
+        if (is_zero(color)) { // terminate low energy paths
+            path.color = glm::vec3(0);
             path.terminate();
             return;
         }

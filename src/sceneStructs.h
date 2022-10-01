@@ -73,6 +73,7 @@ struct TextureGPU {
         tex_desc.addressMode[1] = cudaAddressModeWrap;
         tex_desc.filterMode = cudaFilterModeLinear;
         tex_desc.readMode = cudaReadModeNormalizedFloat;
+        tex_desc.sRGB = 1;
         tex_desc.normalizedCoords = 1;
 
         CHECK_CUDA(cudaCreateTextureObject(&tex, &res_desc, &tex_desc, 0));

@@ -5,7 +5,7 @@ FOVY        45
 ITERATIONS  1000
 DEPTH       8
 FILE        norm_test
-EYE         0.0 5 5
+EYE         0.0 5 7
 LOOKAT      0 5 0
 UP          0 1 0
 
@@ -13,7 +13,7 @@ UP          0 1 0
 OBJECT 
 cube
 material    ../materials/emissive_white.mtl
-TRANS       0 10 3
+TRANS       0 7 3
 ROTAT       0 0 0
 SCALE       3 .3 3
 
@@ -59,8 +59,8 @@ SCALE       .01 10 10
 
 
 OBJECT
-obj         ../meshes/Simple/paper.obj
+obj         ../meshes/Simple/coin.obj
 material    ../materials/diffuse_white.mtl
 TRANS       0 3 3
-ROTAT       -45 0 0
+ROTAT       45 0 0
 SCALE       2 2 2
