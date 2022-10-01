@@ -3,6 +3,7 @@
 #include <cstring>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include "tiny_obj_loader.h"
 
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
@@ -51,6 +52,20 @@ int Scene::loadGeom(string objectid) {
             } else if (strcmp(line.c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
+            } else if (strcmp(line.c_str(), "mesh") == 0) {
+                cout << "Creating new mesh..." << endl;
+                newGeom.type = MESH;
+            }
+        }
+
+        // read filepath and load obj from file
+        if (newGeom.type == MESH) {
+            utilityCore::safeGetline(fp_in, line);
+            if (!line.empty() && fp_in.good()) {
+                vector<string> tokens = utilityCore::tokenizeString(line);
+                const char* filePath = tokens[1].c_str();
+                LoadMeshFromOBJ(filePath, newGeom);
+                std::cout << "creating mesh from file: " << filePath << "..." <<  std::endl;
             }
         }
 
@@ -185,4 +200,61 @@ int Scene::loadMaterial(string materialid) {
         materials.push_back(newMaterial);
         return 1;
     }
+}
+
+int LoadMeshFromOBJ(const char* filePath, Geom& mesh) {
+    std::vector<float> positions;
+    std::vector<float> normals;
+    std::vector<int> posIndex;
+    std::vector<int> normIndex;
+    string errors = tinyobj::SimpleLoadObj(positions, normals, posIndex, normIndex, filePath);
+    std::cout << errors << std::endl;
+    std::cout << positions[0] << std::endl;
+    std::cout << normals[0] << std::endl;
+    if (errors.size() == 0) {
+        mesh.numTris = (int)(posIndex.size() / 3.f);
+        mesh.triangles = new Triangle[mesh.numTris];
+        glm::vec3 p0;
+        glm::vec3 p1;
+        glm::vec3 p2;
+        glm::vec3 n0;
+        glm::vec3 n1;
+        glm::vec3 n2;
+        int triCount = 0;
+        for (int i = 0; i < posIndex.size(); i = i + 3)
+        {
+            Triangle triangle;
+            int idx0 = posIndex[i] * 3;
+            int idx1 = posIndex[i + 1] * 3;
+            int idx2 = posIndex[i + 2] * 3;
+
+            // every three float make a pos
+            p0 = glm::vec3(positions[idx0], positions[idx0 + 1], positions[idx0 + 2]);
+            p1 = glm::vec3(positions[idx1], positions[idx1 + 1], positions[idx1 + 2]);
+            p2 = glm::vec3(positions[idx2], positions[idx2 + 1], positions[idx2 + 2]);
+            
+            // use three pos to create a triangle
+            triangle.p0 = p0;
+            triangle.p1 = p1;
+            triangle.p2 = p2;
+
+            // normal just can use i as index because normal index is 0/1/2/3/4/5...
+            int nIdx0 = i * 3;
+            int nIdx1 = (i + 1) * 3;
+            int nIdx2 = (i + 2) * 3;
+
+            n0 = glm::vec3(normals[nIdx0], normals[nIdx0 + 1], normals[nIdx0 + 2]);
+            n1 = glm::vec3(normals[nIdx1], normals[nIdx1 + 1], normals[nIdx1 + 2]);
+            n2 = glm::vec3(normals[nIdx2], normals[nIdx2 + 1], normals[nIdx2 + 2]);
+
+            triangle.n0 = n0;
+            triangle.n1 = n1;
+            triangle.n2 = n2;
+
+            mesh.triangles[triCount] = triangle;
+
+            triCount++;
+        }
+    }
+    return 1;
 }

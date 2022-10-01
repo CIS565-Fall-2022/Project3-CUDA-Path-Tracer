@@ -133,3 +133,12 @@ material 5
 TRANS       3 4 -1
 ROTAT       0 0 0
 SCALE       3 3 3
+
+// obj from file
+OBJECT 8
+mesh
+filepath ../scenes/mesh/cow.obj
+material 5
+TRANS       3 4 2
+ROTAT       0 0 0
+SCALE       2 2 2

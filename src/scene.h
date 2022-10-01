@@ -24,3 +24,5 @@ public:
     std::vector<Material> materials;
     RenderState state;
 };
+
+int LoadMeshFromOBJ(const char* filePath, Geom& mesh);
