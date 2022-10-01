@@ -3,6 +3,7 @@
 #include <cstring>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <glm/gtc/epsilon.hpp>
 #include "TinyObjLoader/tiny_obj_loader.h"
 #include "stb_image.h"
 #include "ColorConsole/color.hpp"
@@ -63,30 +64,39 @@ static bool initMaterial(
     PARSE_F("ior", mat.ior, 1);
     PARSE_F("emit", mat.emittance, 0);
     PARSE_F("rough", mat.roughness, 0);
-    
 
 #undef PARSE_F
 
-    string const& texname = tinyobj_mat.diffuse_texname;
-    if (!texname.empty()) {
-        if (self.tex_name_to_id.count(texname)) {
-            mat.textures.diffuse = self.tex_name_to_id[texname];
-        } else {
-            int x, y, n;
-            string texpath = obj_dir + '/' + texname;
+    auto load_texture = [&](int& id, string const& texname) {
+        if (!texname.empty()) {
+            if (self.tex_name_to_id.count(texname)) {
+                mat.textures.diffuse = self.tex_name_to_id[texname];
+            } else {
+                int x, y, n;
+                string texpath = obj_dir + '/' + texname;
 
-            unsigned char* data = stbi_load(texpath.c_str(), &x, &y, &n, NUM_TEX_CHANNEL);
-            if (!data) {
-                return false;
+                unsigned char* data = stbi_load(texpath.c_str(), &x, &y, &n, NUM_TEX_CHANNEL);
+                if (!data) {
+                    return false;
+                }
+
+                self.textures.emplace_back(x, y, data);
+                stbi_image_free(data);
+
+                id = self.tex_name_to_id[texname] = self.textures.size() - 1;
             }
-            
-            self.textures.emplace_back(x, y, data);
-            stbi_image_free(data);
-
-            mat.textures.diffuse = self.tex_name_to_id[texname] = self.textures.size() - 1;
+        } else {
+            id = -1;
         }
-    } else {
-        mat.textures.diffuse = -1;
+
+        return true;
+    };
+
+    if (!load_texture(mat.textures.diffuse, tinyobj_mat.diffuse_texname)) {
+        return false;
+    }
+    if (!load_texture(mat.textures.bump, tinyobj_mat.bump_texname)) {
+        return false;
     }
 
     // TODO deduce material type
@@ -125,7 +135,10 @@ static bool initMaterial(
         << "spec_exp   =   " << mat.specular.exponent << "\n\n";
 
     if(mat.textures.diffuse != -1)
-        cout << "diffuse tex = {" << " id = " << mat.textures.diffuse << ", npixels = " << self.textures[mat.textures.diffuse].pixels.size() << "}\n\n";
+        cout << "diffuse tex = {" << " id = " << mat.textures.diffuse << ", npixels = " << self.textures[mat.textures.diffuse].pixels.size() << "}\n";
+    if(mat.textures.bump != -1)
+        cout << "bump tex    = {" << " id = " << mat.textures.bump << ", npixels = " << self.textures[mat.textures.bump].pixels.size() << "}\n";
+
 
     ret = move(mat);
     return true;
@@ -188,9 +201,12 @@ int Scene::loadGeom() {
                 size_t norm_offset = normals.size();
                 size_t uv_offset = uvs.size();
                 size_t mat_offset = materials.size();
+                size_t tan_offset = tangents.size();
 
                 auto const& attrib = reader.GetAttrib();
                 auto const& mats = reader.GetMaterials();
+
+                bool has_normal_map = false;
                 
                 // fill materials
                 for (auto const& mat : mats) {
@@ -200,6 +216,9 @@ int Scene::loadGeom() {
                            mat.diffuse_texname + "\nresulting in an incomplete state of the loader, exiting...\n");
                         exit(EXIT_FAILURE);
                         return -1;
+                    }
+                    if (material.textures.bump != -1) {
+                        has_normal_map = true;
                     }
                     materials.emplace_back(material);
                 }
@@ -227,7 +246,55 @@ int Scene::loadGeom() {
                         attrib.texcoords[i]
                     );
                 }
-                
+
+                // temp buffer to compute tangent and bitangent
+                int num_verts = attrib.vertices.size() / 3;
+                vector<glm::vec3> tan1(num_verts, glm::vec3(0));
+                vector<glm::vec3> tan2(num_verts, glm::vec3(0));
+                vector<glm::vec3> vert2norm(num_verts);
+
+                // maps normal to normal buffer index (used only if the model is missing normals)
+                auto h = [](glm::vec3 const& v)->size_t {
+                    auto hs = hash<float>();
+                    return hs(v.x) ^ hs(v.y) ^ hs(v.z);
+                };
+                auto eq = [](glm::vec3 const& v1, glm::vec3 const& v2)->bool {
+                    for (int i = 0; i < 3; ++i) {
+                        if (!glm::epsilonEqual(v1[i], v2[i], 0.001f)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                };
+                unordered_map<glm::vec3,int,decltype(h),decltype(eq)> normal_deduction_mp(10,h,eq);
+                auto add_or_get_norm_id = [&](glm::vec3 const& v) {
+                    if (normal_deduction_mp.count(v)) {
+                        return normal_deduction_mp[v];
+                    } else {
+                        int ret = normal_deduction_mp[v] = normals.size();
+                        normals.emplace_back(v);
+                        return ret;
+                    }
+                };
+
+                auto compute_tan1tan2 = [&](glm::ivec3 iverts, glm::ivec3 iuvs) {
+                    // reference: Lengyel, Eric. "Computing Tangent Space Basis Vectors for an Arbitrary Mesh."
+                    // Terathon Software 3D Graphics Library, 2001. http://www.terathon.com/code/tangent.html
+                    int i1 = iverts[0], i2 = iverts[1], i3 = iverts[2];
+                    glm::vec3 v1 = vertices[iverts[1]] - vertices[iverts[0]];
+                    glm::vec3 v2 = vertices[iverts[2]] - vertices[iverts[0]];
+                    glm::vec2 u1 = uvs[iuvs[1]] - uvs[iuvs[0]];
+                    glm::vec2 u2 = uvs[iuvs[2]] - uvs[iuvs[0]];
+                    float f = 1.0f / (u1.x * u2.y - u2.x * u1.y);
+                    glm::vec3 sd = (v1 * u2.y - v2 * u1.y) * f;
+                    glm::vec3 td = (v2 * u1.x - v1 * u2.x) * f;
+
+                    for (int i = 0; i < 3; ++i) {
+                        tan1[iverts[i] - vert_offset] += sd;
+                        tan2[iverts[i] - vert_offset] += td;
+                    }
+                };
+
                 int triangles_start = triangles.size();
                 bool missing_norm = false;
                 bool missing_uv = false;
@@ -246,15 +313,22 @@ int Scene::loadGeom() {
                                 missing_norm = true;
                                 norms[x] = -1;
                             } else {
-                                norms[x] = indices[3 * i + x].normal_index;
+                                norms[x] = indices[3 * i + x].normal_index + norm_offset;
                             }
 
                             if (indices[3 * i + x].texcoord_index == -1) {
                                 missing_uv = true;
                                 uvs[x] = -1;
                             } else {
-                                uvs[x] = indices[3 * i + x].texcoord_index;
+                                uvs[x] = indices[3 * i + x].texcoord_index + uv_offset;
                             }
+                        }
+
+                        if (missing_norm) {
+                            // deduce normal from cross product
+                            glm::vec3 v0v1 = vertices[verts[1]] - vertices[verts[0]];
+                            glm::vec3 v0v2 = vertices[verts[2]] - vertices[verts[0]];
+                            norms[0] = norms[1] = norms[2] = add_or_get_norm_id(glm::cross(v0v1, v0v2));
                         }
 
                         int mat_id;
@@ -264,19 +338,58 @@ int Scene::loadGeom() {
                             mat_id = -1;
                         }
                         
+                        // compute temp buffers for tangent computation
+                        if(has_normal_map && !missing_uv) {
+                            compute_tan1tan2(verts, uvs);
+                            vert2norm[verts[0] - vert_offset] = normals[norms[0]];
+                            vert2norm[verts[1] - vert_offset] = normals[norms[1]];
+                            vert2norm[verts[2] - vert_offset] = normals[norms[2]];
+                        }
+
                         triangles.emplace_back(verts, norms, uvs, mat_id);
+                    }
+                }
+
+                if (has_normal_map && !missing_uv) {
+                    for (size_t i = 0; i < num_verts; ++i) {
+                        Normal const& n = vert2norm[i];
+                        glm::vec3 const& t = tan1[i];
+                        glm::vec3 const& t2 = tan2[i];
+                        // Gram-Schmidt orthogonalize
+                        // the 4th component stores handedness
+                        tangents.emplace_back(glm::vec4(
+                            glm::normalize((t - n * glm::dot(n, t))),
+                            glm::dot(glm::cross(n, t), t2) < 0 ? -1.0f : 1.0f
+                        ));
+                    }
+
+                    auto triangle_it = triangles.begin() + triangles_start;
+                    for (auto const& s : reader.GetShapes()) {
+                        auto const& indices = s.mesh.indices;
+                        for (size_t i = 0; i < s.mesh.material_ids.size(); ++i) {
+                            // tangent indices are just verts[0], verts[1], verts[2]
+                            // because size of tangent buffer is the num of verts
+                            (triangle_it++)->tangents = glm::ivec3(
+                                indices[3 * i + 0].vertex_index + tan_offset,
+                                indices[3 * i + 1].vertex_index + tan_offset,
+                                indices[3 * i + 2].vertex_index + tan_offset
+                            );
+                        }
                     }
                 }
 
                 newGeom.meshid = meshes.size();
                 meshes.emplace_back(triangles_start, triangles.size());
 
+                
+
                 cout << dye::green("Loaded:\n")
                     << triangles.size() << " triangles\n"
                     << vertices.size() << " vertices\n"
                     << normals.size() << " normals\n"
                     << uvs.size() << " uvs\n"
-                    << meshes.size() << " meshes\n";
+                    << meshes.size() << " meshes\n"
+                    << tangents.size() << " tangents\n";
 
                 if (missing_uv) {
                     cout << dye::red("missing uv for " + tokens[1]) << endl;

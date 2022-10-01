@@ -194,7 +194,6 @@ __device__ float meshIntersectionTest(Geom mesh, Ray r, Material* materials, Mes
     glm::vec3 rd = glm::normalize(multiplyMV(mesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
 
     float t_min = FLT_MAX;
-    bool intersect = false;
     
     auto const& meshes = meshInfo.meshes;
     auto const& tris = meshInfo.tris;
@@ -202,70 +201,97 @@ __device__ float meshIntersectionTest(Geom mesh, Ray r, Material* materials, Mes
     auto const& norms = meshInfo.normals;
     auto const& uvs = meshInfo.uvs;
 
-    glm::vec3 normal;
-    glm::vec2 uv;
-    int mat_id = -1;
-
+    int idx = -1;
+    glm::vec3 barycoord;
+    
     for (int i = meshes[mesh.meshid].tri_start; i < meshes[mesh.meshid].tri_end; ++i) {
-        
-        glm::vec3 barycoord;
+        glm::vec3 tmp_barycoord;
         glm::vec3 triangle_verts[3]{
             verts[tris[i].verts[0]],
             verts[tris[i].verts[1]],
             verts[tris[i].verts[2]]
         };
 
-        bool has_norm = true, has_uv = true;
-        glm::vec3 triangle_norms[3];
-        glm::vec2 triangle_uvs[3];
-
-        for (int x = 0; x < 3; ++x) {
-            if (tris[i].norms[x] != -1) {
-                triangle_norms[x] = norms[tris[i].norms[x]];
-            } else {
-                has_norm = false;
-                break;
-            }
-        }
-        for (int x = 0; x < 3; ++x) {
-            if (tris[i].uvs[x] != -1) {
-                triangle_uvs[x] = uvs[tris[i].uvs[x]];
-            } else {
-                has_uv = false;
-                break;
-            }
-        }
-
-        if (glm::intersectRayTriangle(ro, rd, triangle_verts[0], triangle_verts[1], triangle_verts[2], barycoord)) {
-            intersect = true;
-            if (barycoord.z > t_min) {
+        if (glm::intersectRayTriangle(ro, rd, triangle_verts[0], triangle_verts[1], triangle_verts[2], tmp_barycoord)) {
+            if (tmp_barycoord.z > t_min) {
                 continue;
             }
-            
-            t_min = barycoord.z;
-
-            if (has_norm) {
-                normal = lerpBarycentric(barycoord, &triangle_norms);
-            } else {
-                glm::vec3 v0v1 = triangle_verts[1] - triangle_verts[0];
-                glm::vec3 v0v2 = triangle_verts[2] - triangle_verts[0];
-                normal = glm::cross(v0v1, v0v2);
-            }
-            normal = glm::normalize(normal);
-
-            if (has_uv) {
-                uv = lerpBarycentric(barycoord, &triangle_uvs);
-            } else {
-                uv = glm::vec2(-1);
-            }
-
-            mat_id = tris[i].mat_id;
+            idx = i;
+            barycoord = tmp_barycoord;
+            t_min = tmp_barycoord.z;
         }
     }
 
-    if (!intersect) {
+    if (idx == -1) {
         return -1;
     }
+
+    glm::vec3 normal;
+    glm::vec2 uv;
+    int mat_id = -1;
+
+    bool has_uv = true;
+    glm::vec3 triangle_verts[3]{
+        verts[tris[idx].verts[0]],
+        verts[tris[idx].verts[1]],
+        verts[tris[idx].verts[2]]
+    };
+    glm::vec3 triangle_norms[3]{
+        norms[tris[idx].norms[0]],
+        norms[tris[idx].norms[1]],
+        norms[tris[idx].norms[2]]
+    };
+    glm::vec2 triangle_uvs[3];
+#pragma unroll
+    for (int x = 0; x < 3; ++x) {
+        if (tris[idx].uvs[x] != -1) {
+            triangle_uvs[x] = uvs[tris[idx].uvs[x]];
+        } else {
+            has_uv = false;
+            break;
+        }
+    }
+
+    // record uv info
+    if (has_uv) {
+        uv = lerpBarycentric(barycoord, &triangle_uvs);
+    } else {
+        uv = glm::vec2(-1);
+    }
+
+    // record material id
+    mat_id = tris[idx].mat_id;
+
+    // record normal info
+    // use bump mapping if applicable
+    if (mat_id != -1 && has_uv &&
+        materials[mat_id].textures.bump != -1) {
+        glm::vec3 bump_norms[3];
+
+#pragma unroll
+        for (int x = 0; x < 3; ++x) {
+            glm::vec4 const& tmp = meshInfo.tangents[tris[idx].tangents[x]];
+
+            glm::vec3 tangent = glm::vec3(tmp);
+            glm::vec3 bitangent = glm::cross(triangle_norms[x], tangent) * tmp.w;
+            glm::vec3 vert_norm = triangle_norms[x];
+
+            tangent = glm::normalize(tangent);
+            bitangent = glm::normalize(bitangent);
+            vert_norm = glm::normalize(vert_norm);
+
+            Material const& mat = materials[mat_id];
+            bump_norms[x] = meshInfo.texs[mat.textures.bump].sample(uv);
+            bump_norms[x] = glm::normalize(bump_norms[x] * 2.0f - 1.0f);
+            bump_norms[x] = glm::mat3x3(tangent, bitangent, vert_norm) * bump_norms[x];
+        }
+
+        normal = lerpBarycentric(barycoord, &bump_norms);
+    } else {
+        normal = lerpBarycentric(barycoord, &triangle_norms);
+    }
+
+    normal = glm::normalize(normal);
 
     // transform to world space and store results
     Ray local_ray;

@@ -99,6 +99,7 @@ struct TextureGPU {
     cudaTextureObject_t tex;
 };
 
+
 struct Material {
     color_t diffuse;
     struct {
@@ -123,14 +124,24 @@ struct Material {
     
     struct {
         int diffuse;
+        int bump;
     } textures;      // optional: invalid = -1
 
     Type type;       // optional: default = DIFFUSE
     float roughness; // optional: default = 1
 
-    __host__ __device__ Material() : diffuse(BACKGROUND_COLOR), roughness(1) {
-        type = DIFFUSE;
-        textures.diffuse = -1;
+    __host__ __device__ Material() : 
+        diffuse(BACKGROUND_COLOR),
+        hasReflective(0),
+        hasRefractive(0),
+        ior(1),
+        emittance(0),
+        type(DIFFUSE),
+        roughness(1)
+    {
+        specular.color = color_t(0);
+        specular.exponent = 0;
+        textures.diffuse = textures.bump = -1;
     }
 
     static Type str_to_mat_type(std::string str) {
@@ -226,13 +237,23 @@ struct ShadeableIntersection {
 
 // Stored in the scene structure
 // automatically generated from objects with emittance > 0 
-// to provide info about what lights are in the scene
+// to provide info about lights in the scene
 struct Light {
     color_t color;
     float intensity;
     glm::vec3 position;
 };
 
+
+
+
+// --------------------------------------------
+// MESH STRUCTURE:
+// Mesh --> a range of triangles
+// Triangle --> Material
+// Material --> Textures
+// --------------------------------------------
+// 
 // Stored in the scene structure
 struct Triangle {
     glm::ivec3 verts;
@@ -242,8 +263,11 @@ struct Triangle {
     glm::ivec3 uvs;
     int mat_id;
 
+    // only used by normal-mapped faces
+    glm::ivec3 tangents;
+
     Triangle(glm::ivec3 verts, glm::ivec3 norms, glm::ivec3 uvs, int mat_id) 
-        : verts(verts), norms(norms), uvs(uvs), mat_id(mat_id) {}
+        : verts(verts), norms(norms), uvs(uvs), mat_id(mat_id), tangents(-1) {}
 };
 typedef glm::vec3 Vertex;
 typedef glm::vec3 Normal;
@@ -265,5 +289,6 @@ struct MeshInfo {
     TexCoord* uvs;
     TextureGPU* texs; //array of textures pointers
     Triangle* tris;
+    glm::vec4* tangents;
     Mesh* meshes;
 };

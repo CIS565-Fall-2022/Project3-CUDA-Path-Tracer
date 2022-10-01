@@ -13,8 +13,6 @@ static double lastX;
 static double lastY;
 
 static bool camchanged = true;
-static float dtheta = 0, dphi = 0;
-static glm::vec3 cammove;
 
 JunksFromMain g_mainJunks;
 

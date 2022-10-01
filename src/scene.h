@@ -35,6 +35,7 @@ public:
     std::vector<Normal> normals;
     std::vector<Vertex> vertices;
     std::vector<TexCoord> uvs;
+    std::vector<glm::vec4> tangents;
     
     std::vector<Texture> textures;
 

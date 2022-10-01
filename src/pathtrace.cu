@@ -164,22 +164,24 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state) {
 	dev_intersections = make_span<ShadeableIntersection>(pixelcount);
 	dev_geoms = make_span(scene->geoms);
 	dev_lights = make_span(scene->lights);
-
-#ifdef CACHE_FIRST_BOUNCE
-	dev_cached_intersections = make_span<ShadeableIntersection>(pixelcount);
-#endif // CACHE_FIRST_BOUNCE
-
 	dev_mesh_info.vertices = make_span(scene->vertices);
 	dev_mesh_info.normals = make_span(scene->normals);
 	dev_mesh_info.uvs = make_span(scene->uvs);
 	dev_mesh_info.tris = make_span(scene->triangles);
 	dev_mesh_info.meshes = make_span(scene->meshes);
+	dev_mesh_info.tangents = make_span(scene->tangents);
 	for (Texture const& hst_tex : scene->textures) {
 		TextureGPU dev_tex(hst_tex);
 		dev_texs.push_back(dev_tex);
 	}
 	dev_mesh_info.texs = make_span(dev_texs);
 	dev_thrust_paths = thrust::device_ptr<PathSegment>((PathSegment*)dev_paths);
+
+
+#ifdef CACHE_FIRST_BOUNCE
+	dev_cached_intersections = make_span<ShadeableIntersection>(pixelcount);
+#endif // CACHE_FIRST_BOUNCE
+
     checkCUDAError("pathtraceInit");
 }
 
@@ -195,11 +197,16 @@ void PathTracer::pathtraceFree() {
 	FREE(dev_mesh_info.uvs);
 	FREE(dev_mesh_info.tris);
 	FREE(dev_mesh_info.meshes);
+	FREE(dev_mesh_info.tangents);
 	for (TextureGPU& tex : dev_texs) {
 		tex.free();
 	}
 	dev_texs.clear();
 	FREE(dev_mesh_info.texs);
+
+#ifdef CACHE_FIRST_BOUNCE
+	FREE(dev_cached_intersections);
+#endif // CACHE_FIRST_BOUNCE
 
     checkCUDAError("pathtraceFree");
 }
