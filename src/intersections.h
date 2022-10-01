@@ -236,12 +236,17 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
             {
                 minVal = barycentric;
             }
-            /*n1 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[0].x, dev_triItr->nor[0].y, dev_triItr->nor[0].z, 1.0));
+            n1 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[0].x, dev_triItr->nor[0].y, dev_triItr->nor[0].z, 1.0));
             n2 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[1].x, dev_triItr->nor[1].y, dev_triItr->nor[1].z, 1.0));
-            n3 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[2].x, dev_triItr->nor[2].y, dev_triItr->nor[2].z, 1.0));*/
-            n1 = dev_triItr->nor[0];
+            n3 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[2].x, dev_triItr->nor[2].y, dev_triItr->nor[2].z, 1.0));
+           
+            //n1 = glm::normalize(n1);
+            //n2 = glm::normalize(n2);
+            //n3 = glm::normalize(n3);
+            
+            /* n1 = dev_triItr->nor[0];
             n2 = dev_triItr->nor[1];
-            n3 = dev_triItr->nor[2];
+            n3 = dev_triItr->nor[2];*/
 
             //printf("NOR1: %f, %f, %f\n", n1.x, n1.y, n1.z);
             //printf("NOR2: %f, %f, %f\n", n2.x, n2.y, n2.z);
@@ -257,7 +262,7 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
         float v = minVal[1];
         float t = minVal[2];
         intersectionPoint = getPointOnRay(r, t);
-        normal = glm::vec3(u * n1 + v * n2 + (1 - u - v) * n3);
+        normal = glm::normalize(glm::vec3(u * n1 + v * n2 + (1 - u - v) * n3));
         /*intersectionPoint = isectPoint;
         normal = isectNor;*/
         //printf("INOR: %f, %f, %f\n", normal.x, normal.y, normal.z);

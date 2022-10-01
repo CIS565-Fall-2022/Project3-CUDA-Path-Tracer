@@ -20,6 +20,16 @@
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
+
+#define PIOVER4 0.78539816339
+#define PIOVER2 1.57079632679
+#define PI 3.14159265359
+
+#define ANTIALIASING 0
+#define CACHEINTERSECTIONS 0
+#define DOF 0
+
+
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #if ERRORCHECK
 	cudaDeviceSynchronize();
@@ -102,22 +112,6 @@ void pathtraceInit(Scene* scene) {
 		{
 			cudaMalloc(&geom.dev_triangles, geom.triCount * sizeof(Triangle));
 			cudaMemcpy(geom.dev_triangles, geom.triangles, geom.triCount * sizeof(Triangle), cudaMemcpyHostToDevice);
-			//printf("******CPU******");
-			//Triangle* tcpu = geom.triangles;
-			//for (int i = 0; i < geom.triCount; i++) {
-			//	printf("\n %f, %f, %f", tcpu->nor[0].x, tcpu->nor[0].y, tcpu->nor[0].z);
-			//	tcpu++;
-			//}
-			//printf("\n##########\n");
-
-			//Triangle* temp_host_tri = new Triangle[geom.triCount * sizeof(Triangle)];
-			//cudaMemcpy(temp_host_tri, geom.dev_triangles, geom.triCount * sizeof(Triangle), cudaMemcpyDeviceToHost);
-
-			//Triangle* tgpucpy = temp_host_tri;
-			//for (int i = 0; i < geom.triCount; i++) {
-			//	printf("\n %f, %f, %f", tgpucpy->nor[0].x, tgpucpy->nor[0].y, tgpucpy->nor[0].z);
-			//	tgpucpy++;
-			//}
 		}
 	}
 	
@@ -141,12 +135,12 @@ void pathtraceFree(Scene* scene) {
 	cudaFree(dev_image);  // no-op if dev_image is null
 	cudaFree(dev_paths);
 
-	/*for (auto& geom : scene->geoms) {
-		for (int i = 0; i < geom.triCount; i++) {
-			delete(geom.triangles);
-			cudaFree(geom.dev_triangles);
-		}
-	}*/
+	//for (auto& geom : scene->geoms) {
+	//	for (int i = 0; i < geom.triCount; i++) {
+	//		//delete(geom.triangles);
+	//		cudaFree(geom.dev_triangles);
+	//	}
+	//}
 
 	cudaFree(dev_geoms);
 	cudaFree(dev_materials);
@@ -155,6 +149,28 @@ void pathtraceFree(Scene* scene) {
 	cudaFree(dev_cache_intersections);
 
 	checkCUDAError("pathtraceFree");
+}
+
+__host__ __device__ glm::vec2 concentricDiskSampling(const glm::vec2 &u) {
+
+	//Map uniform random numbers to [-1, 1]
+	glm::vec2 uOffset = 2.f * u - glm::vec2(1.f, 1.f);
+
+	// Handle degeneracy at origin
+	if (uOffset.x == 0 && uOffset.y == 0)
+		return glm::vec2(0.f, 0.f);
+
+	// Apply concentric mapping to point
+	float theta, r;
+	if (std::abs(uOffset.x) > std::abs(uOffset.y)) {
+		r = uOffset.x;
+		theta = PIOVER4 * (uOffset.y / uOffset.x);
+	}
+	else {
+		r = uOffset.y;
+		theta = PIOVER2 - PIOVER4 * (uOffset.x / uOffset.y);
+	}
+	return r * glm::vec2(cos(theta), sin(theta));
 }
 
 /**
@@ -183,11 +199,35 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		// TODO: implement antialiasing by jittering the ray
-		segment.ray.direction = glm::normalize(cam.view
-			- cam.right * cam.pixelLength.x * ((float)(x + jitterX) - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)(y + jitterY) - (float)cam.resolution.y * 0.5f)
-		);
+#if ANTIALIASING
+			segment.ray.direction = glm::normalize(cam.view
+				- cam.right * cam.pixelLength.x * ((float)(x + jitterX) - (float)cam.resolution.x * 0.5f)
+				- cam.up * cam.pixelLength.y * ((float)(y + jitterY) - (float)cam.resolution.y * 0.5f)
+			);
 
+#else
+			segment.ray.direction = glm::normalize(cam.view
+				- cam.right * cam.pixelLength.x * ((float)(x) - (float)cam.resolution.x * 0.5f)
+				- cam.up * cam.pixelLength.y * ((float)(y) - (float)cam.resolution.y * 0.5f)
+			);
+#endif
+
+#if DOF
+		float lensRadius = cam.lensRadius;
+		glm::vec2 randomSample = glm::vec2(u01(rng), u01(rng));
+		if (lensRadius > 0) {
+			// Sample point on lens
+			glm::vec2 pLens = lensRadius * concentricDiskSampling(randomSample);
+
+			// Compute point on plane of focus
+			float ft = glm::length(cam.lookAt - cam.position); //cam.focalDist / segment.ray.direction.z;
+			glm::vec3 pFocus = getPointOnRay(segment.ray, ft);
+
+			// Update ray for effect of lens
+			segment.ray.origin = glm::vec3(pLens.x, pLens.y, 0);
+			segment.ray.direction = glm::normalize(pFocus - segment.ray.origin);
+		}
+#endif
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
 	}
