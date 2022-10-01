@@ -25,6 +25,7 @@
 #define ERRORCHECK 1
 #define SORT_MATERIALS 0
 #define CACHE_FIRST_BOUNCE 0
+#define ANTIALIASING 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -173,11 +174,19 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		// TODO: implement antialiasing by jittering the ray
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+		thrust::uniform_real_distribution<float> u01(0.50, 0.503);
+#if ANTIALIASING
+		segment.ray.direction = glm::normalize(cam.view
+			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * u01(rng))
+			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * u01(rng))
+		);
+#else
 		segment.ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
 		);
-
+#endif
 		segment.pixelIndex = index;
 
 		// debug hard code to 2 instead of traceDepth;
@@ -233,7 +242,9 @@ __global__ void computeIntersections(
 			else if (geom.type == BOUND_BOX) {
 				// only true if bound box is on
 				float boxT = boundBoxIntersectionTest(&geom, pathSegment.ray, tmp_intersect, outside);
+				// if hits box, make material color black
 				if (boxT != -1) {
+					// pathSegments[path_index].color = glm::vec3(0);
 					for (int j = 0; j < geom.numTris; j++) {
 						t = triangleIntersectionTest(&geom, &geom.device_tris[j], pathSegment.ray, tmp_intersect, tmp_normal, outside);
 					

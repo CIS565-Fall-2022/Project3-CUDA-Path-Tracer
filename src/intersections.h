@@ -201,6 +201,7 @@ __host__ __device__ float triangleIntersectionTest(Geom *geom, Triangle *triangl
     // output[0] = u, output[1] = v, output[2] = t;
     bool doesIntersect = glm::intersectRayTriangle(r.origin, r.direction, glm::vec3(screenPA), glm::vec3(screenPB), glm::vec3(screenPC), baryPosition);
     
+    // bool doesIntersect = glm::intersectRayTriangle(r.origin, r.direction, glm::vec3(triangle->pointA.pos), glm::vec3(triangle->pointB.pos), glm::vec3(triangle->pointC.pos), baryPosition);
     float u = baryPosition.r;
     float v = baryPosition.g;
     float t = baryPosition.b;

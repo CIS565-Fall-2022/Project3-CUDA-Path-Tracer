@@ -141,7 +141,7 @@ SCALE       .01 10 10
 // diffuse cat
 OBJECT 6
 ../Project3-CUDA-Path-Tracer/objs/cat.obj
-material 5
-TRANS		0 2 1
+material 1
+TRANS		0 0 0
 ROTAT		0 0 0
 SCALE		3 3 3

@@ -6,7 +6,7 @@
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
-#define USE_BOUND_BOX 1
+#define USE_BOUND_BOX 0
 
 enum GeomType {
     SPHERE,

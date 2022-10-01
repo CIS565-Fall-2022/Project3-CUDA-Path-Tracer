@@ -258,6 +258,9 @@ int Scene::loadGeom(string objectid) {
                 zMax = std::max(std::max(tri.pointA.pos[2], tri.pointB.pos[2]), std::min(tri.pointC.pos[2], zMax));
             }
 
+           // glm::vec4 transformedBoxMin = newGeom.transform * glm::vec4(glm::vec3(xMin, yMin, zMin), 1.f);
+           // glm::vec4 transformedBoxMax = newGeom.transform * glm::vec4(glm::vec3(xMax, yMax, zMax), 1.f);
+
             BoundBox box = {
                 glm::vec3(xMin, yMin, zMin),
                 glm::vec3(xMax, yMax, zMax)

@@ -138,7 +138,7 @@ TRANS       5 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
-// Sphere
+// cube specular
 OBJECT 6
 cube
 material 4
@@ -162,10 +162,10 @@ TRANS       2 2 2
 ROTAT       0 0 0
 SCALE       3 3 3
 
-// diffuse cat
+// Sphere
 OBJECT 9
-../Project3-CUDA-Path-Tracer/objs/cat.obj
+sphere
 material 1
-TRANS		0 0 0
-ROTAT		0 0 0
-SCALE		1 1 1
+TRANS       -2 1 2
+ROTAT       0 0 0
+SCALE       3 3 3
