@@ -45,7 +45,7 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
-    Triangle* tris;
+    Triangle* host_tris;
     Triangle* device_tris;
     BoundBox bound;
     int numTris;

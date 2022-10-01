@@ -112,11 +112,10 @@ void pathtraceInit(Scene* scene) {
 	checkCUDAError("cudaMalloc dev_paths failed");
 
 	for (int i = 0; i < scene->geoms.size(); i++) {
-		// cout << "numTris: " << scene->geoms[i].numTris;
 		if (scene->geoms[i].numTris) {
 			cudaMalloc(&(scene->geoms[i].device_tris), scene->geoms[i].numTris * sizeof(Triangle));
 			checkCUDAError("cudaMalloc device_tris failed");
-			cudaMemcpy(scene->geoms[i].device_tris, scene->geoms[i].tris, scene->geoms[i].numTris * sizeof(Triangle), cudaMemcpyHostToDevice);
+			cudaMemcpy(scene->geoms[i].device_tris, scene->geoms[i].host_tris, scene->geoms[i].numTris * sizeof(Triangle), cudaMemcpyHostToDevice);
 			checkCUDAError("cudaMemcpy device_tris failed");
 		}
 	}
@@ -150,7 +149,7 @@ void pathtraceFree() {
 	// cudaFree 
 	//for (int i = 0; i < hst_scene->geoms.size(); i++) {
 	//	// cout << "numTris: " << scene->geoms[i].numTris;
-	//	if (hst_scene->geoms[i].numTris) {
+	//	if (hst_scene->geoms[i].type == OBJ) {
 	//		cudaFree(hst_scene->geoms[i].device_tris);
 	//		checkCUDAError("cudaFree device_tris failed");
 	//	}
@@ -289,9 +288,9 @@ __global__ void computeIntersections(
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
 			else if (geom.type == OBJ) {
-				float localT = boundBoxIntersectionTest(&geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
-				// if hits box, make material color black
-				if (localT != -1) {
+				float boxT = boundBoxIntersectionTest(&geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				
+				if (boxT != -1) {
 					for (int j = 0; j < geom.numTris; j++) {
 						t = triangleIntersectionTest(&geom, &geom.device_tris[j], pathSegment.ray, tmp_intersect, tmp_normal, outside);
 					
@@ -306,10 +305,8 @@ __global__ void computeIntersections(
 				}
 			}
 			else if (geom.type == TRIANGLE) {
-				for (int j = 0; j < geom.numTris; j++) {
-					// if not using bound box, should only be one triangle.
-					t = triangleIntersectionTest(&geom, &geom.device_tris[j], pathSegment.ray, tmp_intersect, tmp_normal, outside);
-				}
+				// Only use the first triangle, since in Triangle mode, each geom only has 1 triangle
+				t = triangleIntersectionTest(&geom, &geom.device_tris[0], pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.

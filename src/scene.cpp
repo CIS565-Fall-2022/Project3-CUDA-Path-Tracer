@@ -270,13 +270,13 @@ int Scene::loadGeom(string objectid) {
             cout << "xMax: " << xMax << " , " << yMax << " , " << zMax << endl;
 
 
-            newGeom.tris = new Triangle[triangleArray.size()];//triangleArray.size()];
+            newGeom.host_tris = new Triangle[triangleArray.size()];//triangleArray.size()];
             newGeom.device_tris = NULL;
             newGeom.numTris = triangleArray.size();
 
             newGeom.bound = box;
             for (int i = 0; i < triangleArray.size(); i++) {
-                newGeom.tris[i] = triangleArray[i];
+                newGeom.host_tris[i] = triangleArray[i];
             }
 
             geoms.push_back(newGeom);

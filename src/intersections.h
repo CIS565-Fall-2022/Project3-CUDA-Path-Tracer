@@ -184,11 +184,8 @@ __host__ __device__ float boundBoxIntersectionTest(Geom* geom, Ray r, glm::vec3&
             outside = false;
         }
         intersectionPoint = multiplyMV(geom->transform, glm::vec4(getPointOnRay(q, tmin), 1.0f));
-        // printf("interPoint X: %f, Y: %f, Z: %f \n", intersectionPoint.x, intersectionPoint.y, intersectionPoint.z);
         normal = glm::normalize(multiplyMV(geom->invTranspose, glm::vec4(tmin_n, 0.0f)));
-        //intersectionPoint = getPointOnRay(q, tmin);
         return glm::length(r.origin - intersectionPoint);
-        //tmin;
     }
     return -1;
 
