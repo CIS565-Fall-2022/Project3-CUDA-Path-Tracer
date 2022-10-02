@@ -7,16 +7,6 @@
  * Computes a cosine-weighted random direction in a hemisphere.
  * Used for diffuse lighting.
  */
-__device__ void normalMappingWithTangent(glm::vec3& normal, glm::vec4& tangent, glm::vec3 normalizedVal) {
-    glm::vec3 t = glm::vec3(tangent);
-    glm::vec3 b = glm::cross(normal, t) * tangent.w;
-    glm::mat3 tbn = glm::mat3(t, b, normal);
-    normal = glm::normalize(tbn * normalizedVal);
-}
-
-__device__ void normalMapping() {
-
-}
 
 __host__ __device__
 glm::vec3 calculateRandomDirectionInHemisphere(
@@ -77,13 +67,17 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  *
  * You may need to change the parameter list for your purposes!
  */
+
 __host__ __device__
 void scatterRay(
         PathSegment & pathSegment,
         glm::vec3 intersect,
         glm::vec3 normal,
+        glm::vec2 uv,
         const Material &m,
-        thrust::default_random_engine &rng) {
+        thrust::default_random_engine &rng,
+        const Texture* textures,
+        glm::vec3* texData) {
     
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
@@ -96,6 +90,7 @@ void scatterRay(
         pathSegment.color *= m.color;
         pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
         pathSegment.ray.origin = intersect;
+        
     }
     else if (m.hasReflective && m.hasRefractive) {//both and we will use the equation
         float n1, n2;
@@ -133,6 +128,15 @@ void scatterRay(
         pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
         pathSegment.ray.origin = intersect;
     }
+    //texture mapping
+    if (m.tex.TexIndex >= 0) {
+        int w = m.tex.width;
+        int x = uv.x * (w - 1);
+        int y = uv.y * (m.tex.height - 1);
+        //pathSegment.color *= textures->image[m.tex.TexIndex + y * w + x];
+        pathSegment.color *= texData[m.tex.TexIndex + y * w + x];
+    }
+    
 
     pathSegment.remainingBounces--;
 

@@ -97,12 +97,15 @@ static Scene * hst_scene = NULL;
 static glm::vec3 * dev_image = NULL;
 static Geom * dev_geoms = NULL;
 static Material * dev_materials = NULL;
+
 static PathSegment * dev_paths = NULL;
 static ShadeableIntersection * dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
 static ShadeableIntersection* dev_cache_intersections = NULL;//for first round cache
 static Primitive* dev_primitives = NULL;//for mesh
+static Texture* dev_textures = NULL;
+static glm::vec3* dev_texData = nullptr;
 void pathtraceInit(Scene *scene) {
     hst_scene = scene;
     const Camera &cam = hst_scene->state.camera;
@@ -126,7 +129,14 @@ void pathtraceInit(Scene *scene) {
 
     cudaMalloc(&dev_primitives, scene->primitives.size() * sizeof(Primitive));
     cudaMemcpy(dev_primitives, scene->primitives.data(), scene->primitives.size() * sizeof(Primitive), cudaMemcpyHostToDevice);
+    cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
+    cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
 
+    if (scene->texData.size() > 0)
+    {
+        cudaMalloc(&dev_texData, scene->texData.size() * sizeof(glm::vec3));
+        cudaMemcpy(dev_texData, scene->texData.data(), scene->texData.size() * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+    }
 
     // TODO: initialize any extra device memeory you need
 
@@ -143,6 +153,7 @@ void pathtraceFree() {
     // TODO: clean up any extra device memory you created
     cudaFree(dev_cache_intersections);
     cudaFree(dev_primitives);
+    cudaFree(dev_textures);
     checkCUDAError("pathtraceFree");
 }
 
@@ -212,6 +223,8 @@ __global__ void computeIntersections(
     , int geoms_size
     , ShadeableIntersection * intersections
     , Primitive* prims
+    , Material* material
+    , glm::vec3* texData
     )
 {
     int path_index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -249,8 +262,7 @@ __global__ void computeIntersections(
                 t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
             }
             else if (geom.type == MESH) {
-                t = primitiveIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, tmp_tangent, prims);
-                
+                t = primitiveIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, tmp_tangent, prims, material, texData);
             }
             // TODO: add more intersection tests here... triangle? metaball? CSG?
 
@@ -338,7 +350,7 @@ __global__ void shadeFakeMaterial (
 
 __global__ void shadeMaterial(int iter, int num_paths, ShadeableIntersection* shadeableIntersections
     , PathSegment* pathSegments
-    , Material* materials) {
+    , Material* materials, Texture* textures, glm::vec3* dev_texData) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < num_paths)
     {
@@ -359,7 +371,7 @@ __global__ void shadeMaterial(int iter, int num_paths, ShadeableIntersection* sh
             // like what you would expect from shading in a rasterizer like OpenGL.
             // TODO: replace this! you should be able to start with basically a one-liner
             else {
-                scatterRay(pathSegments[idx], getPointOnRay(pathSegments[idx].ray, intersection.t), intersection.surfaceNormal, material, rng);
+                scatterRay(pathSegments[idx], getPointOnRay(pathSegments[idx].ray, intersection.t), intersection.surfaceNormal, intersection.uv, material, rng, textures, dev_texData);
             }
             // If there was no intersection, color the ray black.
             // Lots of renderers use 4 channel color, RGBA, where A = alpha, often
@@ -481,6 +493,8 @@ void pathtrace(uchar4 *pbo, int frame, int iter) {
             , hst_scene->geoms.size()
             , dev_intersections
             , dev_primitives
+            , dev_materials
+            , dev_texData
             );
         checkCUDAError("trace one bounce");
         cudaDeviceSynchronize();
@@ -506,7 +520,9 @@ void pathtrace(uchar4 *pbo, int frame, int iter) {
             new_num_paths,
             dev_intersections,
             dev_paths,
-            dev_materials
+            dev_materials,
+            dev_textures,
+            dev_texData
             );
 
         if (!firstRoundComplete && CACHE_INTERSECTION) {

@@ -174,12 +174,13 @@ int Scene::loadMaterial(string materialid) {
     } else {
         cout << "Loading Material " << id << "..." << endl;
         Material newMaterial;
-        Texture* tex = nullptr;
+        
         //load static properties
         for (int i = 0; i < 9; i++) {
             string line;
             utilityCore::safeGetline(fp_in, line);
             vector<string> tokens = utilityCore::tokenizeString(line);
+            Texture* tex = nullptr;
             if (strcmp(tokens[0].c_str(), "RGB") == 0) {
                 glm::vec3 color( atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()) );
                 newMaterial.color = color;
@@ -206,16 +207,27 @@ int Scene::loadMaterial(string materialid) {
             if (tex && strcmp(tokens[1].c_str(), "NONE") != 0) {
                 int width, height, comps;
                 unsigned char* pixels = stbi_load(tokens[1].c_str(), &width, &height, &comps, 3);
+                
                 if (!pixels) {
                     cout << "Image not loaded" << endl;
                 }
                 else {
-                    tex->TexIndex = textures.size();
+                    tex->TexIndex = texData.size();
                     tex->width = width;
                     tex->height = height;
                     tex->size = width * height * 3;
                     tex->image = new unsigned char[tex->size];
-                    memcpy(tex->image, pixels, tex->size);
+                    for (int i = 0; i < width * height; ++i)
+                    {
+                        glm::vec3 col;
+                        for (int j = 0; j < 3; ++j)
+                        {
+                            col[j] = (float)pixels[i * 3 + j] / 255.f;
+                        }
+                        texData.push_back(col);
+                    }
+                    //std::cout << texData.size() << endl;
+                    //memcpy(tex->image, pixels, tex->size); some bugs in this so used texData
                     stbi_image_free(pixels);
                 }
             }
@@ -295,10 +307,12 @@ int Scene::loadGLTF(string filename, Geom& geom) {
         textures.push_back(newTex);
     }
     geom.primBegin = primitives.size();
+    const unsigned short* indices = nullptr;
     const float* mesh_vertices = nullptr;
     const float* mesh_uvs = nullptr;
     const float* mesh_tangents = nullptr;
     const float* mesh_normal = nullptr;
+
     //Get all mesh
     for (const tinygltf::Mesh& mesh : model.meshes) {
 
@@ -307,18 +321,12 @@ int Scene::loadGLTF(string filename, Geom& geom) {
             const tinygltf::Accessor& accessor = model.accessors[primitive.indices];
             const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
             const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-            const unsigned short* indices = reinterpret_cast<const unsigned short*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
-
-            for (size_t i = 0; i < accessor.count; ++i) {
-                mesh_indices.push_back(indices[i]);
-            }
+            indices = reinterpret_cast<const unsigned short*>(&buffer.data[bufferView.byteOffset + accessor.byteOffset]);
             
             const tinygltf::Accessor& accessorPos = model.accessors[primitive.attributes.at("POSITION")];
             const tinygltf::BufferView& bufferViewPos = model.bufferViews[accessorPos.bufferView];
             const tinygltf::Buffer& bufferPos = model.buffers[bufferViewPos.buffer];
             mesh_vertices = reinterpret_cast<const float*>(&bufferPos.data[bufferViewPos.byteOffset + accessorPos.byteOffset]);
-            /*geom.aabb_min = glm::vec3(accessorPos.minValues[0], accessorPos.minValues[1], accessorPos.minValues[2]);
-            geom.aabb_max = glm::vec3(accessorPos.maxValues[0], accessorPos.maxValues[1], accessorPos.maxValues[2]);*/
             if (primitive.attributes.count("NORMAL")) {
                 const tinygltf::Accessor& accessorNormal = model.accessors[primitive.attributes.at("NORMAL")];
                 const tinygltf::BufferView& bufferViewNormal = model.bufferViews[accessorNormal.bufferView];
@@ -338,29 +346,22 @@ int Scene::loadGLTF(string filename, Geom& geom) {
                 mesh_tangents = reinterpret_cast<const float*>(&bufferTan.data[bufferViewTan.byteOffset + accessorTan.byteOffset]);
             }
             //transfer all data to primitives
-            /*std::cout << accessor.count << std::endl;
-            std::cout << mesh_indices.size();*/
             for (size_t i = 0; i < accessor.count; i+=3) {
                 Primitive prim;
-                int index1 = 3;
-                int index2 = 2;
-                int index3 = 4;
-                for (size_t j = 0; j < 3; j++) {
-                    int idx = mesh_indices[i + j] * index1;
-                    prim.pos[j] = glm::vec3(mesh_vertices[idx], mesh_vertices[idx + 1], mesh_vertices[idx + 2]);
+                for (int j = 0; j < 3; j++) {
+                    int idx = indices[i + j];
+                    prim.pos[j] = glm::vec3(mesh_vertices[idx*3], mesh_vertices[idx*3 + 1], mesh_vertices[idx*3 + 2]);
                     if (mesh_normal) {
                         prim.hasNormal = true;
-                        prim.normal[j] = glm::vec3(mesh_normal[idx], mesh_normal[idx + 1], mesh_normal[idx + 2]);
+                        prim.normal[j] = glm::vec3(mesh_normal[idx*3], mesh_normal[idx*3 + 1], mesh_normal[idx*3 + 2]);
                     }
                     if (mesh_uvs) {
                         prim.hasUV = true;
-                        idx = mesh_indices[i + j] * index2;
-                        prim.uv[j] = glm::vec2(mesh_uvs[idx], mesh_uvs[idx + 1]);
+                        prim.uv[j] = glm::vec2(mesh_uvs[idx*2], mesh_uvs[idx*2 + 1]);
                     }
                     if (mesh_tangents) {
                         prim.hasTangent = true;
-                        idx = mesh_indices[i + j] * index3;
-                        prim.tangent[j] = glm::vec4(mesh_uvs[idx], mesh_uvs[idx + 1], mesh_uvs[idx + 2], mesh_uvs[idx + 3]);
+                        prim.tangent[j] = glm::vec4(mesh_tangents[idx*4], mesh_tangents[idx*4 + 1], mesh_tangents[idx*4 + 2], mesh_tangents[idx*4 + 3]);
                     }
                     //need to do aabb here
                     glm::vec3 currentPos(geom.transform * glm::vec4(prim.pos[j], 1.f));
@@ -382,8 +383,8 @@ int Scene::loadGLTF(string filename, Geom& geom) {
     }
     
     geom.primEnd = primitives.size();
-    std::cout << geom.aabb_min.x << " " << geom.aabb_min.y << " " << geom.aabb_min.z << endl;
-    std::cout << geom.aabb_max.x << " " << geom.aabb_max.y << " " << geom.aabb_max.z << endl;
-    //std::cout << primitives.size() << " " << geom.primBegin << " " << geom.primEnd << std::endl;
-    return 0;
+    /*std::cout << geom.aabb_min.x << " " << geom.aabb_min.y << " " << geom.aabb_min.z << endl;
+    std::cout << geom.aabb_max.x << " " << geom.aabb_max.y << " " << geom.aabb_max.z << endl;*/
+    std::cout << primitives.size() << " " << geom.primBegin << " " << geom.primEnd << std::endl;
+    return 1;
 }

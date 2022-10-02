@@ -183,8 +183,12 @@ __host__ __device__ bool intersectionCheck(glm::vec3 aabb_min, glm::vec3 aabb_ma
 }
 
 __host__ __device__ float primitiveIntersectionTest(Geom geom, Ray r,
-    glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2& uv, glm::vec4& tangent, Primitive* prims) {
-    
+    glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2& uv, glm::vec4& tangent, Primitive* prims, Material* material, glm::vec3* texData) {
+#if CULLING
+    if (!intersectionCheck(geom.aabb_min, geom.aabb_max, r)) {
+        return -1;
+    }
+#endif // CULLING
     Ray q;
     q.origin = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
     q.direction = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -192,16 +196,11 @@ __host__ __device__ float primitiveIntersectionTest(Geom geom, Ray r,
     glm::vec3 bary;
     float t1 = FLT_MAX;
     bool intersect = false;
+
     for (int primId = geom.primBegin; primId < geom.primEnd; primId++) {
         const Primitive& prim = prims[primId];
 
         //TODO aabb here?
-#if CULLING
-        if (!intersectionCheck(geom.aabb_min, geom.aabb_max, q)) {
-            continue;
-        }
-#endif // CULLING
-
         if (glm::intersectRayTriangle(q.origin, q.direction, prim.pos[0], prim.pos[1], prim.pos[2], bary)) {
             intersect = true;
             if (bary.z > t1) {
@@ -236,6 +235,18 @@ __host__ __device__ float primitiveIntersectionTest(Geom geom, Ray r,
                 tangent = glm::vec4(
                     glm::normalize(sdir - normal * glm::dot(normal, sdir)),
                     glm::dot(glm::cross(normal, sdir), tdir) < 0.0f ? -1.0f : 1.0f);
+            }
+            //do bump mapping if possible
+            if (material[prim.mat_id].bump.TexIndex >= 0) {
+                glm::vec3 tan = glm::vec3(tangent);
+                glm::vec3 bitan = glm::cross(normal, tan) * tangent.w;
+                glm::mat3 tbn = glm::mat3(tan, bitan, normal);
+                int w = material[prim.mat_id].bump.width;
+                int x = uv.x * (w - 1);
+                int y = uv.y * (material[prim.mat_id].bump.height - 1);
+                normal = texData[material[prim.mat_id].bump.TexIndex + +y * w + x];
+                normal = normal * 2.0f - 1.0f;
+                normal = glm::normalize(tbn * normal);
             }
         }
     }

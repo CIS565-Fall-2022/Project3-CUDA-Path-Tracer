@@ -26,11 +26,13 @@ struct Primitive {
     glm::vec3 normal[3];
     glm::vec2 uv[3];
     glm::vec4 tangent[3];
+
     int mat_id;
     bool hasNormal = false;
     bool hasUV = false;
     bool hasTangent = false;
 };
+
 struct Geom {
     enum GeomType type;
     int materialid;
@@ -90,7 +92,7 @@ struct NormalTextureInfo {
 };
 
 struct Texture {
-    int TexIndex;
+    int TexIndex = -1;
     int width;
     int height;
     int components;

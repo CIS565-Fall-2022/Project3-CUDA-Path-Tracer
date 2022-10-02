@@ -26,6 +26,6 @@ public:
     std::vector<Material> materials;
     std::vector<Texture> textures;
     std::vector<Primitive> primitives;
-    std::vector<int> mesh_indices;
+    std::vector<glm::vec3> texData;
     RenderState state;
 };
