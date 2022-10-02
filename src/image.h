@@ -47,17 +47,18 @@ struct DevTextureObj {
     }
 
     __device__ glm::vec3 linearSample(glm::vec2 uv) {
-        const float Eps = FLT_MIN * 2.f;
+        const float Eps = FLT_MIN;
         uv = glm::fract(uv);
 
-        float fx = uv.x * (width - Eps);
-        float fy = uv.y * (height - Eps);
+        float fx = uv.x * (width - Eps) + .5f;
+        float fy = uv.y * (height - Eps) + .5f;
 
-        int ix = glm::fract(fx) < .5f ? int(fx) : int(fx) - 1;
+        int ix = glm::fract(fx) > .5f ? fx : fx - 1;
         if (ix < 0) {
             ix += width;
         }
-        int iy = glm::fract(fy) < .5f ? int(fy) : int(fy) - 1;
+
+        int iy = glm::fract(fy) > .5f ? fy : fy - 1;
         if (iy < 0) {
             iy += height;
         }
@@ -66,20 +67,18 @@ struct DevTextureObj {
         if (ux >= width) {
             ux -= width;
         }
+
         int uy = iy + 1;
-        if (uy >= width) {
+        if (uy >= height) {
             uy -= height;
         }
 
         float lx = glm::fract(fx + .5f);
         float ly = glm::fract(fy + .5f);
 
-        // Bilinear interpolation
-        return glm::mix(
-            glm::mix(fetchTexel(ix, iy), fetchTexel(ux, iy), lx),
-            glm::mix(fetchTexel(ix, uy), fetchTexel(ux, uy), lx),
-            ly
-        );
+        glm::vec3 c1 = glm::mix(fetchTexel(ix, iy), fetchTexel(ux, iy), lx);
+        glm::vec3 c2 = glm::mix(fetchTexel(ix, uy), fetchTexel(ux, uy), lx);
+        return glm::mix(c1, c2, ly);
     }
 
     int width;

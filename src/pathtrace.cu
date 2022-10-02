@@ -81,7 +81,7 @@ void InitDataContainer(GuiDataContainer* imGuiData) {
 void pathTraceInit(Scene* scene) {
 	hstScene = scene;
 
-	const Camera& cam = hstScene->state.camera;
+	const Camera& cam = hstScene->camera;
 	const int pixelcount = cam.resolution.x * cam.resolution.y;
 
 	cudaMalloc(&devImage, pixelcount * sizeof(glm::vec3));
@@ -218,7 +218,7 @@ __global__ void computeIntersections(
 #endif
 
 	if (intersec.primId != NullPrimitive) {
-		if (scene->devMaterials[intersec.matId].type == Material::Type::Light) {
+		if (scene->materials[intersec.matId].type == Material::Type::Light) {
 #if SCENE_LIGHT_SINGLE_SIDED
 			if (glm::dot(intersec.norm, segment.ray.direction) < 0.f) {
 				intersec.primId = NullPrimitive;
@@ -263,20 +263,32 @@ __global__ void pathIntegSampleSurface(
 		return;
 	}
 	Intersection intersec = intersections[idx];
+	PathSegment& segment = segments[idx];
 
 	if (intersec.primId == NullPrimitive) {
-		// TODO
-		// Environment map
-		if (Math::luminance(segments[idx].radiance) < 1e-4f) {
-			segments[idx].pixelIndex = PixelIdxForTerminated;
+		if (scene->envMap != nullptr) {
+			if (scene->envMap != nullptr) {
+				glm::vec3 w = segment.ray.direction;
+				glm::vec3 radiance = scene->envMap->linearSample(Math::toPlane(w)) * segment.throughput;
+
+				if (depth == 0) {
+					segment.radiance += radiance * segment.throughput;
+				}
+				else {
+					float weight = segment.prev.deltaSample ? 1.f :
+						Math::powerHeuristic(segment.prev.BSDFPdf, scene->environmentMapPdf(w));
+					segment.radiance += radiance * weight;
+				}
+			}
 		}
-		else {
-			segments[idx].remainingBounces = 0;
+		segment.remainingBounces = 0;
+
+		if (Math::luminance(segment.radiance) < 1e-4f) {
+			segment.pixelIndex = PixelIdxForTerminated;
 		}
 		return;
 	}
 
-	PathSegment& segment = segments[idx];
 	thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 4 + depth * SamplesConsumedOneIter);
 
 	Material material = scene->getTexturedMaterialAndSurface(intersec);
@@ -375,13 +387,19 @@ __global__ void singleKernelPT(
 	scene->intersect(ray, intersec);
 
 	if (intersec.primId == NullPrimitive) {
+		if (scene->envMap != nullptr) {
+			glm::vec2 uv = Math::toPlane(ray.direction);
+			accRadiance += scene->envMap->linearSample(uv);
+		}
 		goto WriteRadiance;
 	}
 
 	Material material = scene->getTexturedMaterialAndSurface(intersec);
 
 	if (material.type == Material::Type::Light) {
-		accRadiance = material.baseColor;
+		if (glm::dot(intersec.norm, ray.direction) > 0.f) {
+			accRadiance = material.baseColor;
+		}
 		goto WriteRadiance;
 	}
 
@@ -426,6 +444,15 @@ __global__ void singleKernelPT(
 		intersec.wo = -ray.direction;
 
 		if (intersec.primId == NullPrimitive) {
+			if (scene->envMap != nullptr) {
+				glm::vec3 radiance = scene->envMap->linearSample(Math::toPlane(ray.direction))
+					* throughput;
+
+				float weight = deltaSample ? 1.f :
+					Math::powerHeuristic(sample.pdf, scene->environmentMapPdf(ray.direction));
+
+				accRadiance += radiance * weight;
+			}
 			break;
 		}
 		material = scene->getTexturedMaterialAndSurface(intersec);
@@ -437,15 +464,13 @@ __global__ void singleKernelPT(
 			}
 #endif
 			glm::vec3 radiance = material.baseColor;
-			if (deltaSample) {
-				accRadiance += radiance * throughput;
-			}
-			else {
-				float lightPdf = Math::pdfAreaToSolidAngle(Math::luminance(radiance) * scene->sumLightPowerInv,
-					curPos, intersec.pos, intersec.norm);
-				float BSDFPdf = sample.pdf;
-				accRadiance += radiance * throughput * Math::powerHeuristic(BSDFPdf, lightPdf);
-			}
+
+			float weight = deltaSample ? 1.f : Math::powerHeuristic(
+				sample.pdf,
+				Math::pdfAreaToSolidAngle(Math::luminance(radiance) * scene->sumLightPowerInv,
+					curPos, intersec.pos, intersec.norm)
+			);
+			accRadiance += radiance * throughput * weight;
 			break;
 		}
 	}
@@ -493,7 +518,7 @@ struct RemoveInvalidPaths {
  * of memory management
  */
 void pathTrace(uchar4* pbo, int frame, int iter) {
-	const Camera& cam = hstScene->state.camera;
+	const Camera& cam = hstScene->camera;
 	const int pixelCount = cam.resolution.x * cam.resolution.y;
 
 	// 2D block for generating ray from camera

@@ -129,12 +129,19 @@ Scene::Scene(const std::string& filename) {
             if (tokens[0] == "Material") {
                 loadMaterial(tokens[1]);
                 std::cout << " " << std::endl;
-            } else if (tokens[0] == "Object") {
+            }
+            else if (tokens[0] == "Object") {
                 loadModel(tokens[1]);
                 std::cout << " " << std::endl;
-            } else if (tokens[0] == "Camera") {
+            }
+            else if (tokens[0] == "Camera") {
                 loadCamera();
                 std::cout << " " << std::endl;
+            }
+            else if (tokens[0] == "EnvMap") {
+                if (tokens[1] != "Null") {
+                    loadEnvMap(tokens[1]);
+                }
             }
         }
     }
@@ -144,7 +151,10 @@ Scene::~Scene() {
 }
 
 void Scene::createLightSampler() {
-    lightSampler = DiscreteSampler<float>(lightPower);
+    if (envMapTexId != NullTextureId) {
+        lightPower.push_back(envMapSampler.sumAll);
+    }
+    lightSampler = DiscreteSampler1D<float>(lightPower);
     std::cout << "[Light sampler size = " << lightPower.size() << "]" << std::endl;
 }
 
@@ -176,7 +186,6 @@ void Scene::buildDevData() {
                     lightPrimIds.push_back(primId);
                     lightUnitRadiance.push_back(radianceUnitArea);
                     lightPower.push_back(power);
-                    sumLightPower += power;
                     numLightPrims++;
                 }
                 primId++;
@@ -280,8 +289,6 @@ void Scene::loadModel(const std::string& objId) {
 
 void Scene::loadCamera() {
     std::cout << "\t[Camera]" << std::endl;
-    RenderState &state = this->state;
-    Camera &camera = state.camera;
     float fovy;
 
     //load static properties
@@ -338,6 +345,22 @@ void Scene::loadCamera() {
     int arraylen = camera.resolution.x * camera.resolution.y;
     state.image.resize(arraylen);
     std::fill(state.image.begin(), state.image.end(), glm::vec3());
+}
+
+void Scene::loadEnvMap(const std::string& filename) {
+    envMapTexId = addTexture(filename);
+    auto envMap = textures[envMapTexId];
+    std::vector<float> pdf(envMap->width() * envMap->height());
+
+    for (int i = 0; i < envMap->height(); i++) {
+        for (int j = 0; j < envMap->width(); j++) {
+            int idx = i * envMap->width() + j;
+            pdf[idx] = Math::luminance(envMap->data()[idx]) * glm::sin((.5f + i) / envMap->height() * Pi);
+        }
+    }
+    envMapSampler = DiscreteSampler1D<float>(pdf);
+    std::cout << "\t[Environment Map width = " << envMap->width() << ", height = " << envMap->height() <<
+        ", sumPower = " << envMapSampler.sumAll << "]" << std::endl;
 }
 
 int Scene::addMaterial(const Material& material) {
@@ -411,78 +434,80 @@ void DevScene::create(const Scene& scene) {
     for (auto tex : scene.textures) {
         textureTotalSize += tex->byteSize();
     }
-    cudaMalloc(&devTextureData, textureTotalSize);
+    cudaMalloc(&textureData, textureTotalSize);
     checkCUDAError("DevScene::texture");
 
     int textureOffset = 0;
     for (auto tex : scene.textures) {
-        cudaMemcpyHostToDev(devTextureData + textureOffset, tex->data(), tex->byteSize());
-        std::cout << tex->byteSize() << "\n";
+        cudaMemcpyHostToDev(textureData + textureOffset, tex->data(), tex->byteSize());
         checkCUDAError("DevScene::texture::copy");
-        textureObjs.push_back({ tex, devTextureData + textureOffset });
+        textureObjs.push_back({ tex, textureData + textureOffset });
         textureOffset += tex->byteSize() / sizeof(glm::vec3);
     }
-    cudaMalloc(&devTextureObjs, textureObjs.size() * sizeof(DevTextureObj));
+    cudaMalloc(&textures, textureObjs.size() * sizeof(DevTextureObj));
     checkCUDAError("DevScene::textureObjs::malloc");
-    cudaMemcpyHostToDev(devTextureObjs, textureObjs.data(), textureObjs.size() * sizeof(DevTextureObj));
+    cudaMemcpyHostToDev(textures, textureObjs.data(), textureObjs.size() * sizeof(DevTextureObj));
     checkCUDAError("DevScene::textureObjs::copy");
 
-    cudaMalloc(&devMaterials, byteSizeOf(scene.materials));
-    cudaMemcpyHostToDev(devMaterials, scene.materials.data(), byteSizeOf(scene.materials));
+    cudaMalloc(&materials, byteSizeOf(scene.materials));
+    cudaMemcpyHostToDev(materials, scene.materials.data(), byteSizeOf(scene.materials));
 
-    cudaMalloc(&devMaterialIds, byteSizeOf(scene.materialIds));
-    cudaMemcpyHostToDev(devMaterialIds, scene.materialIds.data(), byteSizeOf(scene.materialIds));
+    cudaMalloc(&materialIds, byteSizeOf(scene.materialIds));
+    cudaMemcpyHostToDev(materialIds, scene.materialIds.data(), byteSizeOf(scene.materialIds));
     checkCUDAError("DevScene::material");
 
-    cudaMalloc(&devVertices, byteSizeOf(scene.meshData.vertices));
-    cudaMemcpyHostToDev(devVertices, scene.meshData.vertices.data(), byteSizeOf(scene.meshData.vertices));
+    cudaMalloc(&vertices, byteSizeOf(scene.meshData.vertices));
+    cudaMemcpyHostToDev(vertices, scene.meshData.vertices.data(), byteSizeOf(scene.meshData.vertices));
 
-    cudaMalloc(&devNormals, byteSizeOf(scene.meshData.normals));
-    cudaMemcpyHostToDev(devNormals, scene.meshData.normals.data(), byteSizeOf(scene.meshData.normals));
+    cudaMalloc(&normals, byteSizeOf(scene.meshData.normals));
+    cudaMemcpyHostToDev(normals, scene.meshData.normals.data(), byteSizeOf(scene.meshData.normals));
 
-    cudaMalloc(&devTexcoords, byteSizeOf(scene.meshData.texcoords));
-    cudaMemcpyHostToDev(devTexcoords, scene.meshData.texcoords.data(), byteSizeOf(scene.meshData.texcoords));
+    cudaMalloc(&texcoords, byteSizeOf(scene.meshData.texcoords));
+    cudaMemcpyHostToDev(texcoords, scene.meshData.texcoords.data(), byteSizeOf(scene.meshData.texcoords));
 
-    cudaMalloc(&devBoundingBoxes, byteSizeOf(scene.boundingBoxes));
-    cudaMemcpyHostToDev(devBoundingBoxes, scene.boundingBoxes.data(), byteSizeOf(scene.boundingBoxes));
+    cudaMalloc(&boundingBoxes, byteSizeOf(scene.boundingBoxes));
+    cudaMemcpyHostToDev(boundingBoxes, scene.boundingBoxes.data(), byteSizeOf(scene.boundingBoxes));
 
     for (int i = 0; i < 6; i++) {
-        cudaMalloc(&devBVHNodes[i], byteSizeOf(scene.BVHNodes[i]));
-        cudaMemcpyHostToDev(devBVHNodes[i], scene.BVHNodes[i].data(), byteSizeOf(scene.BVHNodes[i]));
+        cudaMalloc(&BVHNodes[i], byteSizeOf(scene.BVHNodes[i]));
+        cudaMemcpyHostToDev(BVHNodes[i], scene.BVHNodes[i].data(), byteSizeOf(scene.BVHNodes[i]));
     }
     BVHSize = scene.BVHSize;
 
-    cudaMalloc(&devLightPrimIds, byteSizeOf(scene.lightPrimIds));
-    cudaMemcpyHostToDev(devLightPrimIds, scene.lightPrimIds.data(), byteSizeOf(scene.lightPrimIds));
-    numLightPrims = scene.numLightPrims;
+    cudaMalloc(&lightPrimIds, byteSizeOf(scene.lightPrimIds));
+    cudaMemcpyHostToDev(lightPrimIds, scene.lightPrimIds.data(), byteSizeOf(scene.lightPrimIds));
 
-    cudaMalloc(&devLightUnitRadiance, byteSizeOf(scene.lightUnitRadiance));
-    cudaMemcpyHostToDev(devLightUnitRadiance, scene.lightUnitRadiance.data(), byteSizeOf(scene.lightUnitRadiance));
+    cudaMalloc(&lightUnitRadiance, byteSizeOf(scene.lightUnitRadiance));
+    cudaMemcpyHostToDev(lightUnitRadiance, scene.lightUnitRadiance.data(), byteSizeOf(scene.lightUnitRadiance));
 
-    cudaMalloc(&devLightDistrib, byteSizeOf(scene.lightSampler.binomDistribs));
-    cudaMemcpyHostToDev(devLightDistrib, scene.lightSampler.binomDistribs.data(),
-        byteSizeOf(scene.lightSampler.binomDistribs));
-    sumLightPowerInv = 1.f / scene.sumLightPower;
+    lightSampler.create(scene.lightSampler);
+    sumLightPowerInv = 1.f / scene.lightSampler.sumAll;
+
+    if (scene.envMapTexId != NullTextureId) {
+        envMap = textures + scene.envMapTexId;
+        envMapSampler.create(scene.envMapSampler);
+    }
 
     checkCUDAError("DevScene::meshData");
 }
 
 void DevScene::destroy() {
-    cudaSafeFree(devTextureData);
-    cudaSafeFree(devTextureObjs);
-    cudaSafeFree(devMaterials);
-    cudaSafeFree(devMaterialIds);
+    cudaSafeFree(textureData);
+    cudaSafeFree(textures);
+    cudaSafeFree(materials);
+    cudaSafeFree(materialIds);
     
-    cudaSafeFree(devVertices);
-    cudaSafeFree(devNormals);
-    cudaSafeFree(devTexcoords);
-    cudaSafeFree(devBoundingBoxes);
+    cudaSafeFree(vertices);
+    cudaSafeFree(normals);
+    cudaSafeFree(texcoords);
+    cudaSafeFree(boundingBoxes);
 
     for (int i = 0; i < 6; i++) {
-        cudaSafeFree(devBVHNodes[i]);
+        cudaSafeFree(BVHNodes[i]);
     }
 
-    cudaSafeFree(devLightPrimIds);
-    cudaSafeFree(devLightUnitRadiance);
-    cudaSafeFree(devLightDistrib);
+    cudaSafeFree(lightPrimIds);
+    cudaSafeFree(lightUnitRadiance);
+    lightSampler.destroy();
+    envMapSampler.destroy();
 }

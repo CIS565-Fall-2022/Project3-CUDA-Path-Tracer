@@ -65,13 +65,13 @@ struct DevScene {
     void destroy();
 
     __device__ Material getTexturedMaterialAndSurface(Intersection& intersec) {
-        Material mat = devMaterials[intersec.matId];
+        Material mat = materials[intersec.matId];
         if (mat.baseColorMapId > NullTextureId) {
-            mat.baseColor = devTextureObjs[mat.baseColorMapId].linearSample(intersec.uv);
+            mat.baseColor = textures[mat.baseColorMapId].linearSample(intersec.uv);
         }
 
         if (mat.normalMapId > NullTextureId) {
-            glm::vec3 mapped = devTextureObjs[mat.normalMapId].linearSample(intersec.uv);
+            glm::vec3 mapped = textures[mat.normalMapId].linearSample(intersec.uv);
             glm::vec3 localNorm = glm::normalize(glm::vec3(mapped.x, mapped.y, mapped.z) * 1.f - 0.5f);
             intersec.norm = Math::localToWorld(intersec.norm, localNorm);
             //intersec.norm = getPrimitivePlainNormal
@@ -100,34 +100,34 @@ struct DevScene {
     }
 
     __device__ glm::vec3 getPrimitivePlainNormal(int primId) {
-        glm::vec3 v0 = devVertices[primId * 3 + 0];
-        glm::vec3 v1 = devVertices[primId * 3 + 1];
-        glm::vec3 v2 = devVertices[primId * 3 + 2];
+        glm::vec3 v0 = vertices[primId * 3 + 0];
+        glm::vec3 v1 = vertices[primId * 3 + 1];
+        glm::vec3 v2 = vertices[primId * 3 + 2];
         return glm::normalize(glm::cross(v1 - v0, v2 - v0));
     }
 
     __device__ void getIntersecGeomInfo(int primId, glm::vec2 bary, Intersection& intersec) {
-        glm::vec3 va = devVertices[primId * 3 + 0];
-        glm::vec3 vb = devVertices[primId * 3 + 1];
-        glm::vec3 vc = devVertices[primId * 3 + 2];
+        glm::vec3 va = vertices[primId * 3 + 0];
+        glm::vec3 vb = vertices[primId * 3 + 1];
+        glm::vec3 vc = vertices[primId * 3 + 2];
 
-        glm::vec3 na = devNormals[primId * 3 + 0];
-        glm::vec3 nb = devNormals[primId * 3 + 1];
-        glm::vec3 nc = devNormals[primId * 3 + 2];
+        glm::vec3 na = normals[primId * 3 + 0];
+        glm::vec3 nb = normals[primId * 3 + 1];
+        glm::vec3 nc = normals[primId * 3 + 2];
 
-        glm::vec2 ta = devTexcoords[primId * 3 + 0];
-        glm::vec2 tb = devTexcoords[primId * 3 + 1];
-        glm::vec2 tc = devTexcoords[primId * 3 + 2];
+        glm::vec2 ta = texcoords[primId * 3 + 0];
+        glm::vec2 tb = texcoords[primId * 3 + 1];
+        glm::vec2 tc = texcoords[primId * 3 + 2];
 
         intersec.pos = vb * bary.x + vc * bary.y + va * (1.f - bary.x - bary.y);
-        intersec.norm = nb * bary.x + nc * bary.y + na * (1.f - bary.x - bary.y);
+        intersec.norm = glm::normalize(nb * bary.x + nc * bary.y + na * (1.f - bary.x - bary.y));
         intersec.uv = tb * bary.x + tc * bary.y + ta * (1.f - bary.x - bary.y);
     }
 
     __device__ bool intersectPrimitive(int primId, Ray ray, float& dist, glm::vec2& bary) {
-        glm::vec3 va = devVertices[primId * 3 + 0];
-        glm::vec3 vb = devVertices[primId * 3 + 1];
-        glm::vec3 vc = devVertices[primId * 3 + 2];
+        glm::vec3 va = vertices[primId * 3 + 0];
+        glm::vec3 vb = vertices[primId * 3 + 1];
+        glm::vec3 vc = vertices[primId * 3 + 2];
 
         if (!intersectTriangle(ray, va, vb, vc, bary, dist)) {
             return false;
@@ -137,9 +137,9 @@ struct DevScene {
     }
 
     __device__ bool intersectPrimitive(int primId, Ray ray, float distRange) {
-        glm::vec3 va = devVertices[primId * 3 + 0];
-        glm::vec3 vb = devVertices[primId * 3 + 1];
-        glm::vec3 vc = devVertices[primId * 3 + 2];
+        glm::vec3 va = vertices[primId * 3 + 0];
+        glm::vec3 vb = vertices[primId * 3 + 1];
+        glm::vec3 vc = vertices[primId * 3 + 2];
         glm::vec2 bary;
         float dist;
         bool hit = intersectTriangle(ray, va, vb, vc, bary, dist);
@@ -147,9 +147,9 @@ struct DevScene {
     }
 
     __device__ bool intersectPrimitiveDetailed(int primId, Ray ray, Intersection& intersec) {
-        glm::vec3 va = devVertices[primId * 3 + 0];
-        glm::vec3 vb = devVertices[primId * 3 + 1];
-        glm::vec3 vc = devVertices[primId * 3 + 2];
+        glm::vec3 va = vertices[primId * 3 + 0];
+        glm::vec3 vb = vertices[primId * 3 + 1];
+        glm::vec3 vc = vertices[primId * 3 + 2];
         float dist;
         glm::vec2 bary;
 
@@ -157,16 +157,16 @@ struct DevScene {
             return false;
         }
 
-        glm::vec3 na = devNormals[primId * 3 + 0];
-        glm::vec3 nb = devNormals[primId * 3 + 1];
-        glm::vec3 nc = devNormals[primId * 3 + 2];
+        glm::vec3 na = normals[primId * 3 + 0];
+        glm::vec3 nb = normals[primId * 3 + 1];
+        glm::vec3 nc = normals[primId * 3 + 2];
 
-        glm::vec2 ta = devTexcoords[primId * 3 + 0];
-        glm::vec2 tb = devTexcoords[primId * 3 + 1];
-        glm::vec2 tc = devTexcoords[primId * 3 + 2];
+        glm::vec2 ta = texcoords[primId * 3 + 0];
+        glm::vec2 tb = texcoords[primId * 3 + 1];
+        glm::vec2 tc = texcoords[primId * 3 + 2];
 
         intersec.pos = vb * bary.x + vc * bary.y + va * (1.f - bary.x - bary.y);
-        intersec.norm = nb * bary.x + nc * bary.y + na * (1.f - bary.x - bary.y);
+        intersec.norm = glm::normalize(nb * bary.x + nc * bary.y + na * (1.f - bary.x - bary.y));
         intersec.uv = tb * bary.x + tc * bary.y + ta * (1.f - bary.x - bary.y);
         return true;
     }
@@ -191,7 +191,7 @@ struct DevScene {
         if (closestPrimId != NullPrimitive) {
             getIntersecGeomInfo(closestPrimId, closestBary, intersec);
             intersec.primId = closestPrimId;
-            intersec.matId = devMaterialIds[closestPrimId];
+            intersec.matId = materialIds[closestPrimId];
         }
         else {
             intersec.primId = NullPrimitive;
@@ -221,11 +221,11 @@ struct DevScene {
         int closestPrimId = NullPrimitive;
         glm::vec2 closestBary;
 
-        MTBVHNode* nodes = devBVHNodes[getMTBVHId(-ray.direction)];
+        MTBVHNode* nodes = BVHNodes[getMTBVHId(-ray.direction)];
         int node = 0;
 
         while (node != BVHSize) {
-            AABB& bound = devBoundingBoxes[nodes[node].boundingBoxId];
+            AABB& bound = boundingBoxes[nodes[node].boundingBoxId];
             float boundDist;
             bool boundHit = bound.intersect(ray, boundDist);
 
@@ -252,7 +252,7 @@ struct DevScene {
         }
         if (closestPrimId != NullPrimitive) {
             getIntersecGeomInfo(closestPrimId, closestBary, intersec);
-            intersec.matId = devMaterialIds[closestPrimId];
+            intersec.matId = materialIds[closestPrimId];
         }
         intersec.primId = closestPrimId;
     }
@@ -267,10 +267,10 @@ struct DevScene {
 
         Ray ray = makeOffsetedRay(x, dir);
 
-        MTBVHNode* nodes = devBVHNodes[getMTBVHId(-ray.direction)];
+        MTBVHNode* nodes = BVHNodes[getMTBVHId(-ray.direction)];
         int node = 0;
         while (node != BVHSize) {
-            AABB& bound = devBoundingBoxes[nodes[node].boundingBoxId];
+            AABB& bound = boundingBoxes[nodes[node].boundingBoxId];
             float boundDist;
             bool boundHit = bound.intersect(ray, boundDist);
 
@@ -295,12 +295,12 @@ struct DevScene {
         int closestPrimId = NullPrimitive;
         glm::vec2 closestBary;
 
-        MTBVHNode* nodes = devBVHNodes[getMTBVHId(-ray.direction)];
+        MTBVHNode* nodes = BVHNodes[getMTBVHId(-ray.direction)];
         int node = 0;
         int maxDepth = 0;
 
         while (node != BVHSize) {
-            AABB& bound = devBoundingBoxes[nodes[node].boundingBoxId];
+            AABB& bound = boundingBoxes[nodes[node].boundingBoxId];
             float boundDist;
             bool boundHit = bound.intersect(ray, boundDist);
 
@@ -330,18 +330,51 @@ struct DevScene {
         intersec.primId = maxDepth;
     }
 
+    __device__ float environmentMapPdf(glm::vec3 w) {
+        glm::vec3 radiance = envMap->linearSample(Math::toPlane(w));
+        return Math::luminance(radiance) * sumLightPowerInv *
+            envMap->width * envMap->height * .5f;
+    }
+
+    __device__ float sampleEnvironmentMap(glm::vec3 pos, glm::vec2 r, glm::vec3& radiance, glm::vec3& wi) {
+        int pixId = envMapSampler.sample(r.x, r.y);
+        
+        int y = pixId / envMap->width;
+        int x = pixId - y * envMap->width;
+
+        radiance = envMap->devData[pixId];
+        wi = Math::toSphere(glm::vec2((.5f + x) / envMap->width, (.5f + y) / envMap->height));
+
+#if BVH_DISABLE
+        bool occ = naiveTestOcclusion(pos, pos + wi * (FLT_MAX * .01f));
+#else
+        bool occ = testOcclusion(pos, pos + wi * 1e6f);
+#endif
+        if (occ) {
+            return InvalidPdf;
+        }
+        
+        return Math::luminance(radiance) * sumLightPowerInv *
+            envMap->width * envMap->height * PiInv * PiInv * .5f;
+    }
+
     /**
     * Returns solid angle probability
     */
     __device__ float sampleDirectLight(glm::vec3 pos, glm::vec4 r, glm::vec3& radiance, glm::vec3& wi) {
-        int passId = int(float(numLightPrims) * r.x);
-        BinomialDistrib<float> distrib = devLightDistrib[passId];
-        int lightId = (r.y < distrib.prob) ? passId : distrib.failId;
-        int primId = devLightPrimIds[lightId];
+        if (lightSampler.length == 0) {
+            return InvalidPdf;
+        }
+        int lightId = lightSampler.sample(r.x, r.y);
 
-        glm::vec3 v0 = devVertices[primId * 3 + 0];
-        glm::vec3 v1 = devVertices[primId * 3 + 1];
-        glm::vec3 v2 = devVertices[primId * 3 + 2];
+        if (lightId == lightSampler.length - 1 && envMapSampler.length != 0) {
+            return sampleEnvironmentMap(pos, glm::vec2(r.z, r.w), radiance, wi);
+        }
+        int primId = lightPrimIds[lightId];
+
+        glm::vec3 v0 = vertices[primId * 3 + 0];
+        glm::vec3 v1 = vertices[primId * 3 + 1];
+        glm::vec3 v2 = vertices[primId * 3 + 2];
         glm::vec3 sampled = Math::sampleTriangleUniform(v0, v1, v2, r.z, r.w);
 
 #if BVH_DISABLE
@@ -360,28 +393,29 @@ struct DevScene {
             return InvalidPdf;
         }
 #endif
-        radiance = devLightUnitRadiance[lightId];
+        radiance = lightUnitRadiance[lightId];
         wi = glm::normalize(posToSampled);
         return Math::pdfAreaToSolidAngle(Math::luminance(radiance) * sumLightPowerInv, pos, sampled, normal);
     }
 
-    glm::vec3* devVertices = nullptr;
-    glm::vec3* devNormals = nullptr;
-    glm::vec2* devTexcoords = nullptr;
-    AABB* devBoundingBoxes = nullptr;
-    MTBVHNode* devBVHNodes[6] = { nullptr };
+    glm::vec3* vertices = nullptr;
+    glm::vec3* normals = nullptr;
+    glm::vec2* texcoords = nullptr;
+    AABB* boundingBoxes = nullptr;
+    MTBVHNode* BVHNodes[6] = { nullptr };
     int BVHSize;
 
-    int* devMaterialIds = nullptr;
-    Material* devMaterials = nullptr;
-    glm::vec3* devTextureData = nullptr;
-    DevTextureObj* devTextureObjs = nullptr;
+    int* materialIds = nullptr;
+    Material* materials = nullptr;
+    glm::vec3* textureData = nullptr;
+    DevTextureObj* textures = nullptr;
 
-    int* devLightPrimIds = nullptr;
-    glm::vec3* devLightUnitRadiance = nullptr;
-    BinomialDistrib<float>* devLightDistrib;
-    int numLightPrims;
+    int* lightPrimIds = nullptr;
+    glm::vec3* lightUnitRadiance = nullptr;
+    DevDiscreteSampler1D<float> lightSampler;
     float sumLightPowerInv;
+    DevTextureObj* envMap = nullptr;
+    DevDiscreteSampler1D<float> envMapSampler;
 };
 
 class Scene {
@@ -400,6 +434,7 @@ private:
     void loadModel(const std::string& objectId);
     void loadMaterial(const std::string& materialId);
     void loadCamera();
+    void loadEnvMap(const std::string& filename);
 
     int addMaterial(const Material& material);
     int addTexture(const std::string& filename);
@@ -420,12 +455,15 @@ public:
     std::vector<int> lightPrimIds;
     std::vector<float> lightPower;
     std::vector<glm::vec3> lightUnitRadiance;
-    DiscreteSampler<float> lightSampler;
+    DiscreteSampler1D<float> lightSampler;
     int numLightPrims = 0;
-    float sumLightPower = 0.f;
+    DiscreteSampler1D<float> envMapSampler;
+    int envMapTexId = NullTextureId;
 
     DevScene hstScene;
     DevScene* devScene = nullptr;
+
+    Camera camera;
 
 private:
     std::ifstream fpIn;

@@ -1,0 +1,43 @@
+Camera
+Resolution	1800 1350
+FovY        15.4
+LensRadius	0.1
+FocalDist	9.5
+Sample		5000
+Depth		8
+File        Cornell
+Eye         0 1 10
+LookAt      0 1 0
+Up          0 1 0
+
+EnvMap 	texture/forest_slope_4k.hdr
+
+Material Glass
+Type		Dielectric
+BaseColor	1 1 1
+Metallic	0
+Roughness	0
+Ior		1.5
+NormalMap	Null
+
+Material 	Floor
+Type		Lambertian
+BaseColor	texture/checker.png
+Metallic	1
+Roughness	0.3
+Ior		0
+NormalMap	Null
+
+Object Floor
+model/000.obj
+Material 	Floor
+Translate	0 0 0
+Rotate	0 0 0
+Scale		1 1 1
+
+Object Sphere
+model/sphere40.obj
+Material 	Glass
+Translate	0 1 0
+Rotate	0 0 0
+Scale		1 1 1
