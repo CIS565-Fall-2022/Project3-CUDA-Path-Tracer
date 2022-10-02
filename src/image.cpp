@@ -17,7 +17,8 @@ Image::Image(const std::string& filename) {
     float* data = stbi_loadf(filename.c_str(), &mWidth, &mHeight, &channels, 3);
 
     if (!data) {
-        throw std::runtime_error("Fail to load image: " + filename);
+        std::cout << "\t[Fail to load image: " + filename + "]" << std::endl;
+        throw;
     }
     mPixels = new glm::vec3[mWidth * mHeight];
     memcpy(mPixels, data, mWidth * mHeight * sizeof(glm::vec3));

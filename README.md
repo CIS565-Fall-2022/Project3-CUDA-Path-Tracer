@@ -1,13 +1,14 @@
 CUDA Path Tracer
 ================
 
-**University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 3**
+**University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 2**
 
-* (TODO) YOUR NAME HERE
-* Tested on: (TODO) Windows 22, i7-2222 @ 2.22GHz 22GB, GTX 222 222MB (Moore 2222 Lab)
+* Chang Liu
+  * [LinkedIn](https://www.linkedin.com/in/chang-liu-0451a6208/)
+  * [Personal website](https://hummawhite.github.io/)
+* Tested on personal laptop:
+  - Windows 11
+  - i7-12700 @ 4.90GHz with 16GB RAM
+  - RTX 3070 Ti Laptop 8GB
 
-### (TODO: Your README)
-
-*DO NOT* leave the README to the last minute! It is a crucial part of the
-project, and we will not be able to grade you without a good README.
-
+![](./img/photo_realistic.png)
