@@ -2,6 +2,8 @@
 #include "preview.h"
 #include <cstring>
 
+#include <Windows.h>
+
 static std::string startTimeString;
 
 // For camera controls
@@ -77,8 +79,12 @@ int main(int argc, char** argv) {
 	InitImguiData(guiData);
 	InitDataContainer(guiData);
 
+	LoadTexturesToDevice(scene);
+
 	// GLFW main loop
 	mainLoop();
+
+	FreeTextures();
 
 	return 0;
 }
@@ -105,6 +111,7 @@ void saveImage() {
 	img.savePNG(filename);
 	//img.saveHDR(filename);  // Save a Radiance HDR file
 }
+
 
 void runCuda() {
 	if (camchanged) {
@@ -134,6 +141,7 @@ void runCuda() {
 		pathtraceFree();
 		pathtraceInit(scene);
 	}
+
 
 	if (iteration < renderState->iterations) {
 		uchar4* pbo_dptr = NULL;

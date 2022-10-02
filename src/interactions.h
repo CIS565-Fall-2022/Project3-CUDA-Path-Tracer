@@ -1,6 +1,7 @@
 #pragma once
 
 #include "intersections.h"
+#include "utilities.h"
 
 // CHECKITOUT
 /**
@@ -68,12 +69,85 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  */
 __host__ __device__
 void scatterRay(
-        PathSegment & pathSegment,
-        glm::vec3 intersect,
-        glm::vec3 normal,
-        const Material &m,
-        thrust::default_random_engine &rng) {
+    PathSegment& pathSegment,
+    glm::vec3 intersect,
+    glm::vec3 normal,
+    const Material& m,
+    glm::vec3 textureColor,
+    thrust::default_random_engine& rng) {
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    float chance = u01(rng);
+
+    pathSegment.ray.origin = intersect; // Default origin
+
+    glm::vec3 col(1.0f, 1.0f, 1.0f);
+
+    // Texture
+    col *= textureColor;
+
+    if (m.hasReflective && m.hasRefractive)
+    {
+        // Pick between reflection or refratcion
+
+        thrust::uniform_real_distribution<float> u01(0, 1);
+        float chance = u01(rng);
+
+        glm::vec3 inDir = pathSegment.ray.direction;
+        float cosTheta = glm::dot(-inDir, normal);  // View dir is the opposite of incident dir
+
+        float n1, n2;
+        if (cosTheta > 0)
+        {
+            // Ray shoots from air
+            n1 = m.indexOfRefraction;
+            n2 = 1.0f;
+        }
+        else
+        {
+            // Ray shoots from material
+            normal = -normal;
+            n1 = 1.0f;
+            n2 = m.indexOfRefraction;
+        }
+
+        float R0 = pow((n1 - n2) / (n1 + n2), 2);
+        float R = R0 + (1 - R0) * pow(1 - cosTheta, 5); // Reflection coefficient
+
+        glm::vec3 refractDir = glm::refract(inDir, normal, n2 / n1);
+        glm::vec3 reflectDir = glm::reflect(inDir, normal);
+
+        if (R > chance || glm::length(refractDir) < EPSILON)
+        {
+            pathSegment.ray.direction = reflectDir;
+            col *= m.specular.color;
+        }
+        else
+        {
+            pathSegment.ray.direction = refractDir;
+            pathSegment.ray.origin += 0.002f * refractDir;
+            col *= m.specular.color;
+        }
+    }
+    else if (m.hasReflective) // Pure reflection
+    {
+        glm::vec3 reflectDir = glm::reflect(pathSegment.ray.direction, normal);
+        pathSegment.ray.direction = reflectDir;
+        col *= m.specular.color;
+    }
+    else // Pure diffuse
+    {
+        glm::vec3 newDir = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
+        pathSegment.ray.direction = newDir;
+        col *= m.color;
+    }
+
+
+
+    pathSegment.color *= col;
+    pathSegment.remainingBounces -= 1;
 }
+

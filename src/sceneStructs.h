@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include "Texture.h"
 #include <cuda_runtime.h>
 #include "glm/glm.hpp"
 
@@ -10,11 +11,18 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    OBJECT
 };
 
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
+};
+
+struct Triangle{
+    glm::vec3 v0, v1, v2;       // Vertex
+    glm::vec3 n0, n1, n2;       // Normal
+    glm::vec2 tex0, tex1, tex2; // UV coordinate
 };
 
 struct Geom {
@@ -26,7 +34,14 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+
+    // For object geometry
+    int triangleStartIndex = -1;
+    int triangleEndIndex = -1;
+    bool hasNormal = false;
+    bool hasUV = false;
 };
+
 
 struct Material {
     glm::vec3 color;
@@ -38,6 +53,9 @@ struct Material {
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+
+    int textureIndex = -1;
+    int normalMapIndex = -1;
 };
 
 struct Camera {
@@ -64,6 +82,8 @@ struct PathSegment {
     glm::vec3 color;
     int pixelIndex;
     int remainingBounces;
+    bool hitLightSource;
+    bool insightMat;
 };
 
 // Use with a corresponding PathSegment to do:
@@ -72,5 +92,20 @@ struct PathSegment {
 struct ShadeableIntersection {
   float t;
   glm::vec3 surfaceNormal;
+  glm::vec2 uv;
   int materialId;
+  int geomId;
+};
+
+
+// Mark texture information
+
+struct TextureInfo{
+    const char* id = "";
+
+    int width;
+    int height;
+    int channels;
+
+    int startIndex;
 };
