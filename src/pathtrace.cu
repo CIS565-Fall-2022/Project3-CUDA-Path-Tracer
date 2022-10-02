@@ -209,29 +209,6 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		// to blur, shift ray origin using using aperture variable and a RNG
 		// calculate new ray direction using C - (O - r)
 		// shoot multiple secondary rays and average them for pixel. SHOULD ALREADY BE DONE.
-		// segment.ray.origin = cam.position;
-
-		/*glm::vec3 w = glm::normalize(cam.position - cam.lookAt);
-		glm::vec3 u = glm::normalize(glm::cross(cam.up, w));
-		glm::vec3 v = glm::cross(w, u);
-
-		float radius = APERTURE / 2.f;
-
-		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
-		thrust::uniform_real_distribution<float> u01(-0.5, 0.5f);
-
-		glm::vec3 rd = radius * calculateRandomDirectionInHemisphere(cam.view, rng);
-		glm::vec3 offset = u * rd.x + v * rd.y;
-		glm::vec3 origin = cam.position + offset;
-
-		glm::vec3 focalPoint = segment.ray.origin + FOCUS * segment.ray.direction;
-
-		segment.ray.origin = origin;
-		segment.ray.direction = glm::normalize(focalPoint - origin);*/
-		/*segment.ray.direction = glm::normalize(focalPoint
-			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
-		);*/
 
 		glm::vec3 focalPoint = segment.ray.origin + FOCUS * segment.ray.direction;
 

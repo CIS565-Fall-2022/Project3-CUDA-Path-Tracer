@@ -154,6 +154,13 @@ void scatterRay(
             newDirection
         };
 
+        glm::vec3 pointColor;
+
+#if USE_UV
+        pointColor = GetImageColor(u, v, texture);
+#endif
+        pointColor = m.color;
+
         PathSegment newPath = {
             newRay,
             m.color * pathSegment.color,

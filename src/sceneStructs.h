@@ -7,6 +7,7 @@
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 #define USE_BOUND_BOX 1
+#define USE_UV 0
 
 enum GeomType {
     SPHERE,
@@ -28,6 +29,8 @@ struct Ray {
 struct Vertex {
     glm::vec4 pos;
     glm::vec4 nor;
+    bool hasUv = false; // by default
+    glm::vec2 uv;
 };
 
 struct Triangle {
@@ -45,10 +48,13 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+
     Triangle* host_tris;
     Triangle* device_tris;
     BoundBox bound;
     int numTris;
+
+
 };
 
 struct Material {

@@ -40,8 +40,7 @@ Scene::Scene(string filename) {
 
 #if LOAD_OBJ
 // example code taken from https://github.com/tinyobjloader/tinyobjloader
-int Scene::loadObj(const char* filename, glm::mat4 transform,
-    glm::vec3 translate, glm::vec3 rotate, glm::vec3 scale, int matId,
+int Scene::loadObj(const char* filename, 
     std::vector<Triangle>* triangleArray,
     const char* basepath = NULL,
     bool triangulate = true)
@@ -71,10 +70,7 @@ int Scene::loadObj(const char* filename, glm::mat4 transform,
 
     attrib = reader.GetAttrib();
     shapes = reader.GetShapes();
-    // materials = reader.GetMaterials();
-
-    glm::mat4 invTransform = glm::inverse(transform);
-    glm::mat4 invTranspose = glm::inverseTranspose(transform);
+    materials = reader.GetMaterials();
 
     // Loop over shapes and load each attrib
     for (size_t s = 0; s < shapes.size(); s++) {
@@ -117,18 +113,6 @@ int Scene::loadObj(const char* filename, glm::mat4 transform,
                 tinyobj::real_t nyc = attrib.normals[3 * size_t(idxc.normal_index) + 1];
                 tinyobj::real_t nzc = attrib.normals[3 * size_t(idxc.normal_index) + 2];
 
-                // Check if `texcoord_index` is zero or positive. negative = no texcoord data
-                // don't texture yet
-                /*if (idx.texcoord_index >= 0) {
-                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
-                    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
-                }*/
-
-                // Optional: vertex colors
-                // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
-                // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
-                // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
-
                 // construct triangle object
                 Vertex vertA = {
                     glm::vec4(vxa, vya, vza, 1),
@@ -144,6 +128,33 @@ int Scene::loadObj(const char* filename, glm::mat4 transform,
                     glm::vec4(vxc, vyc, vzc, 1),
                     glm::vec4(nxc, nyc, nzc, 0)
                 };
+
+#if USE_UV
+                // Check if `texcoord_index` is zero or positive. negative = no texcoord data
+                // don't texture yet
+                if (idxa.texcoord_index >= 0) {
+                    tinyobj::real_t txa = attrib.texcoords[2 * size_t(idxa.texcoord_index) + 0];
+                    tinyobj::real_t tya = attrib.texcoords[2 * size_t(idxa.texcoord_index) + 1];
+                    vertA.hasUv = true;
+                    vertA.uv = glm::vec2(txa, tya);
+                }
+                if (idxb.texcoord_index >= 0) {
+                    tinyobj::real_t txb = attrib.texcoords[2 * size_t(idxb.texcoord_index) + 0];
+                    tinyobj::real_t tyb = attrib.texcoords[2 * size_t(idxb.texcoord_index) + 1];
+                    vertB.hasUv = true;
+                    vertB.uv = glm::vec2(txb, tyb);
+                }
+                if (idxc.texcoord_index >= 0) {
+                    tinyobj::real_t txc = attrib.texcoords[2 * size_t(idxc.texcoord_index) + 0];
+                    tinyobj::real_t tyc = attrib.texcoords[2 * size_t(idxc.texcoord_index) + 1];
+                    vertC.hasUv = true;
+                    vertC.uv = glm::vec2(txc, tyc);
+                }
+#endif
+                // Optional: vertex colors
+                // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
+                // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
+                // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
 
                 Triangle triangle = {
                     vertA,
@@ -236,7 +247,7 @@ int Scene::loadGeom(string objectid) {
 
         if (hasObj) {
             std::vector<Triangle> triangleArray;
-            loadObj(objFileName.c_str(), newGeom.transform, newGeom.translation, newGeom.rotation, newGeom.scale, newGeom.materialid, &triangleArray);
+            loadObj(objFileName.c_str(), &triangleArray);
 #if USE_BOUND_BOX
             float xMin = FLT_MAX;
             float yMin = FLT_MAX;
