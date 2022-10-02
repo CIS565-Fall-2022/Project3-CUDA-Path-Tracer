@@ -324,8 +324,8 @@ void Scene::loadCamera() {
         std::vector<std::string> tokens = utilityCore::tokenizeString(line);
         if (tokens[0] == "Eye") {
             camera.position = glm::vec3(std::stof(tokens[1]), std::stof(tokens[2]), std::stof(tokens[3]));
-        } else if (tokens[0] == "LookAt") {
-            camera.lookAt = glm::vec3(std::stof(tokens[1]), std::stof(tokens[2]), std::stof(tokens[3]));
+        } else if (tokens[0] == "Rotation") {
+            camera.rotation = glm::vec3(std::stof(tokens[1]), std::stof(tokens[2]), std::stof(tokens[3]));
         } else if (tokens[0] == "Up") {
             camera.up = glm::vec3(std::stof(tokens[1]), std::stof(tokens[2]), std::stof(tokens[3]));
         }
@@ -338,11 +338,7 @@ void Scene::loadCamera() {
     float fovx = (atan(xscaled) * 180) / Pi;
     camera.fov = glm::vec2(fovx, fovy);
     camera.tanFovY = glm::tan(glm::radians(fovy * 0.5f));
-
-    camera.view = glm::normalize(camera.lookAt - camera.position);
-    camera.right = glm::normalize(glm::cross(camera.view, camera.up));
-    camera.pixelLength = glm::vec2(2 * xscaled / (float)camera.resolution.x,
-        2 * yscaled / (float)camera.resolution.y);
+    camera.update();
 
     //set up render camera stuff
     int arraylen = camera.resolution.x * camera.resolution.y;

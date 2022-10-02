@@ -256,11 +256,11 @@ void RenderImGui() {
 
 		glm::vec3 lastPos = cam.position;
 		if (ImGui::DragFloat3("Position", glm::value_ptr(cam.position), .1f)) {
-			cam.lookAt += cam.position - lastPos;
+			cam.rotation += cam.position - lastPos;
 			State::camChanged = true;
 		}
 
-		if (ImGui::DragFloat3("Up", glm::value_ptr(cam.up), .1f)) {
+		if (ImGui::DragFloat3("Rotation", glm::value_ptr(cam.rotation), .1f)) {
 			State::camChanged = true;
 		}
 

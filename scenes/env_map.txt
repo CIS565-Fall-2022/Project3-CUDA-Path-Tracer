@@ -7,7 +7,7 @@ Sample		5000
 Depth		8
 File        Cornell
 Eye         0 0 10
-LookAt      0 0 0
+Rotation      -90 0 0
 Up          0 1 0
 
 EnvMap 	texture/gamrig_4k.hdr
