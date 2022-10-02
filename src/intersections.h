@@ -218,7 +218,6 @@ __host__ __device__ float triangleIntersectionTest(Geom* geom, Triangle* triangl
         normal *= -1.f;
     }
 
-
     return t;
 
 }

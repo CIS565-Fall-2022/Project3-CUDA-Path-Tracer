@@ -76,8 +76,6 @@ int Scene::loadObj(const char* filename, glm::mat4 transform,
     glm::mat4 invTransform = glm::inverse(transform);
     glm::mat4 invTranspose = glm::inverseTranspose(transform);
 
-    // float minX, minY, minZ, maxX, maxY, maxZ;
-
     // Loop over shapes and load each attrib
     for (size_t s = 0; s < shapes.size(); s++) {
 

@@ -26,7 +26,7 @@
 #define SORT_MATERIALS 0
 #define CACHE_FIRST_BOUNCE 0 // note that Cache first bounce and antialiasing cannot be on at the same time.
 #define ANTIALIASING 0
-#define DEPTH_OF_FIELD 0 // depth of field focus defined later
+#define DEPTH_OF_FIELD 1 // depth of field focus defined later
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -146,7 +146,7 @@ void pathtraceFree() {
 	cudaFree(dev_image);  // no-op if dev_image is null
 	cudaFree(dev_paths);
 
-	// cudaFree 
+	//// cudaFree 
 	//for (int i = 0; i < hst_scene->geoms.size(); i++) {
 	//	// cout << "numTris: " << scene->geoms[i].numTris;
 	//	if (hst_scene->geoms[i].type == OBJ) {
@@ -211,19 +211,14 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		// shoot multiple secondary rays and average them for pixel. SHOULD ALREADY BE DONE.
 		// segment.ray.origin = cam.position;
 
-		glm::vec3 w = glm::normalize(cam.position - cam.lookAt);
+		/*glm::vec3 w = glm::normalize(cam.position - cam.lookAt);
 		glm::vec3 u = glm::normalize(glm::cross(cam.up, w));
 		glm::vec3 v = glm::cross(w, u);
 
-		glm::vec3 horizontal = FOCUS * cam.resolution.x * u;
-		glm::vec3 vertical = FOCUS * cam.resolution.y * v;
-
-		glm::vec3 lower_left_corner = segment.ray.origin - horizontal / 2.f - vertical / 2.f - FOCUS * w;
 		float radius = APERTURE / 2.f;
 
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
-		thrust::uniform_real_distribution<float> u01(0, 1);
-
+		thrust::uniform_real_distribution<float> u01(-0.5, 0.5f);
 
 		glm::vec3 rd = radius * calculateRandomDirectionInHemisphere(cam.view, rng);
 		glm::vec3 offset = u * rd.x + v * rd.y;
@@ -232,7 +227,26 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		glm::vec3 focalPoint = segment.ray.origin + FOCUS * segment.ray.direction;
 
 		segment.ray.origin = origin;
-		segment.ray.direction = glm::normalize(focalPoint - origin);
+		segment.ray.direction = glm::normalize(focalPoint - origin);*/
+		/*segment.ray.direction = glm::normalize(focalPoint
+			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
+		);*/
+
+		glm::vec3 focalPoint = segment.ray.origin + FOCUS * segment.ray.direction;
+
+		// add blur effect
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+		thrust::uniform_real_distribution<float> u01(-0.5, 0.5f);
+
+		float randX = u01(rng);
+		float randY = u01(rng);
+		float randZ = u01(rng);
+
+		glm::vec3 offset = glm::vec3(randX, randY, randZ);
+
+		segment.ray.origin += APERTURE * offset;
+		segment.ray.direction = glm::normalize(focalPoint - segment.ray.origin);
 
 #endif
 		segment.pixelIndex = index;
