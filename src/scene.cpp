@@ -1,5 +1,6 @@
 #include "scene.h"
 #include "common.h"
+#include "stb_image.h"
 #include <iostream>
 #include <cstring>
 #include <stack>
@@ -113,6 +114,9 @@ void Resource::clear() {
 }
 
 Scene::Scene(const std::string& filename) {
+    stbi_ldr_to_hdr_gamma(1.f);
+    stbi_set_flip_vertically_on_load(true);
+
     std::cout << "[Scene loading " << filename << " ...]" << std::endl;
     std::cout << " " << std::endl;
     char* fname = (char*)filename.c_str();
@@ -335,11 +339,10 @@ void Scene::loadCamera() {
     camera.fov = glm::vec2(fovx, fovy);
     camera.tanFovY = glm::tan(glm::radians(fovy * 0.5f));
 
+    camera.view = glm::normalize(camera.lookAt - camera.position);
     camera.right = glm::normalize(glm::cross(camera.view, camera.up));
     camera.pixelLength = glm::vec2(2 * xscaled / (float)camera.resolution.x,
         2 * yscaled / (float)camera.resolution.y);
-
-    camera.view = glm::normalize(camera.lookAt - camera.position);
 
     //set up render camera stuff
     int arraylen = camera.resolution.x * camera.resolution.y;
@@ -348,7 +351,10 @@ void Scene::loadCamera() {
 }
 
 void Scene::loadEnvMap(const std::string& filename) {
+    stbi_set_flip_vertically_on_load(false);
     envMapTexId = addTexture(filename);
+    stbi_set_flip_vertically_on_load(true);
+
     auto envMap = textures[envMapTexId];
     std::vector<float> pdf(envMap->width() * envMap->height());
 
@@ -406,10 +412,22 @@ void Scene::loadMaterial(const std::string& matId) {
             }
         }
         else if (tokens[0] == "Metallic") {
-            material.metallic = std::stof(tokens[1]);
+            if (std::isdigit(tokens[1][tokens[1].length() - 1])) {
+                material.metallic = std::stof(tokens[1]);
+            }
+            else {
+                material.metallicMapId = addTexture(tokens[1]);
+                std::cout << "\t\t[Metallic use texture " << tokens[1] << "]" << std::endl;
+            }
         }
         else if (tokens[0] == "Roughness") {
-            material.roughness = std::stof(tokens[1]);
+            if (std::isdigit(tokens[1][tokens[1].length() - 1])) {
+                material.roughness = std::stof(tokens[1]);
+            }
+            else {
+                material.roughnessMapId = addTexture(tokens[1]);
+                std::cout << "\t\t[Roughness use texture " << tokens[1] << "]" << std::endl;
+            }
         }
         else if (tokens[0] == "Ior") {
             material.ior = std::stof(tokens[1]);

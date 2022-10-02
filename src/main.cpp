@@ -230,19 +230,14 @@ void runCuda() {
 	if (State::camChanged) {
 		iteration = 0;
 		Camera& cam = scene->camera;
-		cameraPosition.x = zoom * sin(phi) * sin(theta);
-		cameraPosition.y = zoom * cos(theta);
-		cameraPosition.z = zoom * cos(phi) * sin(theta);
+		cam.view = glm::vec3(sin(phi) * sin(theta), cos(theta), cos(phi) * sin(theta));
 
-		cam.view = -glm::normalize(cameraPosition);
 		glm::vec3 v = cam.view;
 		glm::vec3 u = glm::vec3(0, 1, 0);//glm::normalize(cam.up);
 		glm::vec3 r = glm::cross(v, u);
 		cam.up = glm::cross(r, v);
 		cam.right = r;
 
-		cameraPosition += cam.lookAt;
-		cam.position = cameraPosition;
 		State::camChanged = false;
 	}
 
@@ -305,8 +300,8 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 }
 
 void mouseScrollCallback(GLFWwindow* window, double offsetX, double offsetY) {
-	zoom -= offsetY;
-	zoom = std::fmax(0.1f, zoom);
+	scene->camera.fov.y -= offsetY;
+	scene->camera.fov.y = std::min(scene->camera.fov.y, 45.f);
 	State::camChanged = true;
 }
 
@@ -348,8 +343,8 @@ void mousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
 		right.y = 0.0f;
 		right = glm::normalize(right);
 
-		cam.lookAt -= (float)(xpos - lastX) * right * 0.01f;
-		cam.lookAt += (float)(ypos - lastY) * forward * 0.01f;
+		cam.position -= (float)(xpos - lastX) * right * 0.01f;
+		cam.position += (float)(ypos - lastY) * forward * 0.01f;
 		State::camChanged = true;
 	}
 	lastX = xpos;

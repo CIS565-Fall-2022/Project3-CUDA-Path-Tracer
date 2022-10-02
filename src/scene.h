@@ -70,11 +70,18 @@ struct DevScene {
             mat.baseColor = textures[mat.baseColorMapId].linearSample(intersec.uv);
         }
 
+        if (mat.metallicMapId > NullTextureId) {
+            mat.metallic = textures[mat.metallicMapId].linearSample(intersec.uv).r;
+        }
+
+        if (mat.roughnessMapId > NullTextureId) {
+            mat.roughness = textures[mat.roughnessMapId].linearSample(intersec.uv).r;
+        }
+
         if (mat.normalMapId > NullTextureId) {
             glm::vec3 mapped = textures[mat.normalMapId].linearSample(intersec.uv);
             glm::vec3 localNorm = glm::normalize(glm::vec3(mapped.x, mapped.y, mapped.z) * 1.f - 0.5f);
             intersec.norm = Math::localToWorld(intersec.norm, localNorm);
-            //intersec.norm = getPrimitivePlainNormal
         }
         return mat;
     }

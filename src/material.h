@@ -259,5 +259,7 @@ struct Material {
     float ior = 1.5f;
 
     int baseColorMapId = NullTextureId;
+    int metallicMapId = NullTextureId;
+    int roughnessMapId = NullTextureId;
     int normalMapId = NullTextureId;
 };

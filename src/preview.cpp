@@ -217,6 +217,7 @@ void RenderImGui() {
 		ImGuiWindowFlags_NoFocusOnAppearing |
 		ImGuiWindowFlags_NoNav); {
 		ImGui::Text("Traced Depth %d", imguiData->TracedDepth);
+		ImGui::Text("BVH Size %d", scene->BVHSize);
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
 		ImGui::End();
@@ -256,6 +257,10 @@ void RenderImGui() {
 		glm::vec3 lastPos = cam.position;
 		if (ImGui::DragFloat3("Position", glm::value_ptr(cam.position), .1f)) {
 			cam.lookAt += cam.position - lastPos;
+			State::camChanged = true;
+		}
+
+		if (ImGui::DragFloat3("Up", glm::value_ptr(cam.up), .1f)) {
 			State::camChanged = true;
 		}
 
