@@ -7,6 +7,17 @@
  * Computes a cosine-weighted random direction in a hemisphere.
  * Used for diffuse lighting.
  */
+__device__ void normalMappingWithTangent(glm::vec3& normal, glm::vec4& tangent, glm::vec3 normalizedVal) {
+    glm::vec3 t = glm::vec3(tangent);
+    glm::vec3 b = glm::cross(normal, t) * tangent.w;
+    glm::mat3 tbn = glm::mat3(t, b, normal);
+    normal = glm::normalize(tbn * normalizedVal);
+}
+
+__device__ void normalMapping() {
+
+}
+
 __host__ __device__
 glm::vec3 calculateRandomDirectionInHemisphere(
         glm::vec3 normal, thrust::default_random_engine &rng) {
@@ -102,7 +113,6 @@ void scatterRay(
         }//what if both of the surface is not air?(TODO)
         float R0 = glm::pow((n1 - n2) / (n1 + n2), 2.0f);
         float Rtheta = R0 + (1 - R0) * glm::pow(1 - cosineR, 5.0f);
-        //I use 50/50 before but thats history
         //now I use R value from Schlink approximation and fresnel equations to decide whether reflect or refract
         // > Rtheta then refraction, else reflection
         if (u01(rng) > Rtheta) {

@@ -27,9 +27,5 @@ public:
     std::vector<Texture> textures;
     std::vector<Primitive> primitives;
     std::vector<int> mesh_indices;
-    
-
-    std::vector<Material> materials;
-    std::vector<Texture> textures;
     RenderState state;
 };

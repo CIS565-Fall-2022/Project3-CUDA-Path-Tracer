@@ -26,10 +26,10 @@ struct Primitive {
     glm::vec3 normal[3];
     glm::vec2 uv[3];
     glm::vec4 tangent[3];
+    int mat_id;
     bool hasNormal = false;
     bool hasUV = false;
     bool hasTangent = false;
-    
 };
 struct Geom {
     enum GeomType type;
@@ -89,6 +89,15 @@ struct NormalTextureInfo {
     }
 };
 
+struct Texture {
+    int TexIndex;
+    int width;
+    int height;
+    int components;
+    unsigned char* image;
+    int size;
+};
+
 struct Material {
     glm::vec3 color;
     struct {
@@ -99,6 +108,9 @@ struct Material {
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+
+    Texture tex;
+    Texture bump;
 
     //for gltf extra factor
     bool gltf = false;
@@ -115,15 +127,7 @@ struct Material {
     bool doubleSided;                    // default false;
 };
 
-struct Texture {
-    int TexIndex;
-    int width;
-    int height;
-    int components;
-    unsigned char* image;
-    int size;
 
-};
 struct Camera {
     glm::ivec2 resolution;
     glm::vec3 position;

@@ -174,9 +174,9 @@ int Scene::loadMaterial(string materialid) {
     } else {
         cout << "Loading Material " << id << "..." << endl;
         Material newMaterial;
-
+        Texture* tex = nullptr;
         //load static properties
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < 9; i++) {
             string line;
             utilityCore::safeGetline(fp_in, line);
             vector<string> tokens = utilityCore::tokenizeString(line);
@@ -196,6 +196,28 @@ int Scene::loadMaterial(string materialid) {
                 newMaterial.indexOfRefraction = atof(tokens[1].c_str());
             } else if (strcmp(tokens[0].c_str(), "EMITTANCE") == 0) {
                 newMaterial.emittance = atof(tokens[1].c_str());
+            }
+            else if (strcmp(tokens[0].c_str(), "TEXTURE") == 0) {
+                tex = &newMaterial.tex;
+            }
+            else if (strcmp(tokens[0].c_str(), "BUMP") == 0) {
+                tex = &newMaterial.bump;
+            }
+            if (tex && strcmp(tokens[1].c_str(), "NONE") != 0) {
+                int width, height, comps;
+                unsigned char* pixels = stbi_load(tokens[1].c_str(), &width, &height, &comps, 3);
+                if (!pixels) {
+                    cout << "Image not loaded" << endl;
+                }
+                else {
+                    tex->TexIndex = textures.size();
+                    tex->width = width;
+                    tex->height = height;
+                    tex->size = width * height * 3;
+                    tex->image = new unsigned char[tex->size];
+                    memcpy(tex->image, pixels, tex->size);
+                    stbi_image_free(pixels);
+                }
             }
         }
         materials.push_back(newMaterial);
@@ -242,10 +264,8 @@ int Scene::loadGLTF(string filename, Geom& geom) {
         << model.cameras.size() << " cameras\n"
         << model.scenes.size() << " scenes\n"
         << model.lights.size() << " lights\n";*/
-
-    //In this situation Node is the top hierachy, then we extract all the nodes first
     int texIndex = textures.size();
-    //int matIndex = materials.size();
+    int matIndex = materials.size();
 
     //copy materials in model to host
     for (const tinygltf::Material& material : model.materials) {
@@ -282,7 +302,7 @@ int Scene::loadGLTF(string filename, Geom& geom) {
     //Get all mesh
     for (const tinygltf::Mesh& mesh : model.meshes) {
 
-        for (const tinygltf::Primitive& primitive : mesh.primitives) {\
+        for (const tinygltf::Primitive& primitive : mesh.primitives) {
             //Create mesh object(learnt from Syoyo's https://github.com/syoyo/tinygltf/issues/71)
             const tinygltf::Accessor& accessor = model.accessors[primitive.indices];
             const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
@@ -292,7 +312,7 @@ int Scene::loadGLTF(string filename, Geom& geom) {
             for (size_t i = 0; i < accessor.count; ++i) {
                 mesh_indices.push_back(indices[i]);
             }
-
+            
             const tinygltf::Accessor& accessorPos = model.accessors[primitive.attributes.at("POSITION")];
             const tinygltf::BufferView& bufferViewPos = model.bufferViews[accessorPos.bufferView];
             const tinygltf::Buffer& bufferPos = model.buffers[bufferViewPos.buffer];
@@ -355,6 +375,7 @@ int Scene::loadGLTF(string filename, Geom& geom) {
                         prim.normal[i] = normal;
                     }
                 }
+                prim.mat_id = matIndex + primitive.material;
                 primitives.push_back(prim);
             }
         }
