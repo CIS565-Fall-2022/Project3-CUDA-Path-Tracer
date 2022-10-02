@@ -12,22 +12,58 @@ CUDA Path Tracer
 This program takes in a text file describing a scene(objects, locations, materials) and renders it with the canonical path tracing algorithm. 
 
 Features:
-* Different materials
+* [Different materials](#material-types)
 	* Diffusive
-	* Reflective
-	* Refractive
-* Visual effects
-	* Motion blur
-	* Anti-aliasing
-	* Depth of field
-* Toggle-able performance options
-	* Stream compaction
-	* Sorting rays by intersected material type
-	* Caching first intersection
+	* [Reflective](#specular--imperfect-specular) (specular + imperfect specular)
+	* [Refractive](#dielectric) (dielectric)
+	* [Translucent](#translucent) (subsurface ray scattering)
+* [Visual effects](#visual-effects)
+	* [Motion blur](#motion-blur)
+	* [Anti-aliasing](#antialiasing)
+	* [Depth of field](#depth-of-field)
+* [Toggle-able performance options](#core-feature-benchmarks)
+	* [Stream compaction](#stream-compaction)
+	* [Sorting rays by intersected material type](#sorting-rays-by-intersected-material-type)
+	* [Caching first intersection](#caching-first-intersection)
 
 This README contains many images. Click on them (on Github) to open the full size.
 
 ## Feature Breakdown and Performance Analysis
+
+### Material Types
+Material types can be specified in the scene text files.   
+A material type is means a different BSDF, an inherent part of the ray tracing evaluation. Any CPU path tracer that tries to implement the same thing will be orders of magnitude slower.  
+Adding approximations to respective material types could improve performance, at the cost of physical accuracy (e.g., Schlick approximation for Fresnel equations). The implementations of different material types here are all quite approximated already, and therefore don't have huge performance impacts.
+
+#### Translucent
+The material type TRANSLUCENT enables subsurface scattering of rays beneath the surface of the material, the degree of which is determined by SPECEX, IOR, ABSORPTION of the material in the scene file. IOR and SPECEX determine how rays are either reflected or refracted by the material, and absorption determines how easily light travels through the object (lower is easier). The parameter TRANSRGB determines the transmission color of the material, which colors the light ray depending on how far into the material it goes.   
+Subsurface scattering is enabled by a very approximate interpretation of the BSSRDF, assuming that the internal geometry of the object is uniform and diffuses evenly. The implementation is inspired by [PBRT](https://github.com/mmp/pbrt-v3) and Disney BRDF. The polynomial fit for the "first moment" of the Fresnel reflectance function used to determine if a ray enters the material is pulled directly from the PBRT implementation.     
+| Material | Diffuse | Translucent(ABSORPTION = 0.3) | Translucent(ABSORPTION = 0.03) | 
+| :------- | :-------: | :-------: | :-------: |
+| FPS | 49.7 | 47.5 | 47.4 |
+| Scene | <img src="img/subsurf_diffuse_bench.png"> | <img src="img/subsurf_less_bench.png"> | <img src="img/subsurf_more_bench.png"> |
+
+Other scene parameters are SPECEX=30, IOR=1.45, TRANSRGB(.98 .5 .5). Notice how the otherwise skin-colored objects in the diffuse scene become brighter and redder(due to the TRANSRGB color) from the light transport underneath the surface, depending on their proximity to light, which is more pronounced as the absorption of the material goes down.
+
+#### Dielectric
+The material type DIELECTRIC specifies a material to both reflect and refract light according to its index of refraction(IOR). I used the [Schlick approximation](https://en.wikipedia.org/wiki/Schlick%27s_approximation), of the Fresnel equations since it achieves results at up to 32x speed for less than 1% average error (see Ray Tracing Gems II).    
+The frames per second(FPS) - a rough benchmark of rendering speed - of this material is comparable to diffuse or specular. 
+| Material | Diffuse | Specular | Dielectric(IOR = 1.52) | 
+| :------- | :-------: | :-------: | :-------: |
+| FPS | 51.8 | 52.6 | 52.1 |
+| Scene | <img src="img/diffuse_bench.png"> | <img src="img/mirror_bench.png"> | <img src="img/dielectric_bench.png"> |
+
+Note the subtle reflection of the light on the dielectric spheres; that is the light reflection contribution.   
+
+#### Specular / Imperfect Specular
+The material type SPECULAR specifies a material to reflect light; the degree of this is determined by the specular exponent(SPECEX). The higher the SPECEX, the more reflective.
+
+| Material | Diffuse | SPECEX = 80 | SPECEX = 5000 | 
+| :------- | :-------: | :-------: | :-------: |
+| FPS | 51.8 | 52.6 | 52.6 |
+| Scene | <img src="img/diffuse_bench.png"> | <img src="img/imperfect_bench.png"> | <img src="img/mirror_bench.png"> |
+
+Note the way the reflections look muddled, like a dirty mirror as a consequence of the lower SPECEX.
 
 ### Visual Effects
 
@@ -70,32 +106,6 @@ FOCAL_DIST and LENS_RAD are specified as part of the camera values in the scene 
 
 The scene dielectrics have IOR = 2.42 (diamond). The FOCAL_DIST is kept constant, at 12.5. Note how as LENS_RAD = 0.2 increases, the clarity decreases on everything not on the plane defined by the focal distance.      
 
-### Notable Material Types
-Material types can be specified in the scene text files.   
-A material type is means a different BSDF, an inherent part of the ray tracing evaluation. Any CPU path tracer that tries to implement the same thing will be orders of magnitude slower.  
-Adding approximations to respective material types could improve performance, at the cost of physical accuracy (e.g., Schlick approximation for Fresnel equations).
-
-#### Refraction
-The material type DIELECTRIC specifies a material to both reflects and refracts light according to its index of refraction(IOR). I used the [Schlick approximation](https://en.wikipedia.org/wiki/Schlick%27s_approximation), of the Fresnel equations since it achieves results at up to 32x speed for less than 1% average error (see Ray Tracing Gems II).    
-The frames per second(FPS) - a rough benchmark of rendering speed - of this material is comparable to diffuse or specular. 
-| Material | Diffuse | Specular | Dielectric(IOR = 1.52) | 
-| :------- | :-------: | :-------: | :-------: |
-| FPS | 51.8 | 52.6 | 52.1 |
-| Scene | <img src="img/diffuse_bench.png"> | <img src="img/mirror_bench.png"> | <img src="img/dielectric_bench.png"> |
-
-Note the subtle reflection of the light on the dielectric spheres; that is the light reflection contribution.   
-
-#### Imperfect Specular
-
-The material type SPECULAR specifies a material to reflect light; the degree of this is determined by the specular exponent(SPECEX). The higher the SPECEX, the more reflective.
-
-| Material | Diffuse | SPECEX = 80 | SPECEX = 5000 | 
-| :------- | :-------: | :-------: | :-------: |
-| FPS | 51.8 | 52.6 | 52.6 |
-| Scene | <img src="img/diffuse_bench.png"> | <img src="img/imperfect_bench.png"> | <img src="img/mirror_bench.png"> |
-
-Note the way the reflections look muddled, like a dirty mirror as a consequence of the lower SPECEX.
-
 ### Core Feature Benchmarks
 
 A basic Cornell box scene, used for benchmarks.     
@@ -124,6 +134,9 @@ The first intersection of rays is static, as it is initiated by the static ray c
 Curiously, the difference is negligible, though weighed toward the caching. The simplicity of the Cornell box scene makes it difficult to ascertain clear winners when it comes to different rendering options.
 
 ## References
+[Physically Based Rendering (PBRT)](https://pbr-book.org/)     
+[Disney BRDF](https://media.disneyanimation.com/uploads/production/publication_asset/48/asset/s2012_pbs_disney_brdf_notes_v3.pdf)     
+[Extending Disney's BRDF to a BSDF](https://blog.selfshadow.com/publications/s2015-shading-course/burley/s2015_pbs_disney_bsdf_notes.pdf)     
 [Ray Tracing Gems II](http://www.realtimerendering.com/raytracinggems/rtg2/)     
 [Ray Tracing in One Weekend](https://raytracing.github.io/)      
 [Fresnel Equations, Schlick Approximation, Metals, and Dielectrics](http://psgraphics.blogspot.com/2020/03/fresnel-equations-schlick-approximation.html)      

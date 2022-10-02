@@ -314,7 +314,7 @@ __global__ void shadeMaterial (
 			} else {
 				// BSDF evaluation: in-place assigns new direction + color for ray
 				scatterRay(pathSegments[idx],
-					pathSegments[idx].ray.origin + intersection.t * pathSegments[idx].ray.direction, // where ray intersects material
+					getPointOnRay(pathSegments[idx].ray, intersection.t),
 					intersection.surfaceNormal,
 					intersection.outside,
 					material,

@@ -15,7 +15,8 @@ enum GeomType {
 enum class MatType {
     DIFFUSE,
     SPECULAR,
-    DIELECTRIC
+    DIELECTRIC,
+    TRANSLUCENT
 };
 
 struct Ray {
@@ -38,13 +39,14 @@ struct Geom {
 
 struct Material {
     glm::vec3 color;
+    glm::vec3 transColor;
     struct {
         float exponent;
-        glm::vec3 color;
     } specular;
     MatType matType;
     float indexOfRefraction;
     float emittance;
+    float absorption;
 };
 
 struct Camera {

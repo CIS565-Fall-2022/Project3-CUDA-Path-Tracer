@@ -173,7 +173,7 @@ int Scene::loadMaterial(string materialid) {
     Material newMaterial;
 
     //load static properties
-    for (int _ = 0; _ < 6; _++) {
+    for (int _ = 0; _ < 7; _++) {
         string line;
         utilityCore::safeGetline(fp_in, line);
         vector<string> tokens = utilityCore::tokenizeString(line);
@@ -184,18 +184,25 @@ int Scene::loadMaterial(string materialid) {
                 newMaterial.matType = MatType::SPECULAR;
             } else if (strcmp(tokens[1].c_str(), "DIELECTRIC") == 0) {
                 newMaterial.matType = MatType::DIELECTRIC;
+            } else if (strcmp(tokens[1].c_str(), "TRANSLUCENT") == 0) {
+                newMaterial.matType = MatType::TRANSLUCENT;
+            } else {
+                cout << "Material type not found" << endl;
             }
         } else if (strcmp(tokens[0].c_str(), "RGB") == 0) {
             glm::vec3 color( atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()) );
             newMaterial.color = color;
         } else if (strcmp(tokens[0].c_str(), "SPECEX") == 0) {
             newMaterial.specular.exponent = atof(tokens[1].c_str());
-        } else if (strcmp(tokens[0].c_str(), "SPECRGB") == 0) {
-            glm::vec3 specColor(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-            newMaterial.specular.color = specColor;
-        } else if (strcmp(tokens[0].c_str(), "REFRIOR") == 0) {
+        } else if (strcmp(tokens[0].c_str(), "TRANSRGB") == 0) {
+            glm::vec3 tColor(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+            newMaterial.transColor = tColor;
+        } else if (strcmp(tokens[0].c_str(), "IOR") == 0) {
             newMaterial.indexOfRefraction = atof(tokens[1].c_str());
-        } else if (strcmp(tokens[0].c_str(), "EMITTANCE") == 0) {
+        } else if (strcmp(tokens[0].c_str(), "ABSORPTION") == 0) {
+            newMaterial.absorption = atof(tokens[1].c_str());
+        }
+        else if (strcmp(tokens[0].c_str(), "EMITTANCE") == 0) {
             newMaterial.emittance = atof(tokens[1].c_str());
         }
     }
