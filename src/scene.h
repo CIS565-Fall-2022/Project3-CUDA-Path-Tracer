@@ -16,6 +16,15 @@ private:
     int loadMaterial(string materialid);
     int loadGeom(string objectid);
     int loadCamera();
+    int loadObj(const char* filepath, 
+                glm::mat4 transform, 
+                glm::vec3 trans, 
+                glm::vec3 rot,
+                glm::vec3 scale,
+                int matId,
+                std::vector<Triangle>* triangleArray,
+                const char* basepath,
+                bool triangulate);
 public:
     Scene(string filename);
     ~Scene();

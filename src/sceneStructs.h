@@ -10,6 +10,24 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    TRIANGLE,
+    OBJ_BB
+};
+
+struct BoundingBox {
+    glm::vec3 min;
+    glm::vec3 max;
+};
+
+struct Vertex {
+    glm::vec4 pos;
+    glm::vec4 norm;
+};
+
+struct Triangle {
+    Vertex a;
+    Vertex b;
+    Vertex c;
 };
 
 struct Ray {
@@ -26,6 +44,10 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+    Triangle* host_triangles;
+    Triangle* device_triangles;
+    BoundingBox bb;
+    int triangleNum;
 };
 
 struct Material {
