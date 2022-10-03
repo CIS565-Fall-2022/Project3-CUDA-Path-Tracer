@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <cuda_runtime.h>
+#include <tiny_gltf.h>
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
@@ -35,14 +36,34 @@ struct Primitive
 {
     int count;
     int index_Offset;
-    int v_Offset;
-    int n_Offset=-1;
+    int vertex_Offset;
+    int normal_Offset=-1;
     int uv_Offset=-1;
-    int t_Offset = -1;
+    int tangent_Offset = -1;
     int mat_id;
     glm::vec3 boundingBoxMax;
     glm::vec3 boundingBoxMin;
     glm::mat4 pivotTransform;
+};
+
+
+struct PrimitiveData
+{
+    Primitive* primitives;
+    glm::vec3* vertices;
+    glm::vec2* texCoords;
+    glm::vec3* normals;
+    glm::vec4* tangents;
+    uint16_t* indices;
+    void free()
+    {
+        cudaFree(primitives);
+        cudaFree(vertices);
+        cudaFree(texCoords);
+        cudaFree(normals);
+        cudaFree(tangents);
+        cudaFree(indices);
+    }
 };
 
 struct Texture
@@ -85,6 +106,17 @@ struct Mesh
     int prim_offset;
 };
 
+struct PBRShadingAttribute
+{
+    glm::vec4 baseColor = glm::vec4(1.0);
+
+    std::vector<double> baseColorFactor;  // len = 4. default [1,1,1,1]
+    TextureInfo baseColorTexture;
+    double metallicFactor;   // default 1
+    double roughnessFactor;  // default 1
+    TextureInfo metallicRoughnessTexture;
+
+};
 
 struct Material {
 
@@ -110,17 +142,7 @@ struct Material {
 
 };
 
-struct PBRShadingAttribute
-{
-    glm::vec4 baseColorFactor = glm::vec4(1.0);
 
-    std::vector<double> baseColorFactor;  // len = 4. default [1,1,1,1]
-    TextureInfo baseColorTexture;
-    double metallicFactor;   // default 1
-    double roughnessFactor;  // default 1
-    TextureInfo metallicRoughnessTexture;
-
-};
 
 struct Camera {
     glm::ivec2 resolution;

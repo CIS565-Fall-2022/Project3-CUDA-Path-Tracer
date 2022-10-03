@@ -389,15 +389,171 @@ int Scene::loadGLTF(const std::string filename)
                     const tinygltf::Accessor& attributeAccessor = model.accessors[attribute.second];
                     const tinygltf::BufferView& bufferView = model.bufferViews[attributeAccessor.bufferView];
                     const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
+                    const float* data = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + attributeAccessor.byteOffset]);
+                    const int byte_stride = attributeAccessor.ByteStride(bufferView);
+                    int offset = byte_stride / sizeof(float);
+                    std::cout << "attribute has count" << count
+                        << "and stride" << byte_stride << " bytes\n";
+                    std::cout << "attribute name is: " << attribute.first << std::endl;
+                    if (attribute.first == "POSITION")
+                    {
+                        std::cout << "Load position:" << std::endl;
+                        //get position min/max for bounding box
+                        prim.boundingBoxMax.x = attributeAccessor.maxValues[0];
+                        prim.boundingBoxMax.y = attributeAccessor.maxValues[1];
+                        prim.boundingBoxMax.z = attributeAccessor.maxValues[2];
+
+                        prim.boundingBoxMin.x = attributeAccessor.minValues[0];
+                        prim.boundingBoxMin.y = attributeAccessor.minValues[1];
+                        prim.boundingBoxMin.z = attributeAccessor.minValues[2];
+
+                        //position has 3 value, so offset is 3
+                        if (offset == 0)
+                        {
+                            offset = 3;
+                        }
+                        //store mesh vertices
+                        prim.vertex_Offset = mesh_vertices.size();
+                        for (int i = 0; i < attributeAccessor.count; i++)
+                        {
+                            glm::vec3 v;
+                            int index = i * offset;
+                            v.x = data[index + 0];
+                            v.y = data[index + 1];
+                            v.z = data[index + 2];
+                            mesh_vertices.push_back(v);
+                        }
+
+                    }
+                    else if (attribute.first == "NORMAL")
+                    {
+                        //read normal
+                        std::cout << "Load Normal:" << std::endl;
+                        prim.normal_Offset = mesh_normals.size();
+                        if (offset == 0)
+                        {
+                            offset = 3;
+                        }
+                        //For each triangle
+                        mesh_normals.resize(prim.normal_Offset+attributeAccessor.count);
+                        for (int i = 0; i < prim.count; i += 3)
+                        {
+                            //get the i triangle index
+                            int f0 = indices[i + 0];
+                            int f1 = indices[i + 1];
+                            int f2 = indices[i + 2];
+
+                            int i0, i1, i2;
+                            i0 = f0 * offset;
+                            i1 = f1 * offset;
+                            i2 = f2 * offset;
+
+                            //Get the three normal vector from face
+                            glm::vec3 n0, n1, n2;
+                            n0.x = data[i0 + 0];
+                            n0.y = data[i0 + 1];
+                            n0.z = data[i0 + 2];
+                            n1.x = data[i1 + 0];
+                            n1.y = data[i1 + 1];
+                            n1.z = data[i1 + 2];
+                            n2.x = data[i2 + 0];
+                            n2.y = data[i2 + 1];
+                            n2.z = data[i2 + 2];
+
+                            //Order them correctly
+                            mesh_normals[prim.normal_Offset + f0] = n0;
+                            mesh_normals[prim.normal_Offset + f1] = n1;
+                            mesh_normals[prim.normal_Offset + f2] = n2;
+                        }
+                    }
+                    else if (attribute.first=="TEXCOORD_0")
+                    {
+                        std::cout << "Load Texture: " << endl;
+                        prim.uv_Offset = mesh_uvs.size();
+                        if (offset == 0)
+                        {
+                            offset = 2;
+                        }
+                        mesh_uvs.resize(prim.uv_Offset+attributeAccessor.count);
+                        //For each triangle
+                        for (int i = 0; i < prim.count; i+=3)
+                        {
+                            //get the i'th triangle uv
+                            int f0 = indices[i + 0];
+                            int f1 = indices[i + 1];
+                            int f2 = indices[i + 2];
+
+                            int i0, i1, i2;
+                            i0 = f0 * offset;
+                            i1 = f1 * offset;
+                            i2 = f2 * offset;
+
+                            //get point texture uv
+                            glm::vec2 t0, t1, t2;
+                            t0.x = data[i0 + 0];
+                            t0.y = data[i0 + 1];
+                            t1.x = data[i1 + 0];
+                            t1.y = data[i1 + 1];
+                            t2.x = data[i2 + 0];
+                            t2.y = data[i2 + 1];
+                            //put them in an array
+                            mesh_uvs[prim.uv_Offset + f0] = t0;
+                            mesh_uvs[prim.uv_Offset + f1] = t1;
+                            mesh_uvs[prim.uv_Offset + f2] = t2;
+                        }
+
+                    }
+                    else if (attribute.first == "TANGENT")
+                    {
+                    std::cout << "Load Tangent" << endl;
+                    prim.tangent_Offset = mesh_tangents.size();
+                    if (offset == 0)
+                    {
+                        offset = 4;
+                    }
+                    mesh_tangents.resize(prim.tangent_Offset + attributeAccessor.count);
+                    //For each triangle
+                    for (int i = 0; i < prim.count; i += 3)
+                    {
+                        //get the i'th triangle's indexes
+                        int f0 = indices[i + 0];
+                        int f1 = indices[i + 1];
+                        int f2 = indices[i + 2];
+                        int i0, i1, i2;
+                        i0 = f0 * offset;
+                        i1 = f1 * offset;
+                        i2 = f2 * offset;
+
+                        //get point texture uv
+                        glm::vec4 t0, t1, t2;
+                        t0.x = data[i0 + 0];
+                        t0.y = data[i0 + 1];
+                        t0.z = data[i0 + 3];
+                        t0.w = data[i0 + 4];
+
+                        t1.x = data[i1 + 0];
+                        t1.y = data[i1 + 1];
+                        t1.z = data[i1 + 2];
+                        t1.w = data[i1 + 3];
+
+                        t2.x = data[i2 + 0];
+                        t2.y = data[i2 + 1];
+                        t2.z = data[i2 + 2];
+                        t2.w = data[i2 + 3];
+                        mesh_tangents[prim.tangent_Offset + f0] = t0;
+                        mesh_tangents[prim.tangent_Offset + f1] = t1;
+                        mesh_tangents[prim.tangent_Offset + f2] = t2;
+                    }
+                  }
 
                 }
             }
-            }
-
-
+          }
+          primitives.push_back(prim);
         }
-
+        meshes.push_back(loadMesh);
+        ret = true;
     }
-
+    return ret;
 
 }

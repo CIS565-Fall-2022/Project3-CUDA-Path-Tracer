@@ -141,7 +141,7 @@ Group rays by material without a sorting pass. A sane implementation will requir
 For each extra feature, you must provide the following analysis:
 
 * Overview write-up of the feature along with before/after images.
-* Performance impact of the feature
+* Performance impact of the fature
 * If you did something to accelerate the feature, what did you do and why?
 * Compare your GPU version of the feature to a HYPOTHETICAL CPU version (you don't have to implement it!)? Does it benefit or suffer from being implemented on the GPU?
 * How might this feature be optimized beyond your current implementation?
