@@ -1,10 +1,7 @@
 #pragma once
 #include <iostream>
 
-#define MESH_DATA_STRUCT_OF_ARRAY false
-#define MESH_DATA_INDEXED false
-
-#define DEV_SCENE_PASS_BY_CONST_MEM false
+#define SAMPLER_USE_SOBOL true
 
 #define SCENE_LIGHT_SINGLE_SIDED true
 

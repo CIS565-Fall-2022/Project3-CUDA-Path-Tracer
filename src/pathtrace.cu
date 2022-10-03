@@ -141,7 +141,9 @@ __device__ Ray sampleCamera(const Camera& cam, int x, int y, glm::vec4 r) {
 * motion blur - jitter rays "in time"
 * lens effect - jitter ray origin positions based on a lens
 */
-__global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, PathSegment* pathSegments) {
+__global__ void generateRayFromCamera(
+	DevScene* scene, Camera cam, int iter, int traceDepth, PathSegment* pathSegments
+) {
 
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
@@ -149,7 +151,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 	if (x < cam.resolution.x && y < cam.resolution.y) {
 		int index = x + (y * cam.resolution.x);
 		PathSegment& segment = pathSegments[index];
-		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+		Sampler rng = makeSeededRandomEngine(iter, index, traceDepth, scene->sampleSequence);
 
 		segment.ray = sampleCamera(cam, x, y, sample4D(rng));
 		segment.throughput = glm::vec3(1.f);
@@ -171,7 +173,7 @@ __global__ void previewGBuffer(
 		return;
 	}
 	int index = y * width + x;
-	thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+	Sampler rng = makeSeededRandomEngine(iter, index, 0, scene->sampleSequence);
 
 	Ray ray = sampleCamera(cam, x, y, sample4D(rng));
 	Intersection intersec;
@@ -256,7 +258,7 @@ __global__ void pathIntegSampleSurface(
 	int numPaths,
 	bool sortMaterial
 ) {
-	const int SamplesConsumedOneIter = 10;
+	const int SamplesOneIter = 7;
 
 	int idx = blockDim.x * blockIdx.x + threadIdx.x;
 	if (idx >= numPaths) {
@@ -289,7 +291,7 @@ __global__ void pathIntegSampleSurface(
 		return;
 	}
 
-	thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 4 + depth * SamplesConsumedOneIter);
+	Sampler rng = makeSeededRandomEngine(iter, idx, 4 + depth * SamplesOneIter, scene->sampleSequence);
 
 	Material material = scene->getTexturedMaterialAndSurface(intersec);
 
@@ -380,7 +382,7 @@ __global__ void singleKernelPT(
 	glm::vec3 accRadiance(0.f);
 
 	int index = y * width + x;
-	thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+	Sampler rng = makeSeededRandomEngine(iter, index, 0, scene->sampleSequence);
 
 	Ray ray = sampleCamera(cam, x, y, sample4D(rng));
 	Intersection intersec;
@@ -486,7 +488,7 @@ __global__ void BVHVisualize(int iter, DevScene* scene, Camera cam, glm::vec3* i
 	}
 	int index = y * width + x;
 
-	thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+	Sampler rng = makeSeededRandomEngine(iter, index, 0, scene->sampleSequence);
 	Ray ray = sampleCamera(cam, x, y, sample4D(rng));
 
 	Intersection intersec;
@@ -527,7 +529,7 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 		(cam.resolution.x + blockSize2D.x - 1) / blockSize2D.x,
 		(cam.resolution.y + blockSize2D.y - 1) / blockSize2D.y);
 
-	generateRayFromCamera<<<blocksPerGrid2D, blockSize2D>>>(cam, iter, Settings::traceDepth, devPaths);
+	generateRayFromCamera<<<blocksPerGrid2D, blockSize2D>>>(hstScene->devScene, cam, iter, Settings::traceDepth, devPaths);
 	checkCUDAError("PT::generateRayFromCamera");
 	cudaDeviceSynchronize();
 

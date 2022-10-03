@@ -38,26 +38,6 @@ MeshData* Resource::loadOBJMesh(const std::string& filename) {
     }
     bool hasTexcoord = !attrib.texcoords.empty();
 
-#if MESH_DATA_INDEXED
-    model->vertices.resize(attrib.vertices.size() / 3);
-    model->normals.resize(attrib.normals.size() / 3);
-    memcpy(model->vertices.data(), attrib.vertices.data(), attrib.vertices.size() * sizeof(float));
-    memcpy(model->normals.data(), attrib.normals.data(), attrib.normals.size() * sizeof(float));
-    if (hasTexcoord) {
-        model->texcoord.resize(attrib.texcoords.size() / 2);
-        memcpy(model->texcoords.data(), attrib.texcoords.data(), attrib.texcoords.size() * sizeof(float));
-    }
-    else {
-        model->texcoord.resize(attrib.vertices.size() / 3);
-    }
-
-    for (const auto& shape : shapes) {
-        for (auto idx : shape.mesh.indices) {
-            model->indices.push_back({ idx.vertex_index, idx.normal_index,
-                hasTexcoord ? idx.texcoord_index : idx.vertex_index });
-        }
-    }
-#else
     for (const auto& shape : shapes) {
         for (auto idx : shape.mesh.indices) {
             model->vertices.push_back(*((glm::vec3*)attrib.vertices.data() + idx.vertex_index));
@@ -68,7 +48,7 @@ MeshData* Resource::loadOBJMesh(const std::string& filename) {
             );
         }
     }
-#endif
+
     std::cout << "\t\t[Vertex count = " << model->vertices.size() << "]" << std::endl;
     meshDataPool[filename] = model;
     return model;
@@ -163,8 +143,6 @@ void Scene::createLightSampler() {
 }
 
 void Scene::buildDevData() {
-#if MESH_DATA_INDEXED
-#else
     int primId = 0;
     for (const auto& inst : modelInstances) {
         const auto& material = materials[inst.materialId];
@@ -196,7 +174,7 @@ void Scene::buildDevData() {
             }
         }
     }
-#endif
+
     if (primId == 0) {
         std::cout << "[No mesh data loaded, quit]" << std::endl;
         exit(-1);
@@ -503,6 +481,14 @@ void DevScene::create(const Scene& scene) {
     }
 
     checkCUDAError("DevScene::meshData");
+
+#if SAMPLER_USE_SOBOL
+    std::ifstream sobolFile("sobol_10k_200.bin", std::ios::in | std::ios::binary);
+    std::vector<char> sobolData(SobolSampleNum * SobolSampleDim * sizeof(uint32_t));
+    sobolFile.read(sobolData.data(), byteSizeOf(sobolData));
+    cudaMalloc(&sampleSequence, byteSizeOf(sobolData));
+    cudaMemcpyHostToDev(sampleSequence, sobolData.data(), byteSizeOf(sobolData));
+#endif
 }
 
 void DevScene::destroy() {
@@ -524,4 +510,6 @@ void DevScene::destroy() {
     cudaSafeFree(lightUnitRadiance);
     lightSampler.destroy();
     envMapSampler.destroy();
+
+    cudaSafeFree(sampleSequence);
 }

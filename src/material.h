@@ -67,7 +67,7 @@ __device__ inline float smithG(float cosWo, float cosWi, float alpha) {
     return schlickG(glm::abs(cosWo), alpha) * schlickG(glm::abs(cosWi), alpha);
 }
 
-__device__ static float ggxDistrib(float cosTheta, float alpha) {
+__device__ static float GTR2Distrib(float cosTheta, float alpha) {
     if (cosTheta < 1e-6f) {
         return 0.f;
     }
@@ -78,18 +78,19 @@ __device__ static float ggxDistrib(float cosTheta, float alpha) {
     return nom / denom;
 }
 
-__device__ static float ggxPdf(glm::vec3 n, glm::vec3 m, glm::vec3 wo, float alpha) {
-    return ggxDistrib(glm::dot(n, m), alpha) * schlickG(glm::dot(n, wo), alpha) *
+__device__ static float GTR2Pdf(glm::vec3 n, glm::vec3 m, glm::vec3 wo, float alpha) {
+    return GTR2Distrib(glm::dot(n, m), alpha) * schlickG(glm::dot(n, wo), alpha) *
         Math::absDot(m, wo) / Math::absDot(n, wo);
 }
 
 /**
-* Sample GGX microfacet distribution, but only visible normals.
+* Sampling (Trowbridge-Reitz/GTR2/GGX) microfacet distribution, but only visible normals.
 * This reduces invalid samples and make pdf values at grazing angles more stable
 * See [Sampling the GGX Distribution of Visible Normals, Eric Heitz, JCGT 2018]:
 * https://jcgt.org/published/0007/04/01/
+* Note: 
 */
-__device__ static glm::vec3 ggxSample(glm::vec3 n, glm::vec3 wo, float alpha, glm::vec2 r) {
+__device__ static glm::vec3 GTR2Sample(glm::vec3 n, glm::vec3 wo, float alpha, glm::vec2 r) {
     glm::mat3 transMat = Math::localRefMatrix(n);
     glm::mat3 transInv = glm::inverse(transMat);
 
@@ -175,9 +176,9 @@ struct Material {
             return glm::vec3(0.f);
         }
 
-        glm::vec3 f = fresnelSchlick(glm::dot(h, wo), baseColor * metallic);
+        glm::vec3 f = fresnelSchlick(glm::dot(h, wo), glm::mix(glm::vec3(.08f), baseColor, metallic));
         float g = smithG(cosO, cosI, alpha);
-        float d = ggxDistrib(glm::dot(n, h), alpha);
+        float d = GTR2Distrib(glm::dot(n, h), alpha);
 
         return glm::mix(baseColor * PiInv * (1.f - metallic), glm::vec3(g * d / (4.f * cosI * cosO)), f);
     }
@@ -186,7 +187,7 @@ struct Material {
         glm::vec3 h = glm::normalize(wo + wi);
         return glm::mix(
             Math::satDot(n, wi) * PiInv,
-            ggxPdf(n, h, wo, roughness * roughness) / (4.f * Math::absDot(h, wo)),
+            GTR2Pdf(n, h, wo, roughness * roughness) / (4.f * Math::absDot(h, wo)),
             1.f / (2.f - metallic)
         );
     }
@@ -198,7 +199,7 @@ struct Material {
             sample.dir = Math::sampleHemisphereCosine(n, r.x, r.y);
         }
         else {
-            glm::vec3 h = ggxSample(n, wo, alpha, glm::vec2(r));
+            glm::vec3 h = GTR2Sample(n, wo, alpha, glm::vec2(r));
             sample.dir = -glm::reflect(wo, h);
         }
 

@@ -26,9 +26,6 @@ struct MeshData {
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> normals;
     std::vector<glm::vec2> texcoords;
-#if MESH_DATA_INDEXED
-    std::vector<glm::ivec3> indices;
-#endif
 };
 
 struct ModelInstance {
@@ -423,6 +420,8 @@ struct DevScene {
     float sumLightPowerInv;
     DevTextureObj* envMap = nullptr;
     DevDiscreteSampler1D<float> envMapSampler;
+
+    uint32_t* sampleSequence = nullptr;
 };
 
 class Scene {
