@@ -142,6 +142,6 @@ SCALE       .01 10 10
 OBJECT 7
 implicit
 material 5
-TRANS       0 4 5
+TRANS       0 5 0
 ROTAT       0 0 0
-SCALE       0.8 0.8 0.8
+SCALE       5 5 5

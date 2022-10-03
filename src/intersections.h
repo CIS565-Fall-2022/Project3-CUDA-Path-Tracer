@@ -231,14 +231,15 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
 #define MAX_DIST 100.f
 #define SURF_DIST 0.01
 
-__host__ __device__ float sceneSDF(glm::vec3 p) {
+__host__ __device__ float sceneSDF(glm::vec3 p, glm::vec3 &normal) {
 
-     glm::vec3 sphereCenter = glm::vec3(0,1,0);    // center.xyz,radius
-     float sphereRadius = 1.f;
+     glm::vec3 sphereCenter = glm::vec3(0,5,0);    // center.xyz,radius
+     float sphereRadius = 2.5f;
      float dS = glm::length(p - sphereCenter) - sphereRadius; // dist from sphere = dist from center - radius
      float dP = p.y; // dist from axis aligned plane
      //float d = min(dS,dP);
      float d = dS;
+     normal = glm::normalize(p - sphereCenter);
      return d;
 }
 
@@ -257,13 +258,13 @@ __host__ __device__ float implicitIntersectionTest(Geom impGeom, Ray r,
     for (int i = 0; i < MAX_STEPS; ++i)
     {
         //printf("## 2 ##");
-        float distanceToSurface = sceneSDF(queryPoint);
+        float distanceToSurface = sceneSDF(queryPoint, normal);
 
         if (distanceToSurface < EPSILON)
         {
             //printf("## 3 ##");
             //intersection.position = queryPoint;
-            normal = glm::vec3(0.0, 0.0, 1.0);
+            //normal = glm::vec3(0.0, 0.0, 1.0);
             t = glm::length(queryPoint - r.origin);
 
             return t;
@@ -274,7 +275,7 @@ __host__ __device__ float implicitIntersectionTest(Geom impGeom, Ray r,
     //printf("## 5 ##");
     t = -1.0;
     intersectionPoint = getPointOnRay(r, t);
-    //normal = intersection.surfaceNormal;
+    //normal = intersectionPoint - ;
     //printf("## 6 ##");
     return t;
 }

@@ -94,7 +94,7 @@ void scatterRay(    // similar to sample_f, calculate the new wi and f
 
 
     if (random <= m.hasReflective) {
-        wi_scatteredRayDir = glm::reflect(wo, normal);
+        wi_scatteredRayDir = glm::reflect(glm::normalize(wo), normal);
         color = m.specular.color * m.color * m.hasReflective;
         //color = normal;
     }
