@@ -6,7 +6,7 @@ SPECEX      0 		// used for TRANSLUCENT + SPECULAR
 TRANSRGB    0 0 0
 IOR     0 			// used for TRASLUCENT + DIELECTRIC
 ABSORPTION	0 		// used for TRANSLUCENT
-EMITTANCE   10
+EMITTANCE   5
 
 // Diffuse white
 MATERIAL	1
@@ -40,7 +40,7 @@ EMITTANCE   0
 
 // Sphere mat
 MATERIAL	4
-MAT_TYPE    TRANSLUCENT
+MAT_TYPE    DIFFUSE
 RGB         .91 .74 .67
 SPECEX      30
 TRANSRGB    .98 .5 .5
@@ -57,7 +57,7 @@ CAMERA
 RES         800 800
 LENS_RAD	-1
 FOCAL_DIST	12.5
-ANTIALIAS	1
+ANTIALIAS	0
 FOVY        45
 ITERATIONS  5000
 DEPTH       8
@@ -124,14 +124,6 @@ VELOCITY    0 0 0
 OBJECT
 cube
 material 0
-TRANS       -5 3 -10
-ROTAT       0 0 0
-SCALE       5 5 .3
-VELOCITY    0 0 0
-
-OBJECT
-cube
-material 0
 TRANS       5 6 -10
 ROTAT       0 0 0
 SCALE       5 5 .3
@@ -140,7 +132,7 @@ VELOCITY    0 0 0
 OBJECT
 cube
 material 0
-TRANS       10 2 -3
+TRANS       10 8 -3
 ROTAT       0 0 0
 SCALE       0.25 3 3
 VELOCITY    0 0 0
@@ -149,7 +141,7 @@ VELOCITY    0 0 0
 OBJECT
 sphere
 material 	4
-TRANS       -4 6 -7.5
+TRANS       -2 6 -5.5
 ROTAT       0 0 0
 SCALE       4 4 4
 VELOCITY    0 0 0 
@@ -157,31 +149,15 @@ VELOCITY    0 0 0
 OBJECT
 cube
 material 	4
-TRANS       -4 2 -7.5
-ROTAT       0 0 0
-SCALE       4 4 4
-VELOCITY    0 0 0 
-
-OBJECT
-sphere
-material 	4
-TRANS       3 6 -7.5
-ROTAT       0 0 0
-SCALE       4 4 4
-VELOCITY    0 0 0 
-
-OBJECT
-cube
-material 	4
-TRANS       3 2 -7.5
-ROTAT       0 0 0
+TRANS       -2 2 -5.5
+ROTAT       0 -20 0
 SCALE       4 4 4 
 VELOCITY    0 0 0 
 
 OBJECT
 sphere
 material 	4
-TRANS       8 1.5 -3
+TRANS       -5 1.5 3
 ROTAT       0 0 0
 SCALE       3 3 3
 VELOCITY    0 0 0 

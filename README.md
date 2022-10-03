@@ -8,8 +8,9 @@ CUDA Path Tracer
 * Evan S
 * Tested on: Strix G15: Windows 10, Ryzen 7 4800H @ 2.9 GHz, GTX 3050 (Laptop)
 
-## Background
-This program takes in a text file describing a scene(objects, locations, materials) and renders it with the canonical path tracing algorithm. 
+## Overview
+This program takes in a text file describing a scene(objects, locations, materials) and renders it with the canonical path tracing algorithm.     
+This README contains many images. Click on them (on Github) to open the full size.
 
 Features:
 * [Different materials](#material-types)
@@ -21,14 +22,17 @@ Features:
 	* [Motion blur](#motion-blur)
 	* [Anti-aliasing](#antialiasing)
 	* [Depth of field](#depth-of-field)
-* [Toggle-able performance options](#core-feature-benchmarks)
-	* [Stream compaction](#stream-compaction)
-	* [Sorting rays by intersected material type](#sorting-rays-by-intersected-material-type)
-	* [Caching first intersection](#caching-first-intersection)
+* [Toggle-able sampling options](#sampling-options)
+	* [Stratified diffuse sampling](#stratified-diffuse-sampling)
+* [Toggle-able performance enhancement options](#performance-enhancement-options)
+	* [Stream compaction](#stream-compaction)<sup>1</sup>
+	* [Sorting rays by intersected material type](#sorting-rays-by-intersected-material-type)<sup>1</sup>
+	* [Caching first intersection](#caching-first-intersection)<sup>1</sup>
 
-This README contains many images. Click on them (on Github) to open the full size.
+<sup>1</sup> denotes a core feature of the assignment - see INSTRUCTIONS.md
 
 ## Feature Breakdown and Performance Analysis
+The performance of the features in this section are measured with frames per second (FPS) of the overall render, so a higher FPS is better.
 
 ### Material Types
 Material types can be specified in the scene text files.   
@@ -106,13 +110,33 @@ FOCAL_DIST and LENS_RAD are specified as part of the camera values in the scene 
 
 The scene dielectrics have IOR = 2.42 (diamond). The FOCAL_DIST is kept constant, at 12.5. Note how as LENS_RAD = 0.2 increases, the clarity decreases on everything not on the plane defined by the focal distance.      
 
-### Core Feature Benchmarks
+### Sampling Options
+Sampling options are performed as a core part of the ray tracing evaluation, so it benefits greatly from the GPU. 
 
-A basic Cornell box scene, used for benchmarks.     
-<img src="img/basic_cornell_box.png" width=30% height=30%>
+#### Stratified diffuse sampling
+The diffusive material type is implemented with a simple BSDF that returns a ray, cosine-weighted on the hemisphere of the normal. By default, the inputs to that mapping come uniformly from [0, 1). If unlucky, clumping of samples and empty regions could mean that many iterations are needed to get a satisfying result. Stratified/jittered sampling breaks down the intervals into equal sections; returned rays correspond to jittering within a section. In essence, the returned rays are "smoothed" to be more uniform.
+
+| Sampling | Default(500 iterations) | Stratified(500 iterations) | 
+| :------- | :-------: | :-------: |
+| FPS | 51.3 | 44.4 |
+| Scene | <img src="img/strat_none_500.png"> | <img src="img/strat_yes_500.png"> |
+  
+<img align="left" src="img/stratified5000.png" width=30% height=30%>
+The images above are rendered by stratifying the interval into a 64x64 section. The intended final scene can be seen to the left here.
+
+The clearest point of difference is how the stratified image manages to convey the darkened upper left corner(recommend to click on each image and rapidly switch back and forth).      
+Nonetheless, stratified sampling uses expensive operations like modulo, so there is a nontrivial FPS impact. Whether the decrease in FPS is worth the faster convergence is likely on a scene-by-scene basis (e.g., scenes with thin pockets of color that random sampling fails to pick up on).
+
+<br clear="left"/>
+
+### Performance Enhancement Options
+<img align="left" src="img/basic_cornell_box.png" width=30% height=30%>
+A basic Cornell box scene, used for benchmarks. Note that benchmarks are performed in isolation.
+
+<br clear="left"/>
 
 #### Stream compaction
-Stream compaction/partitioning of terminated paths allows warps to go offline early. The below graph gives the average FPS (a benchmark of the speed of the path tracing) of path tracing with and without stream compaction as depth of the tracing goes up on the (above) basic Cornell box scene.   
+Stream compaction/partitioning of terminated paths allows warps to go offline early, which is good for memory coalescence. The below graph gives the average FPS (a benchmark of the speed of the path tracing) of path tracing with and without stream compaction as depth of the tracing goes up on the (above) basic Cornell box scene.   
 <img src="img/compacted_vs_not.png" width=70% height=70%>    
 The chart indicates that while tracing depth is low, the overhead of partitioning the rays presents a huge slowdown. However, when depth is higher (when it is expected that rays have to bounce numerous times before terminating), the ability to free up threads operating on terminated rays from stream compaction becomes worthwhile. 
 
@@ -126,12 +150,12 @@ Sorting rays by the material type they intersect with means that the code path o
 Clearly sorting causes enormous slowdown on these simple scenes. The greater dip in the object heavy scene when sorting(compared to the basic) implies that the two different materal types causes some serialization in the program, where thread paths have to go down either the diffusive or specular BSDF. Still, sorting only seems like a worthwhile thing to enable if there is a huge variety of materials/code paths. 
 
 #### Caching first intersection
-The first intersection of rays is static, as it is initiated by the static ray casts per-pixel of the render. Caching the first intersection for use across subsequent iterations is expected to boost performance overall at a slight memory cost. The table below compares the average time(over 5 tries) for 5000 iterations between caching and no caching for the basic Cornell box scene:
-| (seconds) | Caching | No caching |
+The first intersection of rays is static, as it is initiated by the static ray casts per-pixel of the render. Caching the first intersection for use across subsequent iterations is expected to boost performance overall at a slight memory cost. The table below compares the FPS for the [stratified diffusive sampling scene](#stratified-diffuse-sampling):
+| (FPS) | Caching | No caching |
 | :------- | :-------: | :-------: |
-| Basic scene | 69 | 70 |   
+| Stratified scene | 59.1 | 51.2 |   
 
-Curiously, the difference is negligible, though weighed toward the caching. The simplicity of the Cornell box scene makes it difficult to ascertain clear winners when it comes to different rendering options.
+As expected, caching the first intersection provides a general speedup, with better returns for more complicated scenes (provided there is a need to bounce more than once).
 
 ## References
 [Physically Based Rendering (PBRT)](https://pbr-book.org/)     

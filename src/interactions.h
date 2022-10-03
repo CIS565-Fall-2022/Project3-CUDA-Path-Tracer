@@ -11,10 +11,22 @@ __device__ void diffuseScatter(
     glm::vec3 normal,
     thrust::default_random_engine &rng,
     thrust::uniform_real_distribution<float> &u01) {
+#if _STRATIFIED_SAMPLING_
+    const float sampleAmt = 64; 
+    int squareIdx = u01(rng) * sampleAmt * sampleAmt;
+    float cellSideLen = (1 / sampleAmt);
+    // rand = (coord of belonging square + additional jitter) * side len
+    float stratifiedRandX = ((squareIdx / sampleAmt) + u01(rng)) * cellSideLen;
+    float stratifiedRandY = ((squareIdx % (int)sampleAmt) + u01(rng)) * cellSideLen;
+    // map to cosine hemisphere with existing code
+    float up = sqrt(stratifiedRandX); // cos(theta)
+    float over = sqrt(1 - up * up); // sin(theta)
+    float around = stratifiedRandY * TWO_PI;
+#else
     float up = sqrt(u01(rng)); // cos(theta)
     float over = sqrt(1 - up * up); // sin(theta)
     float around = u01(rng) * TWO_PI;
-
+#endif
     // Find a direction that is not the normal based off of whether or not the
     // normal's components are all equal to sqrt(1/3) or whether or not at
     // least one component is less than sqrt(1/3). Learned this trick from

@@ -6,6 +6,12 @@
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
+// --- toggleable things ---
+#define _STREAM_COMPACTION_			0
+#define _GROUP_RAYS_BY_MATERIAL_	0
+#define _CACHE_FIRST_BOUNCE_		0
+#define _STRATIFIED_SAMPLING_		0
+// --- end toggleable things ---
 
 enum GeomType {
     SPHERE,

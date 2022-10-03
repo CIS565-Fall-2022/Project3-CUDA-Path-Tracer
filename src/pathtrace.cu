@@ -40,12 +40,6 @@ void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 }
 
 ///////////////////////////////////////
-// --- toggleable things ---
-#define _STREAM_COMPACTION_			0
-#define _GROUP_RAYS_BY_MATERIAL_	0
-#define _CACHE_FIRST_BOUNCE_		0
-// --- end toggleable things ---
-
 __host__ __device__
 thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int depth) {
 	int h = utilhash((1 << 31) | (depth << 22) | iter) ^ utilhash(index);
