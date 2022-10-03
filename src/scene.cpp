@@ -7,10 +7,10 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <memory>
 
-
 #define TINYGLTF_IMPLEMENTATION
-#define TINYGLTF_NO_STB_IMAGE_WRITE
+
 #include <tiny_gltf.h>
+
 
 static std::string getFileExtension(const std::string Filename)
 {
