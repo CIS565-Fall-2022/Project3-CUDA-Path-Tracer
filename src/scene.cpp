@@ -174,7 +174,14 @@ int Scene::loadGeom(string objectid) {
         //load object type
         utilityCore::safeGetline(fp_in, line);
         if (!line.empty() && fp_in.good()) {
-            if (strcmp(line.c_str(), "obj") == 0) {
+            if (strcmp(line.c_str(), "implicit") == 0) {
+                cout << "Creating implicit sphere..." << endl;
+                newGeom.type = IMPLICIT;
+                newGeom.triCount = 0;
+                newGeom.triangles = NULL;
+                newGeom.dev_triangles = NULL;
+            }
+            else if (strcmp(line.c_str(), "obj") == 0) {
                 cout << "Loading new obj..." << endl;
                 newGeom.type = OBJ;
                 utilityCore::safeGetline(fp_in, line);

@@ -143,71 +143,16 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     return glm::length(r.origin - intersectionPoint);
 }
 
-__host__ __device__ float getArea(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3)
-{
-    glm::vec3 p1_temp, p2_temp, p3_temp;
-
-    p1_temp.x = p1.x;
-    p2_temp.x = p2.x;
-    p3_temp.x = p3.x;
-
-    p1_temp.y = p1.y;
-    p2_temp.y = p2.y;
-    p3_temp.y = p3.y;
-
-    p1_temp.z = p2_temp.z = p3_temp.z = 0.f;
-
-    float area = 0.5 * glm::length(glm::cross((p1_temp - p2_temp), (p3_temp - p2_temp)));
-    return area;
-}
-
-//__host__ __device__ glm::vec3 barycentricInterpolation(Vertex v[3], glm::vec3 p)
-//{
-//    glm::vec3 p1, p2, p3;
-//    p1 = v[0].pos;
-//    p2 = v[1].pos;
-//    p3 = v[2].pos;
-//
-//    float s, s1, s2, s3;
-//    s = getArea(p1, p2, p3);
-//    s1 = getArea(p, p2, p3);
-//    s2 = getArea(p1, p, p3);
-//    s3 = getArea(p1, p2, p);
-//
-//    glm::vec3 barycentric_influence(s1 / s, s2 / s, s3 / s);
-//    return barycentric_influence;
-//}
-//
-//__host__ __device__ float zInterpolate(Vertex v[3], glm::vec3 p)
-//{
-//    glm::vec3 weights = barycentricInterpolation(v, p);
-//    float z_inverse = 0;
-//    z_inverse = ((1 / (v[0].pos.z)) * weights[0]) +
-//        ((1 / (v[1].pos.z)) * weights[1]) +
-//        ((1 / (v[2].pos.z)) * weights[2]);
-//    return 1 / z_inverse;
-//}
-//
-//__host__ __device__ glm::vec3 interpolatedNormal(Vertex v[3], glm::vec3 p, float z)
-//{
-//    glm::vec3 weights = barycentricInterpolation(v, p);
-//    glm::vec3 normals(0, 0, 0);
-//
-//    normals = (((v[0].nor) / (v[0].pos.z)) * weights[0]) +
-//        (((v[1].nor) / (v[1].pos.z)) * weights[1]) +
-//        (((v[2].nor) / (v[2].pos.z)) * weights[2]);
-//
-//    return (z * normals);
-//}
-
-
+/*
+ ******************************************************
+ * OBJECT INTERSECTION TEST FOR OBJ
+ ******************************************************
+ */
 __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r,
     glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
     
     bool isectFound = false;
     int triCount = obj.triCount;
-    //glm::vec3 isectPoint;
-    //glm::vec3 isectNor;
     glm::vec3 minVal = glm::vec3(INT_MAX, INT_MAX, INT_MAX);
     glm::vec3 barycentric;
     glm::vec3 n1, n2, n3;
@@ -236,18 +181,6 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
             {
                 minVal = barycentric;
             }
-            /*n1 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[0].x, dev_triItr->nor[0].y, dev_triItr->nor[0].z, 1.0));
-            n2 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[1].x, dev_triItr->nor[1].y, dev_triItr->nor[1].z, 1.0));
-            n3 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[2].x, dev_triItr->nor[2].y, dev_triItr->nor[2].z, 1.0));*/
-           
-            //n1 = glm::normalize(n1);
-            //n2 = glm::normalize(n2);
-            //n3 = glm::normalize(n3);
-            
-            /* n1 = dev_triItr->nor[0];
-            n2 = dev_triItr->nor[1];
-            n3 = dev_triItr->nor[2];*/
-
 
             glm::vec3 v1 = dev_triItr->pos[0];
             glm::vec3 v2 = dev_triItr->pos[1];
@@ -288,61 +221,60 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
     printf("\n###########\n");*/
 }
 
+/*
+ ******************************************************
+ * PROCEDURAL SHAPES FUNCTIONS
+ ******************************************************
+ */
 
+#define MAX_STEPS 100
+#define MAX_DIST 100.f
+#define SURF_DIST 0.01
 
-//__host__ __device__ float triangleIntersectionTest(Geom geom, Ray r,
-//    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
-//
-//    /*glm::vec3 ro = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
-//    glm::vec3 rd = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));*/
-//    glm::vec3 ro = r.origin;
-//    glm::vec3 rd = r.direction;
-//
-//    Ray rt;
-//    rt.origin = ro;
-//    rt.direction = rd;
-//
-//    glm::vec3 intersectResult;
-//    glm::intersectRayTriangle(ro, rd,
-//        geom.triangle.vertices[0].pos, geom.triangle.vertices[1].pos, geom.triangle.vertices[2].pos,
-//        intersectResult);
-//    float t = intersectResult.z;
-//    glm::vec3 objspaceIntersection = getPointOnRay(rt, t);
-//    //printf("%f", &t);
-//    
-//    /*intersectionPoint = multiplyMV(geom.transform, glm::vec4(objspaceIntersection, 1.f));
-//    normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(objspaceIntersection, 0.f)));*/
-//
-//    intersectionPoint = objspaceIntersection;
-//    normal = geom.triangle.vertices[0].nor;
-//    
-//    return t;
-//
-//    //return glm::length(r.origin - intersectionPoint);
-//    //Ray rt;
-//    //rt.origin = ro;
-//    //rt.direction = rd;
-//    //float t = 0;
-//    //glm::vec3 P = geom.triangle.vertices[0].pos;    // P is some point on the plane
-//    //glm::vec3 N = geom.triangle.vertices[0].nor;
-//    ////float z = zInterpolate(geom.triangle.vertices, P);
-//    ////glm::vec3 N = interpolatedNormal(geom.triangle.vertices, P, z);
-//
-//    //t = dot(N, (P - ro)) / dot(N, rd);
-//    //glm::vec3 objspaceIntersection = getPointOnRay(rt, t);
-//
-//    //// check if objectspaceIntersection is within area of triangle using barycentric coordinates
-//    //glm::vec3 S = barycentricInterpolation(geom.triangle.vertices, objspaceIntersection);
-//    //if ((S[0] >= 0 && S[0] <= 1)
-//    //    && (S[1] >= 0 && S[1] <= 1)
-//    //    && (S[2] >= 0 && S[2] <= 1)
-//    //    && (S[0] + S[1] + S[2] == 1.f)) {
-//    //    
-//    //    intersectionPoint = multiplyMV(geom.transform, glm::vec4(objspaceIntersection, 1.f));
-//    //    normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(objspaceIntersection, 0.f)));
-//    //    return glm::length(r.origin - intersectionPoint);
-//    //}
-//    //else {
-//    //    return -1.f;
-//    //}
-//}
+__host__ __device__ float sceneSDF(glm::vec3 p) {
+
+     glm::vec3 sphereCenter = glm::vec3(0,1,0);    // center.xyz,radius
+     float sphereRadius = 1.f;
+     float dS = glm::length(p - sphereCenter) - sphereRadius; // dist from sphere = dist from center - radius
+     float dP = p.y; // dist from axis aligned plane
+     //float d = min(dS,dP);
+     float d = dS;
+     return d;
+}
+
+ /*
+  ******************************************************
+  * Ray Marching
+  ******************************************************
+  */
+
+__host__ __device__ float implicitIntersectionTest(Geom impGeom, Ray r,
+    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+
+    float t;
+    //printf("## 1 ##");
+    glm::vec3 queryPoint = r.origin;
+    for (int i = 0; i < MAX_STEPS; ++i)
+    {
+        //printf("## 2 ##");
+        float distanceToSurface = sceneSDF(queryPoint);
+
+        if (distanceToSurface < EPSILON)
+        {
+            //printf("## 3 ##");
+            //intersection.position = queryPoint;
+            normal = glm::vec3(0.0, 0.0, 1.0);
+            t = glm::length(queryPoint - r.origin);
+
+            return t;
+        }
+        //printf("## 4 ##");
+        queryPoint = queryPoint + r.direction * distanceToSurface;
+    }
+    //printf("## 5 ##");
+    t = -1.0;
+    intersectionPoint = getPointOnRay(r, t);
+    //normal = intersection.surfaceNormal;
+    //printf("## 6 ##");
+    return t;
+}

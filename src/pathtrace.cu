@@ -288,6 +288,10 @@ __global__ void computeIntersections(
 			{
 				t = objIntersectionTest(geom, geom.dev_triangles, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
+			else if (geom.type == IMPLICIT)
+			{
+				t = implicitIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+			}
 
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
