@@ -66,7 +66,7 @@ FOVY        45
 ITERATIONS  5000
 DEPTH       8
 FILE        cornell
-EYE         0.0 5 10.5
+EYE         0.0 5 7.5
 LOOKAT      0 5 0
 UP          0 1 0
 FOCAL       10	
@@ -123,22 +123,23 @@ TRANS       5 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
-// Sphere, pure reflection
-OBJECT 6
-sphere
-material 5
-TRANS       -1 4 -1
-ROTAT       0 0 0
-SCALE       3 3 3
 
-// Sphere, pure diffuse
-OBJECT 7
-sphere
-material 1
-TRANS       3 2 -1
+// floor light
+OBJECT 6
+cube
+material 0
+TRANS       0 0 0
 ROTAT       0 0 0
-SCALE       3 3 3
+SCALE       3 .3 3
+
+
 
 // OBJ
-OBJECT_obj ../scenes/cornell_box.obj
+OBJECT_obj ../scenes/bunny.obj
+TRANS       0 2 -2
+ROTAT       0 0 0
+SCALE       30 30 30
+TEXTURE    ../scenes/wahoo.bmp
+
+
 

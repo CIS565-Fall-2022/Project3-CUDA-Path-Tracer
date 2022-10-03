@@ -4,12 +4,14 @@
 #include <vector>
 #include <cuda_runtime.h>
 #include "glm/glm.hpp"
+#include <array>
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 
 enum GeomType {
     SPHERE,
     CUBE,
+    TRIANGLE
 };
 
 struct Ray {
@@ -26,6 +28,16 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+
+    glm::vec3 pos[3];
+    glm::vec3 normal[3];
+    glm::vec2 uv[3];
+    bool isObj{ false };
+    const char* textureName;
+    unsigned char* img;
+    int texture_width;
+    int texture_height;
+    int channels;
 };
 
 struct Material {
@@ -34,10 +46,18 @@ struct Material {
         float exponent;
         glm::vec3 color;
     } specular;
-    float hasReflective;
-    float hasRefractive;
-    float indexOfRefraction;
-    float emittance;
+    float hasReflective{0};
+    float hasRefractive{0};
+    float indexOfRefraction{0};
+    float emittance{0};
+    float microfacet{0};
+    float roughness{0};
+
+    const char* textureName;
+    unsigned char* img;
+    int texture_width;
+    int texture_height;
+    int channels;
 };
 
 struct Camera {
@@ -49,6 +69,8 @@ struct Camera {
     glm::vec3 right;
     glm::vec2 fov;
     glm::vec2 pixelLength;
+    float lensRadius;
+    float focalDistance;
 };
 
 struct RenderState {
@@ -73,4 +95,31 @@ struct ShadeableIntersection {
   float t;
   glm::vec3 surfaceNormal;
   int materialId;
+  glm::vec2 uv;
+};
+
+struct Triangle {
+    /*std::array<glm::vec3, 3> pos;
+    std::array<glm::vec3, 3> normal;
+    std::array<glm::vec2, 3> uv;*/
+    glm::vec3 pos[3];
+    glm::vec3 normal[3];
+    glm::vec2 uv[3];
+    int materialId;
+};
+
+//struct Face {
+//    std::vector<Triangle> triangles;
+//};
+
+struct Object {
+    std::vector<Triangle> triangles;
+    std::string name;
+};
+
+struct obj_material {
+    glm::vec3 Ka;
+    glm::vec3 Kd;
+    glm::vec3 Ks;
+    std::string name;
 };

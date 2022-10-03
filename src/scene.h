@@ -16,12 +16,20 @@ private:
     int loadMaterial(string materialid);
     int loadGeom(string objectid);
     int loadCamera();
-    int loadGLTF(string fileName);
+    int loadObj(const char* fileName);
+    
+    glm::vec3 loadTexture(Geom &geo, const char* fileName);
 public:
     Scene(string filename);
     ~Scene();
 
     std::vector<Geom> geoms;
     std::vector<Material> materials;
+
+    std::vector<Material> OBJ_materials;
+
     RenderState state;
+
+    //std::vector<Geom> m_geoms;
+    std::vector<Object> objects;
 };
