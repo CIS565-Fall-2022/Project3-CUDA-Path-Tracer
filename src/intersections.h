@@ -7,6 +7,7 @@
 #include "utilities.h"
 
 #define BOUNDINGVOLUME 1
+#define BVH 1
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
  */
@@ -90,7 +91,11 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
     return -1;
 }
 
+#if BVH
+__host__ __device__ bool BoundingBoxIntersectionTest(const Geom& geom, const Ray& r, const BBox& box) {
+#else
 __host__ __device__ bool meshBoundingBoxIntersectionTest(Geom geom, Ray r) {
+#endif
     Ray q;
     q.origin = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
     q.direction = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -102,8 +107,14 @@ __host__ __device__ bool meshBoundingBoxIntersectionTest(Geom geom, Ray r) {
     for (int xyz = 0; xyz < 3; ++xyz) {
         float qdxyz = q.direction[xyz];
         if (glm::abs(qdxyz) > 0.00001f) {
+#if BVH
+            float t1 = (box.minCorner[xyz] - q.origin[xyz]) / qdxyz;
+            float t2 = (box.maxCorner[xyz] - q.origin[xyz]) / qdxyz;
+#else
             float t1 = (geom.mesh.min[xyz] - q.origin[xyz]) / qdxyz;
             float t2 = (geom.mesh.max[xyz] - q.origin[xyz]) / qdxyz;
+#endif
+            
             float ta = glm::min(t1, t2);
             float tb = glm::max(t1, t2);
             glm::vec3 n;
@@ -212,7 +223,7 @@ __host__ __device__ glm::vec3 getNormal(const Triangle& t, const glm::vec3& P) {
 //
 //}
 
-
+#if !BVH
 //world space
 __host__ __device__ float meshIntersectionTest(Geom geom, Triangle* tri, Ray r, 
     glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
@@ -269,6 +280,79 @@ __host__ __device__ float meshIntersectionTest(Geom geom, Triangle* tri, Ray r,
     
     return -1.f;
 }
+#endif
+#if BVH
+__host__ __device__ float bvhIntersectionTest(const Geom& geom, Triangle* tri, bvhNode* bvh, const Ray& r,
+    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside, int bvhSize) {
+    //transformation
+    glm::vec3 ro = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
+    glm::vec3 rd = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+    Ray rt;
+    rt.origin = ro;
+    rt.direction = rd;
+    float closest_t = -1;
+    float t = 0;
+    glm::vec3 bary;
+    glm::vec3 baryPosition(0.f, 0.f, 0.f);
+    Triangle closestTri;
+
+    int stack[32];
+    int top = 0, cur = 0;
+    
+    //push root onto the stack
+    stack[top++] = 0;
+    while (top) {
+        cur = stack[--top];
+        //pop top
+        auto curNode = bvh[cur];
+        
+        if (BoundingBoxIntersectionTest(geom, r, curNode.box)) {
+            //if hit the leaf, try intersecting with the triangle
+            if (curNode.triID >= 0) {
+                Triangle curTri = tri[curNode.triID];
+                
+                if (glm::intersectRayTriangle(rt.origin, rt.direction, curTri.v1, curTri.v2, curTri.v3, baryPosition)) {
+                    glm::vec3 localIntersectionPoint = (1.f - baryPosition.x - baryPosition.y) * curTri.v1 + baryPosition.x * curTri.v2 + baryPosition.y * curTri.v3;
+                    //local t
+                    t = glm::distance(localIntersectionPoint, rt.origin);
+                    if (t > 0 && (t < closest_t || closest_t < 0)) {
+                        closest_t = t;
+                        closestTri = curTri;
+                        bary = localIntersectionPoint;
+                    }
+                }
+            }
+            else {
+                int left = 2 * cur + 1;
+                int right = 2 * cur + 2;
+                
+                if (right > 0 && right < bvhSize) {
+                    stack[top++] = right;
+                }
+                if (left > 0 && left < bvhSize) {
+                    stack[top++] = left;
+                }
+                
+            }
+        }
+    }
+
+     if (closest_t > 0) {
+        glm::vec3 objspaceIntersection = getPointOnRay(rt, closest_t);
+        intersectionPoint = multiplyMV(geom.transform, glm::vec4(objspaceIntersection, 1.f));
+        normal = getNormal(closestTri, bary);
+        normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(normal, 0.f)));
+    
+        if (glm::dot(normal, r.direction) > 0) {
+            normal = -normal;
+            outside = false;
+        }
+        return closest_t = glm::distance(intersectionPoint, r.origin);
+    }
+    return -1.f;
+}
+#endif
 ///// Float approximate-equality comparison
 //template<typename T>
 //inline bool fequal(T a, T b, T epsilon = 0.0001) {

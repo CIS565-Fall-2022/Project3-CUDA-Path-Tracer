@@ -8,6 +8,7 @@
 #include "utilities.h"
 #include "sceneStructs.h"
 #include "tinyobj/tiny_obj_loader.h"
+#include "bvh.h"
 
 #define DEV_TRI 1
 using namespace std;
@@ -28,4 +29,5 @@ public:
     std::vector<Material> materials;
     std::vector<Triangle> triangles;
     RenderState state;
+    bvhTree sceneBVH;
 };

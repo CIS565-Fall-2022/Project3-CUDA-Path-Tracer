@@ -14,11 +14,13 @@
 #include "pathtrace.h"
 #include "intersections.h"
 #include "interactions.h"
+#include "bvh.h"
 
 #define ERRORCHECK 1
 #define SORTMATERIAL 0
 #define CACHEINTERSECTION 0
 #define THINLENSCAM 0
+#define ANTIALIASING 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -82,8 +84,8 @@ static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
-
 static ShadeableIntersection* dev_intersections_cache = NULL;
+static bvhNode* dev_bvhNodes = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -133,6 +135,10 @@ void pathtraceInit(Scene* scene) {
 	// TODO: initialize any extra device memeory you need
 	cudaMalloc(&dev_intersections_cache, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_intersections_cache, 0, pixelcount * sizeof(ShadeableIntersection));
+
+	//for BVH tree
+	cudaMalloc(&dev_bvhNodes, scene->sceneBVH.nodeCount * sizeof(bvhNode));
+	cudaMemcpy(dev_bvhNodes, scene->sceneBVH.bvhNodes.data(), scene->sceneBVH.nodeCount * sizeof(bvhNode), cudaMemcpyHostToDevice);
 
 	checkCUDAError("pathtraceInit");
 }
@@ -193,10 +199,20 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
 
 
+		
+#if ANTIALIASING
+		float dx = 0.f, dy = 0.f;
+		thrust::random::uniform_real_distribution<float> u0(-1.f, 1.f);
+		segment.ray.direction = glm::normalize(cam.view
+			- cam.right * cam.pixelLength.x * ((float)x + u0(rng) - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)y + u0(rng) - (float)cam.resolution.y * 0.5f)
+		);
+#else
 		segment.ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
 		);
+#endif
 #if THINLENSCAM
 		if (cam.lensRadius > 0) {
 			glm::vec2 pLens = cam.lensRadius * ConcentricSampleDisk(rng);
@@ -207,6 +223,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 
 		}
 #endif
+
+
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
 	}
@@ -222,7 +240,9 @@ __global__ void computeIntersections(
 	, PathSegment* pathSegments
 	, Geom* geoms
 	, Triangle* tri
+	, bvhNode* bvh
 	, int geoms_size
+	, int bvhSize
 	, ShadeableIntersection* intersections
 )
 {
@@ -259,7 +279,12 @@ __global__ void computeIntersections(
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 			else if (geom.type == MODEL)
 			{
+#if BVH
+				t = bvhIntersectionTest(geom, tri, bvh, pathSegment.ray,
+					tmp_intersect, tmp_normal, outside, bvhSize);
+#else
 				t = meshIntersectionTest(geom, tri, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+#endif
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
@@ -498,7 +523,9 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_paths
 				, dev_geoms
 				, dev_tris
+				, dev_bvhNodes
 				, hst_scene->geoms.size()
+				, hst_scene->sceneBVH.nodeCount
 				, dev_intersections
 				);
 			checkCUDAError("trace one bounce");

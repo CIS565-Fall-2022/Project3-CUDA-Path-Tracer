@@ -224,6 +224,7 @@ int Scene::loadObj(Geom& geom, string filepath) {
 
 
     int faceIdx = 0;
+    
     geom.mesh.faceCount = 0;
     int &faceCount = geom.mesh.faceCount;
     
@@ -232,7 +233,7 @@ int Scene::loadObj(Geom& geom, string filepath) {
         faceCount += shapes[s].mesh.num_face_vertices.size();
     }
     
-    geom.mesh.faces = new Triangle[geom.mesh.faceCount];
+   // geom.mesh.faces = new Triangle[geom.mesh.faceCount];
     geom.mesh.facesIdOffset = globalTriOffset;
     // Loop over shapes
     for (size_t s = 0; s < shapes.size(); s++) {
@@ -308,8 +309,13 @@ int Scene::loadObj(Geom& geom, string filepath) {
             }
   //          geom.mesh.faces[faceIdx] = face;
             globalTriOffset++;
+            //get triangle bounding box
+            face.bbox.minCorner = glm::min(face.v1, glm::min(face.v2, face.v3));
+            face.bbox.maxCorner = glm::max(face.v1, glm::max(face.v2, face.v3));
             triangles.push_back(face);
+            //get bounding box 
 
+            
            // faceIdx++;
             index_offset += fv;
 
@@ -319,5 +325,9 @@ int Scene::loadObj(Geom& geom, string filepath) {
         }
         
     }
+
+
+    sceneBVH.buildTree(triangles);
+    cout << "TreeBuilt" << endl;
     return 1;
 }
