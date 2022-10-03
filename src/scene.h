@@ -9,19 +9,16 @@
 #include "glm/glm.hpp"
 #include "utilities.h"
 #include "sceneStructs.h"
-
-using namespace std;
-
-#define MAX_EMITTANCE 100.0f
+#include "consts.h"
 
 class Scene {
 private:
-    ifstream fp_in;
-    int loadMaterial(string materialid);
-    int loadGeom();
-    int loadCamera();
+    std::ifstream fp_in;
+    int loadMaterial(std::string materialid);
+    bool loadGeom();
+    void loadCamera();
 public:
-    Scene(string filename, bool load_render_state = true);
+    Scene(std::string filename, bool load_render_state = true);
     ~Scene();
     
     std::string filename;
@@ -43,8 +40,8 @@ public:
     std::vector<Triangle> triangles;
 
     // caches
-    unordered_map<string, int> tex_name_to_id;
-    unordered_map<string, int> mtl_to_id;
+    std::unordered_map<std::string, int> tex_name_to_id;
+    std::unordered_map<std::string, int> mtl_to_id;
 
     RenderState state;
 };

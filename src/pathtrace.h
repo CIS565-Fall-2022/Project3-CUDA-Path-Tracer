@@ -4,7 +4,7 @@
 #include "scene.h"
 
 namespace PathTracer {
-	void InitDataContainer(GuiDataContainer* guiData);
+	void unitTest();
 	void pathtraceInit(Scene* scene, RenderState* renderState);
 	void pathtraceFree();
 	int pathtrace(uchar4* pbo, int iteration);

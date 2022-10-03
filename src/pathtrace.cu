@@ -15,19 +15,19 @@
 #include "intersections.h"
 #include "interactions.h"
 #include "rendersave.h"
+#include "Collision/AABB.h"
 
 // impl switches
 #define COMPACTION
 #define SORT_MAT
+#define AABB_CULLING
 // #define ANTI_ALIAS_JITTER
-// #define DEPTH_OF_FIELD
 // #define FAKE_SHADE
 
 #define CACHE_FIRST_BOUNCE
 #if (defined(CACHE_FIRST_BOUNCE) && defined(ANTI_ALIAS_JITTER)) || (defined(CACHE_FIRST_BOUNCE) && defined(DEPTH_OF_FIELD)) 
 #error "ANTI_ALIAS_JITTER or CACHE_FIRST_BOUNCE cannot be used with CACHE_FIRST_BOUNCE"
 #endif
-
 
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
@@ -56,6 +56,14 @@ thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int de
 	return thrust::default_random_engine(h);
 }
 
+__device__ int f(int i) {
+	if (!i) return 1;
+	return f(i - 1) * i;
+}
+__global__ void recur_test() {
+	printf("recur_test: %d", f(5));
+}
+
 __global__ void print2d(Span<Span<int>> arr) {
 	for (int i = 0; i < arr.size(); ++i) {
 		for (int j = 0; j < arr[i].size(); ++j) {
@@ -64,14 +72,14 @@ __global__ void print2d(Span<Span<int>> arr) {
 		printf("\n");
 	}
 }
-void unitTest() {
+void PathTracer::unitTest() {
 #ifndef NDEBUG
 	// test 2d span
 #define SECTION(name) std::cout << "========= " << name << " =========\n";
 	SECTION("test 2d array") {
 		thrust::default_random_engine rng = makeSeededRandomEngine(0, 0, 0);
 		thrust::uniform_int_distribution<int> udist(3, 10);
-		vector<vector<int>> jagged(udist(rng));
+		std::vector<std::vector<int>> jagged(udist(rng));
 		for (int i = 0; i < jagged.size(); ++i) {
 			jagged[i].resize(udist(rng));
 			for (int j = 0; j < jagged[i].size(); ++j) {
@@ -79,7 +87,7 @@ void unitTest() {
 			}
 		}
 
-		vector<Span<int>> dev_arrs;
+		std::vector<Span<int>> dev_arrs;
 		for (auto const& v : jagged) {
 			int* arr;
 			ALLOC(arr, v.size());
@@ -96,6 +104,10 @@ void unitTest() {
 			FREE(dev_arrs[i]);
 		}
 		FREE(arrs);
+	}
+	
+	SECTION("recursion test") {
+		recur_test KERN_PARAM(1, 1) ();
 	}
 #endif // !NDEBUG
 }
@@ -124,7 +136,6 @@ __global__ void sendImageToPBO(int iter, glm::vec3* pixs, uchar4* pbo, glm::ivec
 
 static RenderState* renderState = nullptr;
 static Scene* hst_scene = nullptr;
-static GuiDataContainer* guiData = nullptr;
 
 static Span<glm::vec3>             dev_image;
 static Span<Geom>                  dev_geoms;
@@ -144,12 +155,6 @@ static std::vector<TextureGPU> dev_texs;
 // pathtracer state
 static bool render_paused = false;
 static int cur_iter;
-
-void PathTracer::InitDataContainer(GuiDataContainer* imGuiData)
-{
-	unitTest();
-	guiData = imGuiData;
-}
 
 void PathTracer::pathtraceInit(Scene* scene, RenderState* state) {
 	hst_scene = scene;
@@ -282,6 +287,11 @@ __global__ void computeIntersections(
 
 	for (int i = 0; i < geoms.size(); i++) {
 		Geom& geom = geoms[i];
+#ifdef AABB_CULLING
+		if (!intersect(geom.bounds, pathSegment.ray))
+			continue;
+#endif // AABB_CULLING
+
 		float t;
 		ShadeableIntersection tmp;
 

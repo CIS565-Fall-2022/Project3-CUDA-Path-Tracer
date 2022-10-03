@@ -5,6 +5,61 @@
 
 #include "sceneStructs.h"
 #include "utilities.h"
+#include "consts.h"
+
+__host__ __device__ bool intersect(AABB const& a, AABB const& b) {
+    glm::vec3 d1 = a.min() - b.max();
+    glm::vec3 d2 = b.min() - a.max();
+    return (d1.x <= 0 && d2.x <= 0) && (d1.y <= 0 && d2.y <= 0) && (d1.z <= 0 && d2.z <= 0);
+}
+
+__host__ __device__ bool intersect(AABB const& aabb, Ray const& r, float& t) {
+    float tmin = FLT_MIN;
+    float tmax = FLT_MAX;
+
+    glm::vec3 tmins = (aabb.min() - r.origin) / r.direction;
+    glm::vec3 tmaxs = (aabb.max() - r.origin) / r.direction;
+
+#pragma unroll
+    for (int i = 0; i < 3; ++i) {
+        if (fabsf(r.direction[i]) < EPSILON) {
+            if (r.origin[i] < aabb.min()[i] || r.origin[i] > aabb.max()[i]) {
+                return false;
+            }
+        } else {
+            float t0 = tmins[i];
+            float t1 = tmaxs[i];
+            if (t0 > t1) {
+                float tmp = t0;
+                t0 = t1;
+                t1 = tmp;
+            }
+            if (tmin > t1 || tmax < t0) {
+                return false;
+            }
+            tmin = fmax(t0, tmin);
+            tmax = fmin(t1, tmax);
+            if (tmin > tmax) {
+                return false;
+            }
+        }
+    }
+
+    if (tmin < 0 && tmax < 0) {
+        return false;
+    }
+    if (tmin < 0) {
+        t = tmax;
+    } else {
+        t = tmin;
+    }
+    return true;
+}
+
+__host__ __device__ bool intersect(AABB const& aabb, Ray const& r) {
+    float t;
+    return intersect(aabb, r, t);
+}
 
 
 /**
@@ -70,8 +125,8 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r, ShadeableIntersec
     for (int xyz = 0; xyz < 3; ++xyz) {
         float qdxyz = q.direction[xyz];
         /*if (glm::abs(qdxyz) > 0.00001f)*/ {
-            float t1 = (-0.5f - q.origin[xyz]) / qdxyz;
-            float t2 = (+0.5f - q.origin[xyz]) / qdxyz;
+            float t1 = (-PRIM_CUBE_EXTENT - q.origin[xyz]) / qdxyz;
+            float t2 = (+PRIM_CUBE_EXTENT - q.origin[xyz]) / qdxyz;
             float ta = glm::min(t1, t2);
             float tb = glm::max(t1, t2);
             glm::vec3 n;
@@ -114,9 +169,7 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r, ShadeableIntersec
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
 __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r, ShadeableIntersection& inters) {
-    float radius = .5;
 #ifdef USE_GLM_RAY_SPHERE
-
     glm::vec3 ro = multiplyMV(sphere.inverseTransform, glm::vec4(r.origin, 1.0f));
     glm::vec3 rd = glm::normalize(multiplyMV(sphere.inverseTransform, glm::vec4(r.direction, 0.0f)));
     Ray rt;
@@ -124,7 +177,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r, ShadeableIn
     rt.direction = rd;
 
     float t;
-    if (!glm::intersectRaySphere(ro, rd, glm::vec3(0), radius * radius, t)) {
+    if (!glm::intersectRaySphere(ro, rd, glm::vec3(0), PRIM_SPHERE_RADIUS * PRIM_SPHERE_RADIUS, t)) {
         return -1;
     }
 
@@ -143,7 +196,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r, ShadeableIn
     rt.direction = rd;
 
     float vDotDirection = glm::dot(rt.origin, rt.direction);
-    float radicand = vDotDirection * vDotDirection - (glm::dot(rt.origin, rt.origin) - powf(radius, 2));
+    float radicand = vDotDirection * vDotDirection - (glm::dot(rt.origin, rt.origin) - powf(PRIM_SPHERE_RADIUS, 2));
     if (radicand < 0) {
         return -1;
     }
@@ -158,10 +211,10 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r, ShadeableIn
     if (t1 < 0 && t2 < 0) {
         return -1;
     } else if (t1 > 0 && t2 > 0) {
-        t = min(t1, t2);
+        t = fmin(t1, t2);
         outside = true;
     } else {
-        t = max(t1, t2);
+        t = fmax(t1, t2);
         outside = false;
     }
 

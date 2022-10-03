@@ -29,7 +29,6 @@ int height;
 
 int main(int argc, char** argv) {
 	startTimeString = Preview::currentTimeString();
-
 	height = width = 800;
 
 	// Initialize ImGui Data
@@ -38,12 +37,12 @@ int main(int argc, char** argv) {
 	if (!Preview::initImguiGL()) {
 		return EXIT_FAILURE;
 	}
-
 	// preload
 	Preview::DoPreloadMenu();
-
+	// GL bufs
 	Preview::initBufs();
-	PathTracer::InitDataContainer(Preview::GetGUIData());
+	
+	PathTracer::unitTest();
 
 	// GLFW main loop
 	Preview::mainLoop();

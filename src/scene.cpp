@@ -1,39 +1,68 @@
-#include <iostream>
 #include "scene.h"
+
+#include <iostream>
 #include <cstring>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtc/epsilon.hpp>
+
 #include "TinyObjLoader/tiny_obj_loader.h"
 #include "stb_image.h"
 #include "ColorConsole/color.hpp"
+#include "consts.h"
+
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
+
+static AABB g_worldAABB;
 
 // if load_render_state flag is true, then the camera & renderstate will be initialized from the file
 // otherwise they must be initialized manually
-Scene::Scene(string filename, bool load_render_state) : filename(filename) {
-    cout << "Reading scene from " << filename << " ..." << endl;
-    cout << " " << endl;
+Scene::Scene(std::string filename, bool load_render_state) : filename(filename) {
+    std::cout << "Reading scene from " << filename << " ..." << std::endl;
+    std::cout << " " << std::endl;
 
     fp_in.open(filename);
     if (!fp_in.is_open()) {
-        cout << "Error reading from file - aborting!" << endl;
+        std::cerr << dye::red("Error reading from file - aborting!") << std::endl;
         throw;
     }
 
+    // saves each geom's min & max vertices
+    std::unordered_map<int, std::pair<glm::vec3, glm::vec3>> geom_id_to_extremes;
+    int attrib_flags = 0;
+    glm::vec3 world_min(FLT_MAX), world_max(FLT_MIN);
     while (fp_in.good()) {
-        string line;
+        std::string line;
         utilityCore::safeGetline(fp_in, line);
         if (!line.empty()) {
-            vector<string> tokens = utilityCore::tokenizeString(line);
+            std::vector<std::string> tokens = utilityCore::tokenizeString(line);
             if (tokens[0] == "OBJECT") {
-                loadGeom();
-                cout << " " << endl;
+                attrib_flags |= 1;
+                if (!loadGeom()) {
+                    std::cerr << dye::red("Error Loading Geoms") << std::endl;
+                    throw;
+                } else {
+                    world_min = glm::min(world_min, geoms.back().bounds.min());
+                    world_max = glm::max(world_max, geoms.back().bounds.max());
+                }
             } else if (tokens[0] == "CAMERA" && load_render_state) {
+                attrib_flags |= 1 << 1;
                 loadCamera();
-                cout << " " << endl;
             }
         }
     }
+
+    if (attrib_flags != 3) {
+        std::cerr << dye::red("Scene " + filename + " is Malformed") << std::endl;
+        throw;
+    }
+
+    g_worldAABB = AABB(world_min - glm::vec3(5), world_max + glm::vec3(5));
 }
 
 Scene::~Scene() {
@@ -43,7 +72,7 @@ Scene::~Scene() {
 static bool initMaterial(
     Scene& self,
     Material& ret,
-    string const& obj_dir,
+    std::string const& obj_dir,
     tinyobj::material_t const& tinyobj_mat
 ) {
     Material mat;
@@ -55,7 +84,7 @@ static bool initMaterial(
 
 #define PARSE_F(name_str, field, default_val)\
     do {\
-    if (params.count(name_str)) field = stod(params.find(name_str)->second);\
+    if (params.count(name_str)) field = std::stof(params.find(name_str)->second);\
     else field = default_val;\
     } while(0)
 
@@ -67,13 +96,13 @@ static bool initMaterial(
 
 #undef PARSE_F
 
-    auto load_texture = [&](int& id, string const& texname) {
+    auto load_texture = [&](int& id, std::string const& texname) {
         if (!texname.empty()) {
             if (self.tex_name_to_id.count(texname)) {
                 mat.textures.diffuse = self.tex_name_to_id[texname];
             } else {
                 int x, y, n;
-                string texpath = obj_dir + '/' + texname;
+                std::string texpath = obj_dir + '/' + texname;
 
                 unsigned char* data = stbi_load(texpath.c_str(), &x, &y, &n, NUM_TEX_CHANNEL);
                 if (!data) {
@@ -124,7 +153,7 @@ static bool initMaterial(
         }
     }
 
-    cout << "loaded material " << tinyobj_mat.name << endl
+    std::cout << "loaded material " << tinyobj_mat.name << std::endl
         << "diffuse =     {" << mat.diffuse[0] << "," << mat.diffuse[1] << "," << mat.diffuse[2] << "}\n"
         << "emittance =    " << mat.emittance << "\n"
         << "ior =          " << mat.ior << "\n"
@@ -135,66 +164,66 @@ static bool initMaterial(
         << "spec_exp   =   " << mat.specular.exponent << "\n\n";
 
     if(mat.textures.diffuse != -1)
-        cout << "diffuse tex = {" << " id = " << mat.textures.diffuse << ", npixels = " << self.textures[mat.textures.diffuse].pixels.size() << "}\n";
+        std::cout << "diffuse tex = {" << " id = " << mat.textures.diffuse << ", npixels = " << self.textures[mat.textures.diffuse].pixels.size() << "}\n";
     if(mat.textures.bump != -1)
-        cout << "bump tex    = {" << " id = " << mat.textures.bump << ", npixels = " << self.textures[mat.textures.bump].pixels.size() << "}\n";
+        std::cout << "bump tex    = {" << " id = " << mat.textures.bump << ", npixels = " << self.textures[mat.textures.bump].pixels.size() << "}\n";
 
 
-    ret = move(mat);
+    ret = std::move(mat);
     return true;
 }
 
-int Scene::loadGeom() {
+bool Scene::loadGeom() {
     int objectid = geoms.size();
-    cout << "Loading Geom " << objectid << "..." << endl;
+    std::cout << "Loading Geom " << objectid << "..." << std::endl;
     Geom newGeom;
-    string line;
+    std::string line;
 
     //load object type
     utilityCore::safeGetline(fp_in, line);
     if (!line.empty() && fp_in.good()) {
-        if (strcmp(line.c_str(), "sphere") == 0) {
-            cout << "Creating new sphere..." << endl;
+        if (line == "sphere") {
+            std::cout << "Creating new sphere..." << std::endl;
             newGeom.type = SPHERE;
-        } else if (strcmp(line.c_str(), "cube") == 0) {
-            cout << "Creating new cube..." << endl;
+        } else if (line ==  "cube") {
+            std::cout << "Creating new cube..." << std::endl;
             newGeom.type = CUBE;
         } else {
             newGeom.type = MESH;
 
             // mesh objects are in the fomat: [file type] [path to file]
-            vector<string> tokens = utilityCore::tokenizeString(line);
+            std::vector<std::string> tokens = utilityCore::tokenizeString(line);
             if (tokens.size() != 2) {
-                cerr << dye::red("ERROR: unrecognized object type\nat line: ") << line << endl;
-                return -1;
+                std::cerr << dye::red("ERROR: unrecognized object type\nat line: ") << line << std::endl;
+                return false;
             }
             if (tokens[0] == "obj") {
-                cout << "Loading obj mesh " << tokens[1] << endl;
+                std::cout << "Loading obj mesh " << tokens[1] << std::endl;
                 size_t pos = tokens[1].find_last_of('/');
-                if (pos == string::npos) {
-                    cerr << dye::red("ERROR: invalid obj file path: " + tokens[1]) << endl;
-                    return -1;
+                if (pos == std::string::npos) {
+                    std::cerr << dye::red("ERROR: invalid obj file path: " + tokens[1]) << std::endl;
+                    return false;
                 }
                 
                 // default material folder to the folder where the mesh is in
                 tinyobj::ObjReaderConfig config;
                 config.mtl_search_path = tokens[1].substr(0, pos);
-                cout << "set material lookup path to: " << config.mtl_search_path << endl;
+                std::cout << "set material lookup path to: " << config.mtl_search_path << std::endl;
                 
 
                 tinyobj::ObjReader reader;
                 if (!reader.ParseFromFile(tokens[1], config)) {
                     if (!reader.Error().empty()) {
-                        cerr << dye::red("TinyObjReader: ERROR: \n");
-                        cerr << dye::red(reader.Error()) << endl;
+                        std::cerr << dye::red("TinyObjReader: ERROR: \n");
+                        std::cerr << dye::red(reader.Error()) << std::endl;
                     } else {
-                        cerr << dye::red("no idea what the hell is happening\n");
+                        std::cerr << dye::red("no idea what the hell is happening\n");
                     }
-                    return -1;
+                    return false;
                 }
                 if (!reader.Warning().empty()) {
-                    cerr << dye::yellow("TinyObjReader: WARNING: \n");
-                    cerr << dye::yellow(reader.Warning()) << endl;
+                    std::cerr << dye::yellow("TinyObjReader: WARNING: \n");
+                    std::cerr << dye::yellow(reader.Warning()) << std::endl;
                 }
 
                 size_t vert_offset = vertices.size();
@@ -212,7 +241,7 @@ int Scene::loadGeom() {
                 for (auto const& mat : mats) {
                     Material material;
                     if (!initMaterial(*this, material, config.mtl_search_path, mat)) {
-                        cerr << dye::red("FATAL ERROR: mesh " + tokens[1] + " is missing some texture files:\n" +
+                        std::cerr << dye::red("FATAL ERROR: mesh " + tokens[1] + " is missing some texture files:\n" +
                            mat.diffuse_texname + "\nresulting in an incomplete state of the loader, exiting...\n");
                         exit(EXIT_FAILURE);
                         return -1;
@@ -249,13 +278,13 @@ int Scene::loadGeom() {
 
                 // temp buffer to compute tangent and bitangent
                 int num_verts = attrib.vertices.size() / 3;
-                vector<glm::vec3> tan1(num_verts, glm::vec3(0));
-                vector<glm::vec3> tan2(num_verts, glm::vec3(0));
-                vector<glm::vec3> vert2norm(num_verts);
+                std::vector<glm::vec3> tan1(num_verts, glm::vec3(0));
+                std::vector<glm::vec3> tan2(num_verts, glm::vec3(0));
+                std::vector<glm::vec3> vert2norm(num_verts);
 
                 // maps normal to normal buffer index (used only if the model is missing normals)
                 auto h = [](glm::vec3 const& v)->size_t {
-                    auto hs = hash<float>();
+                    auto hs = std::hash<float>();
                     return hs(v.x) ^ hs(v.y) ^ hs(v.z);
                 };
                 auto eq = [](glm::vec3 const& v1, glm::vec3 const& v2)->bool {
@@ -266,7 +295,7 @@ int Scene::loadGeom() {
                     }
                     return true;
                 };
-                unordered_map<glm::vec3,int,decltype(h),decltype(eq)> normal_deduction_mp(10,h,eq);
+                std::unordered_map<glm::vec3,int,decltype(h),decltype(eq)> normal_deduction_mp(10,h,eq);
                 auto add_or_get_norm_id = [&](glm::vec3 const& v) {
                     if (normal_deduction_mp.count(v)) {
                         return normal_deduction_mp[v];
@@ -278,7 +307,7 @@ int Scene::loadGeom() {
                 };
 
                 auto compute_tan1tan2 = [&](glm::ivec3 iverts, glm::ivec3 iuvs) {
-                    // reference: Lengyel, Eric. "Computing Tangent Space Basis Vectors for an Arbitrary Mesh."
+                    // reference: Lengyel, Eric. "Computing Tangent Space Basis std::vectors for an Arbitrary Mesh."
                     // Terathon Software 3D Graphics Library, 2001. http://www.terathon.com/code/tangent.html
                     int i1 = iverts[0], i2 = iverts[1], i3 = iverts[2];
                     glm::vec3 v1 = vertices[iverts[1]] - vertices[iverts[0]];
@@ -383,7 +412,7 @@ int Scene::loadGeom() {
 
                 
 
-                cout << dye::green("Loaded:\n")
+                std::cout << dye::green("Loaded:\n")
                     << triangles.size() << " triangles\n"
                     << vertices.size() << " vertices\n"
                     << normals.size() << " normals\n"
@@ -392,47 +421,46 @@ int Scene::loadGeom() {
                     << tangents.size() << " tangents\n";
 
                 if (missing_uv) {
-                    cout << dye::red("missing uv for " + tokens[1]) << endl;
+                    std::cout << dye::red("missing uv for " + tokens[1]) << std::endl;
                 }
                 if (missing_norm) {
-                    cout << dye::red("missing norm for " + tokens[1]) << endl;
+                    std::cout << dye::red("missing norm for " + tokens[1]) << std::endl;
                 }
 
             } else {
-                cerr << "unknown object format" << endl;
+                std::cerr << "unknown object format" << std::endl;
                 return -1;
             }
         }
     }
     utilityCore::safeGetline(fp_in, line);
     if (!line.empty() && fp_in.good()) {
-        vector<string> tokens = utilityCore::tokenizeString(line);
+        std::vector<std::string> tokens = utilityCore::tokenizeString(line);
         if (tokens[0] == "material") {
             int mat_id = loadMaterial(tokens[1]);
             if (mat_id < 0) {
-                return -1;
+                return false;
             }
             newGeom.materialid = mat_id;
-            cout << "Connecting Geom " << objectid << " to Material " << tokens[1] << "..." << endl;
+            std::cout << "Connecting Geom " << objectid << " to Material " << tokens[1] << "..." << std::endl;
         } else {
-            cerr << "unknown field: " << tokens[0] << endl;
-            return -1;
+            std::cerr << "unknown field: " << tokens[0] << std::endl;
+            return false;
         }
     }
     //load transformations
     utilityCore::safeGetline(fp_in, line);
     while (!line.empty() && fp_in.good()) {
-        vector<string> tokens = utilityCore::tokenizeString(line);
+        std::vector<std::string> tokens = utilityCore::tokenizeString(line);
 
         //load tranformations
-        if (strcmp(tokens[0].c_str(), "TRANS") == 0) {
+        if (tokens[0] == "TRANS") {
             newGeom.translation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-        } else if (strcmp(tokens[0].c_str(), "ROTAT") == 0) {
+        } else if (tokens[0] == "ROTAT") {
             newGeom.rotation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-        } else if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
+        } else if (tokens[0] == "SCALE") {
             newGeom.scale = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
         }
-
         utilityCore::safeGetline(fp_in, line);
     }
 
@@ -452,45 +480,79 @@ int Scene::loadGeom() {
             lights.emplace_back(light);
         }
     }
+    // compute AABB
+    glm::vec3 geom_min = glm::vec3(FLT_MAX), geom_max = glm::vec3(FLT_MIN);
+    if (newGeom.type == CUBE) {
+        constexpr float vals[] = { -PRIM_CUBE_EXTENT, PRIM_CUBE_EXTENT };
+        for (float x : vals) {
+            for (float y : vals) {
+                for (float z : vals) {
+                    glm::vec3 vert = glm::vec3(newGeom.transform * glm::vec4(x, y, z, 1));
+                    geom_min = glm::min(geom_min, vert);
+                    geom_max = glm::max(geom_max, vert);
+                }
+            }
+        }
+    } else if (newGeom.type == SPHERE) {
+        glm::vec3 center = glm::vec3(newGeom.transform * glm::vec4(0, 0, 0, 1));
+        geom_min = center - glm::vec3(PRIM_SPHERE_RADIUS) * newGeom.scale;
+        geom_max = center + glm::vec3(PRIM_SPHERE_RADIUS) * newGeom.scale;
+    } else if (newGeom.type == MESH) {
+        for (int i = meshes[newGeom.meshid].tri_start; i < meshes[newGeom.meshid].tri_end; ++i) {
+            glm::vec3 verts[] = {
+                vertices[triangles[i].verts[0]],
+                vertices[triangles[i].verts[1]],
+                vertices[triangles[i].verts[2]]
+            };
+            for (glm::vec3 const& vert : verts) {
+                glm::vec3 world_vert = glm::vec3(newGeom.transform * glm::vec4(vert, 1));
+                geom_min = glm::min(geom_min, world_vert);
+                geom_max = glm::max(geom_max, world_vert);
+            }
+        }
+    } else {
+        std::cerr << dye::red("WTF?\n");
+        exit(77777);
+    }
+    newGeom.bounds = AABB(geom_min, geom_max);
     geoms.push_back(newGeom);
-
-    return 1;
+    return true;
 }
 
-int Scene::loadCamera() {
-    cout << "Loading Camera ..." << endl;
+void Scene::loadCamera() {
+    std::cout << "Loading Camera ..." << std::endl;
     RenderState &state = this->state;
     Camera &camera = state.camera;
     float fovy;
 
     //load static properties
     for (int i = 0; i < 5; i++) {
-        string line;
+        std::string line;
         utilityCore::safeGetline(fp_in, line);
-        vector<string> tokens = utilityCore::tokenizeString(line);
-        if (strcmp(tokens[0].c_str(), "RES") == 0) {
+        std::vector<std::string> tokens = utilityCore::tokenizeString(line);
+        if (tokens[0] == "RES") {
             camera.resolution.x = atoi(tokens[1].c_str());
             camera.resolution.y = atoi(tokens[2].c_str());
-        } else if (strcmp(tokens[0].c_str(), "FOVY") == 0) {
+        } else if (tokens[0] == "FOVY") {
             fovy = atof(tokens[1].c_str());
-        } else if (strcmp(tokens[0].c_str(), "ITERATIONS") == 0) {
+        } else if (tokens[0] == "ITERATIONS") {
             state.iterations = atoi(tokens[1].c_str());
-        } else if (strcmp(tokens[0].c_str(), "DEPTH") == 0) {
+        } else if (tokens[0] == "DEPTH") {
             state.traceDepth = atoi(tokens[1].c_str());
-        } else if (strcmp(tokens[0].c_str(), "FILE") == 0) {
+        } else if (tokens[0] == "FILE") {
             state.imageName = tokens[1];
         }
     }
 
-    string line;
+    std::string line;
     utilityCore::safeGetline(fp_in, line);
     while (!line.empty() && fp_in.good()) {
-        vector<string> tokens = utilityCore::tokenizeString(line);
-        if (strcmp(tokens[0].c_str(), "EYE") == 0) {
+        std::vector<std::string> tokens = utilityCore::tokenizeString(line);
+        if (tokens[0] == "EYE") {
             camera.position = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-        } else if (strcmp(tokens[0].c_str(), "LOOKAT") == 0) {
+        } else if (tokens[0] == "LOOKAT") {
             camera.lookAt = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-        } else if (strcmp(tokens[0].c_str(), "UP") == 0) {
+        } else if (tokens[0] == "UP") {
             camera.up = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
         }
 
@@ -514,39 +576,38 @@ int Scene::loadCamera() {
     state.image.resize(arraylen);
     std::fill(state.image.begin(), state.image.end(), glm::vec3());
 
-    cout << "Loaded camera!" << endl;
-    return 1;
+    std::cout << "Loaded camera!" << std::endl;
 }
 
 
 // standardize material using mtl format
 // returns the material id on success or -1 on error
 // NOTE: only loads 1 material per mtl file, the rest will be discarded
-int Scene::loadMaterial(string mtl_file) {    
+int Scene::loadMaterial(std::string mtl_file) {    
     if (mtl_to_id.count(mtl_file)) {
         return mtl_to_id[mtl_file];
     } else {
-        ifstream fin(mtl_file);
+        std::ifstream fin(mtl_file);
         if (!fin) {
-            cerr << dye::red("cannot find mtl file: ") << dye::red(mtl_file) << endl;
+            std::cerr << dye::red("cannot find mtl file: ") << dye::red(mtl_file) << std::endl;
             return -1;
         }
 
-        map<string, int> mat_mp;
-        vector<tinyobj::material_t> mats;
-        string warn, err;
+        std::map<std::string, int> mat_mp;
+        std::vector<tinyobj::material_t> mats;
+        std::string warn, err;
 
         tinyobj::LoadMtl(&mat_mp, &mats, &fin, &warn, &err);
         if (!err.empty()) {
-            cerr << dye::red("Tiny obj loader: ERROR:\n") << dye::red(err) << endl;
+            std::cerr << dye::red("Tiny obj loader: ERROR:\n") << dye::red(err) << std::endl;
             return -1;
         }
         if (!warn.empty()) {
-            cerr << dye::yellow("Tiny obj loader: WARNING:\n") << dye::yellow(warn) << endl;
+            std::cerr << dye::yellow("Tiny obj loader: WARNING:\n") << dye::yellow(warn) << std::endl;
         }
 
         if (mat_mp.size() > 1) {
-            cerr << dye::yellow("WARNING: ") << dye::yellow(mat_mp.size()-1) << dye::yellow("materials discarded in ") << mtl_file << endl;
+            std::cerr << dye::yellow("WARNING: ") << dye::yellow(mat_mp.size()-1) << dye::yellow("materials discarded in ") << mtl_file << std::endl;
         }
 
         Material material;

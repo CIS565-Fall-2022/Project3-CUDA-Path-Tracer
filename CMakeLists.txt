@@ -74,6 +74,8 @@ set(headers
     src/preview.h
     src/utilities.h
     src/rendersave.h
+    src/Collision/AABB.h
+    src/consts.h
 
     src/ImGui/imconfig.h
 	src/ImGui/imgui.h

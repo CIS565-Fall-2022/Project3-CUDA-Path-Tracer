@@ -6,11 +6,9 @@
 #include "glm/glm.hpp"
 #include "utilities.h"
 #include "texture_types.h"
+#include "Collision/AABB.h"
 #include <texture_fetch_functions.h>
-
-#define BACKGROUND_COLOR (glm::vec3(0.0f))
-#define NUM_TEX_CHANNEL 4
-
+#include "consts.h"
 
 enum GeomType {
     SPHERE,
@@ -20,25 +18,10 @@ enum GeomType {
 
 typedef glm::vec3 color_t;
 
-
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
 };
-
-struct Geom {
-    enum GeomType type;
-    int materialid;
-    int meshid;
-    glm::vec3 translation;
-    glm::vec3 rotation;
-    glm::vec3 scale;
-    glm::mat4 transform;
-    glm::mat4 inverseTransform;
-    glm::mat4 invTranspose;
-};
-
-
 
 struct Texture {
     __host__
@@ -92,6 +75,7 @@ struct TextureGPU {
 #endif
         auto col = f(tex, uv.x, uv.y);
         return color_t(col.x, col.y, col.z);
+#undef f
     }
 
     int pixel_width;
@@ -169,6 +153,19 @@ struct Camera {
     glm::vec3 right;
     glm::vec2 fov;
     glm::vec2 pixelLength;
+};
+
+struct Geom {
+    enum GeomType type;
+    int materialid;
+    int meshid;  // only used for meshes
+    AABB bounds; // only used for meshes
+    glm::vec3 translation;
+    glm::vec3 rotation;
+    glm::vec3 scale;
+    glm::mat4 transform;
+    glm::mat4 inverseTransform;
+    glm::mat4 invTranspose;
 };
 
 // the result of 0 sanity
