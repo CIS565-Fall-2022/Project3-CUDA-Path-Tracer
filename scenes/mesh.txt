@@ -23,7 +23,7 @@ UP          0 1 0
 
 // Sphere
 OBJECT 0
-mesh bunny.obj
+mesh prism.obj
 material 0
 TRANS       0 0 0
 ROTAT       0 0 0

@@ -18,13 +18,39 @@ struct Ray {
     glm::vec3 direction;
 };
 
-struct Triangle {
-    glm::vec3 verts[3];
-};
-
 struct AABB {
     glm::vec3 min;
     glm::vec3 max;
+};
+
+struct MortonCode {
+    int objectId;
+    unsigned int code;
+};
+
+struct Triangle {
+    AABB aabb;
+    unsigned int mcode; // for testing, remove later
+    glm::vec3 verts[3];
+
+    void computeAABB() {
+        aabb.min = glm::min(verts[0], glm::min(verts[1], verts[2]));
+        aabb.max = glm::max(verts[0], glm::max(verts[1], verts[2]));
+    }
+};
+
+struct NodeRange {
+    int i;
+    int j;
+    int l;
+    int d;
+};
+
+struct LBVHNode {
+    AABB aabb;
+    int objectId;
+    unsigned int left;
+    unsigned int right;
 };
 
 struct Geom {

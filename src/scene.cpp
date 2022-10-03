@@ -244,7 +244,7 @@ int Scene::loadOBJ(string filename, int objectid)
     auto& materials = reader.GetMaterials();
 
     // Track aabb
-    AABB aabb;
+    //AABB sceneAABB;
     glm::vec3 min = glm::vec3(INFINITY, INFINITY, INFINITY);
     glm::vec3 max = glm::vec3(-INFINITY, -INFINITY, -INFINITY);
 
@@ -274,6 +274,7 @@ int Scene::loadOBJ(string filename, int objectid)
 
                 i++;
             }
+            tri.computeAABB();
             triangles.push_back(tri);
 
             index_offset += fv;
@@ -281,13 +282,16 @@ int Scene::loadOBJ(string filename, int objectid)
     }
 
     // Set AABB
-    aabb.min = min;
-    aabb.max = max;
+    sceneAABB.min = min;
+    sceneAABB.max = max;
+
+    // Compute Morton Codes for triangles
+    // computeMortonCodes(this, sceneAABB);
 
     // Initialize new mesh
     Geom newGeom;
     newGeom.type = MESH;
-    newGeom.aabb = aabb;
+    newGeom.aabb = sceneAABB;
     newGeom.startIdx = 0;
     newGeom.triangleCount = triangles.size();
     newGeom.materialid = materialid;

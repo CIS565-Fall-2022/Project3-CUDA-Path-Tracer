@@ -44,6 +44,9 @@ int main(int argc, char** argv) {
 	// Load scene file
 	scene = new Scene(sceneFile);
 
+	// Generate BVH
+	unitTest(scene);
+
 	//Create Instance for ImGUIData
 	guiData = new GuiDataContainer();
 
@@ -78,7 +81,7 @@ int main(int argc, char** argv) {
 	InitDataContainer(guiData);
 
 	// GLFW main loop
-	mainLoop();
+	//mainLoop();
 
 	return 0;
 }

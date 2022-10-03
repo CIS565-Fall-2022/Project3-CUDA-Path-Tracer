@@ -113,7 +113,7 @@ SCALE       .01 10 10
 // Mesh
 OBJECT 6
 mesh bunny.obj
-material 1
+material 4
 TRANS       0 0 0
 ROTAT       0 0 0
 SCALE       1 1 1

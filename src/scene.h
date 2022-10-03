@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include "glm/glm.hpp"
+#include "lbvh.h"
 #include "utilities.h"
 #include "sceneStructs.h"
 
@@ -24,5 +25,9 @@ public:
     std::vector<Geom> geoms;
     std::vector<Material> materials;
     std::vector<Triangle> triangles;
+    //std::vector<MortonCode> mcodes;
+    std::vector<unsigned int> mcodes;
+    std::vector<LBVHNode> lbvh;
+    AABB sceneAABB;
     RenderState state;
 };
