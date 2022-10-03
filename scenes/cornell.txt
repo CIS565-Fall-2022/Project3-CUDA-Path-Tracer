@@ -141,17 +141,8 @@ SCALE       .01 10 10
 // Obj
 OBJECT 7
 obj
-../obj/cube.obj
+../obj/ballerina.obj
 material 4
-TRANS       3 6 5
+TRANS       0 4 5
 ROTAT       0 0 0
-SCALE       1.5 1.5 1.5
-
-// Obj
-OBJECT 8
-obj
-../obj/wahoo.obj
-material 4
-TRANS       -2 4 5
-ROTAT       0 0 0
-SCALE       0.7 0.7 0.7
+SCALE       0.8 0.8 0.8

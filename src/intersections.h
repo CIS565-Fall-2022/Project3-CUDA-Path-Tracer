@@ -236,9 +236,9 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
             {
                 minVal = barycentric;
             }
-            n1 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[0].x, dev_triItr->nor[0].y, dev_triItr->nor[0].z, 1.0));
+            /*n1 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[0].x, dev_triItr->nor[0].y, dev_triItr->nor[0].z, 1.0));
             n2 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[1].x, dev_triItr->nor[1].y, dev_triItr->nor[1].z, 1.0));
-            n3 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[2].x, dev_triItr->nor[2].y, dev_triItr->nor[2].z, 1.0));
+            n3 = glm::vec3(obj.invTranspose * glm::vec4(dev_triItr->nor[2].x, dev_triItr->nor[2].y, dev_triItr->nor[2].z, 1.0));*/
            
             //n1 = glm::normalize(n1);
             //n2 = glm::normalize(n2);
@@ -247,6 +247,15 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
             /* n1 = dev_triItr->nor[0];
             n2 = dev_triItr->nor[1];
             n3 = dev_triItr->nor[2];*/
+
+
+            glm::vec3 v1 = dev_triItr->pos[0];
+            glm::vec3 v2 = dev_triItr->pos[1];
+            glm::vec3 v3 = dev_triItr->pos[2];
+
+            n1 = glm::normalize(glm::cross(v2 - v1, v3 - v1));
+            n2 = glm::normalize(glm::cross(v1 - v3, v2 - v3));
+            n3 = glm::normalize(glm::cross(v3 - v2, v1 - v2));
 
             //printf("NOR1: %f, %f, %f\n", n1.x, n1.y, n1.z);
             //printf("NOR2: %f, %f, %f\n", n2.x, n2.y, n2.z);

@@ -25,7 +25,7 @@
 #define PIOVER2 1.57079632679
 #define PI 3.14159265359
 
-#define ANTIALIASING 0
+#define ANTIALIASING 1
 #define CACHEINTERSECTIONS 0
 #define DOF 0
 
@@ -124,10 +124,11 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_intersections, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
-	// TODO: initialize any extra device memeory you need			 
+	// TODO: initialize any extra device memeory you need
+#if CACHEINTERSECTIONS
 	cudaMalloc(&dev_cache_intersections, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_cache_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
-
+#endif
 	checkCUDAError("pathtraceInit");
 }
 
@@ -146,7 +147,10 @@ void pathtraceFree(Scene* scene) {
 	cudaFree(dev_materials);
 	cudaFree(dev_intersections);
 	// TODO: clean up any extra device memory you created
+
+#if CACHEINTERSECTIONS
 	cudaFree(dev_cache_intersections);
+#endif
 
 	checkCUDAError("pathtraceFree");
 }
@@ -511,6 +515,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		// tracing
 		dim3 numblocksPathSegmentTracing = (new_num_paths + blockSize1d - 1) / blockSize1d;
 
+#if CACHEINTERSECTIONS
 		if (depth == 0 && iter == 1) {
 			computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
 				depth
@@ -535,10 +540,17 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_intersections
 				);
 		}
-		
-		// copy cache to dev_inter
-		// else if depth > 0
-		//	computeInter(dev_inter)
+#else
+		computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+			depth
+			, new_num_paths
+			, dev_paths
+			, dev_geoms
+			, hst_scene->geoms.size()
+			, dev_intersections
+			);
+#endif
+
 		checkCUDAError("trace one bounce");
 		cudaDeviceSynchronize();
 		depth++;

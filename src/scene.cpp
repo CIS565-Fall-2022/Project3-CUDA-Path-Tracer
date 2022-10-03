@@ -122,13 +122,14 @@ int Scene::loadObjFile(string objectPath, Geom *newGeom)
                     triangle.nor[vertCnt] = glm::vec3(nx, ny, nz);
                 }
 
-                // Check if `texcoord_index` is zero or positive. negative = no texcoord data
-                if (idx.texcoord_index >= 0) {
-                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
-                    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+                //// Check if `texcoord_index` is zero or positive. negative = no texcoord data
+                //if (idx.texcoord_index >= 0) {
+                //    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+                //    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
 
-                    triangle.uv[vertCnt] = glm::vec2(tx, ty);
-                }
+                //    triangle.uv[vertCnt] = glm::vec2(tx, ty);
+                //}
+
 
                 // Optional: vertex colors
                 // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
