@@ -293,6 +293,7 @@ __host__ __device__ float meshIntersectionTest(Geom& geom,Mesh mesh,PrimitiveDat
     glm::vec3 objSpaceIntersection = getPointOnRay(rt, t);
     intersectionPoint = multiplyMV(geom.transform, glm::vec4(objSpaceIntersection,1.f));
     normal = glm::normalize(multiplyMV(geom.invTranspose,glm::vec4(normal,1)));
-    tangent = glm::normalize(multiplyMV(geom.invTranspose, tangent));
+    glm::vec3 tempTangent = glm::normalize(multiplyMV(geom.invTranspose, tangent));
+    tangent = glm::vec4(tempTangent, tangent.z);
     return glm::length(ray.origin - intersectionPoint);
 }

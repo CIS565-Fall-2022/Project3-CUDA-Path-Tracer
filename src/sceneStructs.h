@@ -110,11 +110,17 @@ struct PBRShadingAttribute
 {
     glm::vec4 baseColor = glm::vec4(1.0);
 
-    std::vector<double> baseColorFactor;  // len = 4. default [1,1,1,1]
     TextureInfo baseColorTexture;
     double metallicFactor;   // default 1
     double roughnessFactor;  // default 1
     TextureInfo metallicRoughnessTexture;
+
+    __host__ __device__ PBRShadingAttribute()
+    {
+        baseColor = glm::vec4(1.0);
+        metallicFactor = 1.0f;
+        roughnessFactor = 1.0f;
+    }
 
 };
 
