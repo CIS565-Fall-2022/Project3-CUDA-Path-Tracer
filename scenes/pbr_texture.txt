@@ -1,16 +1,16 @@
 Camera
-Resolution	1800 1350
-FovY        11.5
-LensRadius	0
-FocalDist	11
-Sample		5000
+Resolution	1600 1200
+FovY       5.5
+LensRadius	0.03
+FocalDist	8.4
+Sample	3000
 Depth		8
 File        Cornell
-Eye         2.894 4.004 4.358
-Rotation      228.444 -38.489 0
+Eye         2.237 3.863 7.587
+Rotation      253 -24.407 0
 Up          0 1 0
 
-EnvMap 	texture/forest_slope_4k.hdr
+EnvMap 	texture/photo_studio_loft_hall_4k.hdr
 
 Material 	Light
 BaseColor	8 8 8
@@ -21,10 +21,10 @@ Ior			0
 NormalMap	Null
 
 Material 	White
-BaseColor	1 1 1
-Type		Lambertian
+BaseColor	texture/fleshy_granite1_albedo.png
+Type		MetallicWorkflow
 Metallic	0
-Roughness	1
+Roughness	0.1
 Ior			0
 NormalMap	Null
 
@@ -60,12 +60,20 @@ Roughness	0
 Ior		1.5
 NormalMap	Null
 
+Material	Clock
+Type		MetallicWorkflow
+BaseColor	model/clock/textures/base.jpg
+Metallic	model/clock/textures/metal.jpg
+Roughness	model/clock/textures/rough.jpg
+Ior		1
+NormalMap	model/clock/textures/norm.jpg
+
 Object 	Floor
 model/square.obj
 Material 	White
 Translate	0 0 0
 Rotate	0 0 0
-Scale		10 10 10
+Scale		5 5 5
 
 Object	Body
 model/Camera/body.obj

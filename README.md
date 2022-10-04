@@ -11,4 +11,6 @@ CUDA Path Tracer
   - i7-12700 @ 4.90GHz with 16GB RAM
   - RTX 3070 Ti Laptop 8GB
 
-![](./img/photo_realistic.png)
+![](./img/photo_realistic.jpg)
+
+![](./img/photo_realistic_2.jpg)

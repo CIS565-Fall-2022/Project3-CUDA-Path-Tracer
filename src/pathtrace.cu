@@ -340,6 +340,9 @@ __global__ void pathIntegSampleSurface(
 			// Terminate path if sampling fails
 			segment.remainingBounces = 0;
 		}
+		else if (sample.pdf < 1e-8f) {
+			segment.remainingBounces = 0;
+		}
 		else {
 			bool deltaSample = (sample.type & BSDFSampleType::Specular);
 			segment.throughput *= sample.bsdf / sample.pdf *
@@ -432,6 +435,9 @@ __global__ void singleKernelPT(
 
 		if (sample.type == BSDFSampleType::Invalid) {
 			// Terminate path if sampling fails
+			break;
+		}
+		else if (sample.pdf < 1e-8f) {
 			break;
 		}
 
