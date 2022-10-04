@@ -8,7 +8,7 @@
 #include "tiny_obj_loader.h"
 
 #define LOAD_OBJ 1
-#define USE_BB 0
+#define USE_BB 1
 
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
@@ -212,10 +212,12 @@ int Scene::loadGeom(string objectid) {
             utilityCore::safeGetline(fp_in, line);
         }
 
-        newGeom.transform = utilityCore::buildTransformationMatrix(
-            newGeom.translation, newGeom.rotation, newGeom.scale);
+        newGeom.transform = utilityCore::buildTransformationMatrix(newGeom.translation, 
+                                                                   newGeom.rotation, 
+                                                                   newGeom.scale);
         newGeom.inverseTransform = glm::inverse(newGeom.transform);
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
+        newGeom.triangleNum = 0;
 
         if (containsObj) {
             std::vector<Triangle> triangleArray;
@@ -253,6 +255,17 @@ int Scene::loadGeom(string objectid) {
                 glm::vec3(min_x, min_y, min_z),
                 glm::vec3(max_x, max_y, max_z)
             };
+
+            newGeom.host_triangles = new Triangle[triangleArray.size()];
+            newGeom.device_triangles = NULL;
+            newGeom.triangleNum = triangleArray.size();
+
+            newGeom.bb = box;
+            for (int i = 0; i < triangleArray.size(); i++) {
+                newGeom.host_triangles[i] = triangleArray[i];
+            }
+
+            geoms.push_back(newGeom);
 #else
             for (int i = 0; i < triangleArray.size(); i++) {
                 Triangle* triangleInObj = new Triangle(triangleArray[i]);

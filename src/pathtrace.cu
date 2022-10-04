@@ -132,7 +132,7 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_paths, pixelcount * sizeof(PathSegment));
 
 	for (int i = 0; i < scene->geoms.size(); i++) {
-		if (scene->geoms[i].triangleNum == 1) {
+		if (scene->geoms[i].triangleNum > 0) {
 			cudaMalloc(&(scene->geoms[i].device_triangles), scene->geoms[i].triangleNum * sizeof(Triangle));
 			checkCUDAError("cudaMalloc device_triangles failed");
 			cudaMemcpy(scene->geoms[i].device_triangles, scene->geoms[i].host_triangles, scene->geoms[i].triangleNum * sizeof(Triangle), cudaMemcpyHostToDevice);
@@ -221,6 +221,23 @@ __global__ void computeIntersections(
 			else if (geom.type == TRIANGLE) {
 				// Only use the first triangle, since in Triangle mode, each geom only has 1 triangle
 				t = triangleIntersectionTest(&geom, &geom.device_triangles[0], pathSegment.ray, tmp_intersect, tmp_normal, outside);
+			}
+			else if (geom.type == OBJ_BB) {
+				float boxT = bbIntersectionTest(&geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+
+				if (boxT != -1) {
+					for (int j = 0; j < geom.triangleNum; j++) {
+						t = triangleIntersectionTest(&geom, &geom.device_triangles[j], pathSegment.ray, tmp_intersect, tmp_normal, outside);
+
+						if (t > 0.0f && t_min > t)
+						{
+							t_min = t;
+							hit_geom_index = i;
+							intersect_point = tmp_intersect;
+							normal = tmp_normal;
+						}
+					}
+				}
 			}
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 
