@@ -43,7 +43,15 @@ static std::vector<std::string> getFilesInDir(char const* dir) {
 }
 
 GuiDataContainer::GuiDataContainer() :
-    traced_depth(0), cur_scene(0), cur_save(0), prompt_text("") {
+    traced_depth(0),
+    cur_scene(0),
+    cur_save(0),
+    prompt_text(""),
+    draw_debug_aabb(false),
+    draw_world_aabb(false),
+    octree_depth(1),
+    test_tree(nullptr)
+{
     memset(buf, 0, sizeof(buf));
 
     auto scene_files = getFilesInDir(scene_files_dir);
@@ -65,6 +73,15 @@ GuiDataContainer::GuiDataContainer() :
         strcpy(save_file_names[i], save_files[i].c_str());
     }
 }
+void GuiDataContainer::Reset() {
+    prompt_text = "";
+    draw_world_aabb = draw_debug_aabb = false;
+    octree_depth = 1;
+    if (test_tree) {
+        delete test_tree;
+        test_tree = nullptr;
+    }
+}
 GuiDataContainer::~GuiDataContainer() {
     for (int i = 0; i < num_scenes; ++i) {
         delete scene_file_names[i];
@@ -74,6 +91,9 @@ GuiDataContainer::~GuiDataContainer() {
     }
     delete[] scene_file_names;
     delete[] save_file_names;
+    if (test_tree) {
+        delete test_tree;
+    }
 }
 float utilityCore::clamp(float f, float min, float max) {
     if (f < min) {
@@ -84,7 +104,6 @@ float utilityCore::clamp(float f, float min, float max) {
         return f;
     }
 }
-
 bool utilityCore::replaceString(std::string& str, const std::string& from, const std::string& to) {
     size_t start_pos = str.find(from);
     if (start_pos == std::string::npos)

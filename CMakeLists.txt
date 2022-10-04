@@ -75,7 +75,9 @@ set(headers
     src/utilities.h
     src/rendersave.h
     src/Collision/AABB.h
+    src/Collision/DebugDrawer.h
     src/consts.h
+    src/Octree/octree.h
 
     src/ImGui/imconfig.h
 	src/ImGui/imgui.h
@@ -103,6 +105,7 @@ set(sources
     src/preview.cpp
     src/utilities.cpp
     src/rendersave.cpp
+    src/Collision/DebugDrawer.cpp
 
     src/ImGui/imgui.cpp 
     src/ImGui/imgui_demo.cpp 

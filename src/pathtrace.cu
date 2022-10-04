@@ -16,11 +16,16 @@
 #include "interactions.h"
 #include "rendersave.h"
 #include "Collision/AABB.h"
+#include "Octree/octree.h"
 
 // impl switches
 #define COMPACTION
 #define SORT_MAT
 #define AABB_CULLING
+
+#define OCTREE_CULLING
+// #define DEPTH_OF_FIELD
+
 // #define ANTI_ALIAS_JITTER
 // #define FAKE_SHADE
 
@@ -151,6 +156,10 @@ static MeshInfo dev_mesh_info;
 
 static thrust::device_ptr<PathSegment> dev_thrust_paths;
 static std::vector<TextureGPU> dev_texs;
+
+// TODO
+static octree* tree;
+static octreeGPU dev_tree;
 
 // pathtracer state
 static bool render_paused = false;

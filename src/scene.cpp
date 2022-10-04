@@ -18,8 +18,6 @@
 #undef max
 #endif
 
-static AABB g_worldAABB;
-
 // if load_render_state flag is true, then the camera & renderstate will be initialized from the file
 // otherwise they must be initialized manually
 Scene::Scene(std::string filename, bool load_render_state) : filename(filename) {
@@ -62,7 +60,8 @@ Scene::Scene(std::string filename, bool load_render_state) : filename(filename) 
         throw;
     }
 
-    g_worldAABB = AABB(world_min - glm::vec3(5), world_max + glm::vec3(5));
+    // calculate world AABB
+    world_AABB = AABB(world_min, world_max);
 }
 
 Scene::~Scene() {

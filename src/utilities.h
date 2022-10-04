@@ -21,12 +21,13 @@
 #define EPSILON           0.00001f
 
 
-
+class octree;
 class GuiDataContainer
 {
 public:
     GuiDataContainer();
     ~GuiDataContainer();
+    void Reset();
     int traced_depth;
     char** scene_file_names;
     char** save_file_names;
@@ -36,6 +37,10 @@ public:
     int cur_save;
     char buf[256];
     char const* prompt_text;
+    bool draw_debug_aabb;
+    bool draw_world_aabb;
+    int octree_depth;
+    octree* test_tree;
 };
 
 // convenience macro

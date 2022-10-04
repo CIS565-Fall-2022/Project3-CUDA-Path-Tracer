@@ -7,6 +7,8 @@
 #include "ImGui/imgui_impl_opengl3.h"
 #include "rendersave.h"
 #include "pathtrace.h"
+#include "Collision/DebugDrawer.h"
+#include "Octree/octree.h"
 
 GLuint positionLocation = 0;
 GLuint texcoordsLocation = 1;
@@ -195,14 +197,17 @@ bool Preview::initBufs() {
 }
 
 void Preview::InitImguiData() {
-	if (guiData) {
-		delete guiData;
+	if (!guiData) {
+		guiData = new GuiDataContainer();
+	} else {
+		guiData->Reset();
 	}
-	guiData = new GuiDataContainer();
 }
 
 // LOOK: Un-Comment to check ImGui Usage
 void RenderImGui() {
+	extern Scene* scene;
+
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
@@ -247,7 +252,66 @@ void RenderImGui() {
 				}
 			}
 		}
+
+		//DebugDrawer::DrawRect(0, 0, 20, 20, { 0,0,1 });
+		//DebugDrawer::DrawRect(width - 20, height - 20, 20, 20, { 0,0,1 });
+
+		if (!guiData->draw_debug_aabb) {
+			if (ImGui::Button("[DEBUG] Draw AABB")) {
+				guiData->draw_debug_aabb = true;
+			}
+		} else {
+			if (ImGui::Button("[DEBUG] Don't draw AABB")) {
+				guiData->draw_debug_aabb = false;
+			}
+		}
+
+		if (!guiData->draw_world_aabb) {
+			if (ImGui::Button("[DEBUG] Draw World AABB")) {
+				guiData->draw_world_aabb = true;
+			}
+		} else {
+			if (ImGui::Button("[DEBUG] Don't draw World AABB")) {
+				guiData->draw_world_aabb = false;
+			}
+		}
+
+		ImGui::Text("Octree Test");
+		{
+			ImGui::SliderInt("Octree Depth", &guiData->octree_depth, 1, 20);
+			if(ImGui::Button("Generate Octree")) {
+				if (guiData->test_tree) {
+					delete guiData->test_tree;
+					guiData->test_tree = nullptr;
+				}
+
+				guiData->test_tree = new octree(*scene, scene->world_AABB, guiData->octree_depth);
+			}
+			if (guiData->test_tree) {
+				if (ImGui::Button("Destroy Octree")) {
+					delete guiData->test_tree;
+					guiData->test_tree = nullptr;
+				}
+			}
+		}
 	}
+
+	if (guiData->draw_debug_aabb) {
+		for (Geom const& g : scene->geoms) {
+			DebugDrawer::DrawAABB(g.bounds, { 1,0,0 });
+		}
+	}
+	if (guiData->draw_world_aabb) {
+		DebugDrawer::DrawAABB(scene->world_AABB, { 0,0,1 });
+	}
+
+	if (guiData->test_tree) {
+		auto f = [](octree::node const& node) {
+			DebugDrawer::DrawAABB(node.bounds, {0.5f, 0.5f, 0.5f});
+		};
+		guiData->test_tree->dfs(f);
+	}
+
 	ImGui::End();
 
 	ImGui::Render();
@@ -256,6 +320,7 @@ void RenderImGui() {
 	if (lastScene != guiData->cur_scene) {
 		switchScene(guiData->scene_file_names[guiData->cur_scene]);
 	}
+
 }
 
 /// <summary>

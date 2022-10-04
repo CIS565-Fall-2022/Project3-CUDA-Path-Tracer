@@ -44,4 +44,5 @@ public:
     std::unordered_map<std::string, int> mtl_to_id;
 
     RenderState state;
+    AABB world_AABB;
 };
