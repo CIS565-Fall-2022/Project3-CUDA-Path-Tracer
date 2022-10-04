@@ -3,6 +3,7 @@ Resolution	1280 960
 FovY        22
 LensRadius	0.1
 FocalDist	11
+ApertureMask	Null
 Sample		5000
 Depth		8
 File        Cornell

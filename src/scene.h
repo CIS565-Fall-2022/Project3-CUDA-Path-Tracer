@@ -421,6 +421,9 @@ struct DevScene {
     DevTextureObj* envMap = nullptr;
     DevDiscreteSampler1D<float> envMapSampler;
 
+    DevTextureObj* apertureMask = nullptr;
+    DevDiscreteSampler1D<float> apertureSampler;
+
     uint32_t* sampleSequence = nullptr;
 };
 
@@ -436,11 +439,11 @@ public:
 
 private:
     void createLightSampler();
+    void createApertureSampler();
 
     void loadModel(const std::string& objectId);
     void loadMaterial(const std::string& materialId);
     void loadCamera();
-    void loadEnvMap(const std::string& filename);
 
     int addMaterial(const Material& material);
     int addTexture(const std::string& filename);
@@ -465,6 +468,9 @@ public:
     int numLightPrims = 0;
     DiscreteSampler1D<float> envMapSampler;
     int envMapTexId = NullTextureId;
+
+    DiscreteSampler1D<float> apertureSampler;
+    int apertureMaskTexId = NullTextureId;
 
     DevScene hstScene;
     DevScene* devScene = nullptr;

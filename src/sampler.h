@@ -120,6 +120,11 @@ struct DiscreteSampler1D {
 		}
 	}
 
+	void clear() {
+		binomDistribs.clear();
+		sumAll = static_cast<T>(0);
+	}
+
 	int sample(float r1, float r2) {
 		int passId = int(float(binomDistribs.size()) * r1);
 		DistribT distrib = binomDistribs[passId];
@@ -161,6 +166,12 @@ struct DiscreteSampler2D {
 		rowSampler = DiscreteSampler1D<T>(sumRows);
 	}
 
+	void clear() {
+		columnSamplers.clear();
+		rowSampler.clear();
+		sumAll = static_cast<T>(0);
+	}
+
 	std::pair<int, int> sample(float r1, float r2, float r3, float r4) {
 		int row = rowSampler.sample(r1, r2);
 		int column = columnSamplers[row].sample(r3, r4);
@@ -198,6 +209,12 @@ struct DevDiscreteSampler1D {
 	int length = 0;
 };
 
+/**
+* Since 2D distribution can be rearranged to 1D distribution,
+*   this class is unused
+* Sampling 2D distribution with alias sampling table consumes
+*   two more random numbers than 1D
+*/
 template<typename T>
 struct DevDiscreteSampler2D {
 	using DistribType = BinomialDistrib<T>;

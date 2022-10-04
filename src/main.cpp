@@ -305,7 +305,6 @@ void mousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
 	else if (rightMousePressed) {
 		float dy = (ypos - lastY) / height;
 		cam.position.y += dy;
-		cam.rotation.y += dy;
 		State::camChanged = true;
 	}
 	else if (middleMousePressed) {

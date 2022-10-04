@@ -116,8 +116,16 @@ void pathTraceFree() {
 /**
  * Antialiasing and physically based camera (lens effect)
  */
-__device__ Ray sampleCamera(const Camera& cam, int x, int y, glm::vec4 r) {
+__device__ Ray sampleCamera(DevScene* scene, const Camera& cam, int x, int y, glm::vec4 r) {
 	Ray ray;
+#if CAMERA_PANORAMA
+	float u = (x - .5f + r.x) / cam.resolution.x - .5f;
+	float v = (y - .5f + r.y) / cam.resolution.y;
+	glm::vec3 dir = Math::toSphere(glm::vec2(u, v));
+	dir = cam.right * dir.x + cam.up * dir.y + cam.view * dir.z;
+	ray.direction = dir;
+	ray.origin = cam.position;
+#else
 	float aspect = float(cam.resolution.x) / cam.resolution.y;
 	float tanFovY = glm::tan(glm::radians(cam.fov.y));
 	glm::vec2 pixelSize = 1.f / glm::vec2(cam.resolution);
@@ -125,11 +133,24 @@ __device__ Ray sampleCamera(const Camera& cam, int x, int y, glm::vec4 r) {
 	glm::vec2 ruv = scr + pixelSize * glm::vec2(r.x, r.y);
 	ruv = 1.f - ruv * 2.f;
 
-	glm::vec3 pLens = glm::vec3(Math::toConcentricDisk(r.z, r.w) * cam.lensRadius, 0.f);
+	glm::vec2 pAperture;
+	if (scene->apertureMask != nullptr) {
+		int id = scene->apertureSampler.sample(r.z, r.w);
+		pAperture.x = glm::fract((id + .5f) / scene->apertureMask->width);
+		pAperture.y = (id / scene->apertureMask->width + .5f) / scene->apertureMask->height;
+		pAperture = pAperture * 2.f - 1.f;
+	}
+	else {
+		pAperture = Math::toConcentricDisk(r.z, r.w);
+	}
+
+	glm::vec3 pLens = glm::vec3(pAperture * cam.lensRadius, 0.f);
+
 	glm::vec3 pFocusPlane = glm::vec3(ruv * glm::vec2(aspect, 1.f) * tanFovY, 1.f) * cam.focalDist;
 	glm::vec3 dir = pFocusPlane - pLens;
 	ray.direction = glm::normalize(glm::mat3(cam.right, cam.up, cam.view) * dir);
 	ray.origin = cam.position + cam.right * pLens.x + cam.up * pLens.y;
+#endif
 	return ray;
 }
 
@@ -142,7 +163,8 @@ __device__ Ray sampleCamera(const Camera& cam, int x, int y, glm::vec4 r) {
 * lens effect - jitter ray origin positions based on a lens
 */
 __global__ void generateRayFromCamera(
-	DevScene* scene, Camera cam, int iter, int traceDepth, PathSegment* pathSegments
+	DevScene* scene, Camera cam, 
+	int iter, int traceDepth, PathSegment* pathSegments
 ) {
 
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -153,7 +175,7 @@ __global__ void generateRayFromCamera(
 		PathSegment& segment = pathSegments[index];
 		Sampler rng = makeSeededRandomEngine(iter, index, traceDepth, scene->sampleSequence);
 
-		segment.ray = sampleCamera(cam, x, y, sample4D(rng));
+		segment.ray = sampleCamera(scene, cam, x, y, sample4D(rng));
 		segment.throughput = glm::vec3(1.f);
 		segment.radiance = glm::vec3(0.f);
 		segment.pixelIndex = index;
@@ -175,7 +197,7 @@ __global__ void previewGBuffer(
 	int index = y * width + x;
 	Sampler rng = makeSeededRandomEngine(iter, index, 0, scene->sampleSequence);
 
-	Ray ray = sampleCamera(cam, x, y, sample4D(rng));
+	Ray ray = sampleCamera(scene, cam, x, y, sample4D(rng));
 	Intersection intersec;
 	scene->intersect(ray, intersec);
 
@@ -387,7 +409,7 @@ __global__ void singleKernelPT(
 	int index = y * width + x;
 	Sampler rng = makeSeededRandomEngine(iter, index, 0, scene->sampleSequence);
 
-	Ray ray = sampleCamera(cam, x, y, sample4D(rng));
+	Ray ray = sampleCamera(scene, cam, x, y, sample4D(rng));
 	Intersection intersec;
 	scene->intersect(ray, intersec);
 
@@ -495,7 +517,7 @@ __global__ void BVHVisualize(int iter, DevScene* scene, Camera cam, glm::vec3* i
 	int index = y * width + x;
 
 	Sampler rng = makeSeededRandomEngine(iter, index, 0, scene->sampleSequence);
-	Ray ray = sampleCamera(cam, x, y, sample4D(rng));
+	Ray ray = sampleCamera(scene, cam, x, y, sample4D(rng));
 
 	Intersection intersec;
 	scene->visualizedIntersect(ray, intersec);
