@@ -9,7 +9,10 @@
 #include <thrust/sort.h>
 #include <thrust/partition.h>
 #include <iostream>
-
+#include <device_functions.h>
+#include "device_launch_parameters.h"
+#include "cuda_runtime.h"
+#include <cuda_runtime_api.h>
 #include "sceneStructs.h"
 #include "scene.h"
 #include "glm/glm.hpp"
@@ -26,6 +29,7 @@
 #define SORT_RAY 1
 #define ANTI_ALIASING 1
 #define DOF 0
+#define DIRECTLIGHTING 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -106,6 +110,7 @@ static ShadeableIntersection* dev_cache_intersections = NULL;//for first round c
 static Primitive* dev_primitives = NULL;//for mesh
 static Texture* dev_textures = NULL;
 static glm::vec3* dev_texData = nullptr;
+static glm::vec3* dev_lightPoint = nullptr;
 void pathtraceInit(Scene *scene) {
     hst_scene = scene;
     const Camera &cam = hst_scene->state.camera;
@@ -138,6 +143,9 @@ void pathtraceInit(Scene *scene) {
         cudaMemcpy(dev_texData, scene->texData.data(), scene->texData.size() * sizeof(glm::vec3), cudaMemcpyHostToDevice);
     }
 
+    cudaMalloc(&dev_lightPoint, pixelcount * sizeof(glm::vec3));
+    cudaMemset(dev_lightPoint, 0, pixelcount * sizeof(glm::vec3));
+
     // TODO: initialize any extra device memeory you need
 
     checkCUDAError("pathtraceInit");
@@ -154,6 +162,7 @@ void pathtraceFree() {
     cudaFree(dev_cache_intersections);
     cudaFree(dev_primitives);
     cudaFree(dev_textures);
+    cudaFree(dev_lightPoint);
     checkCUDAError("pathtraceFree");
 }
 
@@ -295,7 +304,34 @@ __global__ void computeIntersections(
     }
 }
 
-// LOOK: "fake" shader demonstrating what you might do with the info in
+__global__ void shadeDirectLight(int iter, int num_paths, ShadeableIntersection* shadeableIntersections
+    , PathSegment* pathSegments
+    , Material* materials, Texture* textures, glm::vec3* dev_texData, glm::vec3* dev_lightPoint) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < num_paths)
+    {
+        ShadeableIntersection intersection = shadeableIntersections[idx];
+        if (intersection.t > 0.0f) {
+            Material material = materials[intersection.materialId];
+            glm::vec3 materialColor = material.color;
+            // If the material indicates that the object was a light, "light" the ray
+            if (material.emittance > 0.0f) {
+                dev_lightPoint[idx] = getPointOnRay(pathSegments[idx].ray, intersection.t);
+            }
+        }
+    }
+    //__syncthreads();
+}
+
+__device__ glm::vec3 findClosestLight(int numPath, glm::vec3* dev_lightPoint) {
+    for (int i = 0; i < numPath; i++) {
+        if (dev_lightPoint[i] != glm::vec3(0, 0, 0)) {
+            return dev_lightPoint[i];
+        }
+    }
+    return glm::vec3(0.f, 0.f, 0.f);
+}
+// LOOK: shader demonstrating what you might do with the info in
 // a ShadeableIntersection, as well as how to use thrust's random number
 // generator. Observe that since the thrust random number generator basically
 // adds "noise" to the iteration, the image should start off noisy and get
@@ -304,53 +340,9 @@ __global__ void computeIntersections(
 // Note that this shader does NOT do a BSDF evaluation!
 // Your shaders should handle that - this can allow techniques such as
 // bump mapping.
-__global__ void shadeFakeMaterial (
-  int iter
-  , int num_paths
-    , ShadeableIntersection * shadeableIntersections
-    , PathSegment * pathSegments
-    , Material * materials
-    )
-{
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < num_paths)
-  {
-    ShadeableIntersection intersection = shadeableIntersections[idx];
-    if (intersection.t > 0.0f) { // if the intersection exists...
-      // Set up the RNG
-      // LOOK: this is how you use thrust's RNG! Please look at
-      // makeSeededRandomEngine as well.
-      thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
-      thrust::uniform_real_distribution<float> u01(0, 1);
-
-      Material material = materials[intersection.materialId];
-      glm::vec3 materialColor = material.color;
-
-      // If the material indicates that the object was a light, "light" the ray
-      if (material.emittance > 0.0f) {
-        pathSegments[idx].color *= (materialColor * material.emittance);
-      }
-      // Otherwise, do some pseudo-lighting computation. This is actually more
-      // like what you would expect from shading in a rasterizer like OpenGL.
-      // TODO: replace this! you should be able to start with basically a one-liner
-      else {
-        float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));
-        pathSegments[idx].color *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f;
-        pathSegments[idx].color *= u01(rng); // apply some noise because why not
-      }
-    // If there was no intersection, color the ray black.
-    // Lots of renderers use 4 channel color, RGBA, where A = alpha, often
-    // used for opacity, in which case they can indicate "no opacity".
-    // This can be useful for post-processing and image compositing.
-    } else {
-      pathSegments[idx].color = glm::vec3(0.0f);
-    }
-  }
-}
-
 __global__ void shadeMaterial(int iter, int num_paths, ShadeableIntersection* shadeableIntersections
     , PathSegment* pathSegments
-    , Material* materials, Texture* textures, glm::vec3* dev_texData) {
+    , Material* materials, Texture* textures, glm::vec3* dev_texData, glm::vec3* dev_lightPoint) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < num_paths)
     {
@@ -372,6 +364,13 @@ __global__ void shadeMaterial(int iter, int num_paths, ShadeableIntersection* sh
             // TODO: replace this! you should be able to start with basically a one-liner
             else {
                 scatterRay(pathSegments[idx], getPointOnRay(pathSegments[idx].ray, intersection.t), intersection.surfaceNormal, intersection.uv, material, rng, textures, dev_texData);
+                if (DIRECTLIGHTING && pathSegments[idx].remainingBounces == 2) {
+                    glm::vec3 lightPoint = findClosestLight(num_paths, dev_lightPoint);
+                    if (lightPoint != glm::vec3(0.f, 0.f, 0.f)) {
+                        pathSegments[idx].ray.direction = glm::normalize(lightPoint - pathSegments[idx].ray.origin);
+                    }
+                }
+                pathSegments[idx].remainingBounces--;
             }
             // If there was no intersection, color the ray black.
             // Lots of renderers use 4 channel color, RGBA, where A = alpha, often
@@ -416,8 +415,6 @@ int thrustCompaction(int num, PathSegment* dev_path) {
     new_num_paths = newEnd - dev_path;
     return new_num_paths;
 }
-
-    
 
 void pathtrace(uchar4 *pbo, int frame, int iter) {
     const int traceDepth = hst_scene->state.traceDepth;
@@ -515,6 +512,17 @@ void pathtrace(uchar4 *pbo, int frame, int iter) {
           // materials you have in the scenefile.
           // TODO: compare between directly shading the path segments and shading
           // path segments that have been reshuffled to be contiguous in memory.
+        shadeDirectLight << <numblocksPathSegmentTracing, blockSize1d >> > (
+            iter,
+            new_num_paths,
+            dev_intersections,
+            dev_paths,
+            dev_materials,
+            dev_textures,
+            dev_texData,
+            dev_lightPoint
+            );
+
         shadeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
             iter,
             new_num_paths,
@@ -522,7 +530,8 @@ void pathtrace(uchar4 *pbo, int frame, int iter) {
             dev_paths,
             dev_materials,
             dev_textures,
-            dev_texData
+            dev_texData,
+            dev_lightPoint
             );
 
         if (!firstRoundComplete && CACHE_INTERSECTION) {

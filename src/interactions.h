@@ -8,6 +8,8 @@
  * Used for diffuse lighting.
  */
 
+#define PROCEDURAL 1
+
 __host__ __device__
 glm::vec3 calculateRandomDirectionInHemisphere(
         glm::vec3 normal, thrust::default_random_engine &rng) {
@@ -68,6 +70,11 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  * You may need to change the parameter list for your purposes!
  */
 
+__host__ __device__ glm::vec3 checkerBoard(const glm::vec2 uv) {
+    glm::vec2 v = 5.0f * uv;
+    return (int(v.x) + int(v.y)) % 2 == 0 ? glm::vec3(0.f) : glm::vec3(1.f);
+}
+
 __host__ __device__
 void scatterRay(
         PathSegment & pathSegment,
@@ -90,7 +97,6 @@ void scatterRay(
         pathSegment.color *= m.color;
         pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
         pathSegment.ray.origin = intersect;
-        
     }
     else if (m.hasReflective && m.hasRefractive) {//both and we will use the equation
         float n1, n2;
@@ -100,20 +106,29 @@ void scatterRay(
             normal = -normal;//reverse the normal if outside
             n1 = 1.0f;
             n2 = m.indexOfRefraction;
-            cosineR = glm::dot(incident, normal);
         }
         else {//inside
             n1 = m.indexOfRefraction;
             n2 = 1.0f;
         }//what if both of the surface is not air?(TODO)
+
         float R0 = glm::pow((n1 - n2) / (n1 + n2), 2.0f);
-        float Rtheta = R0 + (1 - R0) * glm::pow(1 - cosineR, 5.0f);
+        float Rtheta = R0 + (1 - R0) * glm::pow(1 - glm::dot(-incident, normal), 5.0f);
         //now I use R value from Schlink approximation and fresnel equations to decide whether reflect or refract
         // > Rtheta then refraction, else reflection
-        if (u01(rng) > Rtheta) {
-            pathSegment.ray.direction = glm::normalize(glm::refract(incident, normal, m.indexOfRefraction));
-            pathSegment.ray.origin = intersect;
-            pathSegment.color *= m.specular.color;
+        float index = n1 / n2;
+        if (u01(rng) >= Rtheta) {//refraction
+            glm::vec3 refract_dir = glm::refract(incident, normal, 1.f / index);
+            //if (glm::length(refract_dir) == 0.f) {
+            //    pathSegment.ray.direction = glm::reflect(incident, normal);
+            //    pathSegment.ray.origin = intersect;
+            //    pathSegment.color *= m.specular.color;
+            //}
+            //else {//refraction
+                pathSegment.ray.direction = glm::normalize(refract_dir);
+                pathSegment.ray.origin = intersect + 0.002f * pathSegment.ray.direction;
+                pathSegment.color *= m.specular.color;
+            //}
         }
         else {
             pathSegment.color *= m.specular.color;
@@ -136,8 +151,12 @@ void scatterRay(
         //pathSegment.color *= textures->image[m.tex.TexIndex + y * w + x];
         pathSegment.color *= texData[m.tex.TexIndex + y * w + x];
     }
-    
+    //procedural
+#if PROCEDURAL
+    if (m.tex.TexIndex >= 0) {
+        pathSegment.color *= checkerBoard(uv);
+    }
+#endif // 
 
-    pathSegment.remainingBounces--;
 
 }
