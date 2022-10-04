@@ -29,7 +29,11 @@
 #define SORT_RAY 1
 #define ANTI_ALIASING 1
 #define DOF 0
-#define DIRECTLIGHTING 1
+#define DIRECTLIGHTING 0
+#define POSTPROCESS 1
+#define RED 0
+#define GREEN 0
+#define BLUE 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -396,6 +400,27 @@ __global__ void finalGather(int nPaths, glm::vec3 * image, PathSegment * iterati
     }
 }
 
+__global__ void shadePostProcess(int iter, int num_paths, ShadeableIntersection* shadeableIntersections
+    , PathSegment* pathSegments) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < num_paths)
+    {
+        glm::vec3 postProcessColor;
+#if RED
+        postProcessColor = glm::vec3(1.f, 0.5f, 0.5f);
+#endif
+#if GREEN
+        postProcessColor = glm::vec3(0.5f, 1.f, 0.5f);
+#endif
+#if BLUE
+        postProcessColor = glm::vec3(0.5f, 0.5f, 1.f);
+#endif
+        ShadeableIntersection intersection = shadeableIntersections[idx];
+        if (intersection.t > 0.0f) {
+            pathSegments[idx].color *= postProcessColor;
+        }
+    }
+}
 /**
  * Wrapper for the __global__ call that sets up the kernel calls and does a ton
  * of memory management
@@ -497,7 +522,7 @@ void pathtrace(uchar4 *pbo, int frame, int iter) {
         cudaDeviceSynchronize();
         depth++;
 
-#ifdef SORT_RAY
+#if SORT_RAY
         thrust::device_ptr<ShadeableIntersection> dev_thrust_intersections(dev_intersections);
         thrust::device_ptr<PathSegment> dev_thrust_segment = thrust::device_ptr<PathSegment>(dev_paths);
         thrust::sort_by_key(thrust::device, dev_thrust_intersections, dev_thrust_intersections + new_num_paths, dev_thrust_segment, compareMatId());
@@ -533,7 +558,14 @@ void pathtrace(uchar4 *pbo, int frame, int iter) {
             dev_texData,
             dev_lightPoint
             );
-
+#if POSTPROCESS
+        shadePostProcess << <numblocksPathSegmentTracing, blockSize1d >> > (
+            iter,
+            new_num_paths,
+            dev_intersections,
+            dev_paths
+            );
+#endif
         if (!firstRoundComplete && CACHE_INTERSECTION) {
             firstRoundComplete = true;
             cudaMemcpy(dev_cache_intersections, dev_intersections, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyHostToHost);
