@@ -28,7 +28,7 @@ struct bvhTree {
     bvhTree(){}
     ~bvhTree(){}
 
-	__host__ void buildTree(std::vector<Triangle>& triangles);
+	__host__ void buildTree(const std::vector<Triangle>& triangles);
     __host__ void recursiveBuild(std::vector<BVHPrimitiveInfo>& primitiveInfo, int start, int end, int curIdx);
     __host__ void initLeaf(std::vector<BVHPrimitiveInfo>& primitiveInfo, int cur, int triIdx);
     //linear form of the tree

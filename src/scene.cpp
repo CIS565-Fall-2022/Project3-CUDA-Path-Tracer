@@ -30,6 +30,17 @@ Scene::Scene(string filename) {
             } 
         }
     }
+
+    //getglobalbounding box
+    for (auto& t : triangles) {
+        std::cout << "geomID: " << t.geomID << std::endl;
+        t.setGlobalBBox(geoms[t.geomID]);
+        /*printf("box={<%f,%f,%f>, <%f,%f,%f>} with geoms[%d]\n",           
+            t.bbox.minCorner.x, t.bbox.minCorner.y, t.bbox.minCorner.z,
+            t.bbox.maxCorner.x, t.bbox.maxCorner.y, t.bbox.maxCorner.z,
+            t.geomID);*/
+
+    }
 }
 
 int Scene::loadGeom(string objectid) {
@@ -54,7 +65,7 @@ int Scene::loadGeom(string objectid) {
                 newGeom.type = CUBE;
             }
             else if (strcmp(tokens[0].c_str(), "model") == 0) {
-                loadObj(newGeom, tokens[1]);
+                loadObj(newGeom, id, tokens[1]);
                 cout << "Creating new model..." << endl;
                 newGeom.type = MODEL;
             }
@@ -199,7 +210,7 @@ int Scene::loadMaterial(string materialid) {
     
 }
 
-int Scene::loadObj(Geom& geom, string filepath) {
+int Scene::loadObj(Geom& geom, int id, string filepath) {
     tinyobj::ObjReaderConfig reader_config;
     reader_config.mtl_search_path = "./"; // Path to material files
 
@@ -312,6 +323,9 @@ int Scene::loadObj(Geom& geom, string filepath) {
             //get triangle bounding box
             face.bbox.minCorner = glm::min(face.v1, glm::min(face.v2, face.v3));
             face.bbox.maxCorner = glm::max(face.v1, glm::max(face.v2, face.v3));
+            face.geomID = id;
+
+            
             triangles.push_back(face);
             //get bounding box 
 

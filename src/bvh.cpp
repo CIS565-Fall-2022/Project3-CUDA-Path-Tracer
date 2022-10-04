@@ -1,7 +1,7 @@
 #include "bvh.h"
 
 using namespace std;
-__host__ void bvhTree::buildTree(std::vector<Triangle>& triangles) {
+__host__ void bvhTree::buildTree(const std::vector<Triangle>& triangles) {
 	if (triangles.size() == 0)
 		return;
 	std::vector<BVHPrimitiveInfo> primitiveInfo(triangles.size());

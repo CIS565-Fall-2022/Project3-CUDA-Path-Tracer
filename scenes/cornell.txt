@@ -112,8 +112,10 @@ SCALE       .01 10 10
 
 // Sphere
 OBJECT 6
-model ../scenes/obj_files/dragon.obj
+model ../scenes/obj_files/cube.obj
 material 1
 TRANS       -1 4 -1
-ROTAT       0 90 0
-SCALE       5 5 5
+ROTAT       0 0 0
+SCALE       1 1 1
+
+

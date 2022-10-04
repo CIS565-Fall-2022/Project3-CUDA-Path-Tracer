@@ -54,21 +54,6 @@ struct BBox {
     
     
 };
-
-
-struct Triangle {
-    //Triangle() {}
-    BBox bbox;
-    int geomID;
-    glm::vec3 v1;
-    glm::vec3 v2;
-    glm::vec3 v3;
-    glm::vec3 n1;
-    glm::vec3 n2;
-    glm::vec3 n3;
-
-};
-
 struct Mesh {
     //Triangle* faces;
     //bounding box
@@ -82,7 +67,7 @@ struct Geom {
     enum GeomType type;
     int materialid;
     // for indexing scene->triangles indexing
-    
+
     Mesh mesh;
     glm::vec3 translation;
     glm::vec3 rotation;
@@ -91,6 +76,27 @@ struct Geom {
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
 };
+
+struct Triangle {
+    BBox bbox;
+    int geomID;
+    glm::vec3 v1;
+    glm::vec3 v2;
+    glm::vec3 v3;
+    glm::vec3 n1;
+    glm::vec3 n2;
+    glm::vec3 n3;
+
+    void setGlobalBBox(const Geom& geom) {
+        glm::vec3 globalV1 = glm::vec3(geom.transform * glm::vec4(v1, 1.f));
+        glm::vec3 globalV2 = glm::vec3(geom.transform * glm::vec4(v2, 1.f));
+        glm::vec3 globalV3 = glm::vec3(geom.transform * glm::vec4(v3, 1.f));
+        bbox.minCorner = glm::min(globalV1, glm::min(globalV2, globalV3));
+        bbox.maxCorner = glm::max(globalV1, glm::max(globalV2, globalV3));
+    }
+};
+
+
 
 struct Material {
     glm::vec3 color;
