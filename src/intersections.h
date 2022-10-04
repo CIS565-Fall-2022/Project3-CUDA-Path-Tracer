@@ -92,24 +92,24 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
 }
 
 #if BVH
-__host__ __device__ bool BoundingBoxIntersectionTest(const Geom& geom, const Ray& r, const BBox& box) {
+__host__ __device__ float BoundingBoxIntersectionTest(const Geom& geom, const Ray& r, const BBox& box) {
 #else
 __host__ __device__ bool meshBoundingBoxIntersectionTest(Geom geom, Ray r) {
 #endif
-    Ray q;
+   /* Ray q;
     q.origin = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
-    q.direction = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));
+    q.direction = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));*/
 
     float tmin = -1e38f;
     float tmax = 1e38f;
     glm::vec3 tmin_n;
     glm::vec3 tmax_n;
     for (int xyz = 0; xyz < 3; ++xyz) {
-        float qdxyz = q.direction[xyz];
+        float qdxyz = r.direction[xyz];
         if (glm::abs(qdxyz) > 0.00001f) {
 #if BVH
-            float t1 = (box.minCorner[xyz] - q.origin[xyz]) / qdxyz;
-            float t2 = (box.maxCorner[xyz] - q.origin[xyz]) / qdxyz;
+            float t1 = (box.minCorner[xyz] - r.origin[xyz]) / qdxyz;
+            float t2 = (box.maxCorner[xyz] - r.origin[xyz]) / qdxyz;
 #else
             float t1 = (geom.mesh.min[xyz] - q.origin[xyz]) / qdxyz;
             float t2 = (geom.mesh.max[xyz] - q.origin[xyz]) / qdxyz;
@@ -131,9 +131,11 @@ __host__ __device__ bool meshBoundingBoxIntersectionTest(Geom geom, Ray r) {
     }
 
     if (tmax >= tmin && tmax > 0) {       
-        return true;
+        glm::vec3 intersectionPoint = getPointOnRay(r, tmin);
+       // normal = glm::normalize(multiplyMV(box.invTranspose, glm::vec4(tmin_n, 0.0f)));
+        return glm::length(r.origin - intersectionPoint);
     }
-    return false;
+    return -1.f;
 }
 // CHECKITOUT
 /**
@@ -306,12 +308,12 @@ __host__ __device__ float bvhIntersectionTest(const Geom& geom, Triangle* tri, b
         cur = stack[--top];
         //pop top
         auto curNode = bvh[cur];
-        
-        if (BoundingBoxIntersectionTest(geom, r, curNode.box)) {
+        t = BoundingBoxIntersectionTest(geom, r, curNode.box);
+        if (t > 0) {
             //if hit the leaf, try intersecting with the triangle
             if (curNode.triID >= 0) {
                 Triangle curTri = tri[curNode.triID];
-                
+
                 if (glm::intersectRayTriangle(rt.origin, rt.direction, curTri.v1, curTri.v2, curTri.v3, baryPosition)) {
                     glm::vec3 localIntersectionPoint = (1.f - baryPosition.x - baryPosition.y) * curTri.v1 + baryPosition.x * curTri.v2 + baryPosition.y * curTri.v3;
                     //local t
@@ -326,14 +328,14 @@ __host__ __device__ float bvhIntersectionTest(const Geom& geom, Triangle* tri, b
             else {
                 int left = 2 * cur + 1;
                 int right = 2 * cur + 2;
-                
+
                 if (right > 0 && right < bvhSize) {
                     stack[top++] = right;
                 }
                 if (left > 0 && left < bvhSize) {
                     stack[top++] = left;
                 }
-                
+
             }
         }
     }

@@ -35,12 +35,13 @@ Scene::Scene(string filename) {
     for (auto& t : triangles) {
         std::cout << "geomID: " << t.geomID << std::endl;
         t.setGlobalBBox(geoms[t.geomID]);
-        /*printf("box={<%f,%f,%f>, <%f,%f,%f>} with geoms[%d]\n",           
-            t.bbox.minCorner.x, t.bbox.minCorner.y, t.bbox.minCorner.z,
+      /*printf("box={<%f,%f,%f>, <%f,%f,%f>} with geoms[%d]\n",           
+           t.bbox.minCorner.x, t.bbox.minCorner.y, t.bbox.minCorner.z,
             t.bbox.maxCorner.x, t.bbox.maxCorner.y, t.bbox.maxCorner.z,
             t.geomID);*/
 
     }
+    sceneBVH.buildTree(triangles);
 }
 
 int Scene::loadGeom(string objectid) {
@@ -341,7 +342,7 @@ int Scene::loadObj(Geom& geom, int id, string filepath) {
     }
 
 
-    sceneBVH.buildTree(triangles);
+  //  sceneBVH.buildTree(triangles);
     cout << "TreeBuilt" << endl;
     return 1;
 }

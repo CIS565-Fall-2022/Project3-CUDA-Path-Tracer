@@ -27,11 +27,11 @@ __host__ void bvhTree::recursiveBuild(std::vector<BVHPrimitiveInfo>& primitiveIn
 	if (end - start == 1) {
 		initLeaf(primitiveInfo, cur, start);
 		//BBox box = bvhNodes[cur].box;
-		/*printf("==Leaf: nodes[%d].box={<%f,%f,%f>, <%f,%f,%f>} with geoms leaf[%d] at depth[%d]\n",
+		printf("==Leaf: nodes[%d].box={<%f,%f,%f>, <%f,%f,%f>} with geoms leaf[%d]\n",
 			cur,
-			box.minCorner.x, box.minCorner.y, box.minCorner.z,
-			box.maxCorner.x, box.maxCorner.y, box.maxCorner.z,
-			start, depth);*/
+			bvhNodes[cur].box.minCorner.x, bvhNodes[cur].box.minCorner.y, bvhNodes[cur].box.minCorner.z,
+			bvhNodes[cur].box.maxCorner.x, bvhNodes[cur].box.maxCorner.y, bvhNodes[cur].box.maxCorner.z,
+			start);
 		return;
 	}
 	else {
@@ -69,11 +69,12 @@ __host__ void bvhTree::recursiveBuild(std::vector<BVHPrimitiveInfo>& primitiveIn
 		bvhNodes[cur].left = left;
 		bvhNodes[cur].right = right;
 
-		/*printf("==NODE: nodes[%d].box={<%f,%f,%f>, <%f,%f,%f>} with left: [%d], right: [%d], at depth [%d], geomID is [%d]\n",
+		printf("==NODE: nodes[%d].box={<%f,%f,%f>, <%f,%f,%f>} with left: [%d], right: [%d], geomID is [%d]\n",
 			cur,
 			centroidBounds.minCorner.x, centroidBounds.minCorner.y, centroidBounds.minCorner.z,
 			centroidBounds.maxCorner.x, centroidBounds.maxCorner.y, centroidBounds.maxCorner.z,
-			left, right, depth, bvhNodes[cur].triID);*/
+			left, right, bvhNodes[cur].triID);
+		printf("a:[%d], b:[%d]\n", start, mid);
 		recursiveBuild(primitiveInfo, start, mid, left);
 		recursiveBuild(primitiveInfo, mid, end, right);
 		//}
