@@ -39,7 +39,7 @@ public:
     __host__ void build(std::vector<Triangle>& faces);
 
 private:
-    __host__ void recursiveBuild(int nodeIdx, std::vector<Triangle>& faces, int depth);
+    __host__ void recursiveBuild(int nodeIdx, std::vector<Triangle>& faces);
 
 };
 

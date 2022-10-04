@@ -43,11 +43,11 @@ void BVHTree::build(std::vector<Triangle>& faces)
 	int depth = glm::ceil(glm::log2((float)faces.size())) + 1;
 	bvhNodes.resize(glm::pow(2, depth) - 1);
 
-	recursiveBuild(0, faces, 0);
+	recursiveBuild(0, faces);
 }
 
 __host__
-void BVHTree::recursiveBuild(int nodeIdx, std::vector<Triangle>& faces, int depth)
+void BVHTree::recursiveBuild(int nodeIdx, std::vector<Triangle>& faces)
 {
 	if (nodeIdx >= bvhNodes.size() * 2 - 1) return;
 	bvhNodes[nodeIdx].idx = nodeIdx;
@@ -91,10 +91,10 @@ void BVHTree::recursiveBuild(int nodeIdx, std::vector<Triangle>& faces, int dept
 		});
 
 	std::vector<Triangle> leftFaces(faces.begin(), faces.begin() + midIdx);
-	recursiveBuild(bvhNodes[nodeIdx].getLeftChildIdx(), leftFaces, depth + 1);
+	recursiveBuild(bvhNodes[nodeIdx].getLeftChildIdx(), leftFaces);
 
 	std::vector<Triangle> rightFaces(faces.begin() + midIdx, faces.end());
-	recursiveBuild(bvhNodes[nodeIdx].getRightChildIdx(), rightFaces, depth + 1);
+	recursiveBuild(bvhNodes[nodeIdx].getRightChildIdx(), rightFaces);
 }
 
 #endif

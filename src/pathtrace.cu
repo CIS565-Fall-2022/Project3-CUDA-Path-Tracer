@@ -20,7 +20,9 @@
 #define ERRORCHECK 1
 
 #define SORT_BY_MATERIAL 0
-#define CACHE_FIRST_INTERSECTION 1
+#define ANTIALIASING 1
+#define CACHE_FIRST_INTERSECTION (1 && !ANTIALIASING)
+
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -184,10 +186,23 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		// TODO: implement antialiasing by jittering the ray
+#if ANTIALIASING
+		thrust::uniform_real_distribution<float> shiftDistGenerator(-0.5f, 0.5f);
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index << 1, 0);
+		float dx = shiftDistGenerator(rng);
+		rng = makeSeededRandomEngine(iter, index << 1 + 1, 0);
+		float dy = shiftDistGenerator(rng);
+
+		segment.ray.direction = glm::normalize(cam.view
+			- cam.right * cam.pixelLength.x * ((float)x + dx - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)y + dy - (float)cam.resolution.y * 0.5f)
+		);
+#else
 		segment.ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
 		);
+#endif
 
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
@@ -253,7 +268,6 @@ __global__ void computeIntersections(
 			else if (!didBVHIntersection && geom.type == MESH)
 			{
 				didBVHIntersection = true;
-				//t = meshIntersectionTest(geom, faces, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 				t = bvhIntersectionTest(geoms, bvhNodes, bvhNodes_size, pathSegment.ray, tmp_intersect, tmp_normal, outside, &hit_geom_index);
 			}
 			else if (didBVHIntersection && geom.type == MESH)
@@ -511,8 +525,13 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			cudaMemcpy(dev_intersectionsCache, dev_intersections, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
 		}
 #else
-        computeIntersections <<<numblocksPathSegmentTracing, blockSize1d>>> (
-            depth, num_paths, dev_paths, dev_geoms, hst_scene->geoms.size(), dev_intersections);
+#if USE_BVH_FOR_INTERSECTION
+		computeIntersections <<<numblocksPathSegmentTracing, blockSize1d >>> (
+			depth, num_paths, dev_paths, dev_geoms, hst_scene->geoms.size(), dev_bvhNodes, bvhNodes_size, dev_intersections);
+#else
+		computeIntersections <<<numblocksPathSegmentTracing, blockSize1d >>> (
+			depth, num_paths, dev_paths, dev_geoms, hst_scene->geoms.size(), dev_faces, hst_scene->faces.size(), dev_intersections);
+#endif
         checkCUDAError("trace one bounce");
 		cudaDeviceSynchronize();
 #endif
