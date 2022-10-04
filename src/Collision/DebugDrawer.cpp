@@ -89,3 +89,10 @@ void DebugDrawer::DrawRect3D(glm::vec3 center, glm::vec3 extent, color_t color) 
 		}
 	}
 }
+
+void DebugDrawer::DrawLine3D(glm::vec3 from, glm::vec3 to, color_t color, float thickness) {
+	glm::vec2 from2D = w2s(glm::mat4(1), from);
+	glm::vec2 to2D = w2s(glm::mat4(1), to);
+	ImU32 col = ImGui::ColorConvertFloat4ToU32(ImVec4(color.x, color.y, color.z, 1));
+	ImGui::GetForegroundDrawList()->AddLine(ImVec2(from2D.x, from2D.y), ImVec2(to2D.x, to2D.y), col, thickness);
+}

@@ -60,23 +60,44 @@ __host__ __device__ inline bool intersect(AABB const& aabb, Ray const& r) {
     float t;
     return intersect(aabb, r, t);
 }
+__host__ __device__ inline bool intersect(AABB const& aabb, glm::vec3 const& point) {
+    bool contained = true;
+#pragma unroll
+    for (int j = 0; j < 3; ++j) {
+        if (point[j] > aabb.max()[j] || point[j] < aabb.min()[j]) {
+            contained = false;
+            break;
+        }
+    }
+    return contained;
+}
 
 template<size_t N>
 __host__ __device__ inline void project(glm::vec3 axis, glm::vec3 const(&pos)[N], float& tmin, float& tmax) {
     tmin = LARGE_FLOAT, tmax = SMALL_FLOAT;
-#pragma unroll
     axis = glm::normalize(axis);
+
+#pragma unroll
     for (int i = 0; i < N; ++i) {
         float t = glm::dot(pos[i], axis);
         tmin = fmin(tmin, t);
         tmax = fmax(tmax, t);
     }
 }
-
 // reference: https://stackoverflow.com/questions/17458562/efficient-aabb-triangle-intersection-in-c-sharp
 __host__ __device__ inline bool intersect(AABB const& a, glm::vec3 const(&tri_verts)[3]) {
     float tri_min, tri_max;
     float box_min, box_max;
+
+    bool contained = true;
+    for (int i = 0; i < 3 && contained; ++i) {
+        if (!intersect(a, tri_verts[i])) {
+            contained = false;
+        }
+    }
+    if (contained) {
+        return true;
+    }
 
     glm::vec3 box_verts[8];
     a.vertices(box_verts, true);

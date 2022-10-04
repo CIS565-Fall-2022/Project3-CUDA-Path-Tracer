@@ -37,9 +37,12 @@ public:
     int cur_save;
     char buf[256];
     char const* prompt_text;
+    bool draw_coord_frame;
     bool draw_debug_aabb;
     bool draw_world_aabb;
     int octree_depth;
+    int octree_depth_filter;
+    int octree_intersection_cnt;
     octree* test_tree;
 };
 

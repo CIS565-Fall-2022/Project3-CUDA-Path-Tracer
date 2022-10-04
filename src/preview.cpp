@@ -255,7 +255,15 @@ void RenderImGui() {
 
 		//DebugDrawer::DrawRect(0, 0, 20, 20, { 0,0,1 });
 		//DebugDrawer::DrawRect(width - 20, height - 20, 20, 20, { 0,0,1 });
-
+		if (!guiData->draw_coord_frame) {
+			if (ImGui::Button("[DEBUG] Draw World Frame")) {
+				guiData->draw_coord_frame = true;
+			}
+		} else {
+			if (ImGui::Button("[DEBUG] Don't draw World Frame")) {
+				guiData->draw_coord_frame = false;
+			}
+		}
 		if (!guiData->draw_debug_aabb) {
 			if (ImGui::Button("[DEBUG] Draw AABB")) {
 				guiData->draw_debug_aabb = true;
@@ -265,7 +273,6 @@ void RenderImGui() {
 				guiData->draw_debug_aabb = false;
 			}
 		}
-
 		if (!guiData->draw_world_aabb) {
 			if (ImGui::Button("[DEBUG] Draw World AABB")) {
 				guiData->draw_world_aabb = true;
@@ -278,7 +285,7 @@ void RenderImGui() {
 
 		ImGui::Text("Octree Test");
 		{
-			ImGui::SliderInt("Octree Depth", &guiData->octree_depth, 1, 20);
+			ImGui::SliderInt("Octree Depth", &guiData->octree_depth, 0, 20);
 			if(ImGui::Button("Generate Octree")) {
 				if (guiData->test_tree) {
 					delete guiData->test_tree;
@@ -296,9 +303,19 @@ void RenderImGui() {
 		}
 	}
 
+	if (guiData->draw_coord_frame) {
+		float x = scene->world_AABB.min().x + 1.f;
+		float y = scene->world_AABB.min().y + 1.f;
+		glm::vec3 origin{ x, y, 0 };
+		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(2, 0, 0), { 1,0,0 });
+		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(0, 2, 0), { 0,1,0 });
+		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(0, 0, 2), { 0,0,1 });
+	}
 	if (guiData->draw_debug_aabb) {
 		for (Geom const& g : scene->geoms) {
-			DebugDrawer::DrawAABB(g.bounds, { 1,0,0 });
+			if (g.type == MESH) {
+				DebugDrawer::DrawAABB(g.bounds, { 1,0,0 });
+			}
 		}
 	}
 	if (guiData->draw_world_aabb) {
@@ -306,10 +323,28 @@ void RenderImGui() {
 	}
 
 	if (guiData->test_tree) {
-		auto f = [](octree::node const& node) {
-			DebugDrawer::DrawAABB(node.bounds, {0.5f, 0.5f, 0.5f});
-		};
-		guiData->test_tree->dfs(f);
+		if (ImGui::Button("Clear Depth Filter")) {
+			if (guiData->octree_depth_filter != -1) {
+				guiData->octree_depth_filter = -1;
+			}
+		}
+		ImGui::SliderInt("Set Depth Filter (-1 means no)", &guiData->octree_depth_filter, -1, guiData->octree_depth);
+		guiData->octree_intersection_cnt = 0;
+		guiData->test_tree->dfs([&](octree::node const& node, int depth) {
+			if (guiData->octree_depth_filter != -1) {
+				if (guiData->octree_depth_filter == depth) {
+					DebugDrawer::DrawAABB(node.bounds, { 0.5f, 0.5f, 0.5f });
+					guiData->octree_intersection_cnt += node.triangles.size();
+				}
+			} else {
+				DebugDrawer::DrawAABB(node.bounds, { 0.5f, 0.5f, 0.5f });
+				guiData->octree_intersection_cnt += node.triangles.size();
+			}
+		});
+		std::string info = "intersected triangles: " + std::to_string(guiData->octree_intersection_cnt) + 
+			"\ntotal: " + std::to_string(scene->triangles.size());
+
+		ImGui::Text(info.c_str());
 	}
 
 	ImGui::End();

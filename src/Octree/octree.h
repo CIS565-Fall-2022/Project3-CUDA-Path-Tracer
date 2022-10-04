@@ -16,12 +16,13 @@
 class octree {
 	friend class octreeGPU;
 
+public:
 	typedef size_t node_id_t;
 	static constexpr node_id_t null_id = 0;
 	static constexpr node_id_t root_id = 1;
 	static constexpr float eps_scale = 100.0f;
 	static constexpr float eps = eps_scale * std::numeric_limits<float>::epsilon();
-public:
+
 	struct node {
 		AABB bounds;
 		node_id_t children[8];
@@ -48,7 +49,7 @@ private:
 
 
 	node_id_t new_node(AABB const& bounds) {
-		int ret = _nodes.size();
+		node_id_t ret = _nodes.size();
 		_nodes.emplace_back(bounds);
 		return ret;
 	}
@@ -59,14 +60,19 @@ private:
 		auto const& verts = scene.vertices;
 		auto const& tris = scene.triangles;
 		auto const& geoms = scene.geoms;
-		glm::vec3 triangle_verts[3];
 
 		for (auto const& geom : geoms) {
 			if (geom.type != MESH) {
 				continue;
 			}
+			if (!intersect(geom.bounds, box)) {
+				continue;
+			}
+
 			for (int i = meshes[geom.meshid].tri_start; i < meshes[geom.meshid].tri_end; ++i) {
 				auto const& tri = tris[i];
+
+				glm::vec3 triangle_verts[3];
 				for (int x = 0; x < 3; ++x) {
 					triangle_verts[x] = glm::vec3(geom.transform * glm::vec4(verts[tri.verts[x]], 1));
 				}
@@ -95,8 +101,6 @@ private:
 			return;
 		}
 
-		auto const& verts = scene.vertices;
-		auto const& tris = scene.triangles;
 		// recursively divide the space
 		glm::vec3 half_size = _nodes[cur].bounds.extent();
 		glm::vec3 half_X = glm::vec3(half_size.x, 0, 0);
@@ -116,9 +120,14 @@ private:
 		};
 
 		for (size_t i = 0; i < 8; ++i) {
-			bs[i] = AABB(mins[i], mins[i] + half_size);
+			bs[i] = AABB(mins[i] - eps, mins[i] + half_size + eps);
 			if (get_hits(scene, bs[i], null_id)) {
-				_nodes[cur].children[i] = new_node(bs[i]);
+				node_id_t ret = new_node(bs[i]);
+				_nodes[cur].children[i] = ret;
+
+//				_nodes[cur].children[i] = new_node(bs[i]);
+				// TODO: figure out why _nodes[cur].children[i] = new_node(bs[i]) is wrong in release
+
 				build(scene, _nodes[cur].children[i], depth + 1);
 			}
 		}
@@ -132,15 +141,15 @@ public:
 
 	template<typename Callback>
 	void dfs(Callback func) {
-		std::function<void(node_id_t)> f = [&](node_id_t cur) {
-			func(_nodes[cur]);
+		std::function<void(node_id_t, int)> f = [&](node_id_t cur, int depth) {
+			func(_nodes[cur], depth);
 			for (node_id_t child : _nodes[cur].children) {
 				if (child != null_id) {
-					f(child);
+					f(child, depth + 1);
 				}
 			}
 		};
-		f(root_id);
+		f(root_id, 0);
 	}
 };
 

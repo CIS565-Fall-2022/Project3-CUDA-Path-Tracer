@@ -47,9 +47,12 @@ GuiDataContainer::GuiDataContainer() :
     cur_scene(0),
     cur_save(0),
     prompt_text(""),
+    draw_coord_frame(false),
     draw_debug_aabb(false),
     draw_world_aabb(false),
-    octree_depth(1),
+    octree_depth(0),
+    octree_depth_filter(-1),
+    octree_intersection_cnt(0),
     test_tree(nullptr)
 {
     memset(buf, 0, sizeof(buf));
@@ -75,8 +78,10 @@ GuiDataContainer::GuiDataContainer() :
 }
 void GuiDataContainer::Reset() {
     prompt_text = "";
-    draw_world_aabb = draw_debug_aabb = false;
-    octree_depth = 1;
+    draw_coord_frame = draw_world_aabb = draw_debug_aabb = false;
+    octree_depth = 0;
+    octree_depth_filter = -1;
+    octree_intersection_cnt = 0;
     if (test_tree) {
         delete test_tree;
         test_tree = nullptr;
