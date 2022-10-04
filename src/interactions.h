@@ -91,6 +91,7 @@ void scatterRay(
             // specular reflection
             pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
         }
+        pathSegment.color *= 2.f;
     }
     else
     {
@@ -100,5 +101,4 @@ void scatterRay(
 
     pathSegment.ray.origin = intersect + EPSILON * pathSegment.ray.direction;
     pathSegment.color *= m.color;
-    pathSegment.remainingBounces--;
 }

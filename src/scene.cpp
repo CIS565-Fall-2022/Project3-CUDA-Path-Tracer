@@ -3,6 +3,9 @@
 #include <cstring>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include "ThirdPartyLib/tiny_obj_loader.h"
+
+#define USE_BVH_FOR_INTERSECTION 1
 
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
@@ -30,6 +33,16 @@ Scene::Scene(string filename) {
             }
         }
     }
+#if USE_BVH_FOR_INTERSECTION
+    for (Triangle& face : faces)
+    {
+        face.computeGlobalBoundingBox(geoms[face.geomId]);
+    }
+#endif
+}
+
+Scene::~Scene()
+{
 }
 
 int Scene::loadGeom(string objectid) {
@@ -51,6 +64,10 @@ int Scene::loadGeom(string objectid) {
             } else if (strcmp(line.c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
+            } else {
+                cout << "Creating new mesh..." << endl;
+                newGeom.type = MESH;
+                loadObj(line, newGeom, id);
             }
         }
 
@@ -185,4 +202,107 @@ int Scene::loadMaterial(string materialid) {
         materials.push_back(newMaterial);
         return 1;
     }
+}
+
+int Scene::loadObj(string filePath, Geom& geom, int geomId)
+{
+    tinyobj::ObjReaderConfig reader_config;
+    reader_config.mtl_search_path = "./"; // Path to material files
+
+    tinyobj::ObjReader reader;
+
+    if (!reader.ParseFromFile(filePath, reader_config)) {
+        if (!reader.Error().empty()) {
+            std::cerr << "TinyObjReader: " << reader.Error();
+        }
+        return -1;
+    }
+
+    if (!reader.Warning().empty()) {
+        std::cout << "TinyObjReader: " << reader.Warning();
+    }
+
+    cout << "Loading Obj File From " << filePath << "..." << endl;
+
+    auto& attrib = reader.GetAttrib();
+    auto& shapes = reader.GetShapes();
+    //auto& materials = reader.GetMaterials();
+
+    geom.faceNum = 0;
+    for (size_t s = 0; s < shapes.size(); s++)
+    {
+        geom.faceNum += shapes[s].mesh.num_face_vertices.size();
+    }
+
+    geom.faceStartIdx = faces.size();
+
+    // Loop over shapes
+    for (size_t s = 0; s < shapes.size(); s++) {
+        // Loop over faces(polygon)
+        size_t index_offset = 0;
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+            size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+
+            Triangle face;
+            // Loop over vertices in the face.
+            for (size_t v = 0; v < fv; v++) {
+                // access to vertex
+                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+                tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
+                tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
+                tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+
+                glm::vec3 vertexPos = glm::vec3(vx, vy, vz);
+                glm::vec3 vertexNormal;
+
+                // Check if `normal_index` is zero or positive. negative = no normal data
+                if (idx.normal_index >= 0) {
+                    tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
+                    tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
+                    tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
+
+                    vertexNormal = glm::vec3(nx, ny, nz);
+                }
+
+                // Check if `texcoord_index` is zero or positive. negative = no texcoord data
+                if (idx.texcoord_index >= 0) {
+                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+                    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+                }
+
+                // Optional: vertex colors
+                // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
+                // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
+                // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
+
+                
+                switch (v)
+                {
+                case 0:
+                    face.point1 = vertexPos;
+                    face.normal1 = vertexNormal;
+                    break;
+                case 1:
+                    face.point2 = vertexPos;
+                    face.normal2 = vertexNormal;
+                    break;
+                case 2:
+                    face.point3 = vertexPos;
+                    face.normal3 = vertexNormal;
+                    break;
+                }
+            }
+#if USE_BVH_FOR_INTERSECTION
+            face.geomId = geomId;
+            //face.computeLocalBoundingBox(geom);
+#endif
+            faces.push_back(face);
+            index_offset += fv;
+
+            // per-face material
+            //shapes[s].mesh.material_ids[f];
+        }
+    }
+
+    return 1;
 }
