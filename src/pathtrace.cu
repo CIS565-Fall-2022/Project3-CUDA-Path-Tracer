@@ -104,7 +104,8 @@ static Scene* hst_scene = NULL;
 static GuiDataContainer* guiData = NULL;
 static glm::vec3* dev_image = NULL;
 static Geom* dev_geoms = NULL;
-static Triangle* dev_tris = NULL; // --> all triangles in the mesh
+static LBVHNode* dev_lbvh = NULL;
+static Triangle* dev_tris = NULL;
 static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
@@ -131,7 +132,10 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_geoms, scene->geoms.size() * sizeof(Geom));
 	cudaMemcpy(dev_geoms, scene->geoms.data(), scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
 
-	cudaMalloc(&dev_tris, scene->triangles.size() * sizeof(Geom));
+	cudaMalloc(&dev_lbvh, scene->lbvh.size() * sizeof(LBVHNode));
+	cudaMemcpy(dev_lbvh, scene->lbvh.data(), scene->lbvh.size() * sizeof(LBVHNode), cudaMemcpyHostToDevice);
+	
+	cudaMalloc(&dev_tris, scene->triangles.size() * sizeof(Triangle));
 	cudaMemcpy(dev_tris, scene->triangles.data(), scene->triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice);
 
 	cudaMalloc(&dev_materials, scene->materials.size() * sizeof(Material));
@@ -151,6 +155,7 @@ void pathtraceFree() {
 	cudaFree(dev_image);  // no-op if dev_image is null
 	cudaFree(dev_paths);
 	cudaFree(dev_geoms);
+	cudaFree(dev_lbvh);
 	cudaFree(dev_tris);
 	cudaFree(dev_materials);
 	cudaFree(dev_intersections);
@@ -252,6 +257,7 @@ __global__ void computeIntersections(
 	, int num_paths
 	, PathSegment* pathSegments
 	, Geom* geoms
+	, LBVHNode* dev_lbvh
 	, Triangle* dev_tris
 	, int geoms_size
 	, ShadeableIntersection* intersections
@@ -293,7 +299,8 @@ __global__ void computeIntersections(
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 			else if (geom.type == MESH)
 			{
-				t = meshIntersectionTest(geom, pathSegment.ray, dev_tris, tmp_intersect, tmp_normal, outside);
+				//t = meshIntersectionTest(geom, pathSegment.ray, dev_tris, tmp_intersect, tmp_normal, outside);
+				t = lbvhIntersectionTest(dev_lbvh, dev_tris, pathSegment.ray, geom.triangleCount, tmp_intersect, tmp_normal, outside);
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
@@ -514,6 +521,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, compact_num_paths
 				, dev_paths
 				, dev_geoms
+				, dev_lbvh
 				, dev_tris
 				, hst_scene->geoms.size()
 				, dev_intersections
@@ -535,6 +543,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 					, compact_num_paths
 					, dev_paths
 					, dev_geoms
+					, dev_lbvh
 					, dev_tris
 					, hst_scene->geoms.size()
 					, dev_intersections
@@ -549,6 +558,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, compact_num_paths
 			, dev_paths
 			, dev_geoms
+			, dev_lbvh
 			, dev_tris
 			, hst_scene->geoms.size()
 			, dev_intersections

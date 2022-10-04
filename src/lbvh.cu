@@ -1,6 +1,6 @@
 #include "lbvh.h"
 
-bool morton_sort(MortonCode a, MortonCode b) {
+bool morton_sort(const MortonCode& a, const MortonCode& b) {
     return a.code < b.code;
 }
 
@@ -12,6 +12,30 @@ AABB Union(AABB left, AABB right) {
     glm::vec3 umin = glm::min(left.min, right.min);
     glm::vec3 umax = glm::max(left.max, right.max);
     return AABB{ umin, umax }; 
+}
+
+float test_aabbIntersectionTest(AABB aabb, Ray r) {
+    glm::vec3 invR = glm::vec3(1.0, 1.0, 1.0) / r.direction;
+
+    float x1 = (aabb.min.x - r.origin.x) * invR.x;
+    float x2 = (aabb.max.x - r.origin.x) * invR.x;
+
+    float tmin = min(x1, x2);
+    float tmax = max(x1, x2);
+
+    float y1 = (aabb.min.y - r.origin.y) * invR.y;
+    float y2 = (aabb.max.y - r.origin.y) * invR.y;
+
+    tmin = min(tmin, min(y1, y2));
+    tmax = max(tmin, max(y1, y2));
+
+    float z1 = (aabb.min.z - r.origin.z) * invR.z;
+    float z2 = (aabb.max.z - r.origin.z) * invR.z;
+
+    tmin = min(tmin, min(y1, y2));
+    tmax = max(tmin, max(y1, y2));
+
+    return tmin <= tmax;
 }
 
 // Helper functions to calculate a 30-bit Morton code for the
@@ -45,20 +69,23 @@ void computeMortonCodes(Scene* scene, const AABB& sceneAABB) {
         glm::vec3 norm_centroid = (centroid - sceneAABB.min) / (sceneAABB.max - sceneAABB.min);
 
         // Calculate Morton code and add to list
-        unsigned int mcode = mortonCode3D(norm_centroid);
-        scene->triangles[i].mcode = mcode;
+        MortonCode mcode;
+        mcode.objectId = i;
+        mcode.code = mortonCode3D(norm_centroid);
+        scene->triangles[i].mcode = mcode.code;
         scene->mcodes.push_back(mcode);
     }
 }
 
 void sortMortonCodes(Scene* scene) {
-    std::vector<unsigned int> mcodes_copy = scene->mcodes;
-    thrust::sort(thrust::host, mcodes_copy.begin(), mcodes_copy.end());
+    std::vector<MortonCode> mcodes_copy = scene->mcodes;
+    //thrust::stable_sort(thrust::host, mcodes_copy.begin(), mcodes_copy.end(), morton_sort());
+    std::sort(mcodes_copy.begin(), mcodes_copy.end(), morton_sort);
     scene->mcodes = mcodes_copy;
 }
 
 // Determine range functions
-int delta(unsigned int* sortedMCodes, int N, int i, int j) {
+int delta(MortonCode* sortedMCodes, int N, int i, int j) {
     // Range check
     if (i < 0 || j < 0 || i >= N || j >= N) {
         return -1;
@@ -66,15 +93,15 @@ int delta(unsigned int* sortedMCodes, int N, int i, int j) {
 
     // if same - return 32 + lzcnt(i ^ j) ?
     // Is this 31 - lzcnt?
-    return __lzcnt(sortedMCodes[i] ^ sortedMCodes[j]);
+    return __lzcnt(sortedMCodes[i].code ^ sortedMCodes[j].code);
 }
 
-int sign(unsigned int* sortedMCodes, int N, int i) {
+int sign(MortonCode* sortedMCodes, int N, int i) {
     int diff = delta(sortedMCodes, N, i, i + 1) - delta(sortedMCodes, N, i, i - 1);
     return (diff >= 0) ? 1 : -1;
 }
 
-NodeRange determineRange(unsigned int* sortedMCodes, int triangleCount, int i) {
+NodeRange determineRange(MortonCode* sortedMCodes, int triangleCount, int i) {
     // Determine direction of range (+1 or -1)
     int d = sign(sortedMCodes, triangleCount, i);
 
@@ -97,7 +124,7 @@ NodeRange determineRange(unsigned int* sortedMCodes, int triangleCount, int i) {
     return NodeRange{ i, j, l, d };
 }
 
-int findSplit(unsigned int* sortedMCodes, int triangleCount, NodeRange range) {
+int findSplit(MortonCode* sortedMCodes, int triangleCount, NodeRange range) {
     int i = range.i;
     int j = range.j;
     int l = range.l;
@@ -138,7 +165,8 @@ void buildLBVH(Scene* scene, int triangleCount) {
     // Initialize leaf nodes
     for (int i = 0; i < numLeaf; ++i) {
         LBVHNode leafNode;
-        leafNode.objectId = i; // TODO: this points to the wrong data
+        leafNode.objectId = scene->mcodes[i].objectId; // TODO: this points to the wrong data
+        leafNode.aabb = scene->triangles[leafNode.objectId].aabb;
         leafNode.left = 0xFFFFFFFF;
         leafNode.right = 0xFFFFFFFF;
         scene->lbvh[i] = leafNode;
@@ -170,11 +198,79 @@ void buildLBVH(Scene* scene, int triangleCount) {
             rightChild = triangleCount + split + 1;
         }
 
-        internalNode.objectId = j;
+        internalNode.objectId = -1;
         internalNode.left = leftChild;
         internalNode.right = rightChild;
         scene->lbvh[j] = internalNode;
     }
+    // Assign bounding boxes here
+    assignBoundingBoxes(scene, &scene->lbvh[triangleCount]);
+}
+
+float traverseLBVH(Scene* scene, Ray r, int triangleCount)
+{
+    float stack[64];
+    int stackPtr = -1;
+
+    float min_t = INFINITY;
+    glm::vec3 barycenter;
+
+    // Push root node
+    stack[++stackPtr] = triangleCount;
+    int currNodeIdx = stack[stackPtr];
+    while (stackPtr >= 0)
+    {
+        // Check intersection with left and right children
+        int leftChild = scene->lbvh[currNodeIdx].left;
+        int rightChild = scene->lbvh[currNodeIdx].right;
+        LBVHNode left = scene->lbvh[leftChild];
+        LBVHNode right = scene->lbvh[rightChild];
+
+        bool intersectLeft = test_aabbIntersectionTest(left.aabb, r);
+        intersectLeft = true;
+        bool intersectRight = test_aabbIntersectionTest(right.aabb, r);
+        intersectRight = true;
+
+        // If intersection found, and they are leaf nodes, check for triangle intersections
+        if (intersectLeft && isLeaf(&left)) {
+            //float t = triangleIntersectionTest(tris[leftChild.idx], r, barycenter);
+            //min_t = glm::min(min_t, t);
+        }
+        if (intersectRight && isLeaf(&right)) {
+            //float t = triangleIntersectionTest(tris[rightChild.idx], r, barycenter);
+            //min_t = glm::min(min_t, t);
+        }
+
+        // If internal nodes, keep traversing
+        bool traverseLeftSubtree = (intersectLeft && !isLeaf(&left));
+        bool traverseRightSubtree = (intersectRight && !isLeaf(&right));
+
+        if (!traverseLeftSubtree && !traverseRightSubtree) {
+            // Pop node from stack
+            currNodeIdx = stack[stackPtr--];
+        }
+        else {
+            currNodeIdx = (traverseLeftSubtree) ? leftChild : rightChild;
+            if (traverseLeftSubtree && traverseRightSubtree) {
+                // Push right child onto stack
+                stack[++stackPtr] = rightChild;
+            }
+        }
+    }
+
+    return min_t;
+}
+
+void generateLBVH(Scene* scene)
+{
+    // Morton code computation
+    computeMortonCodes(scene, scene->sceneAABB);
+
+    // Sort Morton codes
+    sortMortonCodes(scene);
+
+    // Build tree from sorted Morton codes
+    buildLBVH(scene, scene->mcodes.size());
 }
 
 void unitTest(Scene* scene)
@@ -185,17 +281,28 @@ void unitTest(Scene* scene)
     // Sort Morton codes
     sortMortonCodes(scene);
     
-    for (int i = 0; i < scene->mcodes.size(); i++) {
-        std::cout << scene->mcodes[i] << std::endl;
-    }
+    /*for (int i = 0; i < scene->mcodes.size(); i++) {
+        std::cout << scene->mcodes[i].code << std::endl;
+    }*/
 
-    std::vector<unsigned int> test_sorted_mcodes = { 0b00001, 0b00010, 0b00100, 0b00101, 0b10011, 0b11000, 0b11001, 0b11110 };
-    scene->mcodes = test_sorted_mcodes;
-    // Test common prefix function
-    int commonPrefix = delta(test_sorted_mcodes.data(), test_sorted_mcodes.size(), 5, 6);
+    std::vector<MortonCode> test_sorted_mcodes = { MortonCode { 0, 0b00001 },
+                                                   MortonCode { 1, 0b00010 },
+                                                   MortonCode { 6, 0b00100 },
+                                                   MortonCode { 4, 0b00101 },
+                                                   MortonCode { 5, 0b10011 },
+                                                   MortonCode { 2, 0b11000 },
+                                                   MortonCode { 3, 0b11001 },
+                                                   MortonCode { 7, 0b11110 } };
+    //scene->mcodes = test_sorted_mcodes;
 
     // Test tree building
-    buildLBVH(scene, test_sorted_mcodes.size());
-    int j = 0;
+    buildLBVH(scene, scene->mcodes.size());
+    
+    // Test tree traversal
+    Ray ray;
+    ray.origin = glm::vec3(0.0, 0.0, 0.0);
+    ray.direction = glm::vec3(0.0, 0.0, 1.0);
+    traverseLBVH(scene, ray, scene->mcodes.size());
+
     return;
 }

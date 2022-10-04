@@ -30,6 +30,7 @@ NodeRange determineRange(unsigned int* sortedMCodes, int triangleCount, int idx)
 int findSplit(unsigned int* sortedMCodes, int triangleCount, NodeRange range);
 void assignBoundingBoxes(Scene* scene);
 void buildLBVH(Scene* scene, int triangleCount);
+void traverseLBVH(Scene* scene);
 
 // Construct entire LBVH
 void generateLBVH(Scene* scene);
