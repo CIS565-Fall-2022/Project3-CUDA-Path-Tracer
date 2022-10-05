@@ -4,6 +4,9 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;
@@ -51,6 +54,14 @@ int Scene::loadGeom(string objectid) {
             } else if (strcmp(line.c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
+            } else if (strcmp(line.c_str(), "mesh") == 0) {
+                cout << "Creating new mesh..." << endl;
+                newGeom.type = MESH;
+                utilityCore::safeGetline(fp_in, line);
+                if (!line.empty() && fp_in.good())
+                {
+                    loadTrianglesForMesh(line, newGeom);
+                }
             }
         }
 
@@ -185,4 +196,119 @@ int Scene::loadMaterial(string materialid) {
         materials.push_back(newMaterial);
         return 1;
     }
+}
+
+int Scene::loadTrianglesForMesh(string filename, Geom& thisMesh)
+{
+    //tiny obj vars
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string warn, err;
+
+    bool success = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filename.c_str());
+
+    //warning + error checks
+    if (!(warn.empty())) {
+        std::cout << "TinyObjReader: " << warn << std::endl;
+    }
+
+    if (!(err.empty())) {
+        std::cout << "TinyObjReader: " << err << std::endl;
+    }
+
+    if (!success) return -1;
+
+
+    // Loop over shapes, should be only one shape
+    for (size_t shape = 0; shape < shapes.size(); shape++) {
+        //check for only one shape
+        if (shape > 0)
+        {
+            std::cout << "TinyObjReader: more than one shape in "<< filename << std::endl;
+            return -1;
+        }
+
+        thisMesh.triangleStartIndex = globalTriangleCount;
+
+        // Loop over faces(polygon)
+        size_t index_offset = 0;
+
+        glm::vec3 boundMin{ FLT_MAX };
+        glm::vec3 boundMax{ FLT_MIN };
+
+        for (size_t face = 0; face < shapes[shape].mesh.num_face_vertices.size(); face++)
+        {
+            //vertex count of current face
+            size_t vertexCount = size_t(shapes[shape].mesh.num_face_vertices[face]);
+
+            glm::vec3 current_ver{ 0 };
+            glm::vec3 current_norm{ 0 };
+            Triangle current_triangle = Triangle();
+
+            // Loop over vertices in the face.
+            for (size_t v = 0; v < vertexCount; v++) {
+                // access to vertex
+                tinyobj::index_t idx = shapes[shape].mesh.indices[index_offset + v];
+                tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
+                tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
+                tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+
+                current_ver = glm::vec3(vx, vy, vz);
+
+                if (vx < boundMin.x) { boundMin.x = vx; }
+                if (vy < boundMin.y) { boundMin.y = vy; }
+                if (vz < boundMin.z) { boundMin.z = vz; }
+                if (vx > boundMax.x) { boundMax.x = vx; }
+                if (vy > boundMax.y) { boundMax.y = vy; }
+                if (vz > boundMax.z) { boundMax.z = vz; }
+
+                //normal
+                if (idx.normal_index >= 0) {
+                    tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
+                    tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
+                    tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
+                    current_norm = glm::vec3(nx, ny, nz);
+                }
+
+                // texture TODO
+                /*if (idx.texcoord_index >= 0) {
+                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+                    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+                }*/
+
+                if (v == 0) {
+                    current_triangle.pos1 = current_ver;
+                    current_triangle.normal1 = current_norm;
+                }
+                else if (v == 1) {
+                    current_triangle.pos2 = current_ver;
+                    current_triangle.normal2 = current_norm;
+                }
+                else {
+                    current_triangle.pos3 = current_ver;
+                    current_triangle.normal3 = current_norm;
+                }
+            }
+
+            index_offset += vertexCount;
+            globalTriangles.push_back(current_triangle);
+            globalTriangleCount++;
+        }
+        thisMesh.totaltriangles = globalTriangleCount - thisMesh.triangleStartIndex;
+        thisMesh.boxMin = boundMin;
+        thisMesh.boxMax = boundMax;
+    }
+
+    return 1;
+}
+
+void Scene::freeObjs()
+{
+    //delete globalTriangles;
+}
+
+Scene::~Scene()
+{
+    freeObjs();
 }

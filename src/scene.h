@@ -16,11 +16,16 @@ private:
     int loadMaterial(string materialid);
     int loadGeom(string objectid);
     int loadCamera();
+    int loadTrianglesForMesh(string filename, Geom& thisMesh);
 public:
     Scene(string filename);
     ~Scene();
+    void freeObjs();
 
     std::vector<Geom> geoms;
     std::vector<Material> materials;
+
+    std::vector<Triangle> globalTriangles;
+    unsigned int globalTriangleCount = 0;
     RenderState state;
 };
