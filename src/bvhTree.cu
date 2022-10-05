@@ -39,6 +39,7 @@ BVHTree::~BVHTree()
 __host__
 void BVHTree::build(std::vector<Triangle>& faces)
 {
+	if (faces.size() == 0) return;
 	// The maximum depth of nodes if we use equal counts methods to build the tree.
 	int depth = glm::ceil(glm::log2((float)faces.size())) + 1;
 	bvhNodes.resize(glm::pow(2, depth) - 1);
