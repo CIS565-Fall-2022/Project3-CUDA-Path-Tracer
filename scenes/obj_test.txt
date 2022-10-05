@@ -118,10 +118,12 @@ TRANS       5 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
-// Sphere
+//earth
 OBJECT 6
-sphere
-material 4
+gltf
+../scenes/Cube.gltf
+material 1
 TRANS       -1 4 -1
-ROTAT       0 0 0
-SCALE       3 3 3
+ROTAT       90 45 45
+SCALE       .1 .1 .1
+
