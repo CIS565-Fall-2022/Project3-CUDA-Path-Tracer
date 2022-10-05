@@ -1,6 +1,7 @@
 #pragma once
 
 #include "intersections.h"
+#include "stb_image.h"
 
 // CHECKITOUT
 /**
@@ -66,12 +67,16 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  *
  * You may need to change the parameter list for your purposes!
  */
+#if USE_UV
 __host__ __device__
 void scatterRay(
         PathSegment & pathSegment,
         glm::vec3 intersect,
         glm::vec3 normal,
+        int texid,
+        glm::vec2 uv,
         const Material &m,
+        const Texture &tex,
         thrust::default_random_engine &rng) {
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
@@ -156,14 +161,31 @@ void scatterRay(
 
         glm::vec3 pointColor;
 
-#if USE_UV
-        pointColor = GetImageColor(u, v, texture);
-#endif
-        pointColor = m.color;
+        if (texid != -1) {
+            float u = uv[0];
+            float v = uv[1];
+
+            // if uv exists, as in, they're both not -1
+            // if (u > 0 && v >= 0) {
+                float ix = u * (tex.width - 1);
+                float iy = v * (tex.height - 1);
+                int texDataIdx = ceil(iy * tex.height + ix);
+
+                // printf("texDataIdx %f \n");
+
+                pointColor = 3.f * tex.dev_texImage[texDataIdx];
+                // pointColor = glm::vec3(u, v, 0.f);
+                //pointColor = m.color;
+                //printf("pointColor: X %f, Y %f, Z %f \n", pointColor[0], pointColor[1], pointColor[2]);
+            //}
+        }
+        else {
+            pointColor = m.color;
+        }
 
         PathSegment newPath = {
             newRay,
-            m.color * pathSegment.color,
+            pointColor * pathSegment.color,
             pathSegment.pixelIndex,
             pathSegment.remainingBounces
         };
@@ -171,3 +193,108 @@ void scatterRay(
         pathSegment = newPath;
     }
 }
+
+#else
+__host__ __device__
+void scatterRay(
+    PathSegment& pathSegment,
+    glm::vec3 intersect,
+    glm::vec3 normal,
+    const Material& m,
+    thrust::default_random_engine& rng) {
+    // TODO: implement this.
+    // A basic implementation of pure-diffuse shading will just call the
+    // calculateRandomDirectionInHemisphere defined above.
+    // treat the rest as perfectly specular.
+    // assuming there's only one light
+
+    // based on float value of reflective and refractive
+    // with float percent likelihood the ray goes reflective vs. refractive
+
+    thrust::uniform_real_distribution<float> u01(0, 1);
+
+    float randGen = u01(rng);
+
+    if (randGen <= m.hasReflective) {
+        // take a reflective ray
+        glm::vec3 newDirection = glm::reflect(pathSegment.ray.direction, normal);
+        Ray newRay = {
+            intersect,
+            newDirection
+        };
+
+        PathSegment newPath = {
+            newRay,
+            m.specular.color * m.color * pathSegment.color * m.hasReflective,
+            pathSegment.pixelIndex,
+            pathSegment.remainingBounces
+        };
+
+        pathSegment = newPath;
+    }
+    else if (randGen <= m.hasReflective + m.hasRefractive) {
+        // take a refractive ray
+        float airIOR = 1.0f;
+        float eta = airIOR / m.indexOfRefraction;
+
+        float cosTheta = glm::dot(-1.f * pathSegment.ray.direction, normal);
+
+        // then entering
+        bool entering = cosTheta > 0;
+
+        if (!entering) {
+            eta = 1.0f / eta; // invert eta
+        }
+
+        float sinThetaI = sqrt(1.0 - cosTheta * cosTheta);
+        float sinThetaT = eta * sinThetaI;
+
+        glm::vec3 newDirection = pathSegment.ray.direction;
+
+        // if total internal reflection
+        if (sinThetaT >= 1) {
+            newDirection = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+        }
+        else {
+            newDirection = glm::normalize(glm::refract(pathSegment.ray.direction, normal, eta));
+        }
+
+        glm::vec3 newColor = pathSegment.color * m.color * m.specular.color;
+
+        Ray newRay = {
+            intersect + 0.001f * pathSegment.ray.direction,
+            newDirection
+        };
+
+        PathSegment newPath = {
+            newRay,
+            newColor,
+            pathSegment.pixelIndex,
+            pathSegment.remainingBounces
+        };
+
+        pathSegment = newPath;
+    }
+    else {
+        // only diffuse
+        glm::vec3 newDirection = calculateRandomDirectionInHemisphere(normal, rng);
+        Ray newRay = {
+            intersect,
+            newDirection
+        };
+
+        glm::vec3 pointColor;
+
+        pointColor = m.color;
+
+        PathSegment newPath = {
+            newRay,
+            pointColor * pathSegment.color,
+            pathSegment.pixelIndex,
+            pathSegment.remainingBounces
+        };
+
+        pathSegment = newPath;
+    }
+}
+#endif

@@ -4,6 +4,7 @@
 #include <vector>
 #include <cuda_runtime.h>
 #include "glm/glm.hpp"
+#include "image.h"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 #define USE_BOUND_BOX 1
@@ -29,8 +30,9 @@ struct Ray {
 struct Vertex {
     glm::vec4 pos;
     glm::vec4 nor;
-    bool hasUv = false; // by default
-    glm::vec2 uv;
+    // bool hasUv = false; // by default
+    glm::vec2 uv = glm::vec2(-1.f, -1.f);
+    //int textureid = -1; // the specific texture associated with this vertex
 };
 
 struct Triangle {
@@ -54,7 +56,14 @@ struct Geom {
     BoundBox bound;
     int numTris;
 
+    int textureid = -1; // texture associated with geom
+};
 
+struct Texture {
+    int width;
+    int height;
+    glm::vec3* host_texImage;
+    glm::vec3* dev_texImage;
 };
 
 struct Material {
@@ -102,4 +111,6 @@ struct ShadeableIntersection {
     float t;
     glm::vec3 surfaceNormal;
     int materialId;
+    int textureId;
+    glm::vec2 uv;
 };

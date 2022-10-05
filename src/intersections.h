@@ -192,7 +192,7 @@ __host__ __device__ float boundBoxIntersectionTest(Geom* geom, Ray r, glm::vec3&
 }
 
 __host__ __device__ float triangleIntersectionTest(Geom* geom, Triangle* triangle, Ray r,
-    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+    glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2 &uv, bool& outside) {
 
     glm::vec3 screenPA = glm::vec3(geom->transform * triangle->pointA.pos);
     glm::vec3 screenPB = glm::vec3(geom->transform * triangle->pointB.pos);
@@ -212,7 +212,11 @@ __host__ __device__ float triangleIntersectionTest(Geom* geom, Triangle* triangl
 
     intersectionPoint = getPointOnRay(r, t);
 
-    normal = glm::vec3(u * triangle->pointA.nor + v * triangle->pointB.nor + (1 - u - v) * triangle->pointC.nor);
+    normal = glm::vec3((1 - u- v) * triangle->pointA.nor + u * triangle->pointB.nor + v * triangle->pointC.nor);
+    
+    if (geom->textureid != -1) {
+        uv = glm::vec2((1 - u - v) * triangle->pointA.uv + u * triangle->pointB.uv +  v * triangle->pointC.uv);
+    }
 
     if (!outside) {
         normal *= -1.f;

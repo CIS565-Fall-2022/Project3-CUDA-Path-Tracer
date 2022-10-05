@@ -3,6 +3,8 @@
 #include <cstring>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include "stb_image.h"
+#include "stb_image_write.h"
 
 #include "tiny_obj_loader.h"
 
@@ -34,6 +36,10 @@ Scene::Scene(string filename) {
                 loadCamera();
                 cout << " " << endl;
             }
+            else if (strcmp(tokens[0].c_str(), "TEXTURE") == 0) {
+                loadTexture(tokens[1]);
+                cout << " " << endl;
+            }
         }
     }
 }
@@ -52,10 +58,8 @@ int Scene::loadObj(const char* filename,
     std::string err;
 
     tinyobj::ObjReaderConfig reader_config;
+    reader_config.mtl_search_path = "../Project3-CUDA-Path-Tracer/objs/"; // Path to material files
     tinyobj::ObjReader reader;
-
-    // bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filename,
-    // basepath, triangulate);
 
     if (!reader.ParseFromFile(filename, reader_config)) {
         if (!reader.Error().empty()) {
@@ -70,7 +74,10 @@ int Scene::loadObj(const char* filename,
 
     attrib = reader.GetAttrib();
     shapes = reader.GetShapes();
-    materials = reader.GetMaterials();
+    // materials = reader.GetMaterials();
+
+    //cout << "material name: " << materials[0].name << std::endl;
+    // cout << materials.size() << std::endl;
 
     // Loop over shapes and load each attrib
     for (size_t s = 0; s < shapes.size(); s++) {
@@ -135,21 +142,25 @@ int Scene::loadObj(const char* filename,
                 if (idxa.texcoord_index >= 0) {
                     tinyobj::real_t txa = attrib.texcoords[2 * size_t(idxa.texcoord_index) + 0];
                     tinyobj::real_t tya = attrib.texcoords[2 * size_t(idxa.texcoord_index) + 1];
-                    vertA.hasUv = true;
+                    // vertA.hasUv = true;
                     vertA.uv = glm::vec2(txa, tya);
                 }
                 if (idxb.texcoord_index >= 0) {
                     tinyobj::real_t txb = attrib.texcoords[2 * size_t(idxb.texcoord_index) + 0];
                     tinyobj::real_t tyb = attrib.texcoords[2 * size_t(idxb.texcoord_index) + 1];
-                    vertB.hasUv = true;
+                    // vertB.hasUv = true;
                     vertB.uv = glm::vec2(txb, tyb);
                 }
                 if (idxc.texcoord_index >= 0) {
                     tinyobj::real_t txc = attrib.texcoords[2 * size_t(idxc.texcoord_index) + 0];
                     tinyobj::real_t tyc = attrib.texcoords[2 * size_t(idxc.texcoord_index) + 1];
-                    vertC.hasUv = true;
+                    // vertC.hasUv = true;
                     vertC.uv = glm::vec2(txc, tyc);
                 }
+
+                //printf("u: %f, v: %f \n", vertA.uv[0], vertA.uv[1]);
+                //printf("u: %f, v: %f \n", vertB.uv[0], vertB.uv[1]);
+                //printf("u: %f, v: %f \n", vertC.uv[0], vertC.uv[1]);
 #endif
                 // Optional: vertex colors
                 // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
@@ -166,6 +177,8 @@ int Scene::loadObj(const char* filename,
 
             }
             index_offset += fv;
+
+            // shapes[s].mesh.material_ids[f];
         }
     }
 
@@ -221,7 +234,7 @@ int Scene::loadGeom(string objectid) {
             cout << "Connecting Geom " << objectid << " to Material " << newGeom.materialid << "..." << endl;
         }
 
-        //load transformations
+        //load transformations and texture
         utilityCore::safeGetline(fp_in, line);
         while (!line.empty() && fp_in.good()) {
             vector<string> tokens = utilityCore::tokenizeString(line);
@@ -235,6 +248,10 @@ int Scene::loadGeom(string objectid) {
             }
             else if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
                 newGeom.scale = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+            }
+            else if (strcmp(tokens[0].c_str(), "TEXTURE") == 0) {
+                cout << "finding Texture... " << endl;
+                newGeom.textureid = atof(tokens[1].c_str());
             }
 
             utilityCore::safeGetline(fp_in, line);
@@ -496,4 +513,71 @@ int Scene::loadMaterial(string materialid) {
         materials.push_back(newMaterial);
         return 1;
     }
+}
+
+int Scene::loadTexture(string textureid) {
+    int id = atoi(textureid.c_str());
+    cout << "Loading Texture " << id << "..." << endl;
+    Texture newTexture;
+    glm::vec3* pixelData;
+    int width, height, channels;
+
+    if (id != textures.size()) {
+        cout << "ERROR: TEXTURE ID does not match expected number of textures" << endl;
+        return -1;
+    }
+    //load static properties
+    for (int i = 0; i < 1; i++) {
+        string line;
+        utilityCore::safeGetline(fp_in, line);
+        vector<string> tokens = utilityCore::tokenizeString(line);
+
+        if (strcmp(tokens[0].c_str(), "PATH") == 0) {
+            const char* filepath = tokens[1].c_str();
+            unsigned char* data = stbi_load(filepath, &width, &height, &channels, 0);
+
+            pixelData = new glm::vec3[width * height];
+
+            // ... process data if not NULL ..
+            if (data != nullptr && width > 0 && height > 0)
+            {
+                if (channels == 3)
+                {
+                    int pixelDataIdx = 0;
+                    // iterate over every pixel
+                    // total number of data points is width * height * channels (should be 3)
+                    for (int p = 0; p < (width * height) * channels - 2; p += 3) {
+                        glm::vec3 currPix = glm::vec3(static_cast<float>(data[p]) / 256.f,
+                            static_cast<float>(data[p + 1]) / 256.f,
+                            static_cast<float>(data[p + 2]) / 256.f);
+                        pixelData[pixelDataIdx] = currPix;
+                        
+                        if (pixelDataIdx == 2300 || pixelDataIdx == width * height - 2300) {
+                            cout << "pix: " << pixelDataIdx << " is: " << currPix[0] << ", " << currPix[1] << ", " << currPix[2] << endl;
+                        }
+                        pixelDataIdx++;
+                    }
+
+                    newTexture.width = width;
+                    newTexture.height = height;
+                    newTexture.host_texImage = pixelData;
+
+                    cout << "Loaded all Texture Points" << endl;
+                    cout << "width: " << newTexture.width; // looks good
+                    cout << "height: " << newTexture.height; // looks good
+                    cout << "last pixelIdx: " << pixelDataIdx; // looks correct
+                }
+            }
+            else
+            {
+                std::cout << "Some error: channels are weird\n";
+                return -1;
+            }
+
+            stbi_image_free(data);
+        }
+    }
+
+    textures.push_back(newTexture);
+    return 1;
 }

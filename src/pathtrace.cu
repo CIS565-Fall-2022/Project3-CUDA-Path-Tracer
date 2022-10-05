@@ -26,7 +26,8 @@
 #define SORT_MATERIALS 0
 #define CACHE_FIRST_BOUNCE 0 // note that Cache first bounce and antialiasing cannot be on at the same time.
 #define ANTIALIASING 0
-#define DEPTH_OF_FIELD 1 // depth of field focus defined later
+#define DEPTH_OF_FIELD 0 // depth of field focus defined later
+#define DIRECT_LIGHTING 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -92,6 +93,8 @@ static ShadeableIntersection* dev_intersections = NULL;
 static ShadeableIntersection* dev_cached_intersections = NULL;
 #endif
 
+static Texture* dev_textures = NULL;
+
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
 	guiData = imGuiData;
@@ -135,6 +138,26 @@ void pathtraceInit(Scene* scene) {
 	cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 	checkCUDAError("cudaMemcpy dev_intersectionsf ailed");
 
+	// printf("num textures: %i \n", scene->textures.size());
+
+	//for (int i = 0; i < scene->textures[0].height * scene->textures[0].width; i++) {
+	//	glm::vec3 tex = scene->textures[0].host_texImage[i];
+	//	printf("host x: %f, y: %f, z: %f \n", tex[0], tex[1], tex[2]);
+	//}
+
+	// copy each texture's pixel information from cpu to gpu
+	for (int i = 0; i < scene->textures.size(); i++) {
+		cudaMalloc(&(scene->textures[i].dev_texImage), scene->textures[i].height * scene->textures[i].width * sizeof(glm::vec3));
+		checkCUDAError("cudaMalloc device_texImage failed");
+		cudaMemcpy(scene->textures[i].dev_texImage, scene->textures[i].host_texImage, scene->textures[i].height * scene->textures[i].width * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+		checkCUDAError("cudaMemcpy device_texImage failed");
+	}
+
+	cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
+	checkCUDAError("cudaMalloc dev_textures failed");
+	cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
+	checkCUDAError("cudaMemcpy dev_textures ailed");
+
 #if CACHE_FIRST_BOUNCE
 	cudaMalloc(&dev_cached_intersections, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_cached_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
@@ -154,11 +177,15 @@ void pathtraceFree() {
 	//		checkCUDAError("cudaFree device_tris failed");
 	//	}
 	//}
+	//dev_geoms->free();
 
 	cudaFree(dev_geoms);
 	cudaFree(dev_materials);
 	cudaFree(dev_intersections);
 	// TODO: clean up any extra device memory you created
+
+	// dev_textures->free();
+	cudaFree(dev_textures);
 
 	checkCUDAError("pathtraceFree");
 }
@@ -257,10 +284,12 @@ __global__ void computeIntersections(
 		glm::vec3 normal;
 		float t_min = FLT_MAX;
 		int hit_geom_index = -1;
+		glm::vec2 uv = glm::vec2(-1, -1);
 		bool outside = true;
 
 		glm::vec3 tmp_intersect;
 		glm::vec3 tmp_normal;
+		glm::vec2 tmp_uv = glm::vec2(-1, -1);
 
 		// naive parse through global geoms
 
@@ -283,7 +312,7 @@ __global__ void computeIntersections(
 				
 				if (boxT != -1) {
 					for (int j = 0; j < geom.numTris; j++) {
-						t = triangleIntersectionTest(&geom, &geom.device_tris[j], pathSegment.ray, tmp_intersect, tmp_normal, outside);
+						t = triangleIntersectionTest(&geom, &geom.device_tris[j], pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
 					
 						if (t > 0.0f && t_min > t)
 						{
@@ -291,13 +320,14 @@ __global__ void computeIntersections(
 							hit_geom_index = i;
 							intersect_point = tmp_intersect;
 							normal = tmp_normal;
+							uv = tmp_uv;
 						}
 					}
 				}
 			}
 			else if (geom.type == TRIANGLE) {
 				// Only use the first triangle, since in Triangle mode, each geom only has 1 triangle
-				t = triangleIntersectionTest(&geom, &geom.device_tris[0], pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				t = triangleIntersectionTest(&geom, &geom.device_tris[0], pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
@@ -307,6 +337,7 @@ __global__ void computeIntersections(
 				hit_geom_index = i;
 				intersect_point = tmp_intersect;
 				normal = tmp_normal;
+				uv = tmp_uv;
 			}
 		}
 
@@ -321,6 +352,8 @@ __global__ void computeIntersections(
 			intersections[path_index].t = t_min;
 			intersections[path_index].materialId = geoms[hit_geom_index].materialid;
 			intersections[path_index].surfaceNormal = normal;
+			intersections[path_index].uv = uv;
+			intersections[path_index].textureId = geoms[hit_geom_index].textureid;
 
 			pathSegments[path_index].remainingBounces--;
 		}
@@ -423,7 +456,8 @@ __global__ void kernComputeShade(
 	, int num_paths
 	, ShadeableIntersection* shadeableIntersections
 	, PathSegment* pathSegments
-	, Material* materials)
+	, Material* materials
+	, Texture* textures)
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx < num_paths)
@@ -452,8 +486,12 @@ __global__ void kernComputeShade(
 			else {
 				// generate new ray and load it into pathSegments by calling scatterRay
 				glm::vec3 intersectionPoint = getPointOnRay(pathSegments[idx].ray, intersection.t);
+#if USE_UV
+				Texture texture = textures[intersection.textureId];
+				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, intersection.textureId, intersection.uv, material, texture, rng);
+#else
 				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, material, rng);
-
+#endif
 			}
 			// If there was no intersection, color the ray black.
 			// Lots of renderers use 4 channel color, RGBA, where A = alpha, often
@@ -580,7 +618,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			currNumPaths,
 			dev_intersections,
 			dev_paths,
-			dev_materials
+			dev_materials,
+			dev_textures
 			);
 
 		cudaDeviceSynchronize();
@@ -713,6 +752,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 		depth++;
 
+		// printf("computed intersections \n");
+
 		// TODO:
 		// --- Shading Stage ---
 		// Shade path segments based on intersections and generate new rays by
@@ -734,7 +775,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			currNumPaths,
 			dev_intersections,
 			dev_paths,
-			dev_materials
+			dev_materials,
+			dev_textures
 			);
 
 		cudaDeviceSynchronize();
