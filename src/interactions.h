@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "intersections.h"
+#include "intersections.cuh"
 #include "utilities.h"
 #include <thrust/random.h>
 #include <glm/gtc/epsilon.hpp>

@@ -1,24 +1,16 @@
 #pragma once
-
-#include <glm/glm.hpp>
-#include <glm/gtx/intersect.hpp>
-
-#include "sceneStructs.h"
-#include "utilities.h"
-#include "consts.h"
-
-__host__ __device__ inline bool intersect(AABB const& a, AABB const& b) {
+#include "intersections.cuh"
+__host__ __device__  bool AABBIntersect(AABB const& a, AABB const& b) {
     glm::vec3 d1 = a.min() - b.max();
     glm::vec3 d2 = b.min() - a.max();
     return (d1.x <= 0 && d2.x <= 0) && (d1.y <= 0 && d2.y <= 0) && (d1.z <= 0 && d2.z <= 0);
 }
-__host__ __device__ inline bool intersect(AABB const& aabb, Ray const& r, float& t) {
+__host__ __device__  bool AABBRayIntersect(AABB const& aabb, Ray const& r, float* t) {
     float tmin = SMALL_FLOAT;
     float tmax = LARGE_FLOAT;
-    
+
     glm::vec3 tmins = (aabb.min() - r.origin) / r.direction;
     glm::vec3 tmaxs = (aabb.max() - r.origin) / r.direction;
-
 
 #pragma unroll
     for (int i = 0; i < 3; ++i) {
@@ -48,19 +40,18 @@ __host__ __device__ inline bool intersect(AABB const& aabb, Ray const& r, float&
     if (tmin < 0 && tmax < 0) {
         return false;
     }
-    if (tmin < 0) {
-        t = tmax;
-    } else {
-        t = tmin;
+
+    if (t) {
+        if (tmin < 0) {
+            *t = tmax;
+        } else {
+            *t = tmin;
+        }
     }
+
     return true;
 }
-
-__host__ __device__ inline bool intersect(AABB const& aabb, Ray const& r) {
-    float t;
-    return intersect(aabb, r, t);
-}
-__host__ __device__ inline bool intersect(AABB const& aabb, glm::vec3 const& point) {
+__host__ __device__  bool AABBPointIntersect(AABB const& aabb, glm::vec3 const& point) {
     bool contained = true;
 #pragma unroll
     for (int j = 0; j < 3; ++j) {
@@ -72,26 +63,14 @@ __host__ __device__ inline bool intersect(AABB const& aabb, glm::vec3 const& poi
     return contained;
 }
 
-template<size_t N>
-__host__ __device__ inline void project(glm::vec3 axis, glm::vec3 const(&pos)[N], float& tmin, float& tmax) {
-    tmin = LARGE_FLOAT, tmax = SMALL_FLOAT;
-    axis = glm::normalize(axis);
-
-#pragma unroll
-    for (int i = 0; i < N; ++i) {
-        float t = glm::dot(pos[i], axis);
-        tmin = fmin(tmin, t);
-        tmax = fmax(tmax, t);
-    }
-}
 // reference: https://stackoverflow.com/questions/17458562/efficient-aabb-triangle-intersection-in-c-sharp
-__host__ __device__ inline bool intersect(AABB const& a, glm::vec3 const(&tri_verts)[3]) {
+__host__ __device__  bool AABBTriangleIntersect(AABB const& a, glm::vec3 const(&tri_verts)[3]) {
     float tri_min, tri_max;
     float box_min, box_max;
 
     bool contained = true;
     for (int i = 0; i < 3 && contained; ++i) {
-        if (!intersect(a, tri_verts[i])) {
+        if (!AABBPointIntersect(a, tri_verts[i])) {
             contained = false;
         }
     }
@@ -138,48 +117,7 @@ __host__ __device__ inline bool intersect(AABB const& a, glm::vec3 const(&tri_ve
     }
     return true;
 }
-/**
- * Handy-dandy hash function that provides seeds for random number generation.
- */
-__host__ __device__ inline unsigned int utilhash(unsigned int a) {
-    a = (a + 0x7ed55d16) + (a << 12);
-    a = (a ^ 0xc761c23c) ^ (a >> 19);
-    a = (a + 0x165667b1) + (a << 5);
-    a = (a + 0xd3a2646c) ^ (a << 9);
-    a = (a + 0xfd7046c5) + (a << 3);
-    a = (a ^ 0xb55a4f09) ^ (a >> 16);
-    return a;
-}
 
-// CHECKITOUT
-/**
- * Compute a point at parameter value `t` on ray `r`.
- * Falls slightly short so that it doesn't intersect the object it's hitting.
- */
-__host__ __device__ inline glm::vec3 getPointOnRay(Ray r, float t) {
-    return r.origin + (t - .0001f) * glm::normalize(r.direction);
-}
-
-/// <summary>
-/// lerp between 3 vectors based on barycentric coord
-/// </summary>
-/// <param name="bary">barycentric coord</param>
-/// <param name="vecs">3 vectors</param>
-/// <returns>the interpolated vector</returns>
-template<typename T>
-__host__ __device__ inline T lerpBarycentric(glm::vec2 bary, T const(&vecs)[3]) {
-    float u = (1.0f - bary.x - bary.y), v = bary.x, w = bary.y;
-    return u * vecs[0] + v * vecs[1] + w * vecs[2];
-}
-
-/**
- * Multiplies a mat4 and a vec4 and returns a vec3 clipped from the vec4.
- */
-__host__ __device__ inline glm::vec3 multiplyMV(glm::mat4 m, glm::vec4 v) {
-    return glm::vec3(m * v);
-}
-
-// CHECKITOUT
 /**
  * Test intersection between a ray and a transformed cube. Untransformed,
  * the cube ranges from -0.5 to 0.5 in each axis and is centered at the origin.
@@ -189,9 +127,9 @@ __host__ __device__ inline glm::vec3 multiplyMV(glm::mat4 m, glm::vec4 v) {
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ inline float boxIntersectionTest(Geom box, Ray r, ShadeableIntersection& inters) {
+__host__ __device__  float boxIntersectionTest(Geom box, Ray r, ShadeableIntersection& inters) {
     Ray q;
-    q.origin    =                multiplyMV(box.inverseTransform, glm::vec4(r.origin   , 1.0f));
+    q.origin = multiplyMV(box.inverseTransform, glm::vec4(r.origin, 1.0f));
     q.direction = glm::normalize(multiplyMV(box.inverseTransform, glm::vec4(r.direction, 0.0f)));
 
     float tmin = -1e38f;
@@ -244,7 +182,7 @@ __host__ __device__ inline float boxIntersectionTest(Geom box, Ray r, ShadeableI
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ inline float sphereIntersectionTest(Geom sphere, Ray r, ShadeableIntersection& inters) {
+__host__ __device__  float sphereIntersectionTest(Geom sphere, Ray r, ShadeableIntersection& inters) {
 #ifdef USE_GLM_RAY_SPHERE
     glm::vec3 ro = multiplyMV(sphere.inverseTransform, glm::vec4(r.origin, 1.0f));
     glm::vec3 rd = glm::normalize(multiplyMV(sphere.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -311,7 +249,7 @@ __host__ __device__ inline float sphereIntersectionTest(Geom sphere, Ray r, Shad
 }
 
 // fills the ShadeableIntersection from triangle hit information
-__device__ inline float intersFromTriangle(
+__device__  float intersFromTriangle(
     ShadeableIntersection& inters,
     Ray const& ray,
     float hit_t,
@@ -427,20 +365,20 @@ __device__ inline float intersFromTriangle(
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__device__ inline float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo, ShadeableIntersection& inters) {
-    
+__device__  float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo, ShadeableIntersection& inters) {
+
     glm::vec3 ro = multiplyMV(mesh.inverseTransform, glm::vec4(r.origin, 1.0f));
     glm::vec3 rd = glm::normalize(multiplyMV(mesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
 
     float t_min = FLT_MAX;
-    
+
     auto const& meshes = meshInfo.meshes;
     auto const& tris = meshInfo.tris;
     auto const& verts = meshInfo.vertices;
 
     int idx = -1;
     glm::vec3 barycoord;
-    
+
     for (int i = meshes[mesh.meshid].tri_start; i < meshes[mesh.meshid].tri_end; ++i) {
         glm::vec3 tmp_barycoord;
         glm::vec3 triangle_verts[3]{

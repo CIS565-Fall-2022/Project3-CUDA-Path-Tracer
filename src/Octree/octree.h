@@ -7,13 +7,12 @@
 #include "../utilities.h"
 #include "../Collision/AABB.h"
 #include "../scene.h"
-#include "../intersections.h"
+#include "../intersections.cuh"
 
 typedef size_t node_id_t;
 static constexpr node_id_t null_id = 0;
 static constexpr node_id_t root_id = 1;
-static constexpr float eps_scale = 100.0f;
-static constexpr float eps = eps_scale * std::numeric_limits<float>::epsilon();
+static constexpr float eps = 0.1f;
 
 struct nodeGPU;
 struct octreeGPU;
@@ -81,7 +80,7 @@ private:
 
 		for (int geom_id = 0; geom_id < geoms.size(); ++geom_id) {
 			auto const& geom = geoms[geom_id];
-			if (!intersect(geom.bounds, box)) {
+			if (!AABBIntersect(geom.bounds, box)) {
 				continue;
 			}
 			if (geom.type != MESH) {
@@ -102,7 +101,7 @@ private:
 					for (int x = 0; x < 3; ++x) {
 						triangle_verts[x] = glm::vec3(geom.transform * glm::vec4(verts[tri.verts[x]], 1));
 					}
-					if (intersect(box, triangle_verts)) {
+					if (AABBTriangleIntersect(box, triangle_verts)) {
 						if (leaf == null_id) {
 							return true;
 						} else {
@@ -226,6 +225,89 @@ struct octreeGPU {
 		delete[] hst_nodes;
 	}
 
+	__device__ bool handle_leaf(node_id_t const cur, ShadeableIntersection& inters, Ray const& ray) const {
+		auto const& info = _nodes[cur].leaf_infos;
+		float t_min = inters.t;
+
+		// any closer hit?
+		bool any_hit = false;
+
+		// loop through primitives
+		int i;
+		for (i = 0; i < info.size() && info[i].triangle_id == -1; ++i) {
+			auto const& geom = _geoms[info[i].geom_id];
+
+			ShadeableIntersection tmp_inters;
+			if (geom.type == CUBE) {
+				float t = boxIntersectionTest(geom, ray, tmp_inters);
+				if (t > 0) {
+					if (t_min > t) {
+						t_min = t;
+						inters = tmp_inters;
+						any_hit = true;
+					}
+				}
+			} else if (geom.type == SPHERE) {
+				float t = sphereIntersectionTest(geom, ray, tmp_inters);
+				if (t > 0) {
+					if (t_min > t) {
+						t_min = t;
+						inters = tmp_inters;
+						any_hit = true;
+					}
+				}
+			} else {
+				return false;
+			}
+		}
+
+		// loop through triangles
+		int idx = -1;
+		glm::vec3 barycoord;
+		float t_min_tri = FLT_MAX; // use another var because t is apparently different in local space???
+		for (; i < info.size(); ++i) {
+			auto const& tri = _mesh_info.tris[info[i].triangle_id];
+			auto const& geom = _geoms[info[i].geom_id];
+			glm::vec3 ro = multiplyMV(geom.inverseTransform, glm::vec4(ray.origin, 1.0f));
+			glm::vec3 rd = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(ray.direction, 0.0f)));
+			glm::vec3 tmp_barycoord;
+			glm::vec3 triangle_verts[3]{
+				_mesh_info.vertices[tri.verts[0]],
+				_mesh_info.vertices[tri.verts[1]],
+				_mesh_info.vertices[tri.verts[2]]
+			};
+
+			if (glm::intersectRayTriangle(ro, rd, triangle_verts[0], triangle_verts[1], triangle_verts[2], tmp_barycoord)) {
+				float t = tmp_barycoord.z;
+				if (t_min_tri > t) {
+					t_min_tri = t;
+					idx = i;
+					barycoord = tmp_barycoord;
+				}
+			}
+		}
+
+		if (idx != -1) {
+			// result is a ray-triangle intersection
+			ShadeableIntersection tmp_inters;
+			float t = intersFromTriangle(
+				tmp_inters,
+				ray,
+				t_min_tri,
+				_mesh_info,
+				_geoms[info[idx].geom_id],
+				_mesh_info.tris[info[idx].triangle_id],
+				glm::vec2(barycoord));
+
+			if (t_min > t) {
+				t_min = t;
+				inters = tmp_inters;
+				any_hit = true;
+			}
+		}
+		return any_hit;
+	}
+
 	/// <summary>
 	/// recursively searches the octree for hits
 	/// </summary>
@@ -233,98 +315,47 @@ struct octreeGPU {
 	/// <param name="info"> hit info container </param>
 	/// <param name="ray"> ray </param>
 	/// <returns>whether there are any triangle hits </returns>
-	__device__ bool _search(node_id_t cur, ShadeableIntersection& inters, Ray const& ray, int depth) const {
-		if (depth == OCTREE_DEPTH) { // to help compiler determine stack size
-			auto const& info = _nodes[cur].leaf_infos;
-			float t_min = inters.t;
-
-			// any closer hit?
-			bool any_hit = false;
-
-			// loop through primitives
-			int i;
-			for (i = 0; i < info.size() && info[i].triangle_id == -1; ++i) {
-				auto const& geom = _geoms[info[i].geom_id];
-
-				ShadeableIntersection tmp_inters;
-				if (geom.type == CUBE) {
-					float t = boxIntersectionTest(geom, ray, tmp_inters);
-					if (t > 0) {
-						if (t_min > t) {
-							t_min = t;
-							inters = tmp_inters;
-							any_hit = true;
-						}
-					}
-				} else if (geom.type == SPHERE) {
-					float t = sphereIntersectionTest(geom, ray, tmp_inters);
-					if (t > 0) {
-						if (t_min > t) {
-							t_min = t;
-							inters = tmp_inters;
-							any_hit = true;
-						}
-					}
-				} else {
-					return false;
-				}
-			}
-
-			// loop through triangles
-			int idx = -1;
-			glm::vec3 barycoord;
-			float t_min_tri = FLT_MAX; // use another var because t is apparently different in local space???
-			for (; i < info.size(); ++i) {
-				auto const& tri = _mesh_info.tris[info[i].triangle_id];
-				auto const& geom = _geoms[info[i].geom_id];
-				glm::vec3 ro = multiplyMV(geom.inverseTransform, glm::vec4(ray.origin, 1.0f));
-				glm::vec3 rd = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(ray.direction, 0.0f)));
-				glm::vec3 tmp_barycoord;
-				glm::vec3 triangle_verts[3]{
-					_mesh_info.vertices[tri.verts[0]],
-					_mesh_info.vertices[tri.verts[1]],
-					_mesh_info.vertices[tri.verts[2]]
-				};
-
-				if (glm::intersectRayTriangle(ro, rd, triangle_verts[0], triangle_verts[1], triangle_verts[2], tmp_barycoord)) {
-					float t = tmp_barycoord.z;
-					if (t_min_tri > t) {
-						t_min_tri = t;
-						idx = i;
-						barycoord = tmp_barycoord;
-					}
-				}
-			}
-			
-			if (idx != -1) {
-				// result is a ray-triangle intersection
-				ShadeableIntersection tmp_inters;
-				float t = intersFromTriangle(
-					tmp_inters,
-					ray,
-					t_min_tri,
-					_mesh_info,
-					_geoms[info[idx].geom_id],
-					_mesh_info.tris[info[idx].triangle_id],
-					glm::vec2(barycoord));
-				
-				if (t_min > t) {
-					t_min = t;
-					inters = tmp_inters;
-					any_hit = true;
-				}
-			}
-			return any_hit;
+	__device__ bool _search(node_id_t const cur, ShadeableIntersection& inters, Ray const& ray) const {
+		// FOR THE LOVE OF GOD
+		// Why can't recursion just work on GPU ????
+		/*
+		if (_nodes[cur].is_leaf()) {
+			return handle_leaf(cur, inters, ray);
 		} else {
-			for (node_id_t child : _nodes[cur].children) {
-				if (child != null_id && intersect(_nodes[child].bounds, ray)) {
-					if (_search(child, inters, ray, depth + 1)) {
+			for (size_t i = 0; i < 8; ++i) {
+				node_id_t child = _nodes[cur].children[i];
+				if (child != null_id && AABBRayIntersect(_nodes[child].bounds, ray, nullptr)) {
+					if (_search(child, inters, ray)) {
 						return true;
 					}
 				}
 			}
 			return false;
+		}*/
+
+		bool ret = false;
+		node_id_t stack[10 * OCTREE_DEPTH];
+		node_id_t* pstk = stack;
+		for (size_t i = 0; i < 8; ++i) {
+			node_id_t child = _nodes[root_id].children[i];
+			if (child != null_id && AABBRayIntersect(_nodes[child].bounds, ray, nullptr)) {
+				*(pstk++) = child;
+			}
 		}
+		while (pstk != stack) {
+			node_id_t id = *(--pstk);
+			if (_nodes[id].is_leaf()) {
+				ret |= handle_leaf(id, inters, ray);
+			} else {
+				for (size_t i = 0; i < 8; ++i) {
+					node_id_t child = _nodes[id].children[i];
+					if (child != null_id && AABBRayIntersect(_nodes[child].bounds, ray, nullptr)) {
+						*(pstk++) = child;
+					}
+				}
+			}
+		}
+		return ret;
 	}
 	__device__ bool search(ShadeableIntersection& inters, Ray const& ray) const {
 		inters.t = FLT_MAX;
@@ -333,7 +364,7 @@ struct octreeGPU {
 		for (int i = 0; i < _geoms.size(); i++) {
 			Geom const& geom = _geoms[i];
 #ifdef AABB_CULLING
-			if (!intersect(geom.bounds, ray))
+			if (!AABBRayIntersect(geom.bounds, ray, nullptr))
 				continue;
 #endif // AABB_CULLING
 
@@ -354,7 +385,7 @@ struct octreeGPU {
 			}
 		}
 #endif // OCTREE_MESH_ONLY
-		if (_search(root_id, inters, ray, 0)) {
+		if (_search(root_id, inters, ray)) {
 			any_hit = true;
 		}
 		return any_hit;

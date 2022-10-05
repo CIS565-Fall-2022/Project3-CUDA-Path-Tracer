@@ -12,7 +12,7 @@
 #include "glm/gtx/norm.hpp"
 #include "utilities.h"
 #include "pathtrace.h"
-#include "intersections.h"
+#include "intersections.cuh"
 #include "interactions.h"
 #include "rendersave.h"
 #include "Collision/AABB.h"
@@ -266,7 +266,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 // Generating new rays is handled in your shader(s).
 // Feel free to modify the code below.
 __global__ void computeIntersections(
-	int depth,
+	int offset,
 	Span<PathSegment> paths,
 	Span<Geom> geoms,
 	ShadeableIntersection* intersections,
@@ -274,7 +274,7 @@ __global__ void computeIntersections(
 	ShadeableIntersection* cache_intersections,
 	octreeGPU octree)
 {
-	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
+	int path_index = offset + blockIdx.x * blockDim.x + threadIdx.x;
 	if (path_index >= paths.size()) {
 		return;
 	}
@@ -469,40 +469,6 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
             (cam.resolution.x + blockSize2d.x - 1) / blockSize2d.x,
             (cam.resolution.y + blockSize2d.y - 1) / blockSize2d.y);
 
-    // 1D block for path tracing
-    const int blockSize1d = 128;
-
-    ///////////////////////////////////////////////////////////////////////////
-
-    // Recap:
-    // * Initialize array of path rays (using rays that come out of the camera)
-    //   * You can pass the Camera object to that kernel.
-    //   * Each path ray must carry at minimum a (ray, color) pair,
-    //   * where color starts as the multiplicative identity, white = (1, 1, 1).
-    //   * This has already been done for you.
-    // * For each depth:
-    //   * Compute an intersection in the scene for each path ray.
-    //     A very naive version of this has been implemented for you, but feel
-    //     free to add more primitives and/or a better algorithm.
-    //     Currently, intersection distance is recorded as a parametric distance,
-    //     t, or a "distance along the ray." t = -1.0 indicates no intersection.
-    //     * Color is attenuated (multiplied) by reflections off of any object
-    //   * TODO: Stream compact away all of the terminated paths.
-    //     You may use either your implementation or `thrust::remove_if` or its
-    //     cousins.
-    //     * Note that you can't really use a 2D kernel launch any more - switch
-    //       to 1D.
-    //   * TODO: Shade the rays that intersected something or didn't bottom out.
-    //     That is, color the ray by performing a color computation according
-    //     to the shader, then generate a new ray to continue the ray path.
-    //     We recommend just updating the ray's PathSegment in place.
-    //     Note that this step may come before or after stream compaction,
-    //     since some shaders you write may also cause a path to terminate.
-    // * Finally, add this iteration's results to the image. This has been done
-    //   for you.
-
-    // TODO: perform one iteration of path tracing
-
     generateRayFromCamera KERN_PARAM(blocksPerGrid2d, blockSize2d) (cam, iter, traceDepth, dev_paths);
     checkCUDAError("generate camera ray");
 
@@ -515,7 +481,6 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 
 		ShadeableIntersection* dev_cached_inters;
 		ShadeableIntersection* dev_inters;
-		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
 
 		// tracing
 #ifdef CACHE_FIRST_BOUNCE
@@ -536,18 +501,30 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 		dev_inters = dev_intersections;
 		dev_cached_inters = nullptr;
 #endif
-		computeIntersections KERN_PARAM(numblocksPathSegmentTracing, blockSize1d) (
-			depth,
-			dev_paths.subspan(0, num_paths),
-			dev_geoms,
-			dev_inters,
-			dev_mesh_info,
-			dev_cached_inters,
-			dev_tree
-		);
+		// split dev_paths [0 : num_paths] into chunks
+#ifndef MAX_INTERSECTION_TEST_SIZE // if not defined, launch all paths at once
+#define MAX_INTERSECTION_TEST_SIZE num_paths
+#endif // !MAX_INTERSECTION_TEST_SIZE
 
-		checkCUDAError("trace one bounce");
-		cudaDeviceSynchronize();
+		for (int i = 0; i < num_paths; i += MAX_INTERSECTION_TEST_SIZE) {
+			int j = std::min(num_paths, i + MAX_INTERSECTION_TEST_SIZE);
+			int size = j - i;
+
+			computeIntersections KERN_PARAM(DIV_UP(size, BLOCK_SIZE), BLOCK_SIZE) (
+				i,
+				dev_paths.subspan(0, num_paths),
+				dev_geoms,
+				dev_inters,
+				dev_mesh_info,
+				dev_cached_inters,
+				dev_tree
+			);
+			
+			checkCUDAError(std::string("trace one bounce, inters size = " +
+				std::to_string(MAX_INTERSECTION_TEST_SIZE)).c_str());
+			cudaDeviceSynchronize();
+		}
+
 
 		// --- Shading Stage ---
 		// Shade path segments based on intersections and generate new rays by
@@ -564,7 +541,7 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 #ifdef FAKE_SHADE
 #define shadeMaterial shadeFakeMaterial
 #endif
-		shadeMaterial KERN_PARAM(numblocksPathSegmentTracing, blockSize1d) (
+		shadeMaterial KERN_PARAM(DIV_UP(num_paths, BLOCK_SIZE), BLOCK_SIZE) (
 			iter,
 			dev_paths.subspan(0, num_paths),
 			dev_lights,
@@ -586,8 +563,7 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 	}
 	
 	// Assemble this iteration and apply it to the image
-	dim3 numBlocksPixels = (pixelcount + blockSize1d - 1) / blockSize1d;
-    finalGather KERN_PARAM(numBlocksPixels, blockSize1d) (pixelcount, dev_image, dev_paths);
+    finalGather KERN_PARAM(DIV_UP(pixelcount, BLOCK_SIZE), BLOCK_SIZE) (pixelcount, dev_image, dev_paths);
 
     ///////////////////////////////////////////////////////////////////////////
 

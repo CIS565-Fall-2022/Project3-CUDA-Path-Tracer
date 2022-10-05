@@ -67,6 +67,7 @@ void checkCUDAErrorFn(const char* msg, const char* file, int line);
 #define H2D(dev_name, name, size) CHECK_CUDA(cudaMemcpy(dev_name, name, (size) * sizeof(*name), cudaMemcpyHostToDevice))
 #define D2H(name, dev_name, size) CHECK_CUDA(cudaMemcpy(name, dev_name, (size) * sizeof(*name), cudaMemcpyDeviceToHost))
 #define D2D(dev_name1, dev_name2, size) CHECK_CUDA(cudaMemcpy(dev_name1, dev_name2, (size) * sizeof(*dev_name1), cudaMemcpyDeviceToDevice))
+#define DIV_UP(x, y) (((x) + (y) - 1) / (y))
 
 template<typename T>
 static inline void printGPU(char const* name, T* dev, int n) {

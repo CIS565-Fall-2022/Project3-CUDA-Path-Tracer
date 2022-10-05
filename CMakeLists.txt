@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1)
 
-project(cis565_path_tracer)
+project(cis565_path_tracer CXX CUDA)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -23,11 +23,15 @@ endif()
 ########################################
 # CUDA Setup
 ########################################
-find_package(CUDA 10 REQUIRED)
+find_package(CUDA 11 REQUIRED)
 include(${CMAKE_MODULE_PATH}/CUDAComputesList.cmake)
 
-list(APPEND CUDA_NVCC_FLAGS ${CUDA_GENERATE_CODE})
-list(APPEND CUDA_NVCC_FLAGS_DEBUG "-g -G")
+# list(APPEND CUDA_NVCC_FLAGS ${CUDA_GENERATE_CODE})
+# list(APPEND CUDA_NVCC_FLAGS_DEBUG "-g -G")
+
+set(CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE ON)
+set(BUILD_SHARED_LIBS OFF)
+set(CUDA_SEPARABLE_COMPILATION ON)
 set(CUDA_VERBOSE_BUILD ON)
 
 if(WIN32)
@@ -66,7 +70,7 @@ set(headers
     src/main.h
     src/image.h
     src/interactions.h
-    src/intersections.h
+    src/intersections.cuh
     src/glslUtility.hpp
     src/pathtrace.h
     src/scene.h
@@ -100,12 +104,14 @@ set(sources
     src/stb.cpp
     src/image.cpp
     src/glslUtility.cpp
-    src/pathtrace.cu
     src/scene.cpp
     src/preview.cpp
     src/utilities.cpp
     src/rendersave.cpp
     src/Collision/DebugDrawer.cpp
+    
+    src/pathtrace.cu
+    src/intersections.cu
 
     src/ImGui/imgui.cpp 
     src/ImGui/imgui_demo.cpp 
