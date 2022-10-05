@@ -7,25 +7,33 @@ CUDA Path Tracer
   * [LinkedIn](https://www.linkedin.com/in/chang-liu-0451a6208/)
   * [Personal website](https://hummawhite.github.io/)
 * Tested on personal laptop:
-  - Windows 11
   - i7-12700 @ 4.90GHz with 16GB RAM
   - RTX 3070 Ti Laptop 8GB
+
+## Introduction
+
+This is our third project of CIS 565 Fall 2022. In this project, our goal is to implement a GPU-accelerated ray tracer with CUDA. 
 
 ## Representative Outcome
 
 ![](./img/photo_realistic.jpg)
 
-<div align="center">"Photoly" realistic!</div>
+<p align="center">"Photoly" realistic!</p>
 
-<div align="center">Rendered at 2400x1800, 3000 spp within 7 minutes </div>
+| Scene Specs             | [[./scenes/pbr_texture.txt]](./scenes/pbr_texture.txt) |
+| ----------------------- | ------------------------------------------------------ |
+| Resolution              | 2400 x 1800                                            |
+| Samples Per Pixel       | 3000                                                   |
+| Render Time             | < 7 minutes (> 7.5 frames per second)                  |
+| Million Rays Per Second | > 32.4                                                 |
+| Triangle Count          | 25637                                                  |
+| Lighting                | HDR Environment Map                                    |
+
+
 
 ![](./img/aperture_custom.jpg)
 
-<div align="center">Star-shaped bokehs</div>
-
-## Introduction
-
-This is our third project of CIS 565 Fall 2022. In this project, our goal is to implement a GPU-accelerated ray tracer with CUDA. 
+<p align="center">Star-shaped bokehs</p>
 
 
 
@@ -45,24 +53,44 @@ Tired of "virtual artificial" light sources? Let's introduce some real-world li
 
 #### Physically-Based Camera: Depth of Field & Custom Bokeh Shape
 
-This is really my favorite part of the project.
+This is my favorite part of the project.
+
+| No DOF                      | DOF                     |
+| --------------------------- | ----------------------- |
+| ![](./img/aperture_off.jpg) | ![](./img/aperture.jpg) |
+
+This idea can even be extended by stochastically sampling a masked aperture image instead of the whole aperture disk. 
 
 <div align="center">
-    <img src="./img/aperture_off.jpg" width="49%"/>
-    <img src="./img/aperture.jpg" width="49%"/>
+	<img src="./scenes/texture/star3.jpg" width="15%"/>
+	<img src="./scenes/texture/heart2.jpg" width="15%"/>
 </div>
 
+| Star Mask                      | Heart Mask                    |
+| ------------------------------ | ----------------------------- |
+| ![](./img/aperture_custom.jpg) | ![](./img/aperture_heart.jpg) |
+
+#### Efficiently Sampling: Sobol Low Discrepancy Sequence
+
+| Pseudorandom Sequence        | Xor-Scrambled Sobol Sequence |
+| ---------------------------- | ---------------------------- |
+| ![](./img/sampler_indep.jpg) | ![](./img/sampler_sobol.jpg) |
 
 
-#### Xor-Scrambled Sobol Low Discrepancy Sequence
 
 #### Post Processing
+
+##### Gamma Correction
+
+##### Tone Mapping
+
+---
 
 
 
 ### Performance
 
-#### Stackless SAH-Constructed Bounding Volume Hierarchy
+#### Fast Intersection: Stackless SAH-Constructed BVH
 
 For ray-scene intersection, I did two levels of optimization.
 
@@ -107,3 +135,4 @@ Therefore, in my opinion, material sorting is best applied when:
 - There are many different materials in the scene
 - Primitives sharing the same material are randomly distributed in many small clusters over the scene space. The clusters' sizes in solid angle are typically less than what a GPU warp can cover
 
+### Image Texture vs. Procedural Texture

@@ -555,6 +555,10 @@ __global__ void singleKernelPT(int iter, int maxDepth, DevScene* scene, Camera c
 		}
 	}
 WriteRadiance:
+	if (isnan(accRadiance.x) || isnan(accRadiance.y) || isnan(accRadiance.z) ||
+		isinf(accRadiance.x) || isinf(accRadiance.y) || isinf(accRadiance.z)) {
+		return;
+	}
 	image[index] += accRadiance;
 }
 

@@ -3,7 +3,7 @@ Resolution	1800 1350
 FovY       20.5
 LensRadius	0.39
 FocalDist	10.8
-ApertureMask	Null
+ApertureMask	texture/star3.jpg
 Sample	3000
 Depth		8
 File        Cornell
