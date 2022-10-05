@@ -142,3 +142,57 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 
     return glm::length(r.origin - intersectionPoint);
 }
+
+
+__host__ __device__ float triangleIntersectionTest(Geom custom_obj, Ray r,
+    glm::vec3& intersectionPoint, glm::vec3 vertex1, glm::vec3 vertex2, glm::vec3 vertex3,
+    glm::vec3 normal1, glm::vec3 normal2, glm::vec3 normal3, glm::vec3& normal, bool& outside) {
+
+    // get the Ray in local space
+    Ray ray_inversed;
+    ray_inversed.origin = multiplyMV(custom_obj.inverseTransform, glm::vec4(r.origin, 1.0f));
+    ray_inversed.direction = glm::normalize(multiplyMV(custom_obj.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+    glm::vec3 baryPos;
+
+    // Not intersected
+    if (!glm::intersectRayTriangle(ray_inversed.origin, ray_inversed.direction, vertex1, vertex2, vertex3, baryPos)) 
+    {
+        return -1;
+    }
+
+    // Smooth interpolate normals
+    glm::vec3 n0;
+    glm::vec3 n1;
+    glm::vec3 n2;
+
+    glm::vec3 isect_pos = (1.f - baryPos.x - baryPos.y) * vertex1 + baryPos.x * vertex2 + baryPos.y * vertex3;
+    intersectionPoint = multiplyMV(custom_obj.transform, glm::vec4(isect_pos, 1.f));
+    if ((glm::length(normal1) != 0) && (glm::length(normal2) != 0) && (glm::length(normal3) != 0))
+    {
+        n0 = normal1;
+        n1 = normal2;
+        n2 = normal3;
+    }
+    else
+    {
+        n0 = glm::normalize(glm::cross(vertex2 - vertex1, vertex3 - vertex1));
+        n1 = glm::normalize(glm::cross(vertex1 - vertex2, vertex3 - vertex2));
+        n2 = glm::normalize(glm::cross(vertex1 - vertex3, vertex2 - vertex3));
+    }
+
+    float S = 0.5f * glm::length(glm::cross(vertex1 - vertex2, vertex3 - vertex2));
+    float S0 = 0.5f * glm::length(glm::cross(vertex2 - isect_pos, vertex3 - isect_pos));
+    float S1 = 0.5f * glm::length(glm::cross(vertex1 - isect_pos, vertex3 - isect_pos));
+    float S2 = 0.5f * glm::length(glm::cross(vertex1 - isect_pos, vertex2 - isect_pos));
+    glm::vec3 newNormal = glm::normalize(n0 * S0 / S + n1 * S1 / S + n2 * S2 / S);
+
+    normal = glm::normalize(multiplyMV(custom_obj.invTranspose, glm::vec4(newNormal, 0.f)));
+
+    if (glm::dot(normal, r.direction) > 0) {
+        normal = -normal;
+        outside = false;
+    }
+
+    return glm::length(r.origin - intersectionPoint);
+}

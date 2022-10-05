@@ -4,6 +4,10 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+
+
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;
@@ -37,7 +41,8 @@ int Scene::loadGeom(string objectid) {
     if (id != geoms.size()) {
         cout << "ERROR: OBJECT ID does not match expected number of geoms" << endl;
         return -1;
-    } else {
+    }
+    else {
         cout << "Loading Geom " << id << "..." << endl;
         Geom newGeom;
         string line;
@@ -51,6 +56,12 @@ int Scene::loadGeom(string objectid) {
             } else if (strcmp(line.c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
+            }
+            else if (strcmp(line.c_str(), "obj_mesh") == 0)
+            {
+                cout << "Creating new obj mesh..." << endl;
+                newGeom.type = OBJ_MESH;
+                loadObj();
             }
         }
 
@@ -186,3 +197,96 @@ int Scene::loadMaterial(string materialid) {
         return 1;
     }
 }
+
+// Reference: https://github.com/tinyobjloader/tinyobjloader
+int Scene::loadObj()
+{
+    tinyobj::ObjReader reader;
+    tinyobj::ObjReaderConfig reader_config;
+
+    const char* inputfile = "../scenes/cow.obj";
+
+
+    if (!reader.ParseFromFile(inputfile, reader_config)) {
+        if (!reader.Error().empty()) {
+            std::cerr << "TinyObjReader: " << reader.Error();
+        }
+        exit(1);
+    }
+
+    if (!reader.Warning().empty()) {
+        std::cout << "TinyObjReader: " << reader.Warning();
+    }
+
+    tinyobj::attrib_t attrib = reader.GetAttrib();
+    std::vector<tinyobj::shape_t> shapes = reader.GetShapes();
+
+    // Loop over shapes and attributes
+    for (size_t s = 0; s < shapes.size(); s++) {
+        Triangle face;     // current face to be loaded
+
+        size_t idx = 0;
+
+        // Loop over faces
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) 
+        {
+            size_t num_v = size_t(shapes[s].mesh.num_face_vertices[f]);
+
+            glm::vec3 vert;
+            glm::vec3 norm;
+
+            // Loop over vertices
+            for (size_t v = 0; v < num_v; v++)
+            {
+
+                tinyobj::index_t v_idx = shapes[s].mesh.indices[idx + v];
+                tinyobj::real_t vx = attrib.vertices[3 * size_t(v_idx.vertex_index) + 0];
+                tinyobj::real_t vy = attrib.vertices[3 * size_t(v_idx.vertex_index) + 1];
+                tinyobj::real_t vz = attrib.vertices[3 * size_t(v_idx.vertex_index) + 2];
+
+                vert = glm::vec3(vx, vy, vz);
+
+
+                if (v_idx.normal_index >= 0) {
+                    tinyobj::real_t nx = attrib.normals[3 * size_t(v_idx.normal_index) + 0];
+                    tinyobj::real_t ny = attrib.normals[3 * size_t(v_idx.normal_index) + 1];
+                    tinyobj::real_t nz = attrib.normals[3 * size_t(v_idx.normal_index) + 2];
+
+                    norm = glm::vec3(nx, ny, nz);
+
+                }
+
+                if (v_idx.texcoord_index >= 0) {
+                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(v_idx.texcoord_index) + 0];
+                    tinyobj::real_t ty = attrib.texcoords[2 * size_t(v_idx.texcoord_index) + 1];
+                }
+
+                if (v == 0)
+                {
+                    face.v1 = vert;
+                    face.n1 = norm;
+                }
+                else if (v == 1)
+                {
+                    face.v2 = vert;
+                    face.n2 = norm;
+                }
+                else if (v == 2)
+                {
+                    face.v3 = vert;
+                    face.n3= norm;
+                }
+                else
+                {
+                    std::cout << "Quad face detected" << reader.Warning();
+                }
+
+            }
+
+            idx += num_v;
+            triangles.push_back(face);
+        }
+    }
+    return 1;
+}
+
