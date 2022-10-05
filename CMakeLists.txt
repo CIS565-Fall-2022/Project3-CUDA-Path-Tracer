@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1)
 
-project(cis565_path_tracer CXX CUDA)
+project(cis565_path_tracer)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -23,15 +23,11 @@ endif()
 ########################################
 # CUDA Setup
 ########################################
-find_package(CUDA 11 REQUIRED)
+find_package(CUDA 10 REQUIRED)
 include(${CMAKE_MODULE_PATH}/CUDAComputesList.cmake)
 
-# list(APPEND CUDA_NVCC_FLAGS ${CUDA_GENERATE_CODE})
-# list(APPEND CUDA_NVCC_FLAGS_DEBUG "-g -G")
-
-set(CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE ON)
-set(BUILD_SHARED_LIBS OFF)
-set(CUDA_SEPARABLE_COMPILATION ON)
+list(APPEND CUDA_NVCC_FLAGS ${CUDA_GENERATE_CODE})
+list(APPEND CUDA_NVCC_FLAGS_DEBUG "-g -G")
 set(CUDA_VERBOSE_BUILD ON)
 
 if(WIN32)
@@ -65,7 +61,6 @@ endif(UNIX)
 set(GLM_ROOT_DIR "external")
 find_package(GLM REQUIRED)
 include_directories(${GLM_INCLUDE_DIRS})
-
 set(headers
     src/main.h
     src/image.h
@@ -111,7 +106,6 @@ set(sources
     src/Collision/DebugDrawer.cpp
     
     src/pathtrace.cu
-    src/intersections.cu
 
     src/ImGui/imgui.cpp 
     src/ImGui/imgui_demo.cpp 
@@ -133,6 +127,8 @@ source_group(Sources FILES ${sources})
 #add_subdirectory(stream_compaction)  # TODO: uncomment if using your stream compaction
 
 cuda_add_executable(${CMAKE_PROJECT_NAME} ${sources} ${headers})
+set_target_properties(cis565_path_tracer PROPERTIES CUDA_ARCHITECTURES "all-major")
+
 target_link_libraries(${CMAKE_PROJECT_NAME}
     ${LIBRARIES}
     # stream_compaction  # TODO: uncomment if using your stream compaction
