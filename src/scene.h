@@ -11,23 +11,16 @@
 using namespace std;
 
 class Scene {
-
 private:
-	ifstream fp_in;
-	int loadMaterial(string materialid);
-	int loadGLTF(string fileDir, Geom& geom);
-	int loadGeom(string objectid);
-	int loadCamera();
-
+    ifstream fp_in;
+    int loadMaterial(string materialid);
+    int loadGeom(string objectid);
+    int loadCamera();
 public:
+    Scene(string filename);
+    ~Scene();
 
-	Scene(string filename);
-	~Scene();
-
-	std::vector<Geom> geoms;
-	std::vector<Material> materials;
-	RenderState state;
-
-	std::vector<Triangle> triangles;
-	
+    std::vector<Geom> geoms;
+    std::vector<Material> materials;
+    RenderState state;
 };
