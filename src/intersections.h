@@ -142,3 +142,45 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 
     return glm::length(r.origin - intersectionPoint);
 }
+
+__host__ __device__ float meshIntersectionTest(Geom mesh, Ray r, glm::vec3& intersectionPoint, glm::vec3& normal, Triangle* tirangles, bool& outside) {
+
+    glm::vec3 intersectionBaryPos;
+    float tMin = FLT_MAX;
+    glm::vec3 tMinNormal;
+    bool isIntersect = false;
+
+    // do intersection test with every triangle
+    for (int i = 0; i < mesh.numOfTriangles; ++i)
+    {
+        Triangle tri = tirangles[i];
+        
+        glm::vec3 p0 = multiplyMV(mesh.transform, glm::vec4(tri.v1.pos, 1.0f));
+        glm::vec3 p1 = multiplyMV(mesh.transform, glm::vec4(tri.v2.pos, 1.0f));
+        glm::vec3 p2 = multiplyMV(mesh.transform, glm::vec4(tri.v3.pos, 1.0f));
+
+        
+        bool intersection = glm::intersectRayTriangle(r.origin, r.direction, p0, p1, p2, intersectionBaryPos);
+        if (!intersection) {
+            continue;
+        }
+        
+        float t = glm::length(r.origin - intersectionBaryPos);
+      
+
+        glm::vec3 intersectionNormal = glm::normalize(glm::cross(p1-p0, p2-p0));
+        
+        if (t < tMin) {
+            tMin = t;
+            tMinNormal = intersectionNormal;
+            isIntersect = true;
+        }
+    }
+
+    if (isIntersect) {
+        intersectionPoint = getPointOnRay(r, tMin);
+        normal = tMinNormal;
+        return glm::length(r.origin - intersectionPoint);
+    }
+    return -1.f;
+}

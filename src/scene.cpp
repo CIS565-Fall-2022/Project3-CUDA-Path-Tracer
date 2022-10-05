@@ -3,6 +3,7 @@
 #include <cstring>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include "tiny_obj_loader.h"
 
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
@@ -48,9 +49,14 @@ int Scene::loadGeom(string objectid) {
             if (strcmp(line.c_str(), "sphere") == 0) {
                 cout << "Creating new sphere..." << endl;
                 newGeom.type = SPHERE;
-            } else if (strcmp(line.c_str(), "cube") == 0) {
+            } 
+            else if (strcmp(line.c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
+            }
+            else if (strcmp(line.c_str(), "mesh") == 0) {
+                cout << "Creating new mesh..." << endl;
+                newGeom.type = MESH;
             }
         }
 
@@ -62,6 +68,24 @@ int Scene::loadGeom(string objectid) {
             cout << "Connecting Geom " << objectid << " to Material " << newGeom.materialid << "..." << endl;
         }
 
+        //link object
+        if (newGeom.type == MESH) {
+            utilityCore::safeGetline(fp_in, line);
+            if (!line.empty() && fp_in.good()) {
+                vector<string> tokens = utilityCore::tokenizeString(line);
+
+                if (strcmp(tokens[0].c_str(), "FILENAME") == 0) {
+                    string filename = tokens[1].c_str();
+                    std::cout << "Loading:  " << filename << " ..." << endl;
+
+                    if (!loadObj(filename, newGeom)) return -1;
+
+                    hasMesh = true;
+                    meshGeomId = id;
+                }
+            }
+
+        }
         //load transformations
         utilityCore::safeGetline(fp_in, line);
         while (!line.empty() && fp_in.good()) {
@@ -185,4 +209,39 @@ int Scene::loadMaterial(string materialid) {
         materials.push_back(newMaterial);
         return 1;
     }
+}
+
+int Scene::loadObj(string filename, Geom& geo) {
+    cout << "Loading Obj ..." << endl;
+
+    geo.type = GeomType::MESH;
+    std::vector<std::vector<int>> indices;
+    std::vector<glm::vec3> positions;
+    std::vector<tinyobj::shape_t> shapes; 
+    std::vector<tinyobj::material_t> materials;
+    std::string errors = tinyobj::QLoadObj(shapes, materials, filename.c_str(), &indices, &positions);
+    std::cout << errors << std::endl;
+
+    if (errors.size() == 0) {
+        Triangle t;
+        geo.numOfTriangles = indices.size();
+        geo.triangles = new Triangle[geo.numOfTriangles];
+
+        // indices store vertex grouped by face( = num of triangles here)
+        for (size_t i = 0; i < geo.numOfTriangles; i++) {
+            std::vector<glm::vec3> pos;
+
+            for (int j = 0; j < 3; j++) {
+                int idx = indices[i][j];
+                pos.push_back(positions[idx]);
+            }
+            //form triangles
+            t.v1.pos = pos[0];
+            t.v2.pos = pos[1];
+            t.v3.pos = pos[2];
+            geo.triangles[i] = t;
+        }
+    }
+    
+    return 1;
 }
