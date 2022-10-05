@@ -18,8 +18,8 @@
 #include "interactions.h"
 
 #define ERRORCHECK 1
-#define RAYCACHE 1
-#define MEMSORT 1
+#define RAYCACHE 0
+#define MEMSORT 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
