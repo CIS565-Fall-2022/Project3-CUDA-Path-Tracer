@@ -1,5 +1,7 @@
 #include "lbvh.h"
 
+/// LBVH FUNCTIONS ///
+
 bool morton_sort(const MortonCode& a, const MortonCode& b) {
     return a.code < b.code;
 }
@@ -87,11 +89,14 @@ void sortMortonCodes(Scene* scene) {
 // Determine range functions
 int delta(MortonCode* sortedMCodes, int N, int i, int j) {
     // Range check
-    if (i < 0 || j < 0 || i >= N || j >= N) {
+    if (j < 0 || j >= N) {
         return -1;
     }
 
-    // if same - return 32 + lzcnt(i ^ j) ?
+    if (sortedMCodes[i].code == sortedMCodes[j].code)
+    {
+        return 32 + __lzcnt(i ^ j);
+    }
     // Is this 31 - lzcnt?
     return __lzcnt(sortedMCodes[i].code ^ sortedMCodes[j].code);
 }
@@ -121,26 +126,68 @@ NodeRange determineRange(MortonCode* sortedMCodes, int triangleCount, int i) {
     }
     int j = i + l * d;
 
-    return NodeRange{ i, j, l, d };
+    return NodeRange{ min(i, j), max(i, j), l, d };
 }
 
+//int findSplit(MortonCode* sortedMCodes, int triangleCount, NodeRange range) {
+//    int i = range.i;
+//    int j = range.j;
+//    int l = range.l;
+//    int d = range.d;
+//    
+//    // Find split position with binary search
+//    int deltaNode = delta(sortedMCodes, triangleCount, range.i, range.j);
+//    int s = 0;
+//    for (int t = l / 2; t >= 1; t /= 2) {
+//        if (delta(sortedMCodes, triangleCount, i, i + (s + t) * d) > deltaNode) {
+//            s = s + t;
+//        }
+//    }
+//    int gamma = i + s * d + min(d, 0);
+//    
+//    return gamma;
+//}
+
 int findSplit(MortonCode* sortedMCodes, int triangleCount, NodeRange range) {
-    int i = range.i;
-    int j = range.j;
+    int start = range.i;
+    int end = range.j;
     int l = range.l;
     int d = range.d;
-    
-    // Find split position with binary search
-    int deltaNode = delta(sortedMCodes, triangleCount, range.i, range.j);
-    int s = 0;
-    for (int t = l / 2; t >= 1; t /= 2) {
-        if (delta(sortedMCodes, triangleCount, i, i + (s + t) * d) > deltaNode) {
-            s = s + t;
+
+    // Identical Morton codes => split the range in the middle.
+
+    unsigned int firstCode = sortedMCodes[start].code;
+    unsigned int lastCode = sortedMCodes[end].code;
+
+    if (firstCode == lastCode)
+        return (start + end) >> 1;
+
+    // Calculate the number of highest bits that are the same
+    // for all objects, using the count-leading-zeros intrinsic.
+
+    int commonPrefix = delta(sortedMCodes, triangleCount, start, end);
+
+    // Use binary search to find where the next bit differs.
+    // Specifically, we are looking for the highest object that
+    // shares more than commonPrefix bits with the first one.
+
+    int split = start; // initial guess
+    int step = end - start;
+
+    do
+    {
+        step = (step + 1) >> 1; // exponential decrease
+        int newSplit = split + step; // proposed new position
+
+        if (newSplit < end)
+        {
+            int splitPrefix = delta(sortedMCodes, triangleCount, start, newSplit);
+            if (splitPrefix > commonPrefix)
+                split = newSplit; // accept proposal
         }
-    }
-    int gamma = i + s * d + min(d, 0);
-    
-    return gamma;
+    } while (step > 1);
+
+    return split;
 }
 
 // TODO: make sure leaf bounding boxes are assigned in buildLBVH function
@@ -305,4 +352,101 @@ void unitTest(Scene* scene)
     traverseLBVH(scene, ray, scene->mcodes.size());
 
     return;
+}
+
+
+/// BASIC BVH FUNCTIONS ///
+
+int idx = 1;
+
+void updateBounds(Scene* scene, const int idx)
+{
+    BVHNode& node = scene->bvh[idx];
+    for (int i = node.firstTri; i < node.firstTri + node.numTris; ++i)
+    {
+        node.aabb = Union(node.aabb, scene->triangles[i].aabb);
+    }
+}
+
+int maxExtent(glm::vec3 extent) {
+    if (extent.x > extent.y && extent.x > extent.z) {
+        return 0;
+    }
+    else if (extent.y > extent.z) {
+        return 1;
+    }
+    else {
+        return 2;
+    }
+}
+
+void addChildren(Scene* scene, BVHNode* node)
+{
+    if (node->numTris <= 2)
+    {
+        // Leaf stuff
+        return;
+    }
+
+    // Choose split axis and position
+    glm::vec3 extent = node->aabb.max - node->aabb.min;
+    int axis = maxExtent(extent);
+    float split = node->aabb.min[axis] + extent[axis] * 0.5f;
+
+    // Partition primitives (in-place sorting)
+    int start = node->firstTri;
+    int end = node->firstTri + node->numTris - 1;
+    while(start <= end) {
+        if (scene->triangles[start].centroid[axis] < split) {
+            start++;
+        }
+        else {
+            std::swap(scene->triangles[start], scene->triangles[end]);
+            end--;
+        }
+    }
+
+    // Make sure there is no empty side on partition
+    int count = start - node->firstTri;
+    if (count == 0 || count == node->numTris) return;
+
+    // Set children nodes
+    node->left = idx++;
+    node->right = idx++;
+    scene->bvh[node->left].firstTri = node->firstTri;
+    scene->bvh[node->left].numTris = start - node->firstTri;
+    scene->bvh[node->right].firstTri = start;
+    scene->bvh[node->right].numTris = node->numTris - scene->bvh[node->left].numTris;
+    node->numTris = 0;
+
+    updateBounds(scene, node->left);
+    updateBounds(scene, node->right);
+
+    addChildren(scene, &scene->bvh[node->left]);
+    addChildren(scene, &scene->bvh[node->right]);
+}
+
+void generateBVH(Scene* scene, int triangleCount)
+{
+    // Resize BVH
+    scene->bvh.resize(2 * triangleCount - 1);
+
+    // Initialize root node
+    BVHNode* root = &scene->bvh[0];
+    root->aabb = scene->sceneAABB;
+    root->firstTri = 0;
+    root->numTris = triangleCount;
+
+    //std::cout << "Unsorted triangles: " << std::endl;
+    //for (int i = 0; i < triangleCount; i++) {
+    //    std::cout << scene->triangles[i].objectId << std::endl;
+    //}
+
+    // Construct hierarchy
+    addChildren(scene, root);
+
+    //std::cout << "Sorted triangles: " << std::endl;
+    //for (int j = 0; j < triangleCount; j++) {
+    //    std::cout << scene->triangles[j].objectId << std::endl;
+    //}
 }

@@ -105,6 +105,7 @@ static GuiDataContainer* guiData = NULL;
 static glm::vec3* dev_image = NULL;
 static Geom* dev_geoms = NULL;
 static LBVHNode* dev_lbvh = NULL;
+static BVHNode* dev_bvh = NULL;
 static Triangle* dev_tris = NULL;
 static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
@@ -134,6 +135,9 @@ void pathtraceInit(Scene* scene) {
 
 	cudaMalloc(&dev_lbvh, scene->lbvh.size() * sizeof(LBVHNode));
 	cudaMemcpy(dev_lbvh, scene->lbvh.data(), scene->lbvh.size() * sizeof(LBVHNode), cudaMemcpyHostToDevice);
+
+	cudaMalloc(&dev_bvh, scene->bvh.size() * sizeof(BVHNode));
+	cudaMemcpy(dev_bvh, scene->bvh.data(), scene->bvh.size() * sizeof(BVHNode), cudaMemcpyHostToDevice);
 	
 	cudaMalloc(&dev_tris, scene->triangles.size() * sizeof(Triangle));
 	cudaMemcpy(dev_tris, scene->triangles.data(), scene->triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice);
@@ -156,6 +160,7 @@ void pathtraceFree() {
 	cudaFree(dev_paths);
 	cudaFree(dev_geoms);
 	cudaFree(dev_lbvh);
+	cudaFree(dev_bvh);
 	cudaFree(dev_tris);
 	cudaFree(dev_materials);
 	cudaFree(dev_intersections);
@@ -243,6 +248,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 			segment.ray.origin += samplePoint;
 			segment.ray.direction = glm::normalize(focalPoint - segment.ray.origin);
 		}
+		segment.ray.invDirection = glm::vec3(1.0, 1.0, 1.0) / segment.ray.direction;
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
 	}
@@ -258,6 +264,7 @@ __global__ void computeIntersections(
 	, PathSegment* pathSegments
 	, Geom* geoms
 	, LBVHNode* dev_lbvh
+	, BVHNode* dev_bvh
 	, Triangle* dev_tris
 	, int geoms_size
 	, ShadeableIntersection* intersections
@@ -300,7 +307,8 @@ __global__ void computeIntersections(
 			else if (geom.type == MESH)
 			{
 				//t = meshIntersectionTest(geom, pathSegment.ray, dev_tris, tmp_intersect, tmp_normal, outside);
-				t = lbvhIntersectionTest(dev_lbvh, dev_tris, pathSegment.ray, geom.triangleCount, tmp_intersect, tmp_normal, outside);
+				//t = lbvhIntersectionTest(dev_lbvh, dev_tris, pathSegment.ray, geom.triangleCount, tmp_intersect, tmp_normal, outside);
+				t = bvhIntersectionTest(dev_bvh, dev_tris, pathSegment.ray, geom.triangleCount, tmp_intersect, tmp_normal, outside);
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
@@ -522,6 +530,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_paths
 				, dev_geoms
 				, dev_lbvh
+				, dev_bvh
 				, dev_tris
 				, hst_scene->geoms.size()
 				, dev_intersections
@@ -544,6 +553,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 					, dev_paths
 					, dev_geoms
 					, dev_lbvh
+					, dev_bvh
 					, dev_tris
 					, hst_scene->geoms.size()
 					, dev_intersections
@@ -559,6 +569,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, dev_paths
 			, dev_geoms
 			, dev_lbvh
+			, dev_bvh
 			, dev_tris
 			, hst_scene->geoms.size()
 			, dev_intersections

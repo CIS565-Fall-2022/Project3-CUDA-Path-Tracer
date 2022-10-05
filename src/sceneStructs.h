@@ -16,6 +16,7 @@ enum GeomType {
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
+    glm::vec3 invDirection;
 };
 
 struct AABB {
@@ -30,12 +31,18 @@ struct MortonCode {
 
 struct Triangle {
     AABB aabb;
-    unsigned int mcode; // for testing, remove later
+    glm::vec3 centroid;
     glm::vec3 verts[3];
+    unsigned int mcode; // for testing, remove later
+    int objectId;
 
     void computeAABB() {
         aabb.min = glm::min(verts[0], glm::min(verts[1], verts[2]));
         aabb.max = glm::max(verts[0], glm::max(verts[1], verts[2]));
+    }
+
+    void computeCentroid() {
+        centroid = 0.5f * aabb.min + 0.5f * aabb.max;
     }
 };
 
@@ -44,6 +51,12 @@ struct NodeRange {
     int j;
     int l;
     int d;
+};
+
+struct BVHNode {
+    AABB aabb;
+    unsigned int left, right;
+    int firstTri, numTris;
 };
 
 struct LBVHNode {

@@ -34,6 +34,7 @@ void traverseLBVH(Scene* scene);
 
 // Construct entire LBVH
 void generateLBVH(Scene* scene);
+void generateBVH(Scene* scene, int triangleCount);
 
 // Small test for LBVH
 void unitTest(Scene* scene);

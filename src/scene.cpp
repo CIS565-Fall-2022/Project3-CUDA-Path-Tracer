@@ -275,6 +275,8 @@ int Scene::loadOBJ(string filename, int objectid)
                 i++;
             }
             tri.computeAABB();
+            tri.computeCentroid();
+            tri.objectId = f;
             triangles.push_back(tri);
 
             index_offset += fv;

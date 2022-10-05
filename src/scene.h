@@ -27,6 +27,7 @@ public:
     std::vector<Triangle> triangles;
     std::vector<MortonCode> mcodes;
     //std::vector<unsigned int> mcodes;
+    std::vector<BVHNode> bvh;
     std::vector<LBVHNode> lbvh;
     AABB sceneAABB;
     RenderState state;

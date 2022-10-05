@@ -104,13 +104,13 @@ __host__ __device__ float aabbIntersectionTest(AABB aabb, Ray r) {
     float y2 = (aabb.max.y - r.origin.y) * invR.y;
 
     tmin = min(tmin, min(y1, y2));
-    tmax = max(tmin, max(y1, y2));
+    tmax = max(tmax, max(y1, y2));
 
     float z1 = (aabb.min.z - r.origin.z) * invR.z;
     float z2 = (aabb.max.z - r.origin.z) * invR.z;
 
-    tmin = min(tmin, min(y1, y2));
-    tmax = max(tmin, max(y1, y2));
+    tmin = min(tmin, min(z1, z2));
+    tmax = max(tmax, max(z1, z2));
 
     return tmin <= tmax;
 }
@@ -230,8 +230,21 @@ __host__ __device__ float meshIntersectionTest(Geom mesh, Ray r,
     return min_t;
 }
 
-__host__ __device__ bool isLeaf(const LBVHNode* nodes, int idx) {
-    return nodes[idx].left == 0xFFFFFFFF && nodes[idx].right == 0xFFFFFFFF;
+__host__ __device__ bool devIsLeaf(const LBVHNode* node) {
+    return node->left == 0xFFFFFFFF && node->right == 0xFFFFFFFF;
+}
+
+__host__ __device__ void lbvhIntersectTriangle(const Triangle* tris, Ray r, int objectId,
+    Triangle& min_tri, glm::vec3& min_barycenter, float& min_t) {
+
+    glm::vec3 barycenter;
+    float t = triangleIntersectionTest(tris[objectId], r, barycenter);
+    if (t < min_t && t > 0.f)
+    {
+        min_t = t;
+        min_barycenter = barycenter;
+        min_tri = tris[objectId];
+    }
 }
 
 /**
@@ -245,11 +258,12 @@ __host__ __device__ bool isLeaf(const LBVHNode* nodes, int idx) {
 __host__ __device__ float lbvhIntersectionTest(const LBVHNode* nodes, const Triangle* tris, Ray r, int triangleCount,
      glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
 
-    float stack[64];
+    float stack[20];
     int stackPtr = -1;
 
+    Triangle min_tri;
+    glm::vec3 min_barycenter;
     float min_t = INFINITY;
-    glm::vec3 barycenter;
     
     // Push root node
     stack[++stackPtr] = triangleCount;
@@ -259,25 +273,23 @@ __host__ __device__ float lbvhIntersectionTest(const LBVHNode* nodes, const Tria
         // Check intersection with left and right children
         int leftChild = nodes[currNodeIdx].left;
         int rightChild = nodes[currNodeIdx].right;
-        LBVHNode left = nodes[leftChild];
-        LBVHNode right = nodes[rightChild];
+        const LBVHNode* left = &nodes[leftChild];
+        const LBVHNode* right = &nodes[rightChild];
 
-        bool intersectLeft = aabbIntersectionTest(nodes[leftChild].aabb, r);
-        bool intersectRight = aabbIntersectionTest(nodes[rightChild].aabb, r);
+        bool intersectLeft = aabbIntersectionTest(left->aabb, r);
+        bool intersectRight = aabbIntersectionTest(right->aabb, r);
 
         // If intersection found, and they are leaf nodes, check for triangle intersections
-        if (intersectLeft && isLeaf(nodes, leftChild)) {
-            float t = triangleIntersectionTest(tris[left.objectId], r, barycenter);
-            min_t = glm::min(min_t, t);
+        if (intersectLeft && devIsLeaf(left)) {
+            lbvhIntersectTriangle(tris, r, left->objectId, min_tri, min_barycenter, min_t);
         }
-        if (intersectRight && isLeaf(nodes, rightChild)) {
-            float t = triangleIntersectionTest(tris[right.objectId], r, barycenter);
-            min_t = glm::min(min_t, t);
+        if (intersectRight && devIsLeaf(right)) {
+            lbvhIntersectTriangle(tris, r, right->objectId, min_tri, min_barycenter, min_t);
         }
 
         // If internal nodes, keep traversing
-        bool traverseLeftSubtree = (intersectLeft && !isLeaf(nodes, leftChild));
-        bool traverseRightSubtree = (intersectRight && !isLeaf(nodes, rightChild));
+        bool traverseLeftSubtree = (intersectLeft && !devIsLeaf(left));
+        bool traverseRightSubtree = (intersectRight && !devIsLeaf(right));
 
         if (!traverseLeftSubtree && !traverseRightSubtree) {
             // Pop node from stack
@@ -291,6 +303,99 @@ __host__ __device__ float lbvhIntersectionTest(const LBVHNode* nodes, const Tria
             }
         }
     }
+
+    // Find intersection point and normal
+    float u = min_barycenter.x;
+    float v = min_barycenter.y;
+    float w = 1.f - u - v;
+    intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
+    normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
+
+    return min_t;
+}
+
+__host__ __device__ bool devBvhIsLeaf(const BVHNode* node) {
+    return (node->numTris > 0);
+}
+
+__host__ __device__ void bvhIntersectTriangles(const Triangle* tris, Ray r, int start, int numTris,
+    Triangle& min_tri, glm::vec3& min_barycenter, float& min_t) {
+
+    for (int i = start; i < start + numTris; ++i) {
+        glm::vec3 barycenter;
+        float t = triangleIntersectionTest(tris[i], r, barycenter);
+        if (t < min_t && t > 0.f)
+        {
+            min_t = t;
+            min_barycenter = barycenter;
+            min_tri = tris[i];
+        }
+    }
+}
+
+/**
+ * Test intersection between a ray and a BVH.
+ *
+ * @param intersectionPoint  Output parameter for point of intersection.
+ * @param normal             Output parameter for surface normal.
+ * @param outside            Output param for whether the ray came from outside.
+ * @return                   Ray parameter `t` value. -1 if no intersection.
+ */
+__host__ __device__ float bvhIntersectionTest(const BVHNode* nodes, const Triangle* tris, Ray r, int triangleCount,
+    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+
+    float stack[20];
+    int stackPtr = -1;
+
+    Triangle min_tri;
+    glm::vec3 min_barycenter;
+    float min_t = INFINITY;
+
+    // Push root node
+    stack[++stackPtr] = 0;
+    int currNodeIdx = stack[stackPtr];
+    while (stackPtr >= 0)
+    {
+        // Check intersection with left and right children
+        int leftChild = nodes[currNodeIdx].left;
+        int rightChild = nodes[currNodeIdx].right;
+        const BVHNode* left = &nodes[leftChild];
+        const BVHNode* right = &nodes[rightChild];
+
+        bool intersectLeft = aabbIntersectionTest(left->aabb, r);
+        bool intersectRight = aabbIntersectionTest(right->aabb, r);
+
+        // If intersection found, and they are leaf nodes, check for triangle intersections
+        if (intersectLeft && devBvhIsLeaf(left)) {
+            bvhIntersectTriangles(tris, r, left->firstTri, left->numTris, min_tri, min_barycenter, min_t);
+        }
+        if (intersectRight && devBvhIsLeaf(right)) {
+            bvhIntersectTriangles(tris, r, right->firstTri, right->numTris, min_tri, min_barycenter, min_t);
+        }
+
+        // If internal nodes, keep traversing
+        bool traverseLeftSubtree = (intersectLeft && !devBvhIsLeaf(left));
+        bool traverseRightSubtree = (intersectRight && !devBvhIsLeaf(right));
+
+        if (!traverseLeftSubtree && !traverseRightSubtree) {
+            // Pop node from stack
+            currNodeIdx = stack[stackPtr--];
+        }
+        else {
+            currNodeIdx = (traverseLeftSubtree) ? leftChild : rightChild;
+            if (traverseLeftSubtree && traverseRightSubtree) {
+                // Push right child onto stack
+                stack[++stackPtr] = rightChild;
+            }
+        }
+    }
+
+    // Find intersection point and normal
+    float u = min_barycenter.x;
+    float v = min_barycenter.y;
+    float w = 1.f - u - v;
+    intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
+    normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
 
     return min_t;
 }
