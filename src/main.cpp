@@ -297,8 +297,8 @@ void mousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
 
 	if (leftMousePressed) {
 		// compute new camera parameters
-		cam.rotation.x -= (xpos - lastX) / width * 20.f;
-		cam.rotation.y += (ypos - lastY) / height * 20.f;
+		cam.rotation.x -= (xpos - lastX) / width * 40.f;
+		cam.rotation.y += (ypos - lastY) / height * 40.f;
 		cam.rotation.y = glm::clamp(cam.rotation.y, -89.9f, 89.9f);
 		State::camChanged = true;
 	}

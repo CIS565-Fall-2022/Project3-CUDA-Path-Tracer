@@ -256,7 +256,6 @@ void RenderImGui() {
 
 		glm::vec3 lastPos = cam.position;
 		if (ImGui::DragFloat3("Position", glm::value_ptr(cam.position), .1f)) {
-			cam.rotation += cam.position - lastPos;
 			State::camChanged = true;
 		}
 

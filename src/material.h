@@ -9,6 +9,7 @@
 #define MATERIAL_DIELETRIC_USE_SCHLICK_APPROX false
 
 #define NullTextureId -1
+#define ProcTextureId -2
 #define ProceduralTexId -2
 #define InvalidPdf -1.f
 
