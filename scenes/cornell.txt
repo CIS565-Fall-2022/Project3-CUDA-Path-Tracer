@@ -138,7 +138,7 @@ SCALE       .01 10 10
 OBJECT 6
 mesh
 material 2
-TRANS       1 4 -1
+TRANS       1 7 -1
 ROTAT       0 45 0
 SCALE       2 2 2
 filepath ../scenes/mesh/cube.obj

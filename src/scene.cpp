@@ -232,17 +232,6 @@ int Scene::loadMaterial(string materialid) {
     }
 }
 
-//#if USE_BOUNDING_BOX
-//void CalculateAABB(Geom& mesh) {
-//
-//    for (int i = 0; i < mesh.numTris; ++i) {
-//        Triangle tri = 
-//        glm::vec3 p0 = 
-//    }
-
-//}
-//#endif
-
 int LoadMeshFromOBJ(const char* filePath, Geom& mesh) {
     std::vector<float> positions;
     std::vector<float> normals;
@@ -280,25 +269,30 @@ int LoadMeshFromOBJ(const char* filePath, Geom& mesh) {
             triangle.p2 = p2;
 
 #if USE_BOUNDING_BOX
-            //glm::vec3 worldP0 = ;
-            mesh.AABBmax.x = max(mesh.AABBmax.x, p2.x);
-            mesh.AABBmin.x = min(mesh.AABBmin.x, p0.x);
-            mesh.AABBmin.x = min(mesh.AABBmin.x, p1.x);
-            mesh.AABBmin.x = min(mesh.AABBmin.x, p2.x);
+            glm::vec3 worldP0 = glm::vec3(mesh.transform *  glm::vec4(p0, 1.0f));
+            glm::vec3 worldP1 = glm::vec3(mesh.transform * glm::vec4(p1, 1.0f));
+            glm::vec3 worldP2 = glm::vec3(mesh.transform * glm::vec4(p2, 1.0f));
             
-            mesh.AABBmax.y = max(mesh.AABBmax.y, p0.y);
-            mesh.AABBmax.y = max(mesh.AABBmax.y, p1.y);
-            mesh.AABBmax.y = max(mesh.AABBmax.y, p2.y);
-            mesh.AABBmin.y = min(mesh.AABBmin.y, p0.y);
-            mesh.AABBmin.y = min(mesh.AABBmin.y, p1.y);
-            mesh.AABBmin.y = min(mesh.AABBmin.y, p2.y);
+            mesh.AABBmax.x = max(mesh.AABBmax.x, worldP0.x);
+            mesh.AABBmax.x = max(mesh.AABBmax.x, worldP1.x);
+            mesh.AABBmax.x = max(mesh.AABBmax.x, worldP2.x);
+            mesh.AABBmin.x = min(mesh.AABBmin.x, worldP0.x);
+            mesh.AABBmin.x = min(mesh.AABBmin.x, worldP1.x);
+            mesh.AABBmin.x = min(mesh.AABBmin.x, worldP2.x);
             
-            mesh.AABBmax.z = max(mesh.AABBmax.z, p0.z);
-            mesh.AABBmax.z = max(mesh.AABBmax.z, p1.z);
-            mesh.AABBmax.z = max(mesh.AABBmax.z, p2.z);
-            mesh.AABBmin.z = min(mesh.AABBmin.z, p0.z);
-            mesh.AABBmin.z = min(mesh.AABBmin.z, p1.z);
-            mesh.AABBmin.z = min(mesh.AABBmin.z, p2.z);
+            mesh.AABBmax.y = max(mesh.AABBmax.y, worldP0.y);
+            mesh.AABBmax.y = max(mesh.AABBmax.y, worldP1.y);
+            mesh.AABBmax.y = max(mesh.AABBmax.y, worldP2.y);
+            mesh.AABBmin.y = min(mesh.AABBmin.y, worldP0.y);
+            mesh.AABBmin.y = min(mesh.AABBmin.y, worldP1.y);
+            mesh.AABBmin.y = min(mesh.AABBmin.y, worldP2.y);
+            
+            mesh.AABBmax.z = max(mesh.AABBmax.z, worldP0.z);
+            mesh.AABBmax.z = max(mesh.AABBmax.z, worldP1.z);
+            mesh.AABBmax.z = max(mesh.AABBmax.z, worldP2.z);
+            mesh.AABBmin.z = min(mesh.AABBmin.z, worldP0.z);
+            mesh.AABBmin.z = min(mesh.AABBmin.z, worldP1.z);
+            mesh.AABBmin.z = min(mesh.AABBmin.z, worldP2.z);
 #endif
             // normal
             int nIdx0 = normIndex[i] * 3;

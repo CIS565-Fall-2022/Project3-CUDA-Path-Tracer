@@ -150,17 +150,29 @@ __host__ __device__ glm::vec3 calculateNormal(glm::vec3 p0, glm::vec3 p1, glm::v
 }
 
 __host__ __device__
+void swapDevice(float& a, float& b) {
+    float tmp = a;
+    a = b;
+    b = tmp;
+}
+__host__ __device__
 bool rayBoundingBoxIntersect(glm::vec3 origin, glm::vec3 dir, glm::vec3 aabbMin, glm::vec3 aabbMax)
 {
     float tmin = (aabbMin.x - origin.x) / dir.x;
     float tmax = (aabbMax.x - origin.x) / dir.x;
 
-    if (tmin > tmax) swap(tmin, tmax);
+    if (tmin > tmax) {
+        swapDevice(tmin, tmax);
+       // swap(tmin, tmax);
+    }
 
     float tymin = (aabbMin.y - origin.y) / dir.y;
     float tymax = (aabbMax.y - origin.y) / dir.y;
 
-    if (tymin > tymax) swap(tymin, tymax);
+    if (tymin > tymax) {
+        swapDevice(tymin, tymax);
+        //swap(tymin, tymax);
+    }
 
     if ((tmin > tymax) || (tymin > tmax))
         return false;
@@ -174,7 +186,10 @@ bool rayBoundingBoxIntersect(glm::vec3 origin, glm::vec3 dir, glm::vec3 aabbMin,
     float tzmin = (aabbMin.z - origin.z) / dir.z;
     float tzmax = (aabbMax.z - origin.z) / dir.z;
 
-    if (tzmin > tzmax) swap(tzmin, tzmax);
+    if (tzmin > tzmax) {
+        swapDevice(tzmin, tzmax);
+        //swap(tzmin, tzmax);
+    }
 
     if ((tmin > tzmax) || (tzmin > tmax))
         return false;
@@ -188,6 +203,33 @@ bool rayBoundingBoxIntersect(glm::vec3 origin, glm::vec3 dir, glm::vec3 aabbMin,
     return true;
 }
 
+__host__ __device__ bool aabbIntersectionTest(glm::vec3 aabbMin, glm::vec3 aabbMax, Ray r)
+{
+    float tmin, tmax, tymin, tymax, tzmin, tzmax;
+    glm::vec3 invdir = 1.f / r.direction;
+    glm::ivec3 sign;
+    for (int i = 0; i < 3; ++i)
+    {
+        sign[i] = invdir[i] < 0;
+    }
+
+    //tmin = (aabb.bound[sign.x].x - r.origin.x) * invdir.x;
+    //tmax = (aabb.bound[1 - sign.x].x - r.origin.x) * invdir.x;
+    //tymin = (aabb.bound[sign.y].y - r.origin.y) * invdir.y;
+    //tymax = (aabb.bound[1 - sign.y].y - r.origin.y) * invdir.y;
+    //tzmin = (aabb.bound[sign.z].z - r.origin.z) * invdir.z;
+    //tzmax = (aabb.bound[1 - sign.z].z - r.origin.z) * invdir.z;
+
+    if (tmin > tymax || tymin > tmax || max(tmin, tymin) > tzmax || tzmin > min(tmax, tymax))
+    {
+        return false;
+    }
+    else
+    {
+        return true;
+    }
+}
+
 __host__ __device__ 
 float meshIntersectionTest(Geom mesh, Ray r,
                                                  glm::vec3& intersectionPoint,
@@ -196,7 +238,10 @@ float meshIntersectionTest(Geom mesh, Ray r,
                                                  bool& outside)
 {
 #if USE_BOUNDING_BOX
-    //bool isIntersect = rayBoundingBoxIntersect(r.)
+    bool isIntersect = rayBoundingBoxIntersect(r.origin, r.direction, mesh.AABBmin, mesh.AABBmax);
+    if (!isIntersect) {
+        return -1.f;
+    }
 #endif
 
     glm::vec3 intersectionBaryPos;
