@@ -5,6 +5,9 @@
 #include <thrust/random.h>
 #include <thrust/remove.h>
 
+#include <thrust/partition.h>
+
+
 #include "sceneStructs.h"
 #include "scene.h"
 #include "glm/glm.hpp"
@@ -252,15 +255,17 @@ __global__ void shadeFakeMaterial(
 
 			// If the material indicates that the object was a light, "light" the ray
 			if (material.emittance > 0.0f) {
+				pathSegments[idx].remainingBounces = 0;
 				pathSegments[idx].color *= (materialColor * material.emittance);
 			}
 			// Otherwise, do some pseudo-lighting computation. This is actually more
 			// like what you would expect from shading in a rasterizer like OpenGL.
 			// TODO: replace this! you should be able to start with basically a one-liner
 			else {
-				float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));
-				pathSegments[idx].color *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f;
-				pathSegments[idx].color *= u01(rng); // apply some noise because why not
+				//float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));
+				//pathSegments[idx].color *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f;
+				scatterRay(pathSegments[idx], pathSegments[idx].ray.origin + intersection.t * pathSegments[idx].ray.direction, intersection.surfaceNormal, material,rng);
+				//pathSegments[idx].color *= u01(rng); // apply some noise because why not
 			}
 			// If there was no intersection, color the ray black.
 			// Lots of renderers use 4 channel color, RGBA, where A = alpha, often
@@ -268,6 +273,7 @@ __global__ void shadeFakeMaterial(
 			// This can be useful for post-processing and image compositing.
 		}
 		else {
+			pathSegments[idx].remainingBounces = 0;
 			pathSegments[idx].color = glm::vec3(0.0f);
 		}
 	}
@@ -284,6 +290,16 @@ __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iteration
 		image[iterationPath.pixelIndex] += iterationPath.color;
 	}
 }
+
+
+struct is_terminated
+{
+	__host__ __device__
+		bool operator()(const PathSegment pathsegment)
+	{
+		return pathsegment.remainingBounces;
+	}
+};
 
 /**
  * Wrapper for the __global__ call that sets up the kernel calls and does a ton
@@ -380,7 +396,15 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_paths,
 			dev_materials
 			);
-		iterationComplete = true; // TODO: should be based off stream compaction results.
+
+
+
+		dev_path_end = thrust::partition(thrust::device, dev_paths, dev_path_end, is_terminated());
+		num_paths = dev_path_end - dev_paths;
+
+
+
+		iterationComplete = (num_paths == 0); // TODO: should be based off stream compaction results.
 
 		if (guiData != NULL)
 		{
@@ -390,7 +414,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	// Assemble this iteration and apply it to the image
 	dim3 numBlocksPixels = (pixelcount + blockSize1d - 1) / blockSize1d;
-	finalGather << <numBlocksPixels, blockSize1d >> > (num_paths, dev_image, dev_paths);
+	finalGather << <numBlocksPixels, blockSize1d >> > (pixelcount, dev_image, dev_paths);
 
 	///////////////////////////////////////////////////////////////////////////
 

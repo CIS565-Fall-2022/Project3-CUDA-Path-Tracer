@@ -72,6 +72,7 @@ int main(int argc, char** argv) {
 
 	// Initialize CUDA and GL components
 	init();
+	printf("a");
 
 	// Initialize ImGui Data
 	InitImguiData(guiData);
