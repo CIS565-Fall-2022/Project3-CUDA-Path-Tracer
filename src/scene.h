@@ -31,4 +31,7 @@ public:
     // for textures
     std::vector<Texture> textures;
     RenderState state;
+
+    std::vector<Geom> lights;
+    int numLights = 0;
 };

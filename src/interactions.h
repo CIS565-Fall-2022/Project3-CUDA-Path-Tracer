@@ -169,12 +169,12 @@ void scatterRay(
             // if (u > 0 && v >= 0) {
                 float ix = u * (tex.width - 1);
                 float iy = v * (tex.height - 1);
-                int texDataIdx = ceil(iy * tex.height + ix);
+                int texDataIdx = ceil(iy * tex.width + ix);
 
                 // printf("texDataIdx %f \n");
 
-                pointColor = 3.f * tex.dev_texImage[texDataIdx];
-                // pointColor = glm::vec3(u, v, 0.f);
+                // pointColor = tex.dev_texImage[texDataIdx];
+                pointColor = glm::vec3(u, v, 0.f);
                 //pointColor = m.color;
                 //printf("pointColor: X %f, Y %f, Z %f \n", pointColor[0], pointColor[1], pointColor[2]);
             //}

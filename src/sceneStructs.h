@@ -8,7 +8,7 @@
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 #define USE_BOUND_BOX 1
-#define USE_UV 0
+#define USE_UV 1
 
 enum GeomType {
     SPHERE,
@@ -54,14 +54,14 @@ struct Geom {
     Triangle* host_tris;
     Triangle* device_tris;
     BoundBox bound;
-    int numTris;
+    int numTris = 0;
 
     int textureid = -1; // texture associated with geom
 };
 
 struct Texture {
-    int width;
-    int height;
+    int width = 0;
+    int height = 0;
     glm::vec3* host_texImage;
     glm::vec3* dev_texImage;
 };

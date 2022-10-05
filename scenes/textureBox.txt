@@ -40,7 +40,7 @@ EMITTANCE   0
 
 // Box texture
 TEXTURE 0
-PATH ../Project3-CUDA-Path-Tracer/objs/textures/boxTex.png
+PATH ../Project3-CUDA-Path-Tracer/objs/textures/boxOutline.png
 
 // Camera
 CAMERA
@@ -104,7 +104,7 @@ SCALE       .01 10 10
 
 // texture obj
 OBJECT 6
-../Project3-CUDA-Path-Tracer/objs/box.obj
+../Project3-CUDA-Path-Tracer/objs/cat.obj
 material 1
 TRANS		0 2 0
 ROTAT	      0 0 0

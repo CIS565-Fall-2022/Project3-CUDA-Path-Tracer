@@ -335,6 +335,12 @@ int Scene::loadGeom(string objectid) {
 #endif
         }
         else {
+            if (newGeom.materialid == 0)
+            {
+                // materialid == 0 should always be a light
+                lights.push_back(newGeom);
+                numLights++;
+            }
             geoms.push_back(newGeom);
         }
         return 1;
@@ -397,6 +403,13 @@ int Scene::loadGeom(string objectid) {
             newGeom.translation, newGeom.rotation, newGeom.scale);
         newGeom.inverseTransform = glm::inverse(newGeom.transform);
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
+
+        if (newGeom.materialid == 0)
+        {
+            // materialid == 0 should always be a light
+            lights.push_back(newGeom);
+            numLights++;
+        }
 
         geoms.push_back(newGeom);
         return 1;
@@ -541,6 +554,7 @@ int Scene::loadTexture(string textureid) {
             // ... process data if not NULL ..
             if (data != nullptr && width > 0 && height > 0)
             {
+                cout << "channels: " << channels << endl;
                 if (channels == 3)
                 {
                     int pixelDataIdx = 0;
@@ -552,9 +566,35 @@ int Scene::loadTexture(string textureid) {
                             static_cast<float>(data[p + 2]) / 256.f);
                         pixelData[pixelDataIdx] = currPix;
                         
-                        if (pixelDataIdx == 2300 || pixelDataIdx == width * height - 2300) {
+                        /*if (pixelDataIdx == 2300 || pixelDataIdx == width * height - 2300) {
                             cout << "pix: " << pixelDataIdx << " is: " << currPix[0] << ", " << currPix[1] << ", " << currPix[2] << endl;
-                        }
+                        }*/
+                        pixelDataIdx++;
+                    }
+
+                    newTexture.width = width;
+                    newTexture.height = height;
+                    newTexture.host_texImage = pixelData;
+
+                    cout << "Loaded all Texture Points" << endl;
+                    cout << "width: " << newTexture.width; // looks good
+                    cout << "height: " << newTexture.height; // looks good
+                    cout << "last pixelIdx: " << pixelDataIdx; // looks correct
+                }
+                else if (channels == 4) {
+                    // rgba
+                    int pixelDataIdx = 0;
+                    // iterate over every pixel
+                    // total number of data points is width * height * channels (should be 3)
+                    for (int p = 0; p < (width * height) * channels - 3; p += 4) {
+                        glm::vec3 currPix = glm::vec3(static_cast<float>(data[p]) / 256.f,
+                            static_cast<float>(data[p + 1]) / 256.f,
+                            static_cast<float>(data[p + 2]) / 256.f);
+                        pixelData[pixelDataIdx] = currPix;
+
+                        /*if (pixelDataIdx == 2300 || pixelDataIdx == width * height - 2300) {
+                            cout << "pix: " << pixelDataIdx << " is: " << currPix[0] << ", " << currPix[1] << ", " << currPix[2] << endl;
+                        }*/
                         pixelDataIdx++;
                     }
 

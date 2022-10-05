@@ -27,7 +27,7 @@
 #define CACHE_FIRST_BOUNCE 0 // note that Cache first bounce and antialiasing cannot be on at the same time.
 #define ANTIALIASING 0
 #define DEPTH_OF_FIELD 0 // depth of field focus defined later
-#define DIRECT_LIGHTING 1
+#define DIRECT_LIGHTING 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -94,6 +94,10 @@ static ShadeableIntersection* dev_cached_intersections = NULL;
 #endif
 
 static Texture* dev_textures = NULL;
+static int numTextures;
+static int numGeoms; //cursed variables to cudaFree nested pointers;
+
+static Geom* dev_lights = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -102,6 +106,8 @@ void InitDataContainer(GuiDataContainer* imGuiData)
 
 void pathtraceInit(Scene* scene) {
 	hst_scene = scene;
+	numTextures = hst_scene->textures.size();
+	numGeoms = hst_scene->geoms.size();
 
 	const Camera& cam = hst_scene->state.camera;
 	const int pixelcount = cam.resolution.x * cam.resolution.y;
@@ -115,7 +121,7 @@ void pathtraceInit(Scene* scene) {
 	checkCUDAError("cudaMalloc dev_paths failed");
 
 	for (int i = 0; i < scene->geoms.size(); i++) {
-		if (scene->geoms[i].numTris) {
+		if (scene->geoms[i].numTris > 0) {
 			cudaMalloc(&(scene->geoms[i].device_tris), scene->geoms[i].numTris * sizeof(Triangle));
 			checkCUDAError("cudaMalloc device_tris failed");
 			cudaMemcpy(scene->geoms[i].device_tris, scene->geoms[i].host_tris, scene->geoms[i].numTris * sizeof(Triangle), cudaMemcpyHostToDevice);
@@ -146,6 +152,8 @@ void pathtraceInit(Scene* scene) {
 	//}
 
 	// copy each texture's pixel information from cpu to gpu
+
+#if USE_UV
 	for (int i = 0; i < scene->textures.size(); i++) {
 		cudaMalloc(&(scene->textures[i].dev_texImage), scene->textures[i].height * scene->textures[i].width * sizeof(glm::vec3));
 		checkCUDAError("cudaMalloc device_texImage failed");
@@ -157,10 +165,18 @@ void pathtraceInit(Scene* scene) {
 	checkCUDAError("cudaMalloc dev_textures failed");
 	cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
 	checkCUDAError("cudaMemcpy dev_textures ailed");
+#endif
 
 #if CACHE_FIRST_BOUNCE
 	cudaMalloc(&dev_cached_intersections, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_cached_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
+#endif
+
+#if DIRECT_LIGHTING
+	cudaMalloc(&dev_lights, scene->lights.size() * sizeof(Geom));
+	checkCUDAError("cudaMalloc dev_lights failed");
+	cudaMemcpy(dev_lights, scene->lights.data(), scene->lights.size() * sizeof(Geom), cudaMemcpyHostToDevice);
+	checkCUDAError("cudaMalloc dev_lights failed");
 #endif
 	checkCUDAError("pathtraceInit");
 }
@@ -170,14 +186,29 @@ void pathtraceFree() {
 	cudaFree(dev_paths);
 
 	//// cudaFree 
-	//for (int i = 0; i < hst_scene->geoms.size(); i++) {
-	//	// cout << "numTris: " << scene->geoms[i].numTris;
-	//	if (hst_scene->geoms[i].type == OBJ) {
-	//		cudaFree(hst_scene->geoms[i].device_tris);
-	//		checkCUDAError("cudaFree device_tris failed");
-	//	}
-	//}
-	//dev_geoms->free();
+	int numG = numGeoms;
+	Geom* tmp_geom_pointer = new Geom[numG];
+	cudaMemcpy(tmp_geom_pointer, dev_geoms, numG * sizeof(Geom), cudaMemcpyDeviceToHost);
+	for (int i = 0; i < numGeoms; i++) {
+		// cout << "numTris: " << scene->geoms[i].numTris;
+		if (tmp_geom_pointer[i].type == OBJ) {
+			cudaFree(tmp_geom_pointer[i].device_tris);
+			checkCUDAError("cudaFree device_tris failed");
+		}
+	}
+	// dev_geoms->free();
+
+#if USE_UV
+	int numT = numTextures;
+	Texture *tmp_texture_pointer = new Texture[numT];
+	cudaMemcpy(tmp_texture_pointer, dev_textures, numT * sizeof(Texture), cudaMemcpyDeviceToHost);
+	for (int i = 0; i < numT; i++) {
+		cudaFree(tmp_texture_pointer->dev_texImage);
+		checkCUDAError("CudaFree device_texture failed");
+	}
+	cudaFree(dev_textures);
+	delete[] tmp_texture_pointer;
+#endif
 
 	cudaFree(dev_geoms);
 	cudaFree(dev_materials);
@@ -185,7 +216,12 @@ void pathtraceFree() {
 	// TODO: clean up any extra device memory you created
 
 	// dev_textures->free();
-	cudaFree(dev_textures);
+
+#if DIRECT_LIGHTING
+	cudaFree(dev_lights);
+#endif
+
+	delete[] tmp_geom_pointer;
 
 	checkCUDAError("pathtraceFree");
 }
@@ -457,7 +493,10 @@ __global__ void kernComputeShade(
 	, ShadeableIntersection* shadeableIntersections
 	, PathSegment* pathSegments
 	, Material* materials
-	, Texture* textures)
+#if USE_UV
+	, Texture* textures
+#endif
+)
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx < num_paths)
@@ -503,6 +542,83 @@ __global__ void kernComputeShade(
 		}
 	}
 }
+
+#if DIRECT_LIGHTING
+__global__ void kernComputeShadeDirectLighting(
+	int iter
+	, int num_paths
+	, ShadeableIntersection* shadeableIntersections
+	, PathSegment* pathSegments
+	, Material* materials
+	, Geom* lights
+	, int numLights
+#if USE_UV
+	, Texture* textures
+#endif
+)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx < num_paths)
+	{
+		ShadeableIntersection intersection = shadeableIntersections[idx];
+		if (intersection.t > 0.0f) { // if the intersection exists...
+		  // Set up the RNG
+		  // LOOK: this is how you use thrust's RNG! Please look at
+		  // makeSeededRandomEngine as well.
+			thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
+			thrust::uniform_real_distribution<float> u01(0, 1);
+
+			Material material = materials[intersection.materialId];
+			glm::vec3 materialColor = material.color;
+
+			// If the material indicates that the object was a light, "light" the ray
+			if (material.emittance > 0.0f) {
+				pathSegments[idx].color *= (materialColor * material.emittance);
+
+				// not liking this 
+				pathSegments[idx].remainingBounces = 0;
+			}
+			// Otherwise, do some pseudo-lighting computation. This is actually more
+			// like what you would expect from shading in a rasterizer like OpenGL.
+			// TODO: replace this! you should be able to start with basically a one-liner
+			else {
+				// generate new ray and load it into pathSegments by calling scatterRay
+				glm::vec3 intersectionPoint = getPointOnRay(pathSegments[idx].ray, intersection.t);
+#if USE_UV
+				Texture texture = textures[intersection.textureId];
+				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, intersection.textureId, intersection.uv, material, texture, rng);
+#else
+				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, material, rng);
+#endif
+			}
+
+			if (pathSegments[idx].remainingBounces == 1) {
+				// randomly choose light from 0 to numLights
+				thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
+				thrust::uniform_real_distribution<int> u02(0, numLights);
+				int randLightIdx = u02(rng);
+				Geom currLight = lights[randLightIdx];
+				// randomly choose location on light
+				thrust::uniform_real_distribution<float> u03(0, 1);
+				float randX = u03(rng);
+				float randY = u03(rng);
+				float randZ = u03(rng);
+
+				glm::vec3 lightSpot = glm::vec3(currLight.transform * glm::vec4(randX, randY, randZ, 1.f));
+
+				pathSegments[idx].ray.direction = glm::normalize(lightSpot - pathSegments[idx].ray.origin);
+			}
+			// If there was no intersection, color the ray black.
+			// Lots of renderers use 4 channel color, RGBA, where A = alpha, often
+			// used for opacity, in which case they can indicate "no opacity".
+			// This can be useful for post-processing and image compositing.
+		}
+		else {
+			pathSegments[idx].color = glm::vec3(0.0f);
+		}
+	}
+}
+#endif
 
 // if cache
 #if CACHE_FIRST_BOUNCE
@@ -770,14 +886,31 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 #endif	
 		// 2. shade the ray and spawn new path segments using BSDF
 		// this function generates a new ray to replace the old one using BSDF
-		kernComputeShade << <numblocksPathSegmentTracing, blockSize1d >> > (
+#if DIRECT_LIGHTING
+		kernComputeShadeDirectLighting << <numblocksPathSegmentTracing, blockSize1d >> > (
 			iter,
 			currNumPaths,
 			dev_intersections,
 			dev_paths,
 			dev_materials,
-			dev_textures
+			dev_lights,
+			hst_scene->numLights
+#if USE_UV
+			, dev_textures
+#endif
 			);
+#else 
+		kernComputeShade << <numblocksPathSegmentTracing, blockSize1d >> > (
+			iter,
+			currNumPaths,
+			dev_intersections,
+			dev_paths,
+			dev_materials
+#if USE_UV
+			, dev_textures
+#endif
+			);
+#endif
 
 		cudaDeviceSynchronize();
 
