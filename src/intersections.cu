@@ -65,9 +65,6 @@ __host__ __device__  bool AABBPointIntersect(AABB const& aabb, glm::vec3 const& 
 
 // reference: https://stackoverflow.com/questions/17458562/efficient-aabb-triangle-intersection-in-c-sharp
 __host__ __device__  bool AABBTriangleIntersect(AABB const& a, glm::vec3 const(&tri_verts)[3]) {
-    float tri_min, tri_max;
-    float box_min, box_max;
-
     bool contained = true;
     for (int i = 0; i < 3 && contained; ++i) {
         if (!AABBPointIntersect(a, tri_verts[i])) {
@@ -77,6 +74,20 @@ __host__ __device__  bool AABBTriangleIntersect(AABB const& a, glm::vec3 const(&
     if (contained) {
         return true;
     }
+
+    // reduce to a loose & inaccurate AABB-AABB test instead
+    // because I run out of time trying to debug this
+    // this function is only used by the octree anyways
+    glm::vec3 min_tri(FLT_MAX), max_tri(FLT_MIN);
+    for (int i = 0; i < 3; ++i) {
+        min_tri = glm::min(min_tri, tri_verts[i]);
+        max_tri = glm::max(max_tri, tri_verts[i]);
+    }
+    return AABBIntersect(a, AABB(min_tri, max_tri));
+
+#ifdef STACK_OVERFLOW_IMPL
+    float tri_min, tri_max;
+    float box_min, box_max;
 
     glm::vec3 box_verts[8];
     a.vertices(box_verts, true);
@@ -116,6 +127,7 @@ __host__ __device__  bool AABBTriangleIntersect(AABB const& a, glm::vec3 const(&
         }
     }
     return true;
+#endif
 }
 
 /**

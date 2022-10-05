@@ -12,7 +12,8 @@
 // #define MAX_INTERSECTION_TEST_SIZE BLOCK_SIZE
 #define LARGE_FLOAT (float)(1e10)
 #define SMALL_FLOAT (float)(-1e10)
-#define OCTREE_DEPTH 5
+#define OCTREE_BOX_EPS 0.001f
+#define OCTREE_DEPTH 3
 #define OCTREE_MESH_ONLY
 
 // impl switches

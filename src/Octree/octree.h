@@ -12,7 +12,6 @@
 typedef size_t node_id_t;
 static constexpr node_id_t null_id = 0;
 static constexpr node_id_t root_id = 1;
-static constexpr float eps = 0.1f;
 
 struct nodeGPU;
 struct octreeGPU;
@@ -149,7 +148,7 @@ private:
 		};
 
 		for (size_t i = 0; i < 8; ++i) {
-			bs[i] = AABB(mins[i] - eps, mins[i] + half_size + eps);
+			bs[i] = AABB(mins[i] - OCTREE_BOX_EPS, mins[i] + half_size + OCTREE_BOX_EPS);
 			if (get_hits(scene, bs[i], null_id)) {
 				node_id_t ret = new_node(bs[i]);
 				_nodes[cur].children[i] = ret;

@@ -11,7 +11,7 @@ UP          0 1 0
 
 // Sphere
 OBJECT
-sphere
+obj ../meshes/Simple/coin2.obj
 material    ../materials/emissive_white.mtl
 TRANS       0 0 0
 ROTAT       0 0 0

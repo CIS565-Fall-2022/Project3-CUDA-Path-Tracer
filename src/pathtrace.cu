@@ -301,7 +301,7 @@ __global__ void computeIntersections(
 		Geom& geom = geoms[i];
 
 #ifdef AABB_CULLING
-		if (!intersect(geom.bounds, path.ray))
+		if (!AABBRayIntersect(geom.bounds, path.ray, nullptr))
 			continue;
 #endif // AABB_CULLING
 
@@ -322,7 +322,6 @@ __global__ void computeIntersections(
 		if (t > 0.0f && t_min > t) {
 			t_min = t;
 			inters = tmp;
-			inters.t = t;
 		}
 	}
 #endif // OCTREE_CULLING
