@@ -2,6 +2,8 @@
 
 #include "intersections.h"
 
+#define PROCEDURAL_TEXTURE 1
+
 // CHECKITOUT
 /**
  * Computes a cosine-weighted random direction in a hemisphere.
@@ -41,6 +43,29 @@ glm::vec3 calculateRandomDirectionInHemisphere(
         + sin(around) * over * perpendicularDirection2;
 }
 
+__host__ __device__
+void FetchTexture(const Texture& texture, const int offset, const glm::vec3* texImage, const glm::vec2& uv, glm::vec3 &color) {
+  int tx = uv.x * (texture.width - 1);
+  int ty = (uv.y) * (texture.height - 1);
+  int idx = (ty * texture.width + tx);
+
+  //int offset = (isNormal) ? texture.offsetNormal : texture.offsetColor;
+
+#if PROCEDURAL_TEXTURE
+  color = texImage[idx + offset];
+#else
+  color = texImage[idx + offset];
+#endif
+}
+
+__host__ __device__
+void normalMapping(glm::vec3& normalSurface, const glm::vec3& normalMap, const glm::vec4& tangent) {
+  glm::vec3 t = glm::vec3(tangent);
+  glm::vec3 b = glm::cross(normalSurface, t) * tangent.w;
+  glm::mat3 TBN = glm::mat3(t, b, normalSurface);
+  normalSurface = glm::normalize(TBN * normalMap);
+}
+
 /**
  * Scatter a ray with some probabilities according to the material properties.
  * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
@@ -68,12 +93,79 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  */
 __host__ __device__
 void scatterRay(
+        int idx,
         PathSegment & pathSegment,
         glm::vec3 intersect,
         glm::vec3 normal,
+        glm::vec2 uv,
         const Material &m,
+        const int num_lightSource,
+        glm::vec4* lightSourceSampled,
+        const Texture* tex,
+        const glm::vec3* texImage, 
+        const glm::vec3* emissiveTexture,
+        const int traceDepth,
         thrust::default_random_engine &rng) {
-    // TODO: implement this.
+
+  // Textue 
+  glm::vec3 color;
+  color = m.color;
+  if (m.texID != -1) {
+    FetchTexture(tex[m.texID], tex[m.texID].offsetColor, texImage, uv, color);
+    if (m.emissiveTexID != -1) {
+      glm::vec3 emissiveColor;
+      FetchTexture(tex[m.emissiveTexID], tex[m.texID].offsetEmissive, emissiveTexture, uv, emissiveColor);
+
+      if (emissiveColor != glm::vec3(0.f)) {
+        color = emissiveColor;
+
+        lightSourceSampled[idx] = glm::vec4(intersect, 1);
+
+        if (pathSegment.remainingBounces != traceDepth) {
+          color = 40.f*color;
+        }
+        pathSegment.remainingBounces = 0;
+      }
+    }
+  }
+
+  pathSegment.isDifuse = 0;
+
+  // TODO: implement this.
+  thrust::uniform_real_distribution<float> u01(0, 1);
+  float prob = u01(rng);
+  if (m.hasRefractive) {
+    float ior = m.indexOfRefraction;
+    float cosAngle = glm::dot(pathSegment.ray.direction, -normal);
+    float reflectCoeff = ((1 - ior) / (1 + ior)) * ((1 - ior) / (1 + ior));
+    reflectCoeff = reflectCoeff + (1.f - reflectCoeff) * powf(1.f - cosAngle, 5);
+
+    if (u01(rng) < reflectCoeff) {
+      pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+      pathSegment.color *= (color);
+      pathSegment.ray.origin = intersect;
+    }
+    else {
+      pathSegment.ray.direction = glm::normalize(glm::refract(pathSegment.ray.direction, normal, cosAngle > 0.f ? 1.f / ior : ior));
+      pathSegment.color *= (color);
+      pathSegment.ray.origin = intersect + 0.001f * glm::normalize(pathSegment.ray.direction);
+      // pathSegment.ray.origin = intersect;
+    }
+  }
+  else if (m.hasReflective) {
+    pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+    pathSegment.color *= (color);
+    pathSegment.ray.origin = intersect;
+  }
+  else {
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
+    pathSegment.color *= (color);
+    pathSegment.ray.origin = intersect;
+    pathSegment.isDifuse = 1;
+  }
+  
+
+
 }
