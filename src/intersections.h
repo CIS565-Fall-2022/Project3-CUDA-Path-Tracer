@@ -6,6 +6,9 @@
 #include "sceneStructs.h"
 #include "utilities.h"
 
+
+#define AABB 0
+
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
  */
@@ -166,33 +169,8 @@ bool rayTriangleIntersectionTest(glm::vec3 &p0, glm::vec3 &p1, glm::vec3 &p2,
     }
 }
 
-//very naive way
-__host__ __device__ 
-float objIntersectionTest(Object &objs, Ray r,
-    glm::vec3& intersectionPoint, glm::vec3 &normal, int& materialId)
-{
-    for (const auto& tri : objs.triangles) {
-        glm::vec3 p0 = tri.pos[0];
-        glm::vec3 p1 = tri.pos[1];
-        glm::vec3 p2 = tri.pos[2];
-        glm::vec3 O = r.origin;
-        glm::vec3 D = glm::normalize(r.direction);
-        glm::vec3 result;
-        if (rayTriangleIntersectionTest(p0, p1, p2, O, D, result)) {
-            float b0 = 1 - result.y - result.z;
-            float b1 = result.y;
-            float b2 = result.z;
-            intersectionPoint = b0 * p0 + b1 * p1 + b2 * p2;
-            normal = b0 * tri.normal[0] + b1 * tri.normal[1] + b2 * tri.normal[2];
-            materialId = tri.materialId;
-            
-            return glm::length(r.origin - intersectionPoint);
-        }
-    }
-    return -1;
-}
 
-__host__ __device__ 
+__device__ 
 float triangleIntersectionTest(Geom triangle, Ray r,
     glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2& uv, bool& outside)
 {
@@ -216,4 +194,15 @@ float triangleIntersectionTest(Geom triangle, Ray r,
     normal = glm::normalize(multiplyMV(triangle.invTranspose, glm::vec4(normal, 0.f)));
 
     return glm::length(r.origin - intersectionPoint);
+}
+
+__device__ 
+float meshIntersectionTest(Geom mesh, Ray r)
+{
+#if AABB
+
+#else
+
+
+#endif
 }

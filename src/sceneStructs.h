@@ -11,6 +11,7 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    MESH,
     TRIANGLE
 };
 
@@ -33,11 +34,14 @@ struct Geom {
     glm::vec3 normal[3];
     glm::vec2 uv[3];
     bool isObj{ false };
+
     const char* textureName;
     unsigned char* img;
     int texture_width;
     int texture_height;
     int channels;
+
+    //Object obj;
 };
 
 struct Material {
@@ -99,27 +103,75 @@ struct ShadeableIntersection {
 };
 
 struct Triangle {
-    /*std::array<glm::vec3, 3> pos;
-    std::array<glm::vec3, 3> normal;
-    std::array<glm::vec2, 3> uv;*/
     glm::vec3 pos[3];
     glm::vec3 normal[3];
     glm::vec2 uv[3];
     int materialId;
 };
 
-//struct Face {
-//    std::vector<Triangle> triangles;
-//};
 
-struct Object {
-    std::vector<Triangle> triangles;
-    std::string name;
+class AABB {
+public:
+    glm::vec3 pMin, pMax;
+
+    AABB()
+    {
+        float minNum = FLT_MIN;
+        float maxNum = FLT_MAX;
+        pMin = glm::vec3(minNum);
+        pMax = glm::vec3(maxNum);
+    }
+
+    AABB(Geom geo) {
+        if (geo.type == TRIANGLE) {
+            auto p1 = geo.pos[0];
+            auto p2 = geo.pos[1];
+            auto p3 = geo.pos[2];
+            pMin = glm::vec3(fmin(p1.x, p2.x), fmin(p1.y, p2.y), fmin(p1.z, p2.z));
+            pMax = glm::vec3(fmax(p1.x, p2.x), fmax(p1.y, p2.y), fmax(p1.z, p2.z));
+
+            pMin = glm::vec3(fmin(pMin.x, p3.x), fmin(pMin.y, p3.y), fmin(pMin.z, p3.z));
+            pMax = glm::vec3(fmax(pMax.x, p3.x), fmax(pMax.y, p3.y), fmax(pMax.z, p3.z));
+        }
+    }
+
+    bool IntersectP(const Ray& ray) const
+    {
+
+        //auto temp1 = glm::vec3(pMax.x - ray.origin.x, pMax.y - ray.origin.y, pMax.z - ray.origin.z);
+        //auto temp2 = glm::vec3(pMin.x - ray.origin.x, pMin.y - ray.origin.y, pMin.z - ray.origin.z);
+        /*glm::vec3 ttop = glm::vec3((float)temp1.x * (float)invDir.x, (float)temp1.y * (float)invDir.y, (float)temp1.z * (float)invDir.z);
+        glm::vec3 tbot = glm::vec3((float)temp2.x * (float)invDir.x, (float)temp2.y * (float)invDir.y, (float)temp2.z * (float)invDir.z);*/
+
+        glm::vec3 invDir = glm::vec3(1 / ray.direction.x, 1 / ray.direction.y, 1 / ray.direction.z);
+
+        auto temp1 = pMax - ray.origin;
+        auto temp2 = pMin - ray.origin;
+        glm::vec3 ttop = temp1 * invDir;
+        glm::vec3 tbot = temp2 * invDir;
+
+        auto tmin = glm::vec3(std::min(ttop.x, tbot.x), std::min(ttop.y, tbot.y), std::min(ttop.z, tbot.z));
+        auto tmax = glm::vec3(std::max(ttop.x, tbot.x), std::max(ttop.y, tbot.y), std::max(ttop.z, tbot.z));
+
+        float t0 = std::max(tmin.x, (std::max)(tmin.y, tmin.z));
+        float t1 = std::min(tmax.x, (std::min)(tmax.y, tmax.z));
+        return t0 <= t1 && t1 >= 0;
+    }
 };
 
-struct obj_material {
-    glm::vec3 Ka;
-    glm::vec3 Kd;
-    glm::vec3 Ks;
-    std::string name;
+static AABB Union(const AABB& b1, const AABB& b2) {
+    AABB ret;
+    ret.pMin = glm::vec3((std::min)(b1.pMin.x, b2.pMin.x),
+        (std::min)(b1.pMin.y, b2.pMin.y),
+        (std::min)(b1.pMin.z, b2.pMin.z));
+    ret.pMax = glm::vec3((std::max)(b1.pMax.x, b2.pMax.x),
+        (std::max)(b1.pMax.y, b2.pMax.y),
+        (std::max)(b1.pMax.z, b2.pMax.z));
+    return ret;
+}
+
+class Object {
+public:
+    AABB box;
+    Geom* data;
 };

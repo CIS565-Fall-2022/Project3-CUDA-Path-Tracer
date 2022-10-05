@@ -93,7 +93,7 @@ static ShadeableIntersection* dev_firstBounce = NULL;
 static PathSegment* dev_first_paths = NULL;
 #endif
 //for tiny_obj
-static Object* dev_objects = NULL;
+//static Object* dev_objects = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -126,8 +126,8 @@ void pathtraceInit(Scene* scene) {
 	cudaMemset(dev_firstBounce, 0, pixelcount * sizeof(ShadeableIntersection));
 	cudaMalloc(&dev_first_paths, pixelcount * sizeof(PathSegment));	
 #endif
-	cudaMalloc(&dev_objects, scene->objects.size() * sizeof(Object));
-	cudaMemcpy(dev_objects, scene->objects.data(), scene->objects.size() * sizeof(Object), cudaMemcpyHostToDevice);
+	//cudaMalloc(&dev_objects, scene->objects.size() * sizeof(Object));
+	//cudaMemcpy(dev_objects, scene->objects.data(), scene->objects.size() * sizeof(Object), cudaMemcpyHostToDevice);
 
 	checkCUDAError("pathtraceInit");
 }
@@ -143,8 +143,8 @@ void pathtraceFree() {
 	cudaFree(dev_firstBounce);
 	cudaFree(dev_first_paths);
 #endif
-	cudaFree(dev_objects);
-	checkCUDAError("pathtraceFree");
+	//cudaFree(dev_objects);
+	//checkCUDAError("pathtraceFree");
 }
 
 __host__ __device__
@@ -238,9 +238,7 @@ __global__ void computeIntersections(
 	int num_paths,
 	PathSegment* pathSegments,
 	Geom* geoms,
-	int geoms_size, 
-	Object* objs,
-	int objs_size,
+	int geoms_size,
 	ShadeableIntersection* intersections
 )
 {
@@ -282,6 +280,9 @@ __global__ void computeIntersections(
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 			else if (geom.type == TRIANGLE) {
 				t = triangleIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
+			}
+			else if (geom.type == MESH) {
+
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
@@ -560,8 +561,6 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				dev_paths, 
 				dev_geoms, 
 				hst_scene->geoms.size(), 
-				dev_objects,
-				hst_scene->objects.size(),
 				dev_firstBounce
 				);
 			checkCUDAError("trace one bounce");
@@ -580,8 +579,6 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				dev_paths,
 				dev_geoms,
 				hst_scene->geoms.size(),
-				dev_objects,
-				hst_scene->objects.size(),
 				dev_intersections
 				);
 			checkCUDAError("trace one bounce");

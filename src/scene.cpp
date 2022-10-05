@@ -271,6 +271,7 @@ int Scene::loadObj(const char* fileName)
     geo.invTranspose = glm::inverseTranspose(geo.transform);
 
 
+    Object obj;
     //For each shape
     for (size_t i = 0; i < shapes.size(); i++) {
         size_t index_offset = 0;
@@ -311,10 +312,14 @@ int Scene::loadObj(const char* fileName)
 
             geo.isObj = true;
             geoms.push_back(geo);
+
+            Obj_geoms.push_back(geo);
+            obj.box = Union(obj.box, AABB(geo));
         }
     }
 
-
+    obj.data = Obj_geoms.data();
+    
 
     //load materials
     printf("material size: %d\n", m_materials.size());

@@ -30,6 +30,6 @@ public:
 
     RenderState state;
 
-    //std::vector<Geom> m_geoms;
-    std::vector<Object> objects;
+    std::vector<Geom> Obj_geoms;
+    
 };
