@@ -6,6 +6,7 @@
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
+#define USE_BOUNDING_BOX 1
 
 enum GeomType {
     SPHERE,
@@ -39,6 +40,8 @@ struct Geom {
     // for mesh loading from obj
     Triangle* triangles;
     int numTris;
+    glm::vec3 AABBmax = glm::vec3(FLT_MIN);
+    glm::vec3 AABBmin = glm::vec3(FLT_MAX);
 };
 
 struct Material {

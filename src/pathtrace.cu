@@ -25,7 +25,7 @@
 #define MOTION_BLUR 0
 #define MOTION_VELOCITY glm::vec3(0.0f, 1.75f, 0.0f)
 
-#define DEPTH_OF_FIELD 1
+#define DEPTH_OF_FIELD 0
 #define LENS_RADIUS 3.f
 #define FOCAL_DISTANCE 8.5f
 #define PI 3.141592654f
@@ -174,6 +174,7 @@ static ShadeableIntersection* dev_first_intersections = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
+static Triangle* dev_triangles = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -204,6 +205,12 @@ void pathtraceInit(Scene* scene) {
 	cudaMemset(dev_first_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
 	// TODO: initialize any extra device memeory you need
+	// if geoms contain mesh, allocate dev_triangles for it
+	if (scene->hasMesh && scene->meshGeomId != -1) {
+		Geom mesh = scene->geoms[scene->meshGeomId];
+		cudaMalloc(&dev_triangles, mesh.numTris * sizeof(Triangle));
+		cudaMemcpy(dev_triangles, mesh.triangles, mesh.numTris * sizeof(Triangle), cudaMemcpyHostToDevice);
+	}
 
 	checkCUDAError("pathtraceInit");
 }
@@ -217,7 +224,7 @@ void pathtraceFree() {
 	cudaFree(dev_intersections);
 	cudaFree(dev_first_intersections);
 	// TODO: clean up any extra device memory you created
-
+	cudaFree(dev_triangles);
 	checkCUDAError("pathtraceFree");
 }
 
@@ -308,7 +315,8 @@ __global__ void computeIntersections(
 	, PathSegment* pathSegments
 	, Geom* geoms
 	, int geoms_size
-	, ShadeableIntersection* intersections,
+	, ShadeableIntersection* intersections
+	, Triangle* triangles,
 	int iter
 )
 {
@@ -352,6 +360,10 @@ __global__ void computeIntersections(
 #endif
 			}
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
+			else if (geom.type == MESH) {
+				// ray test intersection with every triangle in mesh
+				t = meshIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, triangles, outside);
+			}
 
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
@@ -575,7 +587,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_paths
 				, dev_geoms
 				, hst_scene->geoms.size()
-				, dev_intersections,
+				, dev_intersections
+				, dev_triangles,
 				iter
 				);
 			cudaMemcpy(dev_first_intersections, dev_intersections,  pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
@@ -593,7 +606,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_paths
 				, dev_geoms
 				, hst_scene->geoms.size()
-				, dev_intersections,
+				, dev_intersections
+				, dev_triangles,
 				iter
 				);
 			checkCUDAError("trace one bounce");

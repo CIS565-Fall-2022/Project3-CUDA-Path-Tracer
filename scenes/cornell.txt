@@ -119,26 +119,26 @@ ROTAT       0 0 0
 SCALE       .01 10 10
 
 // Sphere
-OBJECT 6
-sphere
-material 2
-TRANS       -1 4 2
-ROTAT       0 0 0
-SCALE       3 3 3
+//OBJECT 6
+//sphere
+//material 2
+//TRANS       -1 4 2
+//ROTAT       0 0 0
+//SCALE       3 3 3
 
 // Sphere refractive glass
-OBJECT 7
-sphere
-material 5
-TRANS       3 4 -1
-ROTAT       0 0 0
-SCALE       3 3 3
+//OBJECT 7
+//sphere
+//material 5
+//TRANS       3 4 -1
+//ROTAT       0 0 0
+//SCALE       3 3 3
 
 // obj from file
-OBJECT 8
+OBJECT 6
 mesh
-filepath ../scenes/mesh/cow.obj
-material 5
-TRANS       3 4 2
-ROTAT       0 0 0
+material 2
+TRANS       1 4 -1
+ROTAT       0 45 0
 SCALE       2 2 2
+filepath ../scenes/mesh/cube.obj

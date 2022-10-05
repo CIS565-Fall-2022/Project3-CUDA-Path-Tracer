@@ -142,3 +142,106 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 
     return glm::length(r.origin - intersectionPoint);
 }
+
+__host__ __device__ glm::vec3 calculateNormal(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2) {
+    glm::vec3 v1 = p1 - p0;
+    glm::vec3 v2 = p2 - p0;
+    return glm::normalize(glm::cross(v1, v2));
+}
+
+__host__ __device__
+bool rayBoundingBoxIntersect(glm::vec3 origin, glm::vec3 dir, glm::vec3 aabbMin, glm::vec3 aabbMax)
+{
+    float tmin = (aabbMin.x - origin.x) / dir.x;
+    float tmax = (aabbMax.x - origin.x) / dir.x;
+
+    if (tmin > tmax) swap(tmin, tmax);
+
+    float tymin = (aabbMin.y - origin.y) / dir.y;
+    float tymax = (aabbMax.y - origin.y) / dir.y;
+
+    if (tymin > tymax) swap(tymin, tymax);
+
+    if ((tmin > tymax) || (tymin > tmax))
+        return false;
+
+    if (tymin > tmin)
+        tmin = tymin;
+
+    if (tymax < tmax)
+        tmax = tymax;
+
+    float tzmin = (aabbMin.z - origin.z) / dir.z;
+    float tzmax = (aabbMax.z - origin.z) / dir.z;
+
+    if (tzmin > tzmax) swap(tzmin, tzmax);
+
+    if ((tmin > tzmax) || (tzmin > tmax))
+        return false;
+
+    if (tzmin > tmin)
+        tmin = tzmin;
+
+    if (tzmax < tmax)
+        tmax = tzmax;
+
+    return true;
+}
+
+__host__ __device__ 
+float meshIntersectionTest(Geom mesh, Ray r,
+                                                 glm::vec3& intersectionPoint,
+                                                 glm::vec3& normal, 
+                                                 Triangle* tirangles,
+                                                 bool& outside)
+{
+#if USE_BOUNDING_BOX
+    //bool isIntersect = rayBoundingBoxIntersect(r.)
+#endif
+
+    glm::vec3 intersectionBaryPos;
+    float tMin = FLT_MAX;
+    glm::vec3 tMinNormal;
+    bool intersected = false;
+
+    // do intersection test with every triangle
+    for (int i = 0; i < mesh.numTris; ++i)
+    {
+        Triangle tri = tirangles[i];
+        // transform the triangle position from object to world coordinate
+        glm::vec3 p0 = multiplyMV(mesh.transform, glm::vec4(tri.p0, 1.0f));
+        glm::vec3 p1 = multiplyMV(mesh.transform, glm::vec4(tri.p1, 1.0f));
+        glm::vec3 p2 = multiplyMV(mesh.transform, glm::vec4(tri.p2, 1.0f));
+
+       /* glm::vec3 n0 = multiplyMV(mesh.transform, glm::vec4(tri.n0, 0.0f));
+        glm::vec3 n1 = multiplyMV(mesh.transform, glm::vec4(tri.n1, 0.0f));
+        glm::vec3 n2 = multiplyMV(mesh.transform, glm::vec4(tri.n2, 0.0f));*/
+
+        // to intersection test
+        bool intersection = glm::intersectRayTriangle(r.origin, r.direction, p0, p1, p2, intersectionBaryPos);
+        if (!intersection) {
+            continue;
+        }
+        // if intersect calculate the distance
+        float t = glm::length(r.origin - intersectionBaryPos);
+        // use barycentric to calculate the normal
+        //glm::vec3 intersectionNormal = glm::normalize(intersectionBaryPos.x * tri.n0 + intersectionBaryPos.y * tri.n1 + intersectionBaryPos.z * tri.n2);
+        //intersectionNormal = multiplyMV(mesh.transform, glm::vec4(intersectionNormal, 0.0f));
+
+        glm::vec3 intersectionNormal = calculateNormal(p0, p1, p2);
+        // record the min distance between ray and triangles as the intersection
+        if (t < tMin) {
+            tMin = t;
+            tMinNormal = intersectionNormal;
+            intersected = true;
+        }
+    }
+
+    // if intersect, return intersectionPoint
+    if (intersected) {
+        intersectionPoint = getPointOnRay(r, tMin);
+        normal = tMinNormal;
+        return glm::length(r.origin - intersectionPoint);
+    }
+    return -1.f;    
+}

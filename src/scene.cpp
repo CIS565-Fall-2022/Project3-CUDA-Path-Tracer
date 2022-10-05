@@ -58,17 +58,6 @@ int Scene::loadGeom(string objectid) {
             }
         }
 
-        // read filepath and load obj from file
-        if (newGeom.type == MESH) {
-            utilityCore::safeGetline(fp_in, line);
-            if (!line.empty() && fp_in.good()) {
-                vector<string> tokens = utilityCore::tokenizeString(line);
-                const char* filePath = tokens[1].c_str();
-                LoadMeshFromOBJ(filePath, newGeom);
-                std::cout << "creating mesh from file: " << filePath << "..." <<  std::endl;
-            }
-        }
-
         //link material
         utilityCore::safeGetline(fp_in, line);
         if (!line.empty() && fp_in.good()) {
@@ -78,26 +67,67 @@ int Scene::loadGeom(string objectid) {
         }
 
         //load transformations
-        utilityCore::safeGetline(fp_in, line);
-        while (!line.empty() && fp_in.good()) {
-            vector<string> tokens = utilityCore::tokenizeString(line);
+        //utilityCore::safeGetline(fp_in, line);
+        //while (!line.empty() && fp_in.good()) {
+        //    vector<string> tokens = utilityCore::tokenizeString(line);
 
+        //    //load tranformations
+        //    if (strcmp(tokens[0].c_str(), "TRANS") == 0) {
+        //        newGeom.translation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        //    } else if (strcmp(tokens[0].c_str(), "ROTAT") == 0) {
+        //        newGeom.rotation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        //    } else if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
+        //        newGeom.scale = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        //    }
+
+        //    utilityCore::safeGetline(fp_in, line);
+        //}
+        utilityCore::safeGetline(fp_in, line);
+        if (!line.empty() && fp_in.good()) {
+            vector<string> tokens = utilityCore::tokenizeString(line);
             //load tranformations
             if (strcmp(tokens[0].c_str(), "TRANS") == 0) {
                 newGeom.translation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-            } else if (strcmp(tokens[0].c_str(), "ROTAT") == 0) {
-                newGeom.rotation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-            } else if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
+            }
+        }
+
+        utilityCore::safeGetline(fp_in, line);
+        if (!line.empty() && fp_in.good()) {
+            vector<string> tokens = utilityCore::tokenizeString(line);
+            //load tranformations
+            if (strcmp(tokens[0].c_str(), "ROTAT") == 0) {
+            newGeom.rotation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+            }
+        }
+
+        utilityCore::safeGetline(fp_in, line);
+        if (!line.empty() && fp_in.good()) {
+            vector<string> tokens = utilityCore::tokenizeString(line);
+            //load tranformations
+            if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
                 newGeom.scale = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
             }
-
-            utilityCore::safeGetline(fp_in, line);
         }
 
         newGeom.transform = utilityCore::buildTransformationMatrix(
                 newGeom.translation, newGeom.rotation, newGeom.scale);
         newGeom.inverseTransform = glm::inverse(newGeom.transform);
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
+
+        // read filepath and load obj from file
+        // after createing transform matrix 
+        // because need transform matrix to transform postion to create AABB
+        if (newGeom.type == MESH) {
+            utilityCore::safeGetline(fp_in, line);
+            if (!line.empty() && fp_in.good()) {
+                vector<string> tokens = utilityCore::tokenizeString(line);
+                const char* filePath = tokens[1].c_str();
+                LoadMeshFromOBJ(filePath, newGeom);
+                std::cout << "creating mesh from file: " << filePath << "..." << std::endl;
+                hasMesh = true;
+                meshGeomId = id;
+            }
+        }
 
         geoms.push_back(newGeom);
         return 1;
@@ -202,6 +232,17 @@ int Scene::loadMaterial(string materialid) {
     }
 }
 
+//#if USE_BOUNDING_BOX
+//void CalculateAABB(Geom& mesh) {
+//
+//    for (int i = 0; i < mesh.numTris; ++i) {
+//        Triangle tri = 
+//        glm::vec3 p0 = 
+//    }
+
+//}
+//#endif
+
 int LoadMeshFromOBJ(const char* filePath, Geom& mesh) {
     std::vector<float> positions;
     std::vector<float> normals;
@@ -238,10 +279,31 @@ int LoadMeshFromOBJ(const char* filePath, Geom& mesh) {
             triangle.p1 = p1;
             triangle.p2 = p2;
 
-            // normal just can use i as index because normal index is 0/1/2/3/4/5...
-            int nIdx0 = i * 3;
-            int nIdx1 = (i + 1) * 3;
-            int nIdx2 = (i + 2) * 3;
+#if USE_BOUNDING_BOX
+            //glm::vec3 worldP0 = ;
+            mesh.AABBmax.x = max(mesh.AABBmax.x, p2.x);
+            mesh.AABBmin.x = min(mesh.AABBmin.x, p0.x);
+            mesh.AABBmin.x = min(mesh.AABBmin.x, p1.x);
+            mesh.AABBmin.x = min(mesh.AABBmin.x, p2.x);
+            
+            mesh.AABBmax.y = max(mesh.AABBmax.y, p0.y);
+            mesh.AABBmax.y = max(mesh.AABBmax.y, p1.y);
+            mesh.AABBmax.y = max(mesh.AABBmax.y, p2.y);
+            mesh.AABBmin.y = min(mesh.AABBmin.y, p0.y);
+            mesh.AABBmin.y = min(mesh.AABBmin.y, p1.y);
+            mesh.AABBmin.y = min(mesh.AABBmin.y, p2.y);
+            
+            mesh.AABBmax.z = max(mesh.AABBmax.z, p0.z);
+            mesh.AABBmax.z = max(mesh.AABBmax.z, p1.z);
+            mesh.AABBmax.z = max(mesh.AABBmax.z, p2.z);
+            mesh.AABBmin.z = min(mesh.AABBmin.z, p0.z);
+            mesh.AABBmin.z = min(mesh.AABBmin.z, p1.z);
+            mesh.AABBmin.z = min(mesh.AABBmin.z, p2.z);
+#endif
+            // normal
+            int nIdx0 = normIndex[i] * 3;
+            int nIdx1 = normIndex[i + 1] * 3;
+            int nIdx2 = normIndex[i + 2] * 3;
 
             n0 = glm::vec3(normals[nIdx0], normals[nIdx0 + 1], normals[nIdx0 + 2]);
             n1 = glm::vec3(normals[nIdx1], normals[nIdx1 + 1], normals[nIdx1 + 2]);
