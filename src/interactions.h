@@ -84,17 +84,15 @@ void scatterRay(
         pathSegment.ray.origin = intersect;
         pathSegment.color *= (m.color); //* glm::dot(normal, pathSegment.ray.direction);
     }
-    //else if (m.hasRefractive > u01(rng))
-    //{
-    //    pathSegment.color *= m.hasReflective * m.indexOfRefraction;
-    //    pathSegment.ray.direction *= m.indexOfRefraction;
-    //}
+    else if (m.hasRefractive > rand)
+    {
+        pathSegment.color *= (m.color);
+        pathSegment.ray.origin = intersect;
+        pathSegment.ray.direction = glm::refract(pathSegment.ray.direction, normal, 1.0f / m.indexOfRefraction);
+    }
     else
     { 
         auto random = calculateRandomDirectionInHemisphere(normal, rng);
-        float ran_x = random.x;
-        float ran_y = random.y;
-        float ran_z = random.z;
 
         pathSegment.ray.direction = random;
         pathSegment.ray.origin = intersect;

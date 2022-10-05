@@ -17,6 +17,8 @@
 #include "interactions.h"
 
 #define ERRORCHECK 1
+#define SORTMATERIALS 1
+#define CACHE 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -76,14 +78,12 @@ static glm::vec3* dev_image_buffer = NULL;
 static Geom* dev_geoms = NULL;
 static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
-//IF CACHE 
-static PathSegment* dev_pathsFirstCache = NULL;
-static ShadeableIntersection* dev_intersectionsFirstCache = NULL;
-
-
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
+#if CACHE
+static ShadeableIntersection* dev_intersectionsFirstCache = NULL;
+#endif
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -101,11 +101,8 @@ void pathtraceInit(Scene* scene) {
 
 	cudaMalloc(&dev_image_buffer, pixelcount * sizeof(glm::vec3));
 	cudaMemset(dev_image_buffer, 0, pixelcount * sizeof(glm::vec3));
-
+	
 	cudaMalloc(&dev_paths, pixelcount * sizeof(PathSegment));
-	//IF CACHE
-	cudaMalloc(&dev_pathsFirstCache, pixelcount * sizeof(PathSegment));
-	cudaMalloc(&dev_intersectionsFirstCache, pixelcount * sizeof(ShadeableIntersection));
 
 	cudaMalloc(&dev_geoms, scene->geoms.size() * sizeof(Geom));
 	cudaMemcpy(dev_geoms, scene->geoms.data(), scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
@@ -117,6 +114,10 @@ void pathtraceInit(Scene* scene) {
 	cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
 	// TODO: initialize any extra device memeory you need
+#if CACHE
+	cudaMalloc(&dev_intersectionsFirstCache, pixelcount * sizeof(ShadeableIntersection));
+
+#endif
 
 	checkCUDAError("pathtraceInit");
 }
@@ -129,10 +130,9 @@ void pathtraceFree() {
 	cudaFree(dev_materials);
 	cudaFree(dev_intersections);
 	// TODO: clean up any extra device memory you created
-
-	//IF CACHE
-	cudaFree(dev_pathsFirstCache);
+#if CACHE
 	cudaFree(dev_intersectionsFirstCache);
+#endif 
 
 	checkCUDAError("pathtraceFree");
 }
@@ -374,6 +374,29 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 		// tracing
 		dim3 numblocksPathSegmentTracing = (running_paths + blockSize1d - 1) / blockSize1d;
+
+
+#if CACHE
+		if (iter != 1 && depth == 0)
+		{
+			cudaMemcpy(dev_intersections, dev_intersectionsFirstCache, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
+		}
+		else
+		{
+			computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+				depth
+				, running_paths
+				, dev_paths
+				, dev_geoms
+				, hst_scene->geoms.size()
+				, dev_intersections
+				);
+		}
+		if (iter == 1 && depth == 0)
+		{
+			cudaMemcpy(dev_intersectionsFirstCache, dev_intersections, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
+		}
+#else
 		computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
 			depth
 			, running_paths
@@ -382,12 +405,14 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, hst_scene->geoms.size()
 			, dev_intersections
 			);
+#endif
 		checkCUDAError("trace one bounce");
 		cudaDeviceSynchronize();
 		depth++;
 		
-		//IF SORTMATERIALS
+#if SORTMATERIALS		//IF SORTMATERIALS
 		sortMaterials(dev_intersections, dev_paths, running_paths);
+#endif
 
 		// TODO:
 		// --- Shading Stage ---
@@ -405,12 +430,12 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_paths,
 			dev_materials
 			);
+
 		running_paths = streamCompact(dev_intersections, dev_paths, running_paths);
 		if (running_paths == 0 )
 		{
 			iterationComplete = true; // TODO: should be based off stream compaction results.
 		}
-		//iterationComplete = true;
 		
 
 		if (guiData != NULL)
