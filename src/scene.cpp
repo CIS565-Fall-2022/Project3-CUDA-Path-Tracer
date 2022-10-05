@@ -37,7 +37,8 @@ Scene::Scene(string filename) {
             }
             //loading OBJ files
             else if (strcmp(tokens[0].c_str(), "OBJECT_obj") == 0) {
-                loadObj(tokens[1].c_str());
+                //loadObj(tokens[1].c_str());
+                loadMesh(tokens[1].c_str());
                 cout << " " << endl;
             }
         }
@@ -318,7 +319,6 @@ int Scene::loadObj(const char* fileName)
         }
     }
 
-    obj.data = Obj_geoms.data();
     
 
     //load materials
@@ -389,4 +389,168 @@ glm::vec3 Scene::loadTexture(Geom& geo, const char* fileName)
     printf("Loaded image with a width of %dpx, a height of %dpx and %d channels\n", width, height, channels);
 
     
+}
+
+
+int Scene::loadMesh(const char* fileName)
+{
+    printf("loading OBJ file: %s\n", fileName);
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> m_materials;
+
+    std::string warn;
+    std::string err;
+
+    char* material_dir = "../scenes";
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &m_materials, &warn, &err, fileName, material_dir,
+        NULL, true);
+    if (!warn.empty())
+        std::cout << "WARN: " << warn << std::endl;
+    if (!err.empty())
+        std::cerr << "ERR: " << err << std::endl;
+    if (!ret) {
+        printf("Failed to load/parse .obj.\n");
+        return false;
+    }
+
+    for (size_t i = 0; i < shapes.size(); i += 1) {
+        printf("%s\n", shapes[i].name.c_str());
+    }
+
+
+    Geom geo;
+    geo.type = MESH;
+    geo.materialid = 6;
+
+    string line;
+    utilityCore::safeGetline(fp_in, line);
+    while (!line.empty() && fp_in.good()) {
+        vector<string> tokens = utilityCore::tokenizeString(line);
+
+        //load tranformations
+        if (strcmp(tokens[0].c_str(), "TRANS") == 0) {
+            geo.translation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        }
+        else if (strcmp(tokens[0].c_str(), "ROTAT") == 0) {
+            geo.rotation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        }
+        else if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
+            geo.scale = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        }
+        else if (strcmp(tokens[0].c_str(), "TEXTURE") == 0) {
+            geo.textureName = tokens[1].c_str();
+            loadTexture(geo, tokens[1].c_str());
+        }
+
+        utilityCore::safeGetline(fp_in, line);
+    }
+
+    geo.transform = utilityCore::buildTransformationMatrix(
+        geo.translation, geo.rotation, geo.scale);
+    geo.inverseTransform = glm::inverse(geo.transform);
+    geo.invTranspose = glm::inverseTranspose(geo.transform);
+
+
+    Geom triangle;
+    triangle.transform = geo.transform;
+    triangle.inverseTransform = geo.inverseTransform;
+    triangle.invTranspose = geo.invTranspose;
+    //For each shape
+    for (size_t i = 0; i < shapes.size(); i++) {
+        size_t index_offset = 0;
+        // For each face
+        for (size_t f = 0; f < shapes[i].mesh.num_face_vertices.size(); f++) {
+            //size_t fnum = shapes[i].mesh.num_face_vertices[f]; //should always be 3
+            size_t fnum = 3; // hardcode loading to triangles
+
+            triangle.type = TRIANGLE;
+            triangle.materialid = materials.size();// + shapes[i].mesh.material_ids[f];
+            // For each vertex in the face
+            for (size_t v = 0; v < fnum; v++) {
+                tinyobj::index_t idx = shapes[i].mesh.indices[index_offset + v];
+                auto ver = static_cast<size_t>(idx.vertex_index);
+                auto x = attrib.vertices[3 * ver + 0];
+                auto y = attrib.vertices[3 * ver + 1];
+                auto z = attrib.vertices[3 * ver + 2];
+                triangle.pos[v] = glm::vec3(x, y, z);
+
+
+                if (idx.normal_index >= 0) {// -1 means no data
+                    auto nor = static_cast<size_t>(idx.normal_index);
+                    auto nx = attrib.normals[3 * nor + 0];
+                    auto ny = attrib.normals[3 * nor + 1];
+                    auto nz = attrib.normals[3 * nor + 2];
+                    triangle.normal[v] = glm::vec3(nx, ny, nz);
+                }
+
+                if (idx.texcoord_index >= 0) {
+                    auto tex = static_cast<size_t>(idx.texcoord_index);
+                    auto tx = attrib.texcoords[2 * tex + 0];
+                    auto ty = attrib.texcoords[2 * tex + 1];
+                    triangle.uv[v] = glm::vec2(tx, ty);
+                }
+
+            }
+            index_offset += fnum;
+            //push all triangles into Obj_geoms
+            Obj_geoms.push_back(triangle);
+            geo.bbox = Union(geo.bbox, AABB(triangle.pos[0], triangle.pos[1], triangle.pos[2]));
+        }
+    }
+
+    //push mesh to geoms
+    geoms.push_back(geo);
+
+
+    //load materials
+    printf("material size: %d\n", m_materials.size());
+    for (size_t i = 0; i < m_materials.size(); i++) {
+        Material temp;
+
+        //temp.name = m_materials[i].name.c_str();
+        printf("material[%ld].name = %s\n", static_cast<long>(i),
+            m_materials[i].name.c_str());
+
+        temp.color = glm::vec3(
+            static_cast<const double>(m_materials[i].diffuse[0]),
+            static_cast<const double>(m_materials[i].diffuse[1]),
+            static_cast<const double>(m_materials[i].diffuse[2]));
+        //temp.color = glm::vec3(1, 1, 1);
+
+        printf("  material.Kd = (%f, %f ,%f)\n",
+            static_cast<const double>(m_materials[i].diffuse[0]),
+            static_cast<const double>(m_materials[i].diffuse[1]),
+            static_cast<const double>(m_materials[i].diffuse[2]));
+
+        temp.specular.color = glm::vec3(
+            static_cast<const double>(m_materials[i].specular[0]),
+            static_cast<const double>(m_materials[i].specular[1]),
+            static_cast<const double>(m_materials[i].specular[2]));
+        temp.specular.exponent = 10; //hardcode exponent
+        printf("  material.Ks = (%f, %f ,%f)\n",
+            static_cast<const double>(m_materials[i].specular[0]),
+            static_cast<const double>(m_materials[i].specular[1]),
+            static_cast<const double>(m_materials[i].specular[2]));
+
+        temp.hasReflective = 1;
+        temp.hasRefractive = 1;
+        temp.emittance = 0;
+        temp.indexOfRefraction = 1.5;
+        temp.microfacet = 1;
+        temp.roughness = 0.5;
+
+        //just hardcode, only work for simgle image
+        temp.textureName = triangle.textureName;
+        temp.img = triangle.img;
+        temp.channels = triangle.channels;
+        temp.texture_width = triangle.texture_width;
+        temp.texture_height = triangle.texture_height;
+
+        materials.push_back(temp);
+        OBJ_materials.push_back(temp);
+    }
+
+    return 1;
+
 }

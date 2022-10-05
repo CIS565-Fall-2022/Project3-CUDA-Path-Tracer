@@ -7,7 +7,6 @@
 #include "utilities.h"
 
 
-#define AABB 0
 
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
@@ -170,7 +169,7 @@ bool rayTriangleIntersectionTest(glm::vec3 &p0, glm::vec3 &p1, glm::vec3 &p2,
 }
 
 
-__device__ 
+__host__ __device__ 
 float triangleIntersectionTest(Geom triangle, Ray r,
     glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2& uv, bool& outside)
 {
@@ -196,13 +195,61 @@ float triangleIntersectionTest(Geom triangle, Ray r,
     return glm::length(r.origin - intersectionPoint);
 }
 
-__device__ 
-float meshIntersectionTest(Geom mesh, Ray r)
+__host__ __device__ 
+float meshIntersectionTest(Geom mesh, Ray r, Geom* triangle, int tri_size, bool aabb,
+    glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2& uv, bool& outside)
 {
-#if AABB
 
-#else
+    if (!aabb) {
+        float t_min = FLT_MAX;
+        float temp_t = 0.0f;
 
+        glm::vec3 t_intersetion;
+        glm::vec3 t_normal;
+        glm::vec2 t_uv;
+        bool t_outside;
+        for (int i = 0; i < tri_size; i++) {
+            temp_t = triangleIntersectionTest(triangle[i], r, t_intersetion, t_normal, t_uv, t_outside);
+            //if (temp_t < t_min)
+            //    t_min = temp_t;
+            if (temp_t != -1) {
+                t_min = temp_t;
+                break;
+            }
+        }
 
-#endif
+        intersectionPoint = t_intersetion;
+        normal = t_normal;
+        uv = t_uv;
+        outside = t_outside;
+        return t_min;
+    }
+    else {
+        if (!mesh.bbox.IntersectP(r)) return -1;
+        else {
+            float t_min = FLT_MAX;
+            float temp_t = 0.0f;
+
+            glm::vec3 t_intersetion;
+            glm::vec3 t_normal;
+            glm::vec2 t_uv;
+            bool t_outside;
+            for (int i = 0; i < tri_size; i++) {
+                temp_t = triangleIntersectionTest(triangle[i], r, t_intersetion, t_normal, t_uv, t_outside);
+                //if (temp_t < t_min)
+                //    t_min = temp_t;
+                if (temp_t != -1) {
+                    t_min = temp_t;
+                    break;
+                }
+            }
+
+            intersectionPoint = t_intersetion;
+            normal = t_normal;
+            uv = t_uv;
+            outside = t_outside;
+            return t_min;
+        }
+    }
+    return -1;
 }

@@ -66,11 +66,11 @@ FOVY        45
 ITERATIONS  5000
 DEPTH       8
 FILE        cornell
-EYE         0.0 5 10.5
+EYE         0.0 5 7.5
 LOOKAT      0 5 0
 UP          0 1 0
-FOCAL       10	
-LENSE       0.3
+FOCAL       5	
+LENSE       2
 
 
 // Ceiling light
@@ -139,6 +139,18 @@ TRANS       3 2 -1
 ROTAT       0 0 0
 SCALE       3 3 3
 
-// OBJ
-OBJECT_obj ../scenes/cornell_box.obj
+// Sphere, pure diffuse
+OBJECT 8
+sphere
+material 4
+TRANS       0 2 3
+ROTAT       0 0 0
+SCALE       2 2 2
 
+// floor light
+OBJECT 9
+cube
+material 0
+TRANS       -5 5 0
+ROTAT       0 0 0
+SCALE       .3 3 3

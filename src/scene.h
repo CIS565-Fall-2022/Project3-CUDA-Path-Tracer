@@ -17,7 +17,7 @@ private:
     int loadGeom(string objectid);
     int loadCamera();
     int loadObj(const char* fileName);
-    
+    int loadMesh(const char* fileName);
     glm::vec3 loadTexture(Geom &geo, const char* fileName);
 public:
     Scene(string filename);
@@ -25,6 +25,8 @@ public:
 
     std::vector<Geom> geoms;
     std::vector<Material> materials;
+
+    //std::vector<Material> m_materials;
 
     std::vector<Material> OBJ_materials;
 

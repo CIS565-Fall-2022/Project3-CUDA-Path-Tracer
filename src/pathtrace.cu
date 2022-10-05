@@ -17,12 +17,15 @@
 #include "device_launch_parameters.h"
 #include <thrust/partition.h>
 
+#define DIRECT 0
 
-#define CACHE_FIRST_BOUNCE 1
+#define CACHE_FIRST_BOUNCE 0
 #define SORT_MATERIAL 1
 #define COMPACTION 1
 #define DEPTH_OF_FIELD 0
-#define ANTI_ALIASING 1477222222
+#define ANTI_ALIASING 1
+#define BOUNDING_BOX 1
+
 
 
 #define ERRORCHECK 1
@@ -182,6 +185,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
 
+
+	float jitter_x = 0.f, jitter_y = 0.f;
 #if ANTI_ALIASING
 	if (x < cam.resolution.x && y < cam.resolution.y) {
 		int index = x + (y * cam.resolution.x);
@@ -189,11 +194,16 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 
 		segment.ray.origin = cam.position;
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
+		
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+		thrust::uniform_real_distribution<float> u(-0.5, 0.5);
+		jitter_x = u(rng);
+		jitter_y = u(rng);
 
 		// TODO: implement antialiasing by jittering the ray
 		segment.ray.direction = glm::normalize(cam.view
-			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
+			- cam.right * cam.pixelLength.x * ((float)x + jitter_x - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)y + jitter_y - (float)cam.resolution.y * 0.5f)
 		);
 #else
 	if (x < cam.resolution.x && y < cam.resolution.y) {
@@ -240,6 +250,8 @@ __global__ void computeIntersections(
 	PathSegment* pathSegments,
 	Geom* geoms,
 	int geoms_size,
+	Geom* triangles,
+	int triangle_size,
 	ShadeableIntersection* intersections
 )
 {
@@ -283,6 +295,13 @@ __global__ void computeIntersections(
 				t = triangleIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
 			}
 			else if (geom.type == MESH) {
+#ifdef BOUNDING_BOX
+				t = meshIntersectionTest(geom, pathSegment.ray, triangles, triangle_size, true,
+					tmp_intersect, tmp_normal, tmp_uv, outside);
+#else 
+				t = meshIntersectionTest(geom, pathSegment.ray, triangles, triangle_size, false,
+					tmp_intersect, tmp_normal, tmp_uv, outside);
+#endif 
 
 			}
 			// Compute the minimum t from the intersection tests to determine what
@@ -439,10 +458,55 @@ __global__ void kernSimpleShade(
 			}
 
 			else {
-				glm::vec3 intersect = getPointOnRay(ps.ray, intersection.t);
-				scatterRay(ps, intersection, material, rng, camPos);
-				//scatterRay(ps, intersect, intersection.surfaceNormal, material, rng);
-				ps.remainingBounces--;
+				if (pathSegments->remainingBounces == 1) {
+#if DIRECT
+					//hardcode 2 lights, and randomly get 0/1
+					thrust::uniform_real_distribution<float> u02(0, 2);
+
+					thrust::uniform_real_distribution<float> u1(0, 3);
+					//thrust::uniform_real_distribution<float> u2(0, 3);
+					glm::vec3 lightPos = glm::vec3(0,10,0);
+					int whichlight = int(u02(rng));
+					if (whichlight == 0) {
+						float x = u1(rng);
+						float z = u1(rng);
+						lightPos.x = x;
+						lightPos.z = z;
+					}
+					else {
+						float y = u1(rng);
+						float z = u1(rng);
+						lightPos.x = 0;
+						lightPos.y = y;
+						lightPos.z = z;
+					}
+
+					glm::vec3 intersect = getPointOnRay(ps.ray, intersection.t);
+					glm::vec3 normal = intersection.surfaceNormal;
+					glm::vec2 uv = intersection.uv;
+					Ray r;
+					r.origin = intersect;
+					r.direction = glm::normalize(lightPos - intersect);
+					ps.ray = r;
+					ps.color *= material.color;
+					ps.remainingBounces--;
+#else
+					glm::vec3 intersect = getPointOnRay(ps.ray, intersection.t);
+					scatterRay(ps, intersection, material, rng, camPos);
+					//scatterRay(ps, intersect, intersection.surfaceNormal, material, rng);
+					ps.remainingBounces--;
+#endif 
+				}
+				else {
+					glm::vec3 intersect = getPointOnRay(ps.ray, intersection.t);
+					scatterRay(ps, intersection, material, rng, camPos);
+					//scatterRay(ps, intersect, intersection.surfaceNormal, material, rng);
+					ps.remainingBounces--;
+				}
+				//glm::vec3 intersect = getPointOnRay(ps.ray, intersection.t);
+				//scatterRay(ps, intersection, material, rng, camPos);
+				////scatterRay(ps, intersect, intersection.surfaceNormal, material, rng);
+				//ps.remainingBounces--;
 			}
 		}
 		else {
@@ -562,6 +626,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				dev_paths, 
 				dev_geoms, 
 				hst_scene->geoms.size(), 
+				dev_tinyobj,
+				hst_scene->Obj_geoms.size(),
 				dev_firstBounce
 				);
 			checkCUDAError("trace one bounce");
@@ -580,6 +646,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				dev_paths,
 				dev_geoms,
 				hst_scene->geoms.size(),
+				dev_tinyobj,
+				hst_scene->Obj_geoms.size(),
 				dev_intersections
 				);
 			checkCUDAError("trace one bounce");
@@ -592,8 +660,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_paths,
 			dev_geoms,
 			hst_scene->geoms.size(),
-			dev_objects,
-			hst_scene->objects.size(),
+			dev_tinyobj,
+			hst_scene->Obj_geoms.size(),
 			dev_intersections
 			);
 		checkCUDAError("trace one bounce");
