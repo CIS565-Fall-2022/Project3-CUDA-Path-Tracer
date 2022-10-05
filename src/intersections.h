@@ -12,13 +12,13 @@ __host__ __device__ inline bool intersect(AABB const& a, AABB const& b) {
     glm::vec3 d2 = b.min() - a.max();
     return (d1.x <= 0 && d2.x <= 0) && (d1.y <= 0 && d2.y <= 0) && (d1.z <= 0 && d2.z <= 0);
 }
-
 __host__ __device__ inline bool intersect(AABB const& aabb, Ray const& r, float& t) {
     float tmin = SMALL_FLOAT;
     float tmax = LARGE_FLOAT;
-
+    
     glm::vec3 tmins = (aabb.min() - r.origin) / r.direction;
     glm::vec3 tmaxs = (aabb.max() - r.origin) / r.direction;
+
 
 #pragma unroll
     for (int i = 0; i < 3; ++i) {
@@ -167,7 +167,7 @@ __host__ __device__ inline glm::vec3 getPointOnRay(Ray r, float t) {
 /// <param name="vecs">3 vectors</param>
 /// <returns>the interpolated vector</returns>
 template<typename T>
-__host__ __device__ inline T lerpBarycentric(glm::vec3 bary, T const(&vecs)[3]) {
+__host__ __device__ inline T lerpBarycentric(glm::vec2 bary, T const(&vecs)[3]) {
     float u = (1.0f - bary.x - bary.y), v = bary.x, w = bary.y;
     return u * vecs[0] + v * vecs[1] + w * vecs[2];
 }
@@ -229,7 +229,7 @@ __host__ __device__ inline float boxIntersectionTest(Geom box, Ray r, ShadeableI
         inters.surfaceNormal = glm::normalize(multiplyMV(box.invTranspose, glm::vec4(tmin_n, 0.0f)));
         inters.materialId = box.materialid;
 
-        return glm::length(r.origin - inters.hitPoint);
+        return inters.t = glm::length(r.origin - inters.hitPoint);
     }
     return -1;
 }
@@ -307,7 +307,116 @@ __host__ __device__ inline float sphereIntersectionTest(Geom sphere, Ray r, Shad
     inters.materialId = sphere.materialid;
 #endif // USE_GLM_RAY_SPHERE
 
-    return glm::length(r.origin - inters.hitPoint);
+    return inters.t = glm::length(r.origin - inters.hitPoint);
+}
+
+// fills the ShadeableIntersection from triangle hit information
+__device__ inline float intersFromTriangle(
+    ShadeableIntersection& inters,
+    Ray const& ray,
+    float hit_t,
+    MeshInfo const& meshInfo,
+    Geom const& mesh,
+    Triangle const& tri,
+    glm::vec2 barycoord)
+{
+    glm::vec3 ro = multiplyMV(mesh.inverseTransform, glm::vec4(ray.origin, 1.0f));
+    glm::vec3 rd = glm::normalize(multiplyMV(mesh.inverseTransform, glm::vec4(ray.direction, 0.0f)));
+    Ray local_ray;
+    local_ray.origin = ro;
+    local_ray.direction = rd;
+
+    auto const& meshes = meshInfo.meshes;
+    auto const& tris = meshInfo.tris;
+    auto const& verts = meshInfo.vertices;
+    auto const& norms = meshInfo.normals;
+    auto const& uvs = meshInfo.uvs;
+    auto const& materials = meshInfo.materials;
+
+    glm::vec3 normal;
+    glm::vec2 uv;
+    int mat_id = -1;
+
+    bool has_uv = true;
+    glm::vec3 triangle_verts[3]{
+        verts[tri.verts[0]],
+        verts[tri.verts[1]],
+        verts[tri.verts[2]]
+    };
+    glm::vec3 triangle_norms[3]{
+        norms[tri.norms[0]],
+        norms[tri.norms[1]],
+        norms[tri.norms[2]]
+    };
+    glm::vec2 triangle_uvs[3];
+#pragma unroll
+    for (int x = 0; x < 3; ++x) {
+        if (tri.uvs[x] != -1) {
+            triangle_uvs[x] = uvs[tri.uvs[x]];
+        } else {
+            has_uv = false;
+            break;
+        }
+    }
+
+    // record uv info
+    if (has_uv) {
+        uv = lerpBarycentric(barycoord, triangle_uvs);
+    } else {
+        uv = glm::vec2(-1);
+    }
+
+    // record material id
+    mat_id = tri.mat_id;
+
+    // record normal info
+    // use bump mapping if applicable
+    if (mat_id != -1 && has_uv &&
+        materials[mat_id].textures.bump != -1) {
+        glm::vec3 tans[3];
+        glm::vec3 bitans[3];
+
+#pragma unroll
+        for (int x = 0; x < 3; ++x) {
+            glm::vec4 const& tmp = meshInfo.tangents[tri.tangents[x]];
+            tans[x] = glm::vec3(tmp);
+            bitans[x] = glm::cross(triangle_norms[x], tans[x]) * tmp.w;
+        }
+
+        glm::vec3 tan = glm::normalize(lerpBarycentric(barycoord, tans));
+        glm::vec3 anorm = glm::normalize(lerpBarycentric(barycoord, triangle_norms));
+        glm::vec3 bitan = glm::normalize(lerpBarycentric(barycoord, bitans));
+
+        // glm::vec3 bitan = glm::normalize(glm::cross(tan, anorm));
+
+        Material const& mat = materials[mat_id];
+        normal = meshInfo.texs[mat.textures.bump].sample(uv);
+        normal = glm::normalize(normal * 2.0f - 1.0f);
+        normal = glm::mat3x3(tan, bitan, anorm) * normal;
+    } else {
+        normal = lerpBarycentric(barycoord, triangle_norms);
+    }
+
+    normal = glm::normalize(normal);
+
+    // transform to world space and store results
+    inters.hitPoint = multiplyMV(mesh.transform, glm::vec4(getPointOnRay(local_ray, hit_t), 1));
+    inters.surfaceNormal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(normal, 0)));
+    inters.uv = uv;
+
+    // use per-mesh material if per-face material is missing
+    if (mat_id == -1) {
+        inters.materialId = mesh.materialid;
+    } else {
+        inters.materialId = mat_id;
+        // use texture color if applicable
+        Material const& mat = materials[mat_id];
+        if (mat.textures.diffuse != -1) {
+            inters.tex_color = meshInfo.texs[mat.textures.diffuse].sample(uv);
+        }
+    }
+
+    return inters.t = glm::length(ray.origin - inters.hitPoint);
 }
 
 /**
@@ -318,7 +427,7 @@ __host__ __device__ inline float sphereIntersectionTest(Geom sphere, Ray r, Shad
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__device__ float inline meshIntersectionTest(Geom mesh, Ray r, Material* materials, MeshInfo meshInfo, ShadeableIntersection& inters) {
+__device__ inline float meshIntersectionTest(Geom mesh, Ray r, MeshInfo meshInfo, ShadeableIntersection& inters) {
     
     glm::vec3 ro = multiplyMV(mesh.inverseTransform, glm::vec4(r.origin, 1.0f));
     glm::vec3 rd = glm::normalize(multiplyMV(mesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -328,8 +437,6 @@ __device__ float inline meshIntersectionTest(Geom mesh, Ray r, Material* materia
     auto const& meshes = meshInfo.meshes;
     auto const& tris = meshInfo.tris;
     auto const& verts = meshInfo.vertices;
-    auto const& norms = meshInfo.normals;
-    auto const& uvs = meshInfo.uvs;
 
     int idx = -1;
     glm::vec3 barycoord;
@@ -355,93 +462,5 @@ __device__ float inline meshIntersectionTest(Geom mesh, Ray r, Material* materia
     if (idx == -1) {
         return -1;
     }
-
-    glm::vec3 normal;
-    glm::vec2 uv;
-    int mat_id = -1;
-
-    bool has_uv = true;
-    glm::vec3 triangle_verts[3]{
-        verts[tris[idx].verts[0]],
-        verts[tris[idx].verts[1]],
-        verts[tris[idx].verts[2]]
-    };
-    glm::vec3 triangle_norms[3]{
-        norms[tris[idx].norms[0]],
-        norms[tris[idx].norms[1]],
-        norms[tris[idx].norms[2]]
-    };
-    glm::vec2 triangle_uvs[3];
-#pragma unroll
-    for (int x = 0; x < 3; ++x) {
-        if (tris[idx].uvs[x] != -1) {
-            triangle_uvs[x] = uvs[tris[idx].uvs[x]];
-        } else {
-            has_uv = false;
-            break;
-        }
-    }
-
-    // record uv info
-    if (has_uv) {
-        uv = lerpBarycentric(barycoord, triangle_uvs);
-    } else {
-        uv = glm::vec2(-1);
-    }
-
-    // record material id
-    mat_id = tris[idx].mat_id;
-
-    // record normal info
-    // use bump mapping if applicable
-    if (mat_id != -1 && has_uv &&
-        materials[mat_id].textures.bump != -1) {
-        glm::vec3 tans[3];
-        glm::vec3 bitans[3];
-
-#pragma unroll
-        for (int x = 0; x < 3; ++x) {
-            glm::vec4 const& tmp = meshInfo.tangents[tris[idx].tangents[x]];
-            tans[x] = glm::vec3(tmp);
-            bitans[x] = glm::cross(triangle_norms[x], tans[x]) * tmp.w;
-        }
-
-        glm::vec3 tan = glm::normalize(lerpBarycentric(barycoord, tans));
-        glm::vec3 anorm = glm::normalize(lerpBarycentric(barycoord, triangle_norms));
-        glm::vec3 bitan = glm::normalize(lerpBarycentric(barycoord, bitans));
-
-        // glm::vec3 bitan = glm::normalize(glm::cross(tan, anorm));
-
-        Material const& mat = materials[mat_id];
-        normal = meshInfo.texs[mat.textures.bump].sample(uv);
-        normal = glm::normalize(normal * 2.0f - 1.0f);
-        normal = glm::mat3x3(tan, bitan, anorm) * normal;
-    } else {
-        normal = lerpBarycentric(barycoord, triangle_norms);
-    }
-
-    normal = glm::normalize(normal);
-
-    // transform to world space and store results
-    Ray local_ray;
-    local_ray.origin = ro;
-    local_ray.direction = rd;
-
-    inters.hitPoint = multiplyMV(mesh.transform, glm::vec4(getPointOnRay(local_ray, t_min), 1));
-    inters.surfaceNormal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(normal, 0)));
-    inters.uv = uv;
-
-    // use per-mesh material if per-face material is missing
-    if (mat_id == -1) {
-        inters.materialId = mesh.materialid;
-    } else {
-        inters.materialId = mat_id;
-        // use texture color if applicable
-        Material const& mat = materials[mat_id];
-        if (mat.textures.diffuse != -1) {
-            inters.tex_color = meshInfo.texs[mat.textures.diffuse].sample(uv);
-        }
-    }
-
-    return glm::length(r.origin - inters.hitPoint);
+    return inters.t = intersFromTriangle(inters, r, t_min, meshInfo, mesh, tris[idx], glm::vec2(barycoord));
 }

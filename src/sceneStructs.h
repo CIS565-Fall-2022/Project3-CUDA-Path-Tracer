@@ -289,4 +289,5 @@ struct MeshInfo {
     Triangle* tris;
     glm::vec4* tangents;
     Mesh* meshes;
+    Material* materials;
 };

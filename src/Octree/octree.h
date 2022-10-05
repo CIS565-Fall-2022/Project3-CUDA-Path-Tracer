@@ -9,40 +9,58 @@
 #include "../scene.h"
 #include "../intersections.h"
 
-/// <summary>
-/// octree for triangles
-/// primitives can be culled using simple AABB
-/// </summary>
+typedef size_t node_id_t;
+static constexpr node_id_t null_id = 0;
+static constexpr node_id_t root_id = 1;
+static constexpr float eps_scale = 100.0f;
+static constexpr float eps = eps_scale * std::numeric_limits<float>::epsilon();
+
+struct nodeGPU;
+struct octreeGPU;
+
+struct leaf_data {
+	leaf_data(int triangle_id, int geom_id)
+		: triangle_id(triangle_id), geom_id(geom_id) {}
+	int triangle_id; // -1 if the geom is a primitive
+	int geom_id; // geom that this triangle belongs to
+};
+struct node {
+	AABB bounds;
+	node_id_t children[8];
+	std::vector<leaf_data> leaf_infos;
+	node(nodeGPU const& nodeGPU);
+	node(AABB const& bounds) : bounds(bounds) {
+		for (size_t i = 0; i < 8; ++i) {
+			children[i] = null_id;
+		}
+	}
+	bool is_leaf() const {
+		return leaf_infos.size() == 0;
+	}
+};
+struct nodeGPU {
+	AABB bounds;
+	node_id_t children[8];
+	Span<leaf_data> leaf_infos;
+
+	__host__ nodeGPU() {
+		for (size_t i = 0; i < 8; ++i) {
+			children[i] = null_id;
+		}
+	}
+	__host__ nodeGPU(node const& o) : bounds(o.bounds) {
+		for (size_t i = 0; i < 8; ++i) {
+			children[i] = o.children[i];
+		}
+		leaf_infos = make_span(o.leaf_infos);
+	}
+	__host__ __device__ bool is_leaf() const {
+		return leaf_infos.size() != 0;
+	}
+};
+
 class octree {
 	friend class octreeGPU;
-
-public:
-	typedef size_t node_id_t;
-	static constexpr node_id_t null_id = 0;
-	static constexpr node_id_t root_id = 1;
-	static constexpr float eps_scale = 100.0f;
-	static constexpr float eps = eps_scale * std::numeric_limits<float>::epsilon();
-
-	struct node {
-		AABB bounds;
-		node_id_t children[8];
-		std::vector<int> triangles;
-
-		node(AABB const& bounds) : bounds(bounds) {
-			for (size_t i = 0; i < 8; ++i) {
-				children[i] = null_id;
-			}
-		}
-		bool is_leaf() const {
-			for (node_id_t id : children) {
-				if (id != null_id) {
-					return false;
-				}
-			}
-			return true;
-		}
-	};
-
 private:
 	std::vector<node> _nodes;
 	int _depth_lim;
@@ -61,26 +79,35 @@ private:
 		auto const& tris = scene.triangles;
 		auto const& geoms = scene.geoms;
 
-		for (auto const& geom : geoms) {
-			if (geom.type != MESH) {
-				continue;
-			}
+		for (int geom_id = 0; geom_id < geoms.size(); ++geom_id) {
+			auto const& geom = geoms[geom_id];
 			if (!intersect(geom.bounds, box)) {
 				continue;
 			}
+			if (geom.type != MESH) {
+#ifdef OCTREE_MESH_ONLY
+				continue;
+#endif // OCTREE_MESH_ONLY
 
-			for (int i = meshes[geom.meshid].tri_start; i < meshes[geom.meshid].tri_end; ++i) {
-				auto const& tri = tris[i];
-
-				glm::vec3 triangle_verts[3];
-				for (int x = 0; x < 3; ++x) {
-					triangle_verts[x] = glm::vec3(geom.transform * glm::vec4(verts[tri.verts[x]], 1));
+				if (leaf == null_id) {
+					return true;
+				} else {
+					_nodes[leaf].leaf_infos.emplace_back(-1, geom_id);
 				}
-				if (intersect(box, triangle_verts)) {
-					if (leaf == null_id) {
-						return true;
-					} else {
-						_nodes[leaf].triangles.push_back(i);
+			} else {
+				for (int i = meshes[geom.meshid].tri_start; i < meshes[geom.meshid].tri_end; ++i) {
+					auto const& tri = tris[i];
+
+					glm::vec3 triangle_verts[3];
+					for (int x = 0; x < 3; ++x) {
+						triangle_verts[x] = glm::vec3(geom.transform * glm::vec4(verts[tri.verts[x]], 1));
+					}
+					if (intersect(box, triangle_verts)) {
+						if (leaf == null_id) {
+							return true;
+						} else {
+							_nodes[leaf].leaf_infos.emplace_back(i, geom_id);
+						}
 					}
 				}
 			}
@@ -89,7 +116,7 @@ private:
 		if (leaf == null_id) {
 			return false;
 		} else {
-			return !_nodes[leaf].triangles.empty();
+			return !_nodes[leaf].leaf_infos.empty();
 		}
 	}
 	void build(Scene const& scene, node_id_t const cur, int const depth) {
@@ -98,6 +125,9 @@ private:
 		} else if (depth == _depth_lim) {
 			// build leaf
 			get_hits(scene, _nodes[cur].bounds, cur);
+			// put prims before meshes
+			std::partition(_nodes[cur].leaf_infos.begin(), _nodes[cur].leaf_infos.end(), [](leaf_data const& data) {
+				return data.triangle_id == -1; });
 			return;
 		}
 
@@ -125,8 +155,9 @@ private:
 				node_id_t ret = new_node(bs[i]);
 				_nodes[cur].children[i] = ret;
 
-//				_nodes[cur].children[i] = new_node(bs[i]);
-				// TODO: figure out why _nodes[cur].children[i] = new_node(bs[i]) is wrong in release
+				//_nodes[cur].children[i] = new_node(bs[i]);
+				// TODO: figure out why _nodes[cur].children[i] = new_node(bs[i]) is wrong in release with /O2 flag
+				// my mind is BLOWN by this fact
 
 				build(scene, _nodes[cur].children[i], depth + 1);
 			}
@@ -138,6 +169,8 @@ public:
 		new_node(root_aabb); // root
 		build(scene, root_id, 0);
 	}
+
+	octree(octreeGPU const& treeGPU);
 
 	template<typename Callback>
 	void dfs(Callback func) {
@@ -158,29 +191,200 @@ public:
 /// which cannot be modified
 /// </summary>
 struct octreeGPU {
-	struct node {
-		AABB bounds;
-		octree::node_id_t children[8];
-		int* triangles;
-		node(AABB const& bounds) : bounds(bounds) {
-			for (size_t i = 0; i < 8; ++i) {
-				children[i] = octree::null_id;
-			}
+	Span<nodeGPU> _nodes;
+	MeshInfo _mesh_info;
+	Span<Geom> _geoms;
+
+	__host__ octreeGPU() { }
+	__host__ void init(octree const& tree, MeshInfo mesh_info, Span<Geom> geoms) {
+		// save mesh info of the scene
+		this->_mesh_info = mesh_info;
+		this->_geoms = geoms;
+
+		size_t num_nodes = tree._nodes.size();
+		// first form GPU representation at host side
+		std::vector<nodeGPU> hst_nodes(num_nodes);
+		for (size_t i = 0; i < num_nodes; ++i) {
+			hst_nodes[i] = nodeGPU(tree._nodes[i]);
 		}
-		bool is_leaf() const {
-			for (octree::node_id_t id : children) {
-				if (id != octree::null_id) {
+
+		// upload to GPU
+		nodeGPU* tmp;
+		ALLOC(tmp, num_nodes);
+		H2D(tmp, hst_nodes.data(), num_nodes);
+		_nodes = Span<nodeGPU>(num_nodes, tmp);
+	}
+	__host__ void free() {
+		size_t num_nodes = _nodes.size();
+		// get data back from GPU so we can free it
+		nodeGPU* hst_nodes = new nodeGPU[num_nodes];
+		D2H(hst_nodes, _nodes, num_nodes);
+		for (size_t i = 0; i < num_nodes; ++i) {
+			FREE(hst_nodes[i].leaf_infos);
+		}
+		FREE(_nodes);
+		delete[] hst_nodes;
+	}
+
+	/// <summary>
+	/// recursively searches the octree for hits
+	/// </summary>
+	/// <param name="cur"> current node </param>
+	/// <param name="info"> hit info container </param>
+	/// <param name="ray"> ray </param>
+	/// <returns>whether there are any triangle hits </returns>
+	__device__ bool _search(node_id_t cur, ShadeableIntersection& inters, Ray const& ray, int depth) const {
+		if (depth == OCTREE_DEPTH) { // to help compiler determine stack size
+			auto const& info = _nodes[cur].leaf_infos;
+			float t_min = inters.t;
+
+			// any closer hit?
+			bool any_hit = false;
+
+			// loop through primitives
+			int i;
+			for (i = 0; i < info.size() && info[i].triangle_id == -1; ++i) {
+				auto const& geom = _geoms[info[i].geom_id];
+
+				ShadeableIntersection tmp_inters;
+				if (geom.type == CUBE) {
+					float t = boxIntersectionTest(geom, ray, tmp_inters);
+					if (t > 0) {
+						if (t_min > t) {
+							t_min = t;
+							inters = tmp_inters;
+							any_hit = true;
+						}
+					}
+				} else if (geom.type == SPHERE) {
+					float t = sphereIntersectionTest(geom, ray, tmp_inters);
+					if (t > 0) {
+						if (t_min > t) {
+							t_min = t;
+							inters = tmp_inters;
+							any_hit = true;
+						}
+					}
+				} else {
 					return false;
 				}
 			}
-			return true;
-		}
-	};
 
-	Span<node> nodes;
-	__host__ octreeGPU() { }
-	__host__ void from(octree const& tree) {
-		//int num_nodes;
-		//ALLOC(nodes, )
+			// loop through triangles
+			int idx = -1;
+			glm::vec3 barycoord;
+			float t_min_tri = FLT_MAX; // use another var because t is apparently different in local space???
+			for (; i < info.size(); ++i) {
+				auto const& tri = _mesh_info.tris[info[i].triangle_id];
+				auto const& geom = _geoms[info[i].geom_id];
+				glm::vec3 ro = multiplyMV(geom.inverseTransform, glm::vec4(ray.origin, 1.0f));
+				glm::vec3 rd = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(ray.direction, 0.0f)));
+				glm::vec3 tmp_barycoord;
+				glm::vec3 triangle_verts[3]{
+					_mesh_info.vertices[tri.verts[0]],
+					_mesh_info.vertices[tri.verts[1]],
+					_mesh_info.vertices[tri.verts[2]]
+				};
+
+				if (glm::intersectRayTriangle(ro, rd, triangle_verts[0], triangle_verts[1], triangle_verts[2], tmp_barycoord)) {
+					float t = tmp_barycoord.z;
+					if (t_min_tri > t) {
+						t_min_tri = t;
+						idx = i;
+						barycoord = tmp_barycoord;
+					}
+				}
+			}
+			
+			if (idx != -1) {
+				// result is a ray-triangle intersection
+				ShadeableIntersection tmp_inters;
+				float t = intersFromTriangle(
+					tmp_inters,
+					ray,
+					t_min_tri,
+					_mesh_info,
+					_geoms[info[idx].geom_id],
+					_mesh_info.tris[info[idx].triangle_id],
+					glm::vec2(barycoord));
+				
+				if (t_min > t) {
+					t_min = t;
+					inters = tmp_inters;
+					any_hit = true;
+				}
+			}
+			return any_hit;
+		} else {
+			for (node_id_t child : _nodes[cur].children) {
+				if (child != null_id && intersect(_nodes[child].bounds, ray)) {
+					if (_search(child, inters, ray, depth + 1)) {
+						return true;
+					}
+				}
+			}
+			return false;
+		}
+	}
+	__device__ bool search(ShadeableIntersection& inters, Ray const& ray) const {
+		inters.t = FLT_MAX;
+		bool any_hit = false;
+#ifdef OCTREE_MESH_ONLY
+		for (int i = 0; i < _geoms.size(); i++) {
+			Geom const& geom = _geoms[i];
+#ifdef AABB_CULLING
+			if (!intersect(geom.bounds, ray))
+				continue;
+#endif // AABB_CULLING
+
+			float t;
+			ShadeableIntersection tmp;
+
+			if (geom.type == CUBE) {
+				t = boxIntersectionTest(geom, ray, tmp);
+			} else if (geom.type == SPHERE) {
+				t = sphereIntersectionTest(geom, ray, tmp);
+			} else {
+				continue;
+			}
+			if (t > 0.0f && inters.t > t) {
+				inters = tmp;
+				inters.t = t;
+				any_hit = true;
+			}
+		}
+#endif // OCTREE_MESH_ONLY
+		if (_search(root_id, inters, ray, 0)) {
+			any_hit = true;
+		}
+		return any_hit;
 	}
 };
+
+inline octree::octree(octreeGPU const& treeGPU) {
+	size_t num_nodes = treeGPU._nodes.size();
+	nodeGPU* tmp = reinterpret_cast<nodeGPU*>(malloc(num_nodes * sizeof(nodeGPU)));
+	D2H(tmp, treeGPU._nodes, num_nodes);
+	
+	for (int i = 0; i < num_nodes; ++i) {
+		_nodes.emplace_back(tmp[i]);
+	}
+	free(tmp);
+}
+
+inline node::node(nodeGPU const& nodeGPU)
+	: bounds(nodeGPU.bounds) {
+	for (size_t i = 0; i < 8; ++i) {
+		children[i] = nodeGPU.children[i];
+	}
+
+	size_t num_data = nodeGPU.leaf_infos.size();
+	leaf_data* tmp = reinterpret_cast<leaf_data*>(malloc(num_data * sizeof(leaf_data)));
+	D2H(tmp, nodeGPU.leaf_infos, num_data);
+	
+	for (int i = 0; i < num_data; ++i) {
+		leaf_infos.emplace_back(tmp[i].triangle_id, tmp[i].geom_id);
+	}
+	free(tmp);
+}
+

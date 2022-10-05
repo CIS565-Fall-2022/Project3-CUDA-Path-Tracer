@@ -17,23 +17,7 @@
 #include "rendersave.h"
 #include "Collision/AABB.h"
 #include "Octree/octree.h"
-
-// impl switches
-#define COMPACTION
-#define SORT_MAT
-#define AABB_CULLING
-
-#define OCTREE_CULLING
-// #define DEPTH_OF_FIELD
-
-// #define ANTI_ALIAS_JITTER
-// #define FAKE_SHADE
-
-#define CACHE_FIRST_BOUNCE
-#if (defined(CACHE_FIRST_BOUNCE) && defined(ANTI_ALIAS_JITTER)) || (defined(CACHE_FIRST_BOUNCE) && defined(DEPTH_OF_FIELD)) 
-#error "ANTI_ALIAS_JITTER or CACHE_FIRST_BOUNCE cannot be used with CACHE_FIRST_BOUNCE"
-#endif
-
+#include "consts.h"
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #ifndef NDEBUG
@@ -144,7 +128,6 @@ static Scene* hst_scene = nullptr;
 
 static Span<glm::vec3>             dev_image;
 static Span<Geom>                  dev_geoms;
-static Span<Material>              dev_materials;
 static Span<PathSegment>           dev_paths;
 static Span<ShadeableIntersection> dev_intersections;
 
@@ -166,6 +149,8 @@ static bool render_paused = false;
 static int cur_iter;
 
 void PathTracer::pathtraceInit(Scene* scene, RenderState* state) {
+	bool scene_change = hst_scene != scene;
+
 	hst_scene = scene;
 	renderState = state;
 
@@ -174,53 +159,69 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state) {
 
 	dev_image = make_span(state->image);
 	dev_paths = make_span<PathSegment>(pixelcount);
-	dev_materials = make_span(scene->materials);
 	dev_intersections = make_span<ShadeableIntersection>(pixelcount);
-	dev_geoms = make_span(scene->geoms);
-	dev_lights = make_span(scene->lights);
-	dev_mesh_info.vertices = make_span(scene->vertices);
-	dev_mesh_info.normals = make_span(scene->normals);
-	dev_mesh_info.uvs = make_span(scene->uvs);
-	dev_mesh_info.tris = make_span(scene->triangles);
-	dev_mesh_info.meshes = make_span(scene->meshes);
-	dev_mesh_info.tangents = make_span(scene->tangents);
-	for (Texture const& hst_tex : scene->textures) {
-		TextureGPU dev_tex(hst_tex);
-		dev_texs.push_back(dev_tex);
-	}
-	dev_mesh_info.texs = make_span(dev_texs);
-	dev_thrust_paths = thrust::device_ptr<PathSegment>((PathSegment*)dev_paths);
-
-
 #ifdef CACHE_FIRST_BOUNCE
 	dev_cached_intersections = make_span<ShadeableIntersection>(pixelcount);
 #endif // CACHE_FIRST_BOUNCE
+	dev_thrust_paths = thrust::device_ptr<PathSegment>((PathSegment*)dev_paths);
+
+	if (scene_change) {
+		dev_geoms = make_span(scene->geoms);
+		dev_lights = make_span(scene->lights);
+		dev_mesh_info.vertices = make_span(scene->vertices);
+		dev_mesh_info.normals = make_span(scene->normals);
+		dev_mesh_info.uvs = make_span(scene->uvs);
+		dev_mesh_info.tris = make_span(scene->triangles);
+		dev_mesh_info.meshes = make_span(scene->meshes);
+		dev_mesh_info.tangents = make_span(scene->tangents);
+		dev_mesh_info.materials = make_span(scene->materials);
+
+		for (Texture const& hst_tex : scene->textures) {
+			TextureGPU dev_tex(hst_tex);
+			dev_texs.push_back(dev_tex);
+		}
+		dev_mesh_info.texs = make_span(dev_texs);
+#ifdef OCTREE_CULLING
+		tree = new octree(*scene, scene->world_AABB, OCTREE_DEPTH);
+		dev_tree.init(*tree, dev_mesh_info, dev_geoms);
+#endif // OCTREE_CULLING
+	}
 
     checkCUDAError("pathtraceInit");
 }
 
-void PathTracer::pathtraceFree() {
+void PathTracer::pathtraceFree(Scene* scene) {
+	bool scene_changed = hst_scene != scene;
+
 	FREE(dev_image);
 	FREE(dev_paths);
-	FREE(dev_geoms);
-	FREE(dev_materials);
 	FREE(dev_intersections);
-	FREE(dev_lights);
-	FREE(dev_mesh_info.vertices);
-	FREE(dev_mesh_info.normals);
-	FREE(dev_mesh_info.uvs);
-	FREE(dev_mesh_info.tris);
-	FREE(dev_mesh_info.meshes);
-	FREE(dev_mesh_info.tangents);
-	for (TextureGPU& tex : dev_texs) {
-		tex.free();
-	}
-	dev_texs.clear();
-	FREE(dev_mesh_info.texs);
-
 #ifdef CACHE_FIRST_BOUNCE
 	FREE(dev_cached_intersections);
 #endif // CACHE_FIRST_BOUNCE
+
+	if (scene_changed) {
+
+		FREE(dev_geoms);
+		FREE(dev_lights);
+		FREE(dev_mesh_info.vertices);
+		FREE(dev_mesh_info.normals);
+		FREE(dev_mesh_info.uvs);
+		FREE(dev_mesh_info.tris);
+		FREE(dev_mesh_info.meshes);
+		FREE(dev_mesh_info.tangents);
+		FREE(dev_mesh_info.materials);
+		for (TextureGPU& tex : dev_texs) {
+			tex.free();
+		}
+		dev_texs.clear();
+		FREE(dev_mesh_info.texs);
+
+#ifdef OCTREE_CULLING
+		dev_tree.free();
+		delete tree;
+#endif
+	}
 
     checkCUDAError("pathtraceFree");
 }
@@ -261,7 +262,6 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 	}
 }
 
-// TODO:
 // computeIntersections handles generating ray intersections ONLY.
 // Generating new rays is handled in your shader(s).
 // Feel free to modify the code below.
@@ -270,34 +270,38 @@ __global__ void computeIntersections(
 	Span<PathSegment> paths,
 	Span<Geom> geoms,
 	ShadeableIntersection* intersections,
-	Material* materials,
 	MeshInfo meshInfo,
-	ShadeableIntersection* cache_intersections)
+	ShadeableIntersection* cache_intersections,
+	octreeGPU octree)
 {
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
 	if (path_index >= paths.size()) {
 		return;
 	}
-	PathSegment pathSegment = paths[path_index];
+	PathSegment path = paths[path_index];
 
 #ifndef COMPACTION
-	if (!pathSegment.remainingBounces) {
+	if (!path.remainingBounces) {
 		return;
 	}
 #endif // COMPACTION
-
-	assert(pathSegment.remainingBounces > 0);
-
-	float t_min = FLT_MAX;
-
-	// naive parse through global geoms
+	assert(path.remainingBounces > 0);
 	ShadeableIntersection& inters = intersections[path_index];
+
+#ifdef OCTREE_CULLING
+	if (!octree.search(inters, path.ray)) {
+		inters.t = -1;
+	}
+#else
+	float t_min = FLT_MAX;
 	inters.t = -1;
+
 
 	for (int i = 0; i < geoms.size(); i++) {
 		Geom& geom = geoms[i];
+
 #ifdef AABB_CULLING
-		if (!intersect(geom.bounds, pathSegment.ray))
+		if (!intersect(geom.bounds, path.ray))
 			continue;
 #endif // AABB_CULLING
 
@@ -305,11 +309,11 @@ __global__ void computeIntersections(
 		ShadeableIntersection tmp;
 
 		if (geom.type == CUBE) {
-			t = boxIntersectionTest(geom, pathSegment.ray, tmp);
+			t = boxIntersectionTest(geom, path.ray, tmp);
 		} else if (geom.type == SPHERE) {
-			t = sphereIntersectionTest(geom, pathSegment.ray, tmp);
+			t = sphereIntersectionTest(geom, path.ray, tmp);
 		} else if (geom.type == MESH) {
-			t = meshIntersectionTest(geom, pathSegment.ray, materials, meshInfo, tmp);
+			t = meshIntersectionTest(geom, path.ray, meshInfo, tmp);
 		}
 		// add more intersection tests here... triangle? metaball? CSG?
 
@@ -321,6 +325,7 @@ __global__ void computeIntersections(
 			inters.t = t;
 		}
 	}
+#endif // OCTREE_CULLING
 
 	if (cache_intersections) {
 		cache_intersections[path_index] = inters;
@@ -536,9 +541,9 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 			dev_paths.subspan(0, num_paths),
 			dev_geoms,
 			dev_inters,
-			dev_materials,
 			dev_mesh_info,
-			dev_cached_inters
+			dev_cached_inters,
+			dev_tree
 		);
 
 		checkCUDAError("trace one bounce");
@@ -564,7 +569,7 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 			dev_paths.subspan(0, num_paths),
 			dev_lights,
 			dev_inters,
-			dev_materials
+			dev_mesh_info.materials
 		);
 
 		checkCUDAError("shadeMaterial");
@@ -608,4 +613,8 @@ void PathTracer::togglePause() {
 
 bool PathTracer::isPaused() {
 	return render_paused;
+}
+
+octreeGPU PathTracer::getTree() {
+	return dev_tree;
 }

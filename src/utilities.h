@@ -40,6 +40,7 @@ public:
     bool draw_coord_frame;
     bool draw_debug_aabb;
     bool draw_world_aabb;
+    bool draw_GPU_tree;
     int octree_depth;
     int octree_depth_filter;
     int octree_intersection_cnt;
@@ -121,7 +122,8 @@ struct Span {
     DEVICE T& operator[](int idx) {
 #ifndef NDEBUG
         if (idx < 0 || idx >= _size) {
-            assert(!"array out of bounds");
+            printf("array out of bounds, idx=%d, size=%d\n", idx, _size);
+            assert(false);
         }
 #endif // !NDEBUG
         return _arr[idx];

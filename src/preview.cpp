@@ -294,6 +294,14 @@ void RenderImGui() {
 
 				guiData->test_tree = new octree(*scene, scene->world_AABB, guiData->octree_depth);
 			}
+			if (ImGui::Button("Pull Octree From GPU")) {
+				if (guiData->test_tree) {
+					delete guiData->test_tree;
+					guiData->test_tree = nullptr;
+				}
+
+				guiData->test_tree = new octree(PathTracer::getTree());
+			}
 			if (guiData->test_tree) {
 				if (ImGui::Button("Destroy Octree")) {
 					delete guiData->test_tree;
@@ -330,19 +338,19 @@ void RenderImGui() {
 		}
 		ImGui::SliderInt("Set Depth Filter (-1 means no)", &guiData->octree_depth_filter, -1, guiData->octree_depth);
 		guiData->octree_intersection_cnt = 0;
-		guiData->test_tree->dfs([&](octree::node const& node, int depth) {
+		guiData->test_tree->dfs([&](node const& node, int depth) {
 			if (guiData->octree_depth_filter != -1) {
 				if (guiData->octree_depth_filter == depth) {
-					DebugDrawer::DrawAABB(node.bounds, { 0.5f, 0.5f, 0.5f });
-					guiData->octree_intersection_cnt += node.triangles.size();
+					DebugDrawer::DrawAABB(node.bounds, { 0,1,0 });
+					guiData->octree_intersection_cnt += node.leaf_infos.size();
 				}
 			} else {
-				DebugDrawer::DrawAABB(node.bounds, { 0.5f, 0.5f, 0.5f });
-				guiData->octree_intersection_cnt += node.triangles.size();
+				DebugDrawer::DrawAABB(node.bounds, { 0,1,0 });
+				guiData->octree_intersection_cnt += node.leaf_infos.size();
 			}
 		});
-		std::string info = "intersected triangles: " + std::to_string(guiData->octree_intersection_cnt) + 
-			"\ntotal: " + std::to_string(scene->triangles.size());
+		std::string info = "intersection cnt: " + std::to_string(guiData->octree_intersection_cnt) + 
+			"\ntotal triangles: " + std::to_string(scene->triangles.size());
 
 		ImGui::Text(info.c_str());
 	}

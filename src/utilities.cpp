@@ -50,6 +50,7 @@ GuiDataContainer::GuiDataContainer() :
     draw_coord_frame(false),
     draw_debug_aabb(false),
     draw_world_aabb(false),
+    draw_GPU_tree(false),
     octree_depth(0),
     octree_depth_filter(-1),
     octree_intersection_cnt(0),

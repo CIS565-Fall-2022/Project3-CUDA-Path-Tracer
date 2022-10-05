@@ -162,7 +162,7 @@ void runCuda(bool init) {
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
 	if (iteration == 0 || init) {
-		PathTracer::pathtraceFree();
+		PathTracer::pathtraceFree(scene);
 		PathTracer::pathtraceInit(scene, renderState);
 	}
 
@@ -178,7 +178,7 @@ void runCuda(bool init) {
 		cudaGLUnmapBufferObject(pbo);
 	} else {
 		saveImage();
-		PathTracer::pathtraceFree();
+		PathTracer::pathtraceFree(nullptr);
 		cudaDeviceReset();
 		exit(EXIT_SUCCESS);
 	}
