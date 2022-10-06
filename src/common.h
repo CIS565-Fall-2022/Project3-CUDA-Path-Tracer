@@ -1,7 +1,7 @@
 #pragma once
 #include <iostream>
 
-#define SAMPLER_USE_SOBOL true
+#define SAMPLER_USE_SOBOL false
 
 #define SCENE_LIGHT_SINGLE_SIDED true
 

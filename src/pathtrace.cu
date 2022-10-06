@@ -597,10 +597,8 @@ struct RemoveInvalidPaths {
 	}
 };
 
-/**
- * Wrapper for the __global__ call that sets up the kernel calls and does a ton
- * of memory management
- */
+static 
+
 void pathTrace(uchar4* pbo, int frame, int iter) {
 	const Camera& cam = hstScene->camera;
 	const int pixelCount = cam.resolution.x * cam.resolution.y;
@@ -611,16 +609,16 @@ void pathTrace(uchar4* pbo, int frame, int iter) {
 		(cam.resolution.x + blockSize2D.x - 1) / blockSize2D.x,
 		(cam.resolution.y + blockSize2D.y - 1) / blockSize2D.y);
 
-	generateRayFromCamera<<<blocksPerGrid2D, blockSize2D>>>(hstScene->devScene, cam, iter, Settings::traceDepth, devPaths);
-	checkCUDAError("PT::generateRayFromCamera");
-	cudaDeviceSynchronize();
-
 	int depth = 0;
 	int numPaths = pixelCount;
 
 	auto devTerminatedThr = devTerminatedPathsThr;
 
 	if (Settings::tracer == Tracer::Streamed) {
+		generateRayFromCamera<<<blocksPerGrid2D, blockSize2D>>>(hstScene->devScene, cam, iter, Settings::traceDepth, devPaths);
+		checkCUDAError("PT::generateRayFromCamera");
+		cudaDeviceSynchronize();
+
 		bool iterationComplete = false;
 		while (!iterationComplete) {
 			// clean shading chunks
