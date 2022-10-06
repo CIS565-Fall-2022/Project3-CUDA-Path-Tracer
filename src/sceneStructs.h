@@ -10,11 +10,21 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    MESH,
 };
 
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
+};
+
+struct Triangle {
+    glm::vec3 pos1;
+    glm::vec3 pos2;
+    glm::vec3 pos3;
+    glm::vec3 normal1;
+    glm::vec3 normal2;
+    glm::vec3 normal3;
 };
 
 struct Geom {
@@ -26,7 +36,13 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+    glm::vec3 boxMin;
+    glm::vec3 boxMax;
+    unsigned int triangleStartIndex;
+    unsigned int triangleEndIndex;
 };
+
+
 
 struct Material {
     glm::vec3 color;
@@ -73,4 +89,5 @@ struct ShadeableIntersection {
   float t;
   glm::vec3 surfaceNormal;
   int materialId;
+  bool outside;
 };

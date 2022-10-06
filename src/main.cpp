@@ -23,6 +23,7 @@ Scene* scene;
 GuiDataContainer* guiData;
 RenderState* renderState;
 int iteration;
+static bool firstTimeInit = true;
 
 int width;
 int height;
@@ -131,8 +132,16 @@ void runCuda() {
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
 	if (iteration == 0) {
-		pathtraceFree();
-		pathtraceInit(scene);
+		if (firstTimeInit)
+		{
+			firstTimeInit = false;
+			firstTimePathTraceInit(scene);
+		}
+		else
+		{
+			pathtraceFree();
+			pathtraceInit(scene);
+		}
 	}
 
 	if (iteration < renderState->iterations) {
@@ -149,7 +158,7 @@ void runCuda() {
 	}
 	else {
 		saveImage();
-		pathtraceFree();
+		lastTimePathTraceFree();
 		cudaDeviceReset();
 		exit(EXIT_SUCCESS);
 	}

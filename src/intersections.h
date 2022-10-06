@@ -136,9 +136,123 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 
     intersectionPoint = multiplyMV(sphere.transform, glm::vec4(objspaceIntersection, 1.f));
     normal = glm::normalize(multiplyMV(sphere.invTranspose, glm::vec4(objspaceIntersection, 0.f)));
-    if (!outside) {
+    /*if (!outside) {
         normal = -normal;
-    }
+    }*/
 
     return glm::length(r.origin - intersectionPoint);
+}
+
+__host__ __device__ void swapFloat(float& a, float& b)
+{
+    float tmp = a;
+    a = b;
+    b = tmp;
+}
+
+__host__ __device__ bool boundingBoxCheck(glm::vec3 origin, glm::vec3 direction, glm::vec3 min, glm::vec3 max)
+{
+    glm::vec3 inverse_direction = 1.0f / direction;
+
+    float tMin = (min.x - origin.x) * inverse_direction.x;
+    float tMax = (max.x - origin.x) * inverse_direction.x;
+
+    if (tMin > tMax) { swapFloat(tMin, tMax); }
+
+    float tyMin = (min.y - origin.y) * inverse_direction.y;
+    float tyMax = (max.y - origin.y) * inverse_direction.y;
+    
+    if (tyMin > tyMax) { swapFloat(tyMin, tyMax); }
+
+    if (tMin > tyMax || tyMin > tMax) { return false; }
+
+    if (tyMin > tMin) { tMin = tyMin; }
+    if (tyMax < tMax) { tMax = tyMax; }
+
+    float tzMin = (min.z - origin.z) * inverse_direction.z;
+    float tzMax = (max.z - origin.z) * inverse_direction.z;
+
+    if (tzMin > tzMax) { swapFloat(tzMin, tzMax); }
+
+    if (tMin > tzMax || tzMin > tMax) { return false; }
+
+    /*if (tzMin > tMin) { tMin = tzMin; }
+    if (tzMax < tMax) { tMax = tzMax; }*/
+
+    return true;
+}
+
+
+__host__ __device__ float MeshIntersectionTest(Geom mesh, Ray r,
+    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside, Triangle* allTriangles) {
+    Ray q;
+    q.origin = multiplyMV(mesh.inverseTransform, glm::vec4(r.origin, 1.0f));
+    q.direction = glm::normalize(multiplyMV(mesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+    //check bounding box first
+    if (!boundingBoxCheck(q.origin, q.direction, mesh.boxMin, mesh.boxMax))
+    {
+        return -1;
+    }
+
+    float t = FLT_MAX;
+    glm::vec3 temp_normal;
+
+    // test for tirangles belong to this mesh
+    for (unsigned int i = mesh.triangleStartIndex; i < mesh.triangleEndIndex; i++)
+    {
+        glm::vec3 bary;
+        if (!glm::intersectRayTriangle(q.origin, q.direction, allTriangles[i].pos1, allTriangles[i].pos2, allTriangles[i].pos3, bary))
+        {
+            continue;
+        }
+        if (bary.z > t) { continue; } // this one is closer
+
+
+        t = bary.z;
+        float z = 1.0f - bary.x - bary.y;
+
+        //glm::vec3 intersection_current = bary.x * tri->pos1 + bary.y * tri->pos2 + z * tri->pos3;
+        if (allTriangles[i].normal1 == glm::vec3(0))// no normal imported
+        {
+            temp_normal = glm::normalize(glm::cross(allTriangles[i].pos2 - allTriangles[i].pos1, allTriangles[i].pos3 - allTriangles[i].pos1));
+        }
+        else
+        {
+            temp_normal = glm::normalize(bary.x * allTriangles[i].normal1 + bary.y * allTriangles[i].normal2 + z * allTriangles[i].normal3);
+        }
+    }
+
+    if (t == FLT_MAX)
+    {
+        //no intersection
+        return -1;
+    }
+    // determine if outside
+    if (glm::dot(temp_normal, q.direction)>0)
+    {
+        //it is from inside
+        outside = false;
+        //temp_normal = -temp_normal;
+    }
+    else {
+        outside = true;
+    }
+    intersectionPoint = multiplyMV(mesh.transform, glm::vec4(getPointOnRay(q, t), 1.0f));
+    normal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(temp_normal,1.0f)));
+    return glm::length(r.origin - intersectionPoint);
+}
+
+
+__host__ __device__ glm::vec3 randomPointOnCube(Geom cube, thrust::default_random_engine& rng)
+{
+    thrust::uniform_real_distribution<float> u1(-0.5, 0.5);
+    glm::vec3 pos(u1(rng), u1(rng), u1(rng));
+    return glm::vec3(cube.transform * glm::vec4(pos, 1.f));
+}
+
+__host__ __device__ void generateRayToCube(Ray& r, Geom cube, thrust::default_random_engine& rng)
+{
+    glm::vec3 target = randomPointOnCube(cube, rng);
+    r.direction = glm::normalize(target - r.origin);
 }
