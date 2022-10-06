@@ -359,8 +359,7 @@ __global__ void shadeMaterial (
 					material,
 					makeSeededRandomEngine(iter, idx, depth));
 				if (--pathSegments[idx].remainingBounces == 0) {
-					// seems to look better to set the non-terminataing to black
-					pathSegments[idx].color = glm::vec3(0.0f); 
+					pathSegments[idx].color = BACKGROUND_COLOR;
 				}
 			}
 		}
@@ -369,7 +368,7 @@ __global__ void shadeMaterial (
 			// Lots of renderers use 4 channel color, RGBA, where A = alpha, often
 			// used for opacity, in which case they can indicate "no opacity".
 			// This can be useful for post-processing and image compositing.
-			pathSegments[idx].color = glm::vec3(0.0f);
+			pathSegments[idx].color = BACKGROUND_COLOR;
 			pathSegments[idx].remainingBounces = 0; // terminate if hit nothing
 		}
 	}

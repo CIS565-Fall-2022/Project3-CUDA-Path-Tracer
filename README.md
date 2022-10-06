@@ -1,7 +1,7 @@
 CUDA Path Tracer
 ================
 
-(leading img here)
+<img align="center" src="img/scuffed.png" width=50% height=50%>
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 3**
 

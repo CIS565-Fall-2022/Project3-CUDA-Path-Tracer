@@ -5,7 +5,7 @@
 #include <cuda_runtime.h>
 #include "glm/glm.hpp"
 
-#define BACKGROUND_COLOR (glm::vec3(0.0f))
+#define BACKGROUND_COLOR (glm::vec3(0.1f))
 // --- toggleable things ---
 #define _STREAM_COMPACTION_			0
 #define _GROUP_RAYS_BY_MATERIAL_	0

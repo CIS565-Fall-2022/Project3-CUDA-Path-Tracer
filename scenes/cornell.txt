@@ -1,73 +1,51 @@
 // Emissive material (light)
 MATERIAL	0
 MAT_TYPE    N/A
-RGB         1 1 1
+RGB         0.8 0.71 0.23
 SPECEX      0 		// used for TRANSLUCENT + SPECULAR
 TRANSRGB    0 0 0
 IOR     0 			// used for TRASLUCENT + DIELECTRIC
 ABSORPTION	0 		// used for TRANSLUCENT
-EMITTANCE   5
+EMITTANCE   50
 
-// Diffuse white
 MATERIAL	1
 MAT_TYPE    DIFFUSE
-RGB         .98 .98 .98
+RGB         .18 .18 .18
 SPECEX      0
 TRANSRGB    0 0 0
-IOR     0
-ABSORPTION	0
-EMITTANCE   0
-
-// Diffuse left wall
-MATERIAL	2
-MAT_TYPE    DIFFUSE
-RGB         .85 .35 .35
-SPECEX      0
-TRANSRGB    0 0 0
-IOR     0
-ABSORPTION	0
-EMITTANCE   0
-
-// Diffuse green
-MATERIAL	3
-MAT_TYPE    DIFFUSE
-RGB         .35 .85 .35
-SPECEX      0
-TRANSRGB    0 0 0
-IOR     0
+IOR     	0
 ABSORPTION	0
 EMITTANCE   0
 
 // Sphere mat
-MATERIAL	4
-MAT_TYPE    DIELECTRIC
-RGB         .98 .98 .98
+MATERIAL	2
+MAT_TYPE    TRANSLUCENT
+RGB         .91 .74 .67
+SPECEX      0
+TRANSRGB    .98 .4 .4
+IOR     	1.45
+ABSORPTION	0.01
+EMITTANCE   0
+
+// ambient emissive
+MATERIAL	3
+MAT_TYPE    N/A
+RGB         1 1 1
 SPECEX      0
 TRANSRGB    0 0 0
-IOR     	2.42	
+IOR     	0
 ABSORPTION	0
-EMITTANCE   0
-
-MATERIAL	5
-MAT_TYPE    SPECULAR
-RGB         .98 .98 .98
-SPECEX      30000
-TRANSRGB    0 0 0
-IOR     	0	
-ABSORPTION	0
-EMITTANCE   0
-
-
+EMITTANCE   5
 
 // Camera
 CAMERA
 RES         800 800
-LENS_RAD	-1
-FOCAL_DIST	12.5
-ANTIALIAS	0
+LENS_RAD	0.2
+FOCAL_DIST	5
+ANTIALIAS	1
 FOVY        45
 ITERATIONS  5000
-DEPTH       10
+DEPTH       20
 FILE        cornell
 EYE         0.0 5 9
 LOOKAT      0 5 0
@@ -79,92 +57,104 @@ cube
 material 1
 TRANS       0 0 0
 ROTAT       0 0 0
-SCALE       20 .01 30
+SCALE       50 .01 30
 VELOCITY    0 0 0
 
-// Ceiling
 OBJECT
 cube
 material 1
-TRANS       0 12 0
+TRANS       8 0 0
+ROTAT       90 0 0
+SCALE       0.1 30 30
+VELOCITY    0 0 0
+
+OBJECT
+cube
+material 1
+TRANS       -8 0 0
+ROTAT       -90 0 0
+SCALE       0.1 30 30
+VELOCITY    0 0 0
+
+OBJECT
+cube
+material 1
+TRANS       0 0 0
 ROTAT       0 0 90
-SCALE       .01 20 30
-VELOCITY    0 0 0
-
-// Left wall
-OBJECT
-cube
-material 2
-TRANS       -10 5 0
-ROTAT       0 0 0
-SCALE       .01 20 30
-VELOCITY    0 0 0
-
-// Right wall
-OBJECT
-cube
-material 3
-TRANS       10 5 0
-ROTAT       0 0 0
-SCALE       .01 20 30
-VELOCITY    0 0 0
-
-// Back walls
-OBJECT
-cube
-material 1
-TRANS       0 10 -10
-ROTAT       0 90 0
-SCALE       .01 20 30
-VELOCITY    0 0 0
-
-// enclosing wall
-OBJECT
-cube
-material 1
-TRANS       0 10 15
-ROTAT       0 90 0
-SCALE       .01 20 30
+SCALE       50 50 .01
 VELOCITY    0 0 0
 
 // light
 OBJECT
-cube
+sphere
 material 0
-TRANS       5 6 -10
+TRANS       0 3.75 4
 ROTAT       0 0 0
-SCALE       5 5 .3
+SCALE       1 1 1
 VELOCITY    0 0 0
 
+// ambient light
 OBJECT
 cube
-material 0
-TRANS       0 12 -3
+material 3
+TRANS       0 20 5
 ROTAT       0 0 0
-SCALE       4 0.25 4
+SCALE       20 0.5 20
 VELOCITY    0 0 0
 
 // objects
 OBJECT
-sphere
-material 	4
-TRANS       -2 6 -5.5
-ROTAT       0 0 0
-SCALE       4 4 4
+cube
+material 	2
+TRANS       0 2 4
+ROTAT       -80 0 0
+SCALE       4 2 0.5
 VELOCITY    0 0 0 
 
 OBJECT
 cube
-material 	5
-TRANS       -2 2 -5.5
-ROTAT       0 -20 0
-SCALE       4 4 4 
+material 	2
+TRANS       0 3 2.75
+ROTAT       -10 0 0
+SCALE       4 1 0.5
 VELOCITY    0 0 0 
 
 OBJECT
-sphere
-material 	5
-TRANS       -4 1.5 3
+cube
+material 	2
+TRANS       1.65 5.5 2.5
+ROTAT       0 -20 0
+SCALE       0.75 3 0.5
+VELOCITY    0 0 0 
+
+OBJECT
+cube
+material 	2
+TRANS       0.5 5.5 2.5
+ROTAT       0 -10 0
+SCALE       0.75 3 0.5
+VELOCITY    0 0 0 
+
+OBJECT
+cube
+material 	2
+TRANS       -0.6 5.5 2.5
 ROTAT       0 0 0
-SCALE       4 4 4
+SCALE       0.75 3 0.5
+VELOCITY    0 0 0 
+
+OBJECT
+cube
+material 	2
+TRANS       -1.75 5.5 2.5
+ROTAT       0 13 0
+SCALE       0.75 3 0.5
+VELOCITY    0 0 0 
+
+OBJECT
+cube
+material 	2
+TRANS       2.5 3 4.5
+ROTAT       0 -75 -10
+SCALE       0.75 1.5 0.5
 VELOCITY    0 0 0 
