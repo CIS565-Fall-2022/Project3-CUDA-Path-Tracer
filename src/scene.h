@@ -23,8 +23,8 @@ public:
     ~Scene();
 
     std::vector<Geom> geoms;
-    std::vector<TriangleGeom> triangleGeoms;
-
+    //std::vector<TriangleGeom> triangleGeoms;
+    MeshGeom meshGeoms;
     std::vector<Material> materials;
     RenderState state;
 };

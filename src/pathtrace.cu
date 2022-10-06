@@ -25,6 +25,7 @@
 #define DOF 0
 #define MOTION_BLUR_OBJECT 0
 #define MOTION_BLUR_CAMERA 0
+#define BOUNDING_BOX 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -139,8 +140,8 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_cache_intersections, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_cache_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
-	cudaMalloc(&dev_triangles, scene->triangleGeoms.size() * sizeof(TriangleGeom));
-	cudaMemcpy(dev_triangles, scene->triangleGeoms.data(), scene->triangleGeoms.size() * sizeof(TriangleGeom), cudaMemcpyHostToDevice);
+	cudaMalloc(&dev_triangles, scene->meshGeoms.triangleGeoms.size() * sizeof(TriangleGeom));
+	cudaMemcpy(dev_triangles, scene->meshGeoms.triangleGeoms.data(), scene->meshGeoms.triangleGeoms.size() * sizeof(TriangleGeom), cudaMemcpyHostToDevice);
 
 	checkCUDAError("pathtraceInit");
 }
@@ -255,7 +256,42 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.remainingBounces = traceDepth;
 	}
 }
+__host__ __device__ bool checkWithinMeshBoundingBox(Geom& object,
+	glm::vec3 min, glm::vec3 max, Ray& r) {
+	//Basically the same thing as boxIntersectionTest
+	Ray q;
+	q.origin = multiplyMV(object.inverseTransform, glm::vec4(r.origin, 1.0f));
+	q.direction = glm::normalize(multiplyMV(object.inverseTransform, glm::vec4(r.direction, 0.0f)));
 
+	float tmin = -1e38f;
+	float tmax = 1e38f;
+	glm::vec3 tmin_n;
+	glm::vec3 tmax_n;
+	for (int xyz = 0; xyz < 3; ++xyz) {
+		float qdxyz = q.direction[xyz];
+		if (glm::abs(qdxyz) > 0.00001f) {
+			float t1 = (min[xyz] - q.origin[xyz]) / qdxyz;
+			float t2 = (max[xyz] - q.origin[xyz]) / qdxyz;
+			float ta = glm::min(t1, t2);
+			float tb = glm::max(t1, t2);
+			glm::vec3 n;
+			n[xyz] = t2 < t1 ? +1 : -1;
+			if (ta > 0 && ta > tmin) {
+				tmin = ta;
+				tmin_n = n;
+			}
+			if (tb < tmax) {
+				tmax = tb;
+				tmax_n = n;
+			}
+		}
+	}
+
+	if (tmax >= tmin && tmax > 0) {
+		return true;
+	}
+	return false;
+}
 // TODO:
 // computeIntersections handles generating ray intersections ONLY.
 // Generating new rays is handled in your shader(s).
@@ -268,6 +304,8 @@ __global__ void computeIntersections(
 	, int geoms_size
 	, TriangleGeom* triangles
 	, int triangles_size
+	, glm::vec3 min
+	, glm::vec3 max
 	, ShadeableIntersection* intersections
 	
 )
@@ -304,18 +342,22 @@ __global__ void computeIntersections(
 			}
 			else if (geom.type == MESH)
 			{
-				float closest_dist = FLT_MAX;
-
+				float z = FLT_MAX;
+#if BOUNDING_BOX
+				if (!checkWithinMeshBoundingBox(geom, min, max, pathSegment.ray)) {
+					break;
+				}
+#endif
 				for (int j = 0; j < triangles_size; j++) {
 					TriangleGeom& tri = triangles[j];
 
 					float triangle_inter = triangleInteractionTest(geom, pathSegment.ray, tmp_intersect,
 						tri.v1, tri.v2, tri.v3, tri.n1, tri.n2, tri.n3, tmp_normal, outside);
 					if (triangle_inter != -1) {
-						closest_dist = glm::min(closest_dist, triangle_inter);
+						z = glm::min(z, triangle_inter);
 					}
 				}
-				t = closest_dist;
+				t = z;
 
 			}
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
@@ -567,7 +609,9 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_geoms
 				, hst_scene->geoms.size()
 				, dev_triangles
-				, hst_scene->triangleGeoms.size()
+				, hst_scene->meshGeoms.triangleGeoms.size()
+				, hst_scene->meshGeoms.min
+				, hst_scene->meshGeoms.max
 				, dev_intersections
 				);
 			checkCUDAError("trace one bounce");
@@ -588,7 +632,9 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_geoms
 				, hst_scene->geoms.size()
 				, dev_triangles
-				, hst_scene->triangleGeoms.size()
+				, hst_scene->meshGeoms.triangleGeoms.size()
+				, hst_scene->meshGeoms.min
+				, hst_scene->meshGeoms.max
 				, dev_intersections
 				);
 			checkCUDAError("trace one bounce");
@@ -602,7 +648,9 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, dev_geoms
 			, hst_scene->geoms.size()
 			, dev_triangles
-			, hst_scene->triangleGeoms.size()
+			, hst_scene->meshGeoms.triangleGeoms.size()
+			, hst_scene->meshGeoms.min
+			, hst_scene->meshGeoms.max
 			, dev_intersections
 			);
 		checkCUDAError("trace one bounce");

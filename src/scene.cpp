@@ -135,6 +135,8 @@ int Scene::loadOBJ(int id) {
         // Loop over faces(polygon)
         int count = 0;
         TriangleGeom triangle;
+        glm::vec3 bound_min{ FLT_MAX };
+        glm::vec3 bound_max{ FLT_MIN };
 
         size_t index_offset = 0;
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
@@ -153,6 +155,26 @@ int Scene::loadOBJ(int id) {
                 tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
 
                 vertex = glm::vec3{vx, vy, vz};
+
+                if (vx < bound_min.x) {
+                    bound_min.x = vx;
+                }
+                if (vy < bound_min.y) {
+                    bound_min.y = vy;
+                }
+                if (vz < bound_min.z) {
+                    bound_min.z = vz;
+                }
+                if (vx > bound_max.x) {
+                    bound_max.x = vx;
+                }
+                if (vy > bound_max.y) {
+                    bound_max.y = vy;
+                }
+                if (vz > bound_max.z) {
+                    bound_max.z = vz;
+                }
+
                 // Check if `normal_index` is zero or positive. negative = no normal data
                 if (idx.normal_index >= 0) {
                     tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
@@ -162,10 +184,10 @@ int Scene::loadOBJ(int id) {
                 }
 
                 // Check if `texcoord_index` is zero or positive. negative = no texcoord data
-                //if (idx.texcoord_index >= 0) {
-                //    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
-                //    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
-                //}
+                if (idx.texcoord_index >= 0) {
+                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+                    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+                }
 
                 // assign to the current tri
                 if (v == 0) {
@@ -187,8 +209,9 @@ int Scene::loadOBJ(int id) {
             } // end vertex loop
 
             index_offset += fv;
-            triangleGeoms.push_back(triangle);
-
+            meshGeoms.triangleGeoms.push_back(triangle);
+            meshGeoms.max = bound_max;
+            meshGeoms.min = bound_min;
 
             // per-face material
             // shapes[s].mesh.material_ids[f];

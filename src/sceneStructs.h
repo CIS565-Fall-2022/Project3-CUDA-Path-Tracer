@@ -37,7 +37,11 @@ struct TriangleGeom {
     glm::vec3 n2;
     glm::vec3 n3;
 };
-
+struct MeshGeom {
+    std::vector<TriangleGeom> triangleGeoms;
+    glm::vec3 min;
+    glm::vec3 max;
+};
 struct Material {
     glm::vec3 color;
     struct {

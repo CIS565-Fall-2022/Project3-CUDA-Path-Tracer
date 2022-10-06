@@ -13,17 +13,19 @@ CUDA Path Tracer
 Features
 =============
 * Shading Kernel with BSDF Evaluation
+* Path Termination using Stream Compaction
+* Sorting of Paths Segment by Material type
+* First Bounce Intersection Cache
 * Uniform diffuse
-* Perfect specular reflective (mirror)
-* Specular refractive (Fresnel dielectric)
-* Path Continuation/Termination with Stream Compaction
-* Sorting of ray Paths by material type
-* First bounce intersection cache to be used by subsequent iterations
-* Anti-aliasing rays with sub-pixel samples
-* Arbitrary OBJ Mesh Loading
-* Camera depth of field
+* Perfect Specular Reflective
+* Refraction (Fresnel dielectric)
+* Stochastic Sampled Antialiasing
+* OBJ Mesh Loading using TinyOBJ
+* Physically-based depth-of-field
+* Motion Blur
 
-#### Problems of Performing BSDF in a big kernel 
+Problems of Performing BSDF in a big kernel 
+============
 CUDA can only launch a finite number of blocks at a time. Some threads end with only a few bounces while others may end with a lot. Therefore, we will waste a lot of threads. 
 
 To solve this problem, we  launch a kernel that traces ONE bounce for every ray in the pool. According to the results, we remove terminated rays from the ray pool with stream compaction. 
@@ -32,42 +34,66 @@ Sort by Materials Type
 ============
 Using Radix Sort by material ID, we can batch rays according to material type. Therefore, we can further parallelize rays and perform intersection testing and shading evaluation in separate kernels. 
 
+First Bounce Intersection Cache
+============
+We further cache the first bounce intersection and store it in a buffer. Later bounces can use it since this bounce stays the same regardless of iterations. 
+
+Refraction
+===========
+The refraction effects was implemented using glm's `refract()` function according to Schlick's approximation and Snell's Law. 
+
+| Refraction Ball | Refraction Glass Bottle |
+:-------:|:-------:
+|![](img/refraction.png)|![](img/refraction2.png)|
 
 Anti-aliasing
 ===========
 I jitter the direction of sample ray to reduce the aliasing effects
-![](img/aa_comparision.png)
 
 | With AA | No AA |
 :-------:|:-------:
 |![](img/AA.png)|![](img/NO_AA.png)|
+|![](img/aa_large.png ){:height="800px" width="800px"} | ![](img/noAA_large.png){:height="800px" width="800px"}|
 
 Mesh Loading
 ===========
-I used tinyOBJ to load obj file.
+I used [tinyObj](https://github.com/tinyobjloader/tinyobjloader) to load obj file.
 
-![](img/NO_AA.png)
+| Bunny | No AA |
+:-------:|:-------:
+|![](img/AA.png)|![](img/bunny_refract.png)|
 
-Refraction
+Depth of Field
+============
+
+Motion Blur
 ===========
-![](img/refraction.png)
+I developed two ways to achieve motion blur in path tracer. The first one works on the camera and it is global based.
+
+| Sphere Motion Blur 1 | Sphere Motion Blur 2 |
+:-------:|:-------:
+|![](img/motion_blur_object.png)|![](img/motion_blur_object2.png)|
 
 
-#### Sort by Materials Type 
+The second one works on certain objects and users can define a direction of the movement. 
+
+| Camera Motion Blur 1 | Camera Motion Blur 2 |
+:-------:|:-------:
+|![](img/motion_blur_camera.png)|![](img/motion_blur_camera2.png)|
+
+Analysis
+===============
+
+Snapshots
+===============
 
 
-*DO NOT* leave the README to the last minute! It is a crucial part of the
-project, and we will not be able to grade you without a good README.
-
-### Analysis
-
-
-### Snapshots
-
-
-
-### Bloopers
-
-  |![image](img/bloopers/refraction_fail.png)|
+Bloopers
+===============
+  |![image](img/bloopers/refract_fail.png)|
   |:--:| 
-  | *Refraction fail* |
+  | *Refraction Fail* |
+  
+  |![image](img/bloopers/cow1.png)|
+  |:--:| 
+  | *Lonely Cow (Bounding Box Predicate Fail)* |
