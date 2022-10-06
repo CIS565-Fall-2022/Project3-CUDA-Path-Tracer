@@ -76,6 +76,7 @@ set(headers
     src/utilities.h
     src/ImGui/imconfig.h
     src/tiny_obj_loader.h
+	src/noise.h
 	
 	src/ImGui/imgui.h
     src/ImGui/imconfig.h
