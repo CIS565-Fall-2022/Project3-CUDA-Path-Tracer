@@ -21,8 +21,10 @@
 #define ERRORCHECK 1
 #define SORT_MATERIAL 1
 #define CACHE_INTERSECTION 1
-#define ANTI_ALIASING 0
-#define DOF 1
+#define ANTI_ALIASING 1
+#define DOF 0
+#define MOTION_BLUR_OBJECT 0
+#define MOTION_BLUR_CAMERA 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -156,6 +158,24 @@ void pathtraceFree() {
 	checkCUDAError("pathtraceFree");
 }
 
+__global__ void kernBlur(Geom* geoms, int geoms_size, int num_paths, glm::vec3 offset, int iter) {
+	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
+	if (path_index < num_paths) {
+		float dt = iter * 0.00001f;
+		if (iter < 200 || iter > 800) {
+			return;
+		}
+		for (int i = 0; i < geoms_size; ++i) {
+			Geom& geom = geoms[i];
+			if (geom.type == SPHERE) {
+				geom.translation -= glm::clamp(offset * dt, glm::vec3(0.0f), offset);
+				geom.transform[3] = glm::vec4(geom.translation, geom.transform[3].w);
+				geom.inverseTransform = glm::inverse(geom.transform);
+				geom.invTranspose = glm::transpose(geom.inverseTransform);
+			}
+		}
+	}
+}
 /**
 * Generate PathSegments with rays from the camera through the screen into the
 * scene, which is the first bounce of rays.
@@ -199,6 +219,18 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		);
 #endif
 
+#if MOTION_BLUR_CAMERA
+		float dt = iter * 0.1f;
+		segment.ray.direction = glm::normalize(cam.view
+			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f + 2.0f * dt* u01(rng))
+			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f + u01(rng))
+		);
+#else
+		segment.ray.direction = glm::normalize(cam.view
+			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
+		);
+#endif
 #if DOF
 		// code from CIS 561
 		cam.focalDistance = 10.f;
@@ -521,6 +553,10 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		// tracing
 		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
 		std::cout << "depth: " << depth << "\n";
+#if MOTION_BLUR_OBJECT
+		glm::vec3 velocity = glm::vec3(-1e-5f, -1e-6f, 1e-2f);
+		kernBlur << <numblocksPathSegmentTracing, blockSize1d >> > (dev_geoms, hst_scene->geoms.size(), num_paths, velocity, iter);
+#endif //BLURGEOM
 
 #if CACHE_INTERSECTION && !defined(ANTI_ALIASING)
 		if (depth == 0 && iter == 1) {

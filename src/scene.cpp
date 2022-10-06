@@ -97,6 +97,18 @@ int Scene::loadGeom(string objectid) {
     }
 }
 int Scene::loadOBJ(int id) {
+    //std::string inputfile;
+
+    //while (fp_in.good()) {
+    //    string line;
+    //    utilityCore::safeGetline(fp_in, line);
+    //    if (!line.empty()) {
+    //        vector<string> tokens = utilityCore::tokenizeString(line);
+    //        if (strcmp(tokens[0].c_str(), "PATH") == 0) {
+    //            inputfile = "../scenes/bunny.obj";
+    //        }
+    //    }
+    //}
     std::string inputfile = "../scenes/bunny.obj";
     tinyobj::ObjReaderConfig reader_config;
     reader_config.mtl_search_path = "./"; // Path to material files
