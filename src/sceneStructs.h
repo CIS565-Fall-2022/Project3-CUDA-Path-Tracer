@@ -62,8 +62,9 @@ struct Geom {
 struct Texture {
     int width = 0;
     int height = 0;
-    glm::vec3* host_texImage;
-    glm::vec3* dev_texImage;
+
+    unsigned char* host_texData;
+    int channels;
 };
 
 struct Material {

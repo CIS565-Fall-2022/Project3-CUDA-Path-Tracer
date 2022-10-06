@@ -93,7 +93,12 @@ static ShadeableIntersection* dev_intersections = NULL;
 static ShadeableIntersection* dev_cached_intersections = NULL;
 #endif
 
-static Texture* dev_textures = NULL;
+// static Texture* dev_textures = NULL;
+static std::vector<cudaArray_t> dev_textures;
+static std::vector<cudaTextureObject_t> host_textureObjs;
+static cudaTextureObject_t* dev_textureObjs;
+static int* dev_textureChannels;
+
 static int numTextures;
 static int numGeoms; //cursed variables to cudaFree nested pointers;
 
@@ -104,9 +109,124 @@ void InitDataContainer(GuiDataContainer* imGuiData)
 	guiData = imGuiData;
 }
 
+// specialized function just to cudaMalloc textures
+void createTexture(const Texture &t, int numChannels, int texIdx) {
+	/*printf("tex size: %i\n", scene.textures.size());
+
+	printf("width: %f \n", scene.textures[0].width);
+	printf("height: %f \n", scene.textures[0].height);
+
+	for (int i = 0; i < scene.textures.size(); i++) {*/
+		/*cudaMalloc(&(scene->textures[i].dev_texData), scene->textures[i].height * scene->textures[i].width * scene->textures[i].channels * sizeof(unsigned char));
+		checkCUDAError("cudaMalloc device_texImage failed");
+		cudaMemcpy(scene->textures[i].dev_texData, scene->textures[i].host_texData, scene->textures[i].height * scene->textures[i].width * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+		checkCUDAError("cudaMemcpy device_texImage failed");*/
+
+		/*cudaChannelFormatDesc channelDesc;
+
+		if (scene.textures[i].channels == 4) {
+			channelDesc = cudaCreateChannelDesc<uchar4>();
+			checkCUDAError("cudaCreateChannelDesc 4 failed");
+		}
+		else if (scene.textures[i].channels == 3) {
+			channelDesc = cudaCreateChannelDesc<uchar3>();
+			checkCUDAError("cudaCreateChannelDesc 3 failed");
+		}
+		else {
+			cout << "wtf channels" << endl;
+			return;
+		}
+
+		printf("about to malloc a specific device_textures slot \n");
+		printf("index: %i \n", i);
+
+		cudaMallocArray(&dev_textures[i], &channelDesc, scene.textures[i].width, scene.textures[i].height);
+		checkCUDAError("CudaMallocArray textures failed");
+		printf("cuda mallloc success \n");
+		cudaMemcpyToArray(dev_textures[i], 0, 0, scene.textures[i].host_texData, scene.textures[i].height * scene.textures[i].width * scene.textures[i].channels * sizeof(unsigned char), cudaMemcpyHostToDevice);
+		checkCUDAError("CudaMemcpyToArray textures failed");
+
+		printf("about to create ResourceDesc \n");
+
+		struct cudaResourceDesc resDesc;
+		memset(&resDesc, 0, sizeof(resDesc));
+		resDesc.resType = cudaResourceTypeArray;
+		resDesc.res.array.array = dev_textures[i];
+
+		struct cudaTextureDesc texDesc;
+		memset(&texDesc, 0, sizeof(texDesc));
+		texDesc.addressMode[0] = cudaAddressModeWrap;
+		texDesc.addressMode[1] = cudaAddressModeWrap;
+		texDesc.filterMode = cudaFilterModeLinear;
+		texDesc.readMode = cudaReadModeElementType;
+		texDesc.normalizedCoords = 1;
+
+		cudaTextureObject_t texObj = 0;
+		cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
+		checkCUDAError("Cuda create texture object failed");
+		cudaMemcpy(&dev_textureObjs[i], &texObj, sizeof(cudaTextureObject_t), cudaMemcpyHostToDevice);
+		checkCUDAError("CudaMemcpy dev_textureObjs failed");*/
+	// }
+
+	/*cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
+	checkCUDAError("cudaMalloc dev_textures failed");
+	cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
+	checkCUDAError("cudaMemcpy dev_textures ailed");*/
+
+	// create a 
+	cudaChannelFormatDesc channelDesc;
+
+	if (numChannels == 4) {
+		printf("4 channels \n");
+		channelDesc = cudaCreateChannelDesc<uchar4>();
+		checkCUDAError("cudaCreateChannelDesc 4 failed");
+	}
+	else if (numChannels == 3) {
+		printf("3 channels \n");
+		channelDesc = cudaCreateChannelDesc<uchar3>();
+		checkCUDAError("cudaCreateChannelDesc 3 failed");
+	}
+	else {
+		cout << "wtf channels" << endl;
+		return;
+	}
+
+	printf("about to malloc a specific device_textures slot \n");
+	//printf("index: %i \n", i);
+
+	cudaMallocArray(&dev_textures[texIdx], &channelDesc, t.width, t.height);
+	checkCUDAError("CudaMallocArray textures failed");
+	printf("cuda mallloc success \n");
+	cudaMemcpyToArray(dev_textures[texIdx], 0, 0, t.host_texData, t.height * t.width * numChannels * sizeof(unsigned char), cudaMemcpyHostToDevice);
+	checkCUDAError("CudaMemcpyToArray textures failed");
+
+	printf("about to create ResourceDesc \n");
+
+	struct cudaResourceDesc resDesc;
+	memset(&resDesc, 0, sizeof(resDesc));
+	resDesc.resType = cudaResourceTypeArray;
+	resDesc.res.array.array = dev_textures[texIdx];
+
+	struct cudaTextureDesc texDesc;
+	memset(&texDesc, 0, sizeof(texDesc));
+	texDesc.addressMode[0] = cudaAddressModeWrap;
+	texDesc.addressMode[1] = cudaAddressModeWrap;
+	texDesc.filterMode = cudaFilterModeLinear;
+	texDesc.readMode = cudaReadModeNormalizedFloat;
+	texDesc.normalizedCoords = 1;
+
+	cudaTextureObject_t texObj = 0;
+	cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
+	checkCUDAError("Cuda create texture object failed");
+	cudaMemcpy(&dev_textureObjs[texIdx], &texObj, sizeof(cudaTextureObject_t), cudaMemcpyHostToDevice);
+	checkCUDAError("CudaMemcpy dev_textureObjs failed");
+}
+
 void pathtraceInit(Scene* scene) {
 	hst_scene = scene;
 	numTextures = hst_scene->textures.size();
+	printf("numTexutres: %i \n", numTextures);
+
 	numGeoms = hst_scene->geoms.size();
 
 	const Camera& cam = hst_scene->state.camera;
@@ -154,17 +274,43 @@ void pathtraceInit(Scene* scene) {
 	// copy each texture's pixel information from cpu to gpu
 
 #if USE_UV
+	// replace with call to init texture
+	//for (int i = 0; i < scene->textures.size(); i++) {
+	//	cudaMalloc(&(scene->textures[i].dev_texImage), scene->textures[i].height * scene->textures[i].width * sizeof(glm::vec3));
+	//	checkCUDAError("cudaMalloc device_texImage failed");
+	//	cudaMemcpy(scene->textures[i].dev_texImage, scene->textures[i].host_texImage, scene->textures[i].height * scene->textures[i].width * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+	//	checkCUDAError("cudaMemcpy device_texImage failed");
+	//}
+
+	//cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
+	//checkCUDAError("cudaMalloc dev_textures failed");
+	//cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
+	//checkCUDAError("cudaMemcpy dev_textures ailed");
+	cudaMalloc(&dev_textureChannels, scene->textures.size() * sizeof(int));
+	checkCUDAError("cudaMalloc dev_textureChannels failed");
 	for (int i = 0; i < scene->textures.size(); i++) {
-		cudaMalloc(&(scene->textures[i].dev_texImage), scene->textures[i].height * scene->textures[i].width * sizeof(glm::vec3));
-		checkCUDAError("cudaMalloc device_texImage failed");
-		cudaMemcpy(scene->textures[i].dev_texImage, scene->textures[i].host_texImage, scene->textures[i].height * scene->textures[i].width * sizeof(glm::vec3), cudaMemcpyHostToDevice);
-		checkCUDAError("cudaMemcpy device_texImage failed");
+		cudaMemcpy(&dev_textureChannels[i], &scene->textures[i].channels, sizeof(int), cudaMemcpyHostToDevice);
+		checkCUDAError("cudaMalloc dev_textureChannels failed");
+		printf("on Loop: %i \n", i);
 	}
 
-	cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
-	checkCUDAError("cudaMalloc dev_textures failed");
-	cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
-	checkCUDAError("cudaMemcpy dev_textures ailed");
+
+	//cudaMalloc(&dev_textures, scene->textures.size() * sizeof(cudaArray_t));
+	//checkCUDAError("cudaMalloc dev_textures failed");
+
+	cudaMalloc(&dev_textureObjs, scene->textures.size() * sizeof(cudaTextureObject_t));
+	checkCUDAError("cudaMalloc dev_textureObjs ailed");
+
+	dev_textures.resize(scene->textures.size());
+
+	printf("about to createTexture \n");
+	printf("FIRST widht: %i \n", scene->textures[0].width);
+	printf("FIRST height: %i \n", scene->textures[0].height);
+
+	for (int i = 0; i < scene->textures.size(); i++) {
+		createTexture(scene->textures[i], scene->textures[i].channels, i);
+	}
+
 #endif
 
 #if CACHE_FIRST_BOUNCE
@@ -179,6 +325,7 @@ void pathtraceInit(Scene* scene) {
 	checkCUDAError("cudaMalloc dev_lights failed");
 #endif
 	checkCUDAError("pathtraceInit");
+	printf("finished pathtraceINit \n");
 }
 
 void pathtraceFree() {
@@ -199,15 +346,19 @@ void pathtraceFree() {
 	// dev_geoms->free();
 
 #if USE_UV
-	int numT = numTextures;
-	Texture *tmp_texture_pointer = new Texture[numT];
-	cudaMemcpy(tmp_texture_pointer, dev_textures, numT * sizeof(Texture), cudaMemcpyDeviceToHost);
-	for (int i = 0; i < numT; i++) {
-		cudaFree(tmp_texture_pointer->dev_texImage);
-		checkCUDAError("CudaFree device_texture failed");
+	//int numT = numTextures;
+	//Texture *tmp_texture_pointer = new Texture[numT];
+	//cudaMemcpy(tmp_texture_pointer, dev_textures, numT * sizeof(Texture), cudaMemcpyDeviceToHost);
+	//for (int i = 0; i < numT; i++) {
+	//	cudaFree(tmp_texture_pointer->dev_texImage);
+	//	checkCUDAError("CudaFree device_texture failed");
+	//}
+	//cudaFree(dev_textures);
+	//delete[] tmp_texture_pointer;
+	for (int i = 0; i < host_textureObjs.size(); i++) {
+		cudaDestroyTextureObject(host_textureObjs[i]);
+		cudaFreeArray(dev_textures[i]);
 	}
-	cudaFree(dev_textures);
-	delete[] tmp_texture_pointer;
 #endif
 
 	cudaFree(dev_geoms);
@@ -494,7 +645,9 @@ __global__ void kernComputeShade(
 	, PathSegment* pathSegments
 	, Material* materials
 #if USE_UV
-	, Texture* textures
+	// , cudaArray_t* textures
+	, cudaTextureObject_t* textureObjs
+	, int* numChannels
 #endif
 )
 {
@@ -526,8 +679,11 @@ __global__ void kernComputeShade(
 				// generate new ray and load it into pathSegments by calling scatterRay
 				glm::vec3 intersectionPoint = getPointOnRay(pathSegments[idx].ray, intersection.t);
 #if USE_UV
-				Texture texture = textures[intersection.textureId];
-				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, intersection.textureId, intersection.uv, material, texture, rng);
+				// cudaArray_t texture = textures[intersection.textureId];
+				cudaTextureObject_t texObj = textureObjs[intersection.textureId];
+				// printf("texobj: %ld \n", texObj);
+				int channels = numChannels[intersection.textureId];
+				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, intersection.textureId, intersection.uv, material, /*texture,*/ texObj, channels, rng);
 #else
 				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, material, rng);
 #endif
@@ -907,7 +1063,9 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_paths,
 			dev_materials
 #if USE_UV
-			, dev_textures
+// 			, dev_textures
+			, dev_textureObjs
+			, dev_textureChannels
 #endif
 			);
 #endif

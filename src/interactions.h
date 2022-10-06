@@ -2,6 +2,7 @@
 
 #include "intersections.h"
 #include "stb_image.h"
+#include "cuda_runtime.h"
 
 // CHECKITOUT
 /**
@@ -68,7 +69,7 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  * You may need to change the parameter list for your purposes!
  */
 #if USE_UV
-__host__ __device__
+__device__
 void scatterRay(
         PathSegment & pathSegment,
         glm::vec3 intersect,
@@ -76,7 +77,9 @@ void scatterRay(
         int texid,
         glm::vec2 uv,
         const Material &m,
-        const Texture &tex,
+        // cudaArray_t &tex,
+        cudaTextureObject_t &texObject,
+        int numChannels,
         thrust::default_random_engine &rng) {
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
@@ -166,18 +169,33 @@ void scatterRay(
             float v = uv[1];
 
             // if uv exists, as in, they're both not -1
-            // if (u > 0 && v >= 0) {
-                float ix = u * (tex.width - 1);
-                float iy = v * (tex.height - 1);
-                int texDataIdx = ceil(iy * tex.width + ix);
+            //// if (u > 0 && v >= 0) {
+            //    float ix = u * (tex.width - 1);
+            //    float iy = v * (tex.height - 1);
+            //    int texDataIdx = ceil(iy * tex.width + ix);
 
-                // printf("texDataIdx %f \n");
+            //    // printf("texDataIdx %f \n");
 
-                // pointColor = tex.dev_texImage[texDataIdx];
-                pointColor = glm::vec3(u, v, 0.f);
-                //pointColor = m.color;
-                //printf("pointColor: X %f, Y %f, Z %f \n", pointColor[0], pointColor[1], pointColor[2]);
+            //    // pointColor = tex.dev_texImage[texDataIdx];
+            //    pointColor = glm::vec3(u, v, 0.f);
+            //    //pointColor = m.color;
+            //    //printf("pointColor: X %f, Y %f, Z %f \n", pointColor[0], pointColor[1], pointColor[2]);
+            ////}
+            //if (numChannels == 3) {
+            //    float4 finalcol = tex2D<float4>(texObject, u, v);
+            //    pointColor = glm::vec3(finalcol.x, finalcol.y, finalcol.z);
             //}
+            //else if (numChannels == 4) {
+            //    ;                float4 finalcol = tex2D<float4>(texObject, u, v);
+            //    pointColor = glm::vec3(finalcol.x, finalcol.y, finalcol.z);
+            //}
+            //else {
+            //    printf("wtf none channels \n");
+            //}
+            float4 finalcol = tex2D<float4>(texObject, u, v);
+            pointColor = glm::vec3(finalcol.x, finalcol.y, finalcol.z);
+            //printf("x: %f, y: %f, z: %f \n", pointColor[0], pointColor[1], pointColor[2]);
+            // printf("texId: %i \n", texid);
         }
         else {
             pointColor = m.color;

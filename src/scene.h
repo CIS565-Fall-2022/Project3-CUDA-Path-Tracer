@@ -30,6 +30,8 @@ public:
 
     // for textures
     std::vector<Texture> textures;
+    // std::vector<int> textureChannels;
+
     RenderState state;
 
     std::vector<Geom> lights;

@@ -532,7 +532,7 @@ int Scene::loadTexture(string textureid) {
     int id = atoi(textureid.c_str());
     cout << "Loading Texture " << id << "..." << endl;
     Texture newTexture;
-    glm::vec3* pixelData;
+    unsigned char* pixelData;
     int width, height, channels;
 
     if (id != textures.size()) {
@@ -549,7 +549,8 @@ int Scene::loadTexture(string textureid) {
             const char* filepath = tokens[1].c_str();
             unsigned char* data = stbi_load(filepath, &width, &height, &channels, 0);
 
-            pixelData = new glm::vec3[width * height];
+            //pixelData = new glm::vec3[width * height];
+            pixelData = new unsigned char[width * height * channels * sizeof(unsigned char)];
 
             // ... process data if not NULL ..
             if (data != nullptr && width > 0 && height > 0)
@@ -557,55 +558,60 @@ int Scene::loadTexture(string textureid) {
                 cout << "channels: " << channels << endl;
                 if (channels == 3)
                 {
-                    int pixelDataIdx = 0;
+                    // int pixelDataIdx = 0;
                     // iterate over every pixel
                     // total number of data points is width * height * channels (should be 3)
-                    for (int p = 0; p < (width * height) * channels - 2; p += 3) {
-                        glm::vec3 currPix = glm::vec3(static_cast<float>(data[p]) / 256.f,
+                    //for (int p = 0; p < (width * height) * channels - 2; p += 3) {
+                        /*glm::vec3 currPix = glm::vec3(static_cast<float>(data[p]) / 256.f,
                             static_cast<float>(data[p + 1]) / 256.f,
                             static_cast<float>(data[p + 2]) / 256.f);
                         pixelData[pixelDataIdx] = currPix;
                         
-                        /*if (pixelDataIdx == 2300 || pixelDataIdx == width * height - 2300) {
-                            cout << "pix: " << pixelDataIdx << " is: " << currPix[0] << ", " << currPix[1] << ", " << currPix[2] << endl;
-                        }*/
-                        pixelDataIdx++;
-                    }
+                        pixelDataIdx++;*/
+                    //}
+                    memcpy(pixelData, data, width * height * channels * sizeof(unsigned char));
 
                     newTexture.width = width;
                     newTexture.height = height;
-                    newTexture.host_texImage = pixelData;
+                    newTexture.channels = channels;
+
+                    newTexture.host_texData = pixelData;
+                    // newTexture.host_texImage = pixelData;
 
                     cout << "Loaded all Texture Points" << endl;
                     cout << "width: " << newTexture.width; // looks good
                     cout << "height: " << newTexture.height; // looks good
-                    cout << "last pixelIdx: " << pixelDataIdx; // looks correct
+                    // cout << "last pixelIdx: " << pixelDataIdx; // looks correct
                 }
                 else if (channels == 4) {
                     // rgba
-                    int pixelDataIdx = 0;
+                    //int pixelDataIdx = 0;
                     // iterate over every pixel
                     // total number of data points is width * height * channels (should be 3)
-                    for (int p = 0; p < (width * height) * channels - 3; p += 4) {
-                        glm::vec3 currPix = glm::vec3(static_cast<float>(data[p]) / 256.f,
+                    //for (int p = 0; p < (width * height) * channels - 3; p += 4) {
+                        /*glm::vec3 currPix = glm::vec3(static_cast<float>(data[p]) / 256.f,
                             static_cast<float>(data[p + 1]) / 256.f,
                             static_cast<float>(data[p + 2]) / 256.f);
                         pixelData[pixelDataIdx] = currPix;
 
-                        /*if (pixelDataIdx == 2300 || pixelDataIdx == width * height - 2300) {
-                            cout << "pix: " << pixelDataIdx << " is: " << currPix[0] << ", " << currPix[1] << ", " << currPix[2] << endl;
-                        }*/
-                        pixelDataIdx++;
-                    }
+                        pixelDataIdx++;*/
+
+                    //}
+
+                    memcpy(pixelData, data, width * height * channels * sizeof(unsigned char));
 
                     newTexture.width = width;
                     newTexture.height = height;
-                    newTexture.host_texImage = pixelData;
+                    newTexture.channels = channels;
+
+                    newTexture.host_texData = pixelData;
+
+                    // newTexture.host_texImage = pixelData;
 
                     cout << "Loaded all Texture Points" << endl;
                     cout << "width: " << newTexture.width; // looks good
                     cout << "height: " << newTexture.height; // looks good
-                    cout << "last pixelIdx: " << pixelDataIdx; // looks correct
+                    // cout << "last pixelIdx: " << pixelDataIdx; // looks correct
                 }
             }
             else
