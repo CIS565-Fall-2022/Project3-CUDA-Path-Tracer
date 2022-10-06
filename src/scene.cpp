@@ -34,13 +34,65 @@ Scene::Scene(string filename) {
     }
 }
 
+int Scene::getImplicitType(Geom* newGeom) {
+    string line;
+    utilityCore::safeGetline(fp_in, line);
+    while (!line.empty() && fp_in.good()) {
+        vector<string> tokens = utilityCore::tokenizeString(line);
+
+        /*if ((strcmp(tokens[0].c_str(), "IMP_SPHERE") == 0)||
+            (strcmp(tokens[0].c_str(), "IMP_BOOK") == 0) ||
+            (strcmp(tokens[0].c_str(), "IMP_PEN") == 0) ||
+            (strcmp(tokens[0].c_str(), "IMP_MUG") == 0)
+            ) {
+            newGeom->implicitobj = ImplicitObj(atof(tokens[0].c_str()));
+            return 0;
+        }*/
+        if (strcmp(tokens[0].c_str(), "IMP_SPHERE") == 0) {
+            newGeom->implicitobj = IMP_SPHERE;
+            return 0;
+        }
+        else if (strcmp(tokens[0].c_str(), "IMP_MUG") == 0) {
+            newGeom->implicitobj = IMP_MUG;
+            return 0;
+        }
+        else if (strcmp(tokens[0].c_str(), "IMP_COFFEE") == 0) {
+            newGeom->implicitobj = IMP_COFFEE;
+            return 0;
+        }
+        else if (strcmp(tokens[0].c_str(), "IMP_BOOKCOVER") == 0) {
+            newGeom->implicitobj = IMP_BOOKCOVER;
+            return 0;
+        }
+        else if (strcmp(tokens[0].c_str(), "IMP_BOOKPAGES") == 0) {
+            newGeom->implicitobj = IMP_BOOKPAGES;
+            return 0;
+        }
+        else if (strcmp(tokens[0].c_str(), "IMP_BOX") == 0) {
+            newGeom->implicitobj = IMP_BOX;
+            return 0;
+        }
+        else {
+            cout << "ERROR: IMPLICIT OBJECT not defined" << endl;
+            return -1;
+        }
+
+        utilityCore::safeGetline(fp_in, line);
+    }
+
+    newGeom->transform = utilityCore::buildTransformationMatrix(
+        newGeom->translation, newGeom->rotation, newGeom->scale);
+    newGeom->inverseTransform = glm::inverse(newGeom->transform);
+    newGeom->invTranspose = glm::inverseTranspose(newGeom->transform);
+    return 0;
+}
+
 int Scene::linkMaterial(Geom * newGeom) {
     string line;
     utilityCore::safeGetline(fp_in, line);
     if (!line.empty() && fp_in.good()) {
         vector<string> tokens = utilityCore::tokenizeString(line);
         newGeom->materialid = atoi(tokens[1].c_str());
-        return 1;
     }
     return 0;
 }
@@ -152,6 +204,8 @@ int Scene::loadObjFile(string objectPath, Geom *newGeom)
         t++;
     }
     Triangle* tcpu = newGeom->triangles;
+
+    return 0;
     //printf("\n*****SCENE*****\n");
     //for (int i = 0; i < newGeom->triCount; i++) {
     //    printf("\n %f, %f, %f", tcpu->nor[0].x, tcpu->nor[0].y, tcpu->nor[0].z);
@@ -170,23 +224,24 @@ int Scene::loadGeom(string objectid) {
         cout << "Loading Geom " << id << "..." << endl;
         Geom newGeom;
         string line;
-
+        int retVal = 0;
         //load object type
         utilityCore::safeGetline(fp_in, line);
         if (!line.empty() && fp_in.good()) {
             if (strcmp(line.c_str(), "implicit") == 0) {
-                cout << "Creating implicit sphere..." << endl;
+                cout << "Creating implicit surface..." << endl;
                 newGeom.type = IMPLICIT;
                 newGeom.triCount = 0;
                 newGeom.triangles = NULL;
                 newGeom.dev_triangles = NULL;
+                retVal = getImplicitType(&newGeom);
             }
             else if (strcmp(line.c_str(), "obj") == 0) {
                 cout << "Loading new obj..." << endl;
                 newGeom.type = OBJ;
                 utilityCore::safeGetline(fp_in, line);
                 if (!line.empty() && fp_in.good()) {
-                    int retVal =  loadObjFile(line.c_str(), &newGeom);
+                    retVal =  loadObjFile(line.c_str(), &newGeom);
                 }
             } else if (strcmp(line.c_str(), "sphere") == 0) {
                 cout << "Creating new sphere..." << endl;
@@ -210,7 +265,7 @@ int Scene::loadGeom(string objectid) {
         loadTransformations(&newGeom);
         
         geoms.push_back(newGeom);
-        return 1;
+        return retVal;
     }
 }
 

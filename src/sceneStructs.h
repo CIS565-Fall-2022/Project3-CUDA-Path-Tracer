@@ -14,6 +14,15 @@ enum GeomType {
     IMPLICIT
 };
 
+enum ImplicitObj {
+    IMP_SPHERE,
+    IMP_BOOKCOVER,
+    IMP_BOOKPAGES,
+    IMP_MUG,
+    IMP_COFFEE,
+    IMP_BOX
+};
+
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
@@ -37,6 +46,7 @@ struct Geom {
     int triCount;
     Triangle* triangles;
     Triangle* dev_triangles;
+    ImplicitObj implicitobj;
 };
 
 struct Material {

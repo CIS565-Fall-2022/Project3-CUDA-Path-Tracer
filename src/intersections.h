@@ -231,16 +231,137 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
 #define MAX_DIST 100.f
 #define SURF_DIST 0.01
 
-__host__ __device__ float sceneSDF(glm::vec3 p, glm::vec3 &normal) {
 
-     glm::vec3 sphereCenter = glm::vec3(0,5,0);    // center.xyz,radius
-     float sphereRadius = 2.5f;
-     float dS = glm::length(p - sphereCenter) - sphereRadius; // dist from sphere = dist from center - radius
-     float dP = p.y; // dist from axis aligned plane
-     //float d = min(dS,dP);
-     float d = dS;
-     normal = glm::normalize(p - sphereCenter);
+__host__ __device__ float roundedCylinderSDF(glm::vec3 queryPos, float ra, float rb, float h)
+{
+    glm::vec2 d = glm::vec2(glm::length(glm::vec2(queryPos.x, queryPos.z)) - 2.0 * ra + rb, abs(queryPos.y) - h);
+    return min(max(d.x, d.y), 0.f) + glm::length(max(d, 0.f)) - rb;
+}
+
+__host__ __device__ glm::mat2 rot(float a) {
+    float s = sin(a);
+    float c = cos(a);
+    return glm::mat2(c, -s, s, c);
+}
+
+__host__ __device__ float sphereSDF(glm::vec3 p) {
+    glm::vec3 sphereCenter = glm::vec3(0, 0, 0);    // center.xyz,radius
+    float sphereRadius = 1.f;
+    //normal = glm::normalize(p - sphereCenter);
+    return glm::length(p - sphereCenter) - sphereRadius; // dist from sphere = dist from center - radius
+}
+
+__host__ __device__ float torusSDF(glm::vec3 p, glm::vec2 t)
+{
+    glm::vec2 q = glm::vec2(glm::length(glm::vec2(p.x, p.z)) - t.x, p.y);
+    return glm::length(q) - t.y;
+}
+
+__host__ __device__ float cappedCylinderSDF(glm::vec3 queryPos, float r, float h)
+{
+    glm::vec2 d = abs(glm::vec2(glm::length(glm::vec2(queryPos.x, queryPos.z)), queryPos.y)) - glm::vec2(r, h);
+    return min(max(d.x, d.y), 0.f) + glm::length(max(d, 0.f));
+}
+
+__host__ __device__ float boxSDF(glm::vec3 p, glm::vec3 b)
+{
+    glm::vec3 q = abs(p) - b;
+    return glm::length(max(q, 0.f)) + min(max(q.x, max(q.y, q.z)), 0.f);
+}
+
+__host__ __device__ float roundBoxSDF(glm::vec3 p, glm::vec3 b, float r)
+{
+    glm::vec3 q = abs(p) - b;
+    return glm::length(max(q, 0.f)) + min(max(q.x, max(q.y, q.z)), 0.f) - r;
+}
+
+
+
+__host__ __device__ float mugSDF(glm::vec3 p) {
+    // coffee mug
+    float dMugOuter = roundedCylinderSDF(p, 0.6f, 0.2f, 1.f);
+    float dMugInner = roundedCylinderSDF(p - glm::vec3(0.f, 0.1f, 0.f), 0.5f, 0.2f, 1.f);
+
+    //return max(dMugOuter, -dMugInner);
+    // vec3 rotatedP = rotateZ(p, 60.f * 3.14f/ 180.f);
+    glm::vec3 pRotMugHandle = p + glm::vec3(-1.5f, 0.0, 0.0);
+    glm::mat2 rotMugHandleTransform = rot(90.f * 3.14f / 180.f);
+    glm::vec2 pRotMugHandleTemp = glm::vec2(pRotMugHandle.y, pRotMugHandle.z) * rotMugHandleTransform;
+    pRotMugHandle.y = pRotMugHandleTemp.x;
+    pRotMugHandle.z = pRotMugHandleTemp.y;
+
+    float dMugHandle = torusSDF(pRotMugHandle, glm::vec2(0.7f, 0.07));
+    //return dMugHandle;
+    float dMugTemp = min(dMugOuter, dMugHandle);//smoothUnion(dMugOuter, dMugHandle, 0.2f);
+    float dMug = max(dMugTemp, -dMugInner);
+    return dMug;
+
+    //float dCoffee = cappedCylinderSDF(p - glm::vec3(0.f, 0.4f, 0.f), 1.f, 0.01f);
+    //float dCoffeeMug = min(dCoffee, dMug);
+    //return dCoffeeMug; // dist from sphere = dist from center - radius
+}
+
+__host__ __device__ float coffeeSDF(glm::vec3 p) {
+    float dCoffee = cappedCylinderSDF(p - glm::vec3(0.f, 0.4f, 0.f), 1.f, 0.01f);
+    return dCoffee; // dist from sphere = dist from center - radius
+}
+
+__host__ __device__ float bookCoverSDF(glm::vec3 p) {
+    glm::vec3 pCBook = p + glm::vec3(2.5f, 0.80, 0.0);
+
+    float dCBookCover = roundBoxSDF(pCBook, glm::vec3(0.8f, 0.25f, 1.1f), 0.2);
+    float dCBookPagesCut = boxSDF(pCBook + glm::vec3(-0.2f, 0.f, 0.f), glm::vec3(1.1f, 0.28f, 1.8f));
+    float dCBook = max(dCBookCover, -dCBookPagesCut);
+    return dCBook;
+}
+
+__host__ __device__ float bookPagesSDF(glm::vec3 p) {
+    glm::vec3 pCBook = p + glm::vec3(2.5f, 0.80, 0.0);
+    float dCBookPages = boxSDF(pCBook, glm::vec3(0.9f, 0.28f, 1.2f));
+    return dCBookPages;
+}
+
+__host__ __device__ float penSDF(glm::vec3 p) {
+    glm::vec3 sphereCenter = glm::vec3(0, 0, 0);    // center.xyz,radius
+    float sphereRadius = 1.f;
+    //normal = glm::normalize(p - sphereCenter);
+    return glm::length(p - sphereCenter) - sphereRadius; // dist from sphere = dist from center - radius
+}
+
+__host__ __device__ float sceneSDF(glm::vec3 p, Geom impGeom) {
+
+     glm::vec4 transP4 = impGeom.inverseTransform* glm::vec4(p.x, p.y, p.z, 1.0);
+     glm::vec3 transP3 = glm::vec3(transP4.x, transP4.y, transP4.z);
+     float d = 0;
+     switch (impGeom.implicitobj) {
+        case IMP_SPHERE:        d = sphereSDF(transP3);
+                                break;
+        case IMP_MUG:           d = mugSDF(transP3);
+                                break;
+        case IMP_COFFEE:        d = coffeeSDF(transP3);
+                                break;
+        case IMP_BOOKCOVER:     d = bookCoverSDF(transP3);
+                                break;
+        case IMP_BOOKPAGES:     d = bookPagesSDF(transP3);
+                                break;
+        case IMP_BOX:           d = boxSDF(transP3, glm::vec3(0.1f, 0.9f, 0.1f));
+                                break;
+     }
      return d;
+}
+
+/*
+ ******************************************************
+ * Estimating Normals
+ ******************************************************
+ */
+
+__host__ __device__ glm::vec3 estimateNormal(glm::vec3 p, Geom geom) {
+    float x = sceneSDF(glm::vec3(p.x + EPSILON, p.y, p.z), geom) - sceneSDF(glm::vec3(p.x - EPSILON, p.y, p.z), geom);
+    float y = sceneSDF(glm::vec3(p.x, p.y + EPSILON, p.z), geom) - sceneSDF(glm::vec3(p.x, p.y - EPSILON, p.z), geom);
+    float z = sceneSDF(glm::vec3(p.x, p.y, p.z + EPSILON), geom) - sceneSDF(glm::vec3(p.x, p.y, p.z - EPSILON), geom);
+
+    return glm::normalize(glm::vec3(x, y, z));
 }
 
  /*
@@ -258,15 +379,15 @@ __host__ __device__ float implicitIntersectionTest(Geom impGeom, Ray r,
     for (int i = 0; i < MAX_STEPS; ++i)
     {
         //printf("## 2 ##");
-        float distanceToSurface = sceneSDF(queryPoint, normal);
+        float distanceToSurface = sceneSDF(queryPoint, impGeom);
 
         if (distanceToSurface < EPSILON)
         {
             //printf("## 3 ##");
             //intersection.position = queryPoint;
-            //normal = glm::vec3(0.0, 0.0, 1.0);
+            normal = estimateNormal(queryPoint, impGeom);
             t = glm::length(queryPoint - r.origin);
-
+            intersectionPoint = getPointOnRay(r, t);
             return t;
         }
         //printf("## 4 ##");
