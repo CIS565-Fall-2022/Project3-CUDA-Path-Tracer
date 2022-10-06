@@ -87,10 +87,52 @@ void FetchTexture(const Texture& texture, const int offset, const glm::vec3* tex
   //int offset = (isNormal) ? texture.offsetNormal : texture.offsetColor;
 
 #if PROCEDURAL_TEXTURE == 1
-  color = texImage[idx + offset];
+  float xx = (uv.x - 0.5) * (uv.x - 0.5);
+  float yy = (uv.y - 0.5) * (uv.y - 0.5);
+
+  bool c = int((xx + yy) * 20.f) % 2 == 0 ;
+
+  color = c ? glm::vec3(2*sqrt(xx + yy), 6*xx, 6*yy): glm::vec3(0.f);
+
+#elif PROCEDURAL_TEXTURE == 2
+  float xx = cos(uv.x + uv.y + 0.25);
+  float yy = cos(uv.x - uv.y);
+  float x1 = cos(2 - uv.x - uv.y + 0.25);
+  float y1 = cos(-uv.x + uv.y);
+
+  float r = 18.f;
+
+  bool condition = int((xx + yy) * r) % 2 == 0 && int((x1 + y1) * r) % 2 == 0;
+
+  color = condition ? glm::vec3(1.f) : glm::vec3(0.f);
+  
+#elif PROCEDURAL_TEXTURE == 3
+  float u = ((1 - uv.x) * uv.y);
+  float v = (uv.x) * (1 - uv.y);
+  float r = 25.f;
+
+  float f1 = cos(u) + cos(2 * u) + cos(3 * u) + cos(4 * u);
+  float f2 = cos(v) + cos(2 * v) + cos(3 * v) + cos(4 * v);
+  bool c1 = int(f1 * r) % 2 == 0 && int(f2 * r) % 2 == 0;
+
+  float xx = (uv.x - 0.5) * (uv.x - 0.5) + (uv.y - 0.5) * (uv.y - 0.5);
+
+  float o = 0.15;
+  float xy = (uv.x - 0.5 + o) * (uv.x - 0.5 + o) + (uv.y - 0.5 + o) * (uv.y - 0.5 + o);
+  float yx = (uv.x - 0.5 - o) * (uv.x - 0.5 - o) + (uv.y - 0.5 - o) * (uv.y - 0.5 - o);
+
+  float d = 0.1;
+
+  bool c2 = xy < d && yx < d;
+
+  color = c1 || c2 ? glm::vec3(1.f) : glm::vec3(0.6f, 0.2f, 0.2f);
+
 #else
   color = texImage[idx + offset];
 #endif
+
+  if (offset != texture.offsetColor)
+    color = texImage[idx + offset];
 }
 
 __host__ __device__
