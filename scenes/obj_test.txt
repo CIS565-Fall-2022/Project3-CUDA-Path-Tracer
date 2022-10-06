@@ -6,7 +6,7 @@ SPECRGB     0 0 0
 REFL        0
 REFR        0
 REFRIOR     0
-EMITTANCE   5
+EMITTANCE   3
 
 // Diffuse white
 MATERIAL 1
@@ -58,6 +58,65 @@ REFR        1
 REFRIOR     1.5
 EMITTANCE   0
 
+// bunny 1
+MATERIAL 6
+REFL        1
+REFR        1
+REFRIOR     1.5
+EMITTANCE	0
+MICROFACET	1
+ROUGHNESS	0.2
+METALNESS	0.8	
+
+// bunny 2
+MATERIAL 7
+REFL        1
+REFR        1
+REFRIOR     1.5
+EMITTANCE	0
+MICROFACET	1
+ROUGHNESS	0.2
+METALNESS	0.6	
+
+// bunny 3
+MATERIAL 8
+REFL        1
+REFR        1
+REFRIOR     1.5
+EMITTANCE	0
+MICROFACET	1
+ROUGHNESS	0.2
+METALNESS	0.2	
+
+// Emissive material (light)
+MATERIAL 9
+RGB         1 0 0
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   3
+
+// Emissive material (light)
+MATERIAL 10
+RGB         0 1 0
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   3
+
+// Emissive material (light)
+MATERIAL 11
+RGB         0.35 0.45 0.55
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   2
 
 // Camera
 CAMERA
@@ -66,80 +125,125 @@ FOVY        45
 ITERATIONS  5000
 DEPTH       8
 FILE        cornell
-EYE         0.0 5 7.5
+EYE         0.0 5 5.5
 LOOKAT      0 5 0
 UP          0 1 0
 FOCAL       10	
 LENSE       0.3
 
-
-// Ceiling light
+// Floor
 OBJECT 0
 cube
-material 0
-TRANS       0 10 0
+material 1
+TRANS       0 0.5 0
 ROTAT       0 0 0
-SCALE       3 .3 3
+SCALE       20 .01 10
 
+// Ceiling
+//OBJECT 3
+//cube
+//material 1
+//TRANS       0 10 0
+//ROTAT       0 0 90
+//SCALE       .01 20 10
 
-
-// Floor
 OBJECT 1
 cube
 material 1
-TRANS       0 0 0
-ROTAT       0 0 0
-SCALE       10 .01 10
+TRANS       0 10 0
+ROTAT       0 0 00
+SCALE       20 0.1 10
 
-// Ceiling
+// Back wall
 OBJECT 2
 cube
 material 1
-TRANS       0 10 0
-ROTAT       0 0 90
-SCALE       .01 10 10
+TRANS       0 5 -5
+ROTAT       0 0 0
+SCALE       20 10 .1
 
-// Back wall
+// Left wall
 OBJECT 3
 cube
 material 1
-TRANS       0 5 -5
-ROTAT       0 90 0
-SCALE       .01 10 10
-
-// Left wall
-OBJECT 4
-cube
-material 2
-TRANS       -5 5 0
+TRANS       -10 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
 // Right wall
-OBJECT 5
+OBJECT 4
 cube
-material 3
-TRANS       5 5 0
+material 1
+TRANS       10 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
+//diffuse ball
+OBJECT 5
+sphere
+material 1
+TRANS       -5 5 -3
+ROTAT       0 0 0
+SCALE       3 3 3
 
-// floor light
+//mirrow
 OBJECT 6
+sphere
+material 4
+TRANS       5 5 -3
+ROTAT       0 0 0
+SCALE       3 3 3
+
+//refrl/refra
+OBJECT 7
+sphere
+material 5
+TRANS       0 5 -3
+ROTAT       0 0 0
+SCALE       3 3 3
+
+// lights...
+// Ceiling light 1
+OBJECT 8
 cube
 material 0
-TRANS       0 0 0
+TRANS       0 10 0
 ROTAT       0 0 0
-SCALE       3 .3 3
+SCALE       3 .3 5
 
+// Ceiling light 2
+OBJECT 9
+cube
+material 9
+TRANS       -5 10 0
+ROTAT       0 0 0
+SCALE       3 .3 5
 
+// Ceiling light 3
+OBJECT 10
+cube
+material 10
+TRANS       5 10 0
+ROTAT       0 0 0
+SCALE       3 .3 5
+
+// OBJ 1
+OBJECT_obj ../scenes/bunny.obj
+TRANS       -2 0 0
+ROTAT       0 0 0
+SCALE       8 8 8
+MATERIAL	6
 
 // OBJ
 OBJECT_obj ../scenes/bunny.obj
-TRANS       0 2 -2
-ROTAT       0 0 0
-SCALE       30 30 30
-TEXTURE    ../scenes/wahoo.bmp
+TRANS       0 0 -1
+ROTAT       0 90 0
+SCALE       8 8 8
+MATERIAL	7
 
-
+OBJECT_obj ../scenes/bunny.obj
+TRANS       2 0.5 0.7
+ROTAT       0 -90 0
+SCALE       16 16 16
+MATERIAL	8
 

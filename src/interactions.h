@@ -192,17 +192,9 @@ void scatterRay(
 
     glm::vec3 intersect = getPointOnRay(pathSegment.ray, intersection.t);
     glm::vec3 normal = intersection.surfaceNormal;
-    glm::vec2 uv = intersection.uv;
+    glm::vec2 uv = intersection.uv; 
     bool hasTexture = true;
     if (uv == glm::vec2(-1)) hasTexture = false;
-
-    //glm::ivec2 act_uv = glm::ivec2(m.texture_width * uv.x, m.texture_height * (1 - uv.y));
-    //auto data = m.img;
-    //unsigned bytePerPixel = m.channels;
-    //unsigned char* pixelOffset = data + (act_uv.x + m.texture_width * act_uv.y) * bytePerPixel;
-    //unsigned char r = pixelOffset[0];
-    //unsigned char g = pixelOffset[1];
-    //unsigned char b = pixelOffset[2];
 
     //glm::vec2 act_uv = glm::vec2(m.texture_width * uv.x, m.texture_height * (1 - uv.y));
     //int temp = act_uv.x * act_uv.y /** m.channels*/;
@@ -210,7 +202,9 @@ void scatterRay(
     //glm::vec3 tex_color = glm::vec3(data[temp], data[temp+1], data[temp+2]);
 
     if (m.microfacet) {
-        float metalness = 0.8; //hardcode metalness
+        float metalness = m.metalness;
+        float roughness = m.roughness;
+
         glm::vec3 eye_pos = camPos;
         glm::vec3 worldPos = intersect;
         auto wi = -pathSegment.ray.direction;
@@ -234,7 +228,6 @@ void scatterRay(
 
         //float roughness = m.roughness;
         
-        float roughness = 0.2;
 
         float D = D_GGX(roughness, N, H);
         float G = Geometry_Smith(roughness, wi, wo, H);

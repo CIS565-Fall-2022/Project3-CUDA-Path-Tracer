@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
 	iteration = 0;
 	renderState = &scene->state;
 
-	renderState->iterations = 50;
+	//renderState->iterations = 50;
 
 	Camera& cam = renderState->camera;
 	width = cam.resolution.x;
@@ -142,6 +142,7 @@ void runCuda() {
 
 	auto start = std::chrono::steady_clock::now();
 	if (iteration < renderState->iterations) {
+
 		uchar4* pbo_dptr = NULL;
 		iteration++;
 		cudaGLMapBufferObject((void**)&pbo_dptr, pbo);

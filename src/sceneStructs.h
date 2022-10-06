@@ -87,6 +87,10 @@ struct Geom {
     int channels;
 
     AABB bbox;
+    int obj_start_offset;
+    int obj_end;
+
+    glm::vec3 endPos;
 };
 
 struct Material {
@@ -101,6 +105,7 @@ struct Material {
     float emittance{0};
     float microfacet{0};
     float roughness{0};
+    float metalness{ 0 };
 
     const char* textureName;
     unsigned char* img;

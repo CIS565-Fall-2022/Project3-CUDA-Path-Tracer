@@ -18,14 +18,12 @@
 #include <thrust/partition.h>
 
 #define DIRECT 0
-
 #define CACHE_FIRST_BOUNCE 0
 #define SORT_MATERIAL 1
 #define COMPACTION 1
 #define DEPTH_OF_FIELD 0
 #define ANTI_ALIASING 1
 #define BOUNDING_BOX 1
-
 
 
 #define ERRORCHECK 1
@@ -252,7 +250,8 @@ __global__ void computeIntersections(
 	int geoms_size,
 	Geom* triangles,
 	int triangle_size,
-	ShadeableIntersection* intersections
+	ShadeableIntersection* intersections,
+	int iter
 )
 {
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -289,6 +288,7 @@ __global__ void computeIntersections(
 			else if (geom.type == SPHERE)
 			{
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+
 			}
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 			else if (geom.type == TRIANGLE) {
@@ -648,7 +648,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				hst_scene->geoms.size(),
 				dev_tinyobj,
 				hst_scene->Obj_geoms.size(),
-				dev_intersections
+				dev_intersections,
+				iter
 				);
 			checkCUDAError("trace one bounce");
 			cudaDeviceSynchronize();
@@ -662,7 +663,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			hst_scene->geoms.size(),
 			dev_tinyobj,
 			hst_scene->Obj_geoms.size(),
-			dev_intersections
+			dev_intersections,
+			iter
 			);
 		checkCUDAError("trace one bounce");
 		cudaDeviceSynchronize();

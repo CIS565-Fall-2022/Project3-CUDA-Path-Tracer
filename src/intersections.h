@@ -5,6 +5,9 @@
 
 #include "sceneStructs.h"
 #include "utilities.h"
+#include <glm\gtc\matrix_inverse.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 
 
 
@@ -145,6 +148,8 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     return glm::length(r.origin - intersectionPoint);
 }
 
+
+
 //Moller-Trumbore Algorithm for ray triangle intersection
 __host__ __device__
 bool rayTriangleIntersectionTest(glm::vec3 &p0, glm::vec3 &p1, glm::vec3 &p2,
@@ -199,6 +204,8 @@ __host__ __device__
 float meshIntersectionTest(Geom mesh, Ray r, Geom* triangle, int tri_size, bool aabb,
     glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2& uv, bool& outside)
 {
+    int start = mesh.obj_start_offset;
+    int end = start + mesh.obj_end;
 
     if (!aabb) {
         float t_min = FLT_MAX;
@@ -208,10 +215,19 @@ float meshIntersectionTest(Geom mesh, Ray r, Geom* triangle, int tri_size, bool 
         glm::vec3 t_normal;
         glm::vec2 t_uv;
         bool t_outside;
-        for (int i = 0; i < tri_size; i++) {
+        //for (int i = 0; i < tri_size; i++) {
+        //    temp_t = triangleIntersectionTest(triangle[i], r, t_intersetion, t_normal, t_uv, t_outside);
+        //    //if (temp_t < t_min)
+        //    //    t_min = temp_t;
+        //    if (temp_t != -1) {
+        //        t_min = temp_t;
+        //        break;
+        //    }
+        //}
+
+
+        for (int i = start; i < end; i++) {
             temp_t = triangleIntersectionTest(triangle[i], r, t_intersetion, t_normal, t_uv, t_outside);
-            //if (temp_t < t_min)
-            //    t_min = temp_t;
             if (temp_t != -1) {
                 t_min = temp_t;
                 break;
@@ -234,7 +250,7 @@ float meshIntersectionTest(Geom mesh, Ray r, Geom* triangle, int tri_size, bool 
             glm::vec3 t_normal;
             glm::vec2 t_uv;
             bool t_outside;
-            for (int i = 0; i < tri_size; i++) {
+            for (int i = start; i < end; i++) {
                 temp_t = triangleIntersectionTest(triangle[i], r, t_intersetion, t_normal, t_uv, t_outside);
                 //if (temp_t < t_min)
                 //    t_min = temp_t;
