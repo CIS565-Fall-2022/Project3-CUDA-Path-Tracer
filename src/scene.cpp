@@ -38,6 +38,17 @@ Scene::Scene(string filename) {
 		}
 	}
 }
+//reference: http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-13-normal-mapping/
+glm::vec3 triangleTangent(Triangle& tri)
+{
+	glm::vec3 deltaPos1 = tri.pos[1] - tri.pos[0];
+	glm::vec3 deltaPos2 = tri.pos[2] - tri.pos[0];
+	glm::vec2 deltaUV1 = tri.uv[1] - tri.uv[0];
+	glm::vec2 deltaUV2 = tri.uv[2] - tri.uv[0];
+	glm::vec3 tangent = (deltaUV2.y * deltaPos1 - deltaUV1.y * deltaPos2) / (deltaPos2.y * deltaUV1.x - deltaUV1.y * deltaUV2.x);;
+
+	return glm::normalize(tangent);
+}
 
 // Reference example code: https://github.com/syoyo/tinygltf
 int Scene::loadGLTF(string path, Geom& geom) {
@@ -47,6 +58,8 @@ int Scene::loadGLTF(string path, Geom& geom) {
 	std::string warn;
 
 	bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, path);
+	//bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, argv[1]); //
+
 	if (!warn.empty())
 	{
 		cout << "Warning: " << warn << endl;
@@ -66,31 +79,91 @@ int Scene::loadGLTF(string path, Geom& geom) {
 	{
 		for (auto& prim : mesh.primitives)
 		{
-			const int numAttrs = 3;
-			const int attr[numAttrs] = { prim.indices, prim.attributes["POSITION"], prim.attributes["NORMAL"] };
-			const unsigned char* data[numAttrs];
+			const tinygltf::Accessor* accessor;
+			const tinygltf::BufferView* bufferView;
+			const tinygltf::Buffer* buffer;
+			int offset;
+			const unsigned short* indices = nullptr;
+			const float* positions = nullptr;
+			const float* normals = nullptr;
+			const float* uvs = nullptr;
+			const float* tangents = nullptr;
 
-			for (int i = 0; i < numAttrs; ++i)
+			accessor = &model.accessors[prim.indices];
+			bufferView = &model.bufferViews[accessor->bufferView];
+			buffer = &model.buffers[bufferView->buffer];
+			offset = bufferView->byteOffset + accessor->byteOffset;
+			indices = reinterpret_cast<const unsigned short*>(&buffer->data[offset]);
+
+			accessor = &model.accessors[prim.attributes["POSITION"]];
+			bufferView = &model.bufferViews[accessor->bufferView];
+			buffer = &model.buffers[bufferView->buffer];
+			offset = bufferView->byteOffset + accessor->byteOffset;
+			positions = reinterpret_cast<const float*>(&buffer->data[offset]);
+
+			if (prim.attributes["NORMAL"] >= 0)
 			{
-				auto accessor = &model.accessors[attr[i]];
-				auto bufferView = &model.bufferViews[accessor->bufferView];
-				auto buffer = &model.buffers[bufferView->buffer];
-				data[i] = &buffer->data[bufferView->byteOffset + accessor->byteOffset];
+				accessor = &model.accessors[prim.attributes["NORMAL"]];
+				bufferView = &model.bufferViews[accessor->bufferView];
+				buffer = &model.buffers[bufferView->buffer];
+				offset = bufferView->byteOffset + accessor->byteOffset;
+				normals = reinterpret_cast<const float*>(&buffer->data[offset]);
 			}
 
-			auto indices = reinterpret_cast<const unsigned short*>(data[0]);
-			auto positions = reinterpret_cast<const float*>(data[1]);
-			auto normals = reinterpret_cast<const float*>(data[2]);
+			if (prim.attributes["TEXCOORD_0"] >= 0)
+			{
+				accessor = &model.accessors[prim.attributes["TEXCOORD_0"]];
+				bufferView = &model.bufferViews[accessor->bufferView];
+				buffer = &model.buffers[bufferView->buffer];
+				offset = bufferView->byteOffset + accessor->byteOffset;
+				uvs = reinterpret_cast<const float*>(&buffer->data[offset]);
+			}
+
+			if (prim.attributes["TANGENT"] >= 0)
+			{
+				accessor = &model.accessors[prim.attributes["TANGENT"]];
+				bufferView = &model.bufferViews[accessor->bufferView];
+				buffer = &model.buffers[bufferView->buffer];
+				offset = bufferView->byteOffset + accessor->byteOffset;
+				tangents = reinterpret_cast<const float*>(&buffer->data[offset]);
+			}
 
 			for (size_t i = 0; i < model.accessors[prim.indices].count; i += 3)
 			{
 				Triangle tri;
 				for (int j = 0; j < 3; ++j)
 				{
-					int idx = indices[i + j] * 3;
-					tri.pos[j] = glm::vec3(positions[idx], positions[idx + 1], positions[idx + 2]);
-					tri.normal[j] = glm::vec3(normals[idx], normals[idx + 1], normals[idx + 2]);
+					int idx = indices[i + j];
+					tri.pos[j] = glm::vec3(positions[idx * 3], positions[idx * 3 + 1], positions[idx * 3 + 2]);
+					if (normals)
+					{
+						tri.normal[j] = glm::vec3(normals[idx * 3], normals[idx * 3 + 1], normals[idx * 3 + 2]);
+					}
+					if (uvs)
+					{
+						tri.uv[j] = glm::vec2(uvs[idx * 2], uvs[idx * 2 + 1]);
+					}
+					if (tangents)
+					{
+						tri.tangent[j] = glm::vec4(tangents[idx * 4], tangents[idx * 4 + 1], tangents[idx * 4 + 2], tangents[idx * 4 + 3]);
+					}
 					glm::vec3 worldPos(geom.transform * glm::vec4(tri.pos[j], 1.f));
+				}
+				if (!normals)
+				{
+					glm::vec3 normal = glm::normalize(glm::cross(tri.pos[1] - tri.pos[0], tri.pos[2] - tri.pos[0]));
+					for (int i = 0; i < 3; ++i)
+					{
+						tri.normal[i] = normal;
+					}
+				}
+				if (uvs && !tangents)
+				{
+					glm::vec3 t = triangleTangent(tri);
+					for (int i = 0; i < 3; ++i)
+					{
+						tri.tangent[i] = glm::vec4(t, 1);
+					}
 				}
 				triangles.push_back(tri);
 			}
@@ -126,7 +199,7 @@ int Scene::loadGeom(string objectid) {
 				cout << "Creating new MESH..." << endl;
 				newGeom.type = MESH;
 				utilityCore::safeGetline(fp_in, line);
- 				loadGLTF(line, newGeom);
+				loadGLTF(line, newGeom);
 			}
 		}
 
@@ -209,7 +282,12 @@ int Scene::loadCamera() {
 		else if (strcmp(tokens[0].c_str(), "UP") == 0) {
 			camera.up = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
 		}
-
+		else if (strcmp(tokens[0].c_str(), "FOCAL") == 0) {
+			camera.focalLength = atof(tokens[1].c_str());
+		}
+		else if (strcmp(tokens[0].c_str(), "APERTURE") == 0) {
+			camera.aperture = atof(tokens[1].c_str());
+		}
 		utilityCore::safeGetline(fp_in, line);
 	}
 
@@ -245,8 +323,9 @@ int Scene::loadMaterial(string materialid) {
 		Material newMaterial;
 
 		//load static properties
-		for (int i = 0; i < 7; i++) {
+		for (int i = 0; i < 9; i++) {
 			string line;
+			Map* map = nullptr;
 			utilityCore::safeGetline(fp_in, line);
 			vector<string> tokens = utilityCore::tokenizeString(line);
 			if (strcmp(tokens[0].c_str(), "RGB") == 0) {
@@ -271,6 +350,40 @@ int Scene::loadMaterial(string materialid) {
 			}
 			else if (strcmp(tokens[0].c_str(), "EMITTANCE") == 0) {
 				newMaterial.emittance = atof(tokens[1].c_str());
+			}
+			else if (strcmp(tokens[0].c_str(), "TEXTUREMAP") == 0) {
+				if (strcmp(tokens[1].c_str(), "NULL") != 0) {
+					map = &newMaterial.texture_map;
+					int width, height, channels;
+					unsigned char* pixels = stbi_load(tokens[1].c_str(), &width, &height, &channels, 3);
+					map->offset = maps.size();
+					map->dim = glm::ivec2(width, height);
+					for (int i = 0; i < width * height; i++) {
+						glm::vec3 col;
+						for (int j = 0; j < 3; ++j) {
+							col[j] = (float)pixels[i * 3 + j] / 255.f;
+						}
+						maps.push_back(col);
+					}
+					stbi_image_free(pixels);
+				}
+			}
+			else if (strcmp(tokens[0].c_str(), "NORMALMAP") == 0) {
+				if (strcmp(tokens[1].c_str(), "NULL") != 0) {
+					map = &newMaterial.normal_map;
+					int width, height, channels;
+					unsigned char* pixels = stbi_load(tokens[1].c_str(), &width, &height, &channels, 3);
+					map->offset = maps.size();
+					map->dim = glm::ivec2(width, height);
+					for (int i = 0; i < width * height; i++) {
+						glm::vec3 col;
+						for (int j = 0; j < 3; ++j) {
+							col[j] = (float)pixels[i * 3 + j] / 255.f;
+						}
+						maps.push_back(col);
+					}
+					stbi_image_free(pixels);
+				}
 			}
 		}
 		materials.push_back(newMaterial);

@@ -18,6 +18,7 @@ private:
 	int loadGLTF(string fileDir, Geom& geom);
 	int loadGeom(string objectid);
 	int loadCamera();
+	
 
 public:
 
@@ -27,7 +28,7 @@ public:
 	std::vector<Geom> geoms;
 	std::vector<Material> materials;
 	RenderState state;
-
+	vector<glm::vec3> maps;
 	std::vector<Triangle> triangles;
 	
 };
