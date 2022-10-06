@@ -25,6 +25,7 @@ public:
     std::vector<Geom> geoms;
     std::vector<Material> materials;
     std::vector<Triangle> triangles;
+    std::vector<Triangle> sorted_triangles;
     std::vector<MortonCode> mcodes;
     //std::vector<unsigned int> mcodes;
     std::vector<BVHNode> bvh;

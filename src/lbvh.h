@@ -32,9 +32,15 @@ void assignBoundingBoxes(Scene* scene);
 void buildLBVH(Scene* scene, int triangleCount);
 void traverseLBVH(Scene* scene);
 
+bool bvhIsLeaf(const BVHNode* node);
+void test_bvhIntersectionTestRecursive(const BVHNode* nodes, const Triangle* tris, Ray r, int idx, Triangle& min_tri, glm::vec3& min_barycenter, float& min_t);
+float test_bvhIntersectionTest(const BVHNode* nodes, const Triangle* tris, Ray r, int triangleCount, glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside);
+
 // Construct entire LBVH
 void generateLBVH(Scene* scene);
 void generateBVH(Scene* scene, int triangleCount);
+void flattenBVH(Scene* scene, int triangleCount);
 
 // Small test for LBVH
 void unitTest(Scene* scene);
+void unitTestBVH(Scene* scene, int triangleCount);

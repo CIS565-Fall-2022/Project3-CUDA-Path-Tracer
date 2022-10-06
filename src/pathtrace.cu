@@ -307,8 +307,9 @@ __global__ void computeIntersections(
 			else if (geom.type == MESH)
 			{
 				//t = meshIntersectionTest(geom, pathSegment.ray, dev_tris, tmp_intersect, tmp_normal, outside);
-				//t = lbvhIntersectionTest(dev_lbvh, dev_tris, pathSegment.ray, geom.triangleCount, tmp_intersect, tmp_normal, outside);
-				t = bvhIntersectionTest(dev_bvh, dev_tris, pathSegment.ray, geom.triangleCount, tmp_intersect, tmp_normal, outside);
+				t = lbvhIntersectionTest(dev_lbvh, dev_tris, pathSegment.ray, geom.triangleCount, tmp_intersect, tmp_normal, outside);
+				//t = bvhIntersectionTestIterative(dev_bvh, dev_tris, pathSegment.ray, geom.triangleCount, tmp_intersect, tmp_normal, outside);
+				//t = bvhIntersectionTest(dev_bvh, dev_tris, pathSegment.ray, geom.triangleCount, tmp_intersect, tmp_normal, outside);
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.

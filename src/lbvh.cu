@@ -1,5 +1,8 @@
 #include "lbvh.h"
 
+#define USE_MIDPOINT
+//#define USE_SAH
+
 /// LBVH FUNCTIONS ///
 
 bool morton_sort(const MortonCode& a, const MortonCode& b) {
@@ -208,16 +211,20 @@ void buildLBVH(Scene* scene, int triangleCount) {
     int numLeaf = triangleCount;
     int numInternal = triangleCount - 1;
     scene->lbvh.resize(numLeaf + numInternal);
+    scene->sorted_triangles.resize(numLeaf);
 
     // Initialize leaf nodes
     for (int i = 0; i < numLeaf; ++i) {
         LBVHNode leafNode;
-        leafNode.objectId = scene->mcodes[i].objectId; // TODO: this points to the wrong data
+        leafNode.objectId = scene->mcodes[i].objectId; 
         leafNode.aabb = scene->triangles[leafNode.objectId].aabb;
         leafNode.left = 0xFFFFFFFF;
         leafNode.right = 0xFFFFFFFF;
         scene->lbvh[i] = leafNode;
+
+        scene->sorted_triangles[i] = scene->triangles[leafNode.objectId];
     }
+    scene->triangles = scene->sorted_triangles;
 
     // Initialize internal nodes
     for (int j = numLeaf; j < numLeaf + numInternal; ++j) {
@@ -380,6 +387,63 @@ int maxExtent(glm::vec3 extent) {
     }
 }
 
+// SAH cost = num_triangles_left * left_box_area + num_triangles_right * right_box_area
+// Determines bounding boxes that result from splitting at this position and how many
+// triangles to place in each box. Once these are determined, we can calculate SAH cost
+float evalSAH(Scene* scene, BVHNode* node, float queryPos, int axis)
+{
+    AABB leftChild = { glm::vec3{INFINITY, INFINITY, INFINITY}, glm::vec3{-INFINITY, -INFINITY, -INFINITY} };
+    AABB rightChild = { glm::vec3{INFINITY, INFINITY, INFINITY}, glm::vec3{-INFINITY, -INFINITY, -INFINITY} };
+    int leftCount = 0;
+    int rightCount = 0;
+
+    for (int i = node->firstTri; i < node->firstTri + node->numTris; ++i) {
+        glm::vec3 centroid = scene->triangles[i].centroid;
+        if (centroid[axis] < queryPos) {
+            leftCount++;
+
+        }
+        else {
+            rightCount++;
+        }
+    }
+    // Calculate cost
+    //float cost = leftCount * leftAABB.area() + rightCount * rightAABB.area();
+
+    return 0.f;
+}
+
+void calculateCost(Scene* scene, BVHNode* node, float& split, int& axis)
+{
+    float optimalCost = INFINITY;
+    for (int i = 0; i < 3; ++i) {
+        for (int j = node->firstTri; j < node->firstTri + node->numTris; ++j) {
+            float centroidPos = scene->triangles[j].centroid[i];
+            float cost = evalSAH(scene, node, centroidPos, i);
+            if (cost < optimalCost) {
+                optimalCost = cost;
+                split = centroidPos;
+                axis = i;
+            }
+        }
+    }
+}
+
+void chooseSplit(Scene* scene, BVHNode* node, float& split, int& axis)
+{
+
+#ifdef USE_MIDPOINT
+    glm::vec3 extent = node->aabb.max - node->aabb.min;
+    axis = maxExtent(extent);
+    split = node->aabb.min[axis] + extent[axis] * 0.5f;
+#endif
+
+#ifdef USE_SAH
+
+#endif
+
+}
+
 void addChildren(Scene* scene, BVHNode* node)
 {
     if (node->numTris <= 2)
@@ -389,9 +453,9 @@ void addChildren(Scene* scene, BVHNode* node)
     }
 
     // Choose split axis and position
-    glm::vec3 extent = node->aabb.max - node->aabb.min;
-    int axis = maxExtent(extent);
-    float split = node->aabb.min[axis] + extent[axis] * 0.5f;
+    float split = 0.f;
+    int axis = 0;
+    chooseSplit(scene, node, split, axis);
 
     // Partition primitives (in-place sorting)
     int start = node->firstTri;
@@ -449,4 +513,59 @@ void generateBVH(Scene* scene, int triangleCount)
     //for (int j = 0; j < triangleCount; j++) {
     //    std::cout << scene->triangles[j].objectId << std::endl;
     //}
+}
+
+bool bvhIsLeaf(const BVHNode* node) {
+    return (node->numTris > 0);
+}
+
+void test_bvhIntersectionTestRecursive(const BVHNode* nodes, const Triangle* tris, Ray r, int idx,
+    Triangle& min_tri, glm::vec3& min_barycenter, float& min_t) {
+
+    const BVHNode* node = &nodes[idx];
+
+    if (test_aabbIntersectionTest(node->aabb, r)) {
+        if (bvhIsLeaf(node)) {
+            //bvhIntersectTriangles(tris, r, node->firstTri, node->numTris, min_tri, min_barycenter, min_t);
+        }
+        else {
+            test_bvhIntersectionTestRecursive(nodes, tris, r, node->left, min_tri, min_barycenter, min_t);
+            test_bvhIntersectionTestRecursive(nodes, tris, r, node->right, min_tri, min_barycenter, min_t);
+        }
+    }
+}
+
+float test_bvhIntersectionTest(const BVHNode* nodes, const Triangle* tris, Ray r, int triangleCount,
+    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+
+    Triangle min_tri;
+    glm::vec3 min_barycenter;
+    float min_t = INFINITY;
+
+    // Start traversing tree from root node
+    test_bvhIntersectionTestRecursive(nodes, tris, r, 0, min_tri, min_barycenter, min_t);
+
+    // Find intersection point and normal
+    float u = min_barycenter.x;
+    float v = min_barycenter.y;
+    float w = 1.f - u - v;
+    intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
+    normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
+
+    return min_t;
+}
+
+void unitTestBVH(Scene* scene, int triangleCount)
+{
+    generateBVH(scene, triangleCount);
+
+    Ray ray;
+    ray.origin = glm::vec3(0.0, 0.0, 0.0);
+    ray.direction = glm::vec3(0.0, 0.0, 1.0);
+
+    glm::vec3 intersectionPoint;
+    glm::vec3 normal;
+    bool outside = true;
+
+    test_bvhIntersectionTest(scene->bvh.data(), scene->triangles.data(), ray, triangleCount, intersectionPoint, normal, outside);
 }

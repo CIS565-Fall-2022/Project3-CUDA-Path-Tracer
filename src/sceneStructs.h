@@ -22,6 +22,10 @@ struct Ray {
 struct AABB {
     glm::vec3 min;
     glm::vec3 max;
+
+    float getArea() {
+        
+    };
 };
 
 struct MortonCode {
