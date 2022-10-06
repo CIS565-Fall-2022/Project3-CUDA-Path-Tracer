@@ -6,6 +6,7 @@
 #include <thrust/remove.h>
 
 #include <thrust/partition.h>
+#include <glm/gtc/matrix_inverse.hpp>
 
 
 #include "sceneStructs.h"
@@ -364,6 +365,17 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	// --- PathSegment Tracing Stage ---
 	// Shoot ray into scene, bounce between objects, push shading chunks
+
+	//motion
+	for (int i = 0; i < hst_scene->geoms.size(); i++) {
+		Geom& newGeom = hst_scene->geoms[i];
+		hst_scene->geoms[i].transform = utilityCore::buildTransformationMatrix(
+			newGeom.translation + (newGeom.end - newGeom.translation) * (float)iter / (float) hst_scene->state.iterations, newGeom.rotation, newGeom.scale);
+		hst_scene->geoms[i].inverseTransform = glm::inverse(newGeom.transform);
+		hst_scene->geoms[i].invTranspose = glm::inverseTranspose(newGeom.transform);
+
+	}
+	cudaMemcpy(dev_geoms, hst_scene->geoms.data(), hst_scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
 
 	bool iterationComplete = false;
 	while (!iterationComplete) {
