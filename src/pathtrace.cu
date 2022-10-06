@@ -50,6 +50,26 @@ thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int de
 	return thrust::default_random_engine(h);
 }
 
+// PBRT 13.6.2
+__host__ __device__ 
+glm::vec2 sampleDisk(thrust::default_random_engine& rng) {
+	thrust::uniform_real_distribution<float> u01(-1, 1);
+	glm::vec2 t(u01(rng), u01(rng));
+	if (glm::length(t) == 0) {
+		return t; 
+	}
+	float theta, r;
+	if (std::abs(t.x) > std::abs(t.y)) {
+		r = t.x;
+		theta = PI / 4.f * (t.y / t.x);
+	}
+	else {
+		r = t.y;
+		theta = PI / 2.f - PI / 4.f * (t.x / t.y);
+	}
+	return r * glm::vec2(cos(theta), sin(theta));
+}
+
 /**
 * Generate PathSegments with rays from the camera through the screen into the
 * scene, which is the first bounce of rays.
@@ -86,6 +106,14 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f + jitter[0])
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f + jitter[1])
 		);
+
+		if (cam.focalLength != 0 && cam.lensRadius != 0) {
+			glm::vec2 lensSample = cam.lensRadius * sampleDisk(rng);
+			segment.ray.origin += glm::vec3(lensSample.x, lensSample.y, 0);
+
+			glm::vec3 focalPoint = segment.ray.direction * cam.focalLength / std::abs(segment.ray.direction.z);
+			segment.ray.direction = glm::normalize(focalPoint - glm::vec3(lensSample.x, lensSample.y, 0));
+		}
 
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
