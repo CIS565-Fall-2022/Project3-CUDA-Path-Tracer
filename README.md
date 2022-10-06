@@ -35,13 +35,22 @@ Using Radix Sort by material ID, we can batch rays according to material type. T
 
 Anti-aliasing
 ===========
+I jitter the direction of sample ray to reduce the aliasing effects
+![](img/aa_comparision.png)
+
 | With AA | No AA |
 :-------:|:-------:
-|![](img/aa.png)|![](img/NO_AA.png)|
+|![](img/AA.png)|![](img/NO_AA.png)|
 
-With AA           |  No AA              
-:-------------------------:|:-------------------------:
-![](img/aa.png)|![](img/NO_AA.png)
+Mesh Loading
+===========
+I used tinyOBJ to load obj file.
+
+![](img/NO_AA.png)
+
+Refraction
+===========
+![](img/refraction.png)
 
 
 #### Sort by Materials Type 
