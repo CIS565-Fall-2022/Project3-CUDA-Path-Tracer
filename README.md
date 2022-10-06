@@ -47,8 +47,7 @@
 ![](./img/NormalMap/comp2.png)
 
 ### Octree Spatial Partition
-![](./img/Octree/1.png)
-![](./img/Octree/2.png)
+![](./img/Octree/demo.gif)
 
 ### Restartable Ray Tracing (Saving & Loading)
 ![](./img/Checkpointing/demo.gif)
