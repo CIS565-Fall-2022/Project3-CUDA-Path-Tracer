@@ -70,7 +70,7 @@ EMITTANCE   0
 
 // Camera
 CAMERA
-RES         800 800
+RES         200 200
 FOVY        45
 ITERATIONS  5000
 DEPTH       8
@@ -86,7 +86,7 @@ cube
 material 0
 TRANS       0 10 0
 ROTAT       0 0 0
-SCALE       3 .3 3
+SCALE       5 .3 5
 
 // Floor
 OBJECT 1
@@ -130,10 +130,10 @@ SCALE       .01 10 10
 
 // Sphere REFL
 OBJECT 6
-sphere
+cube
 material 6
-TRANS       -1 4 0.5
-ROTAT       0 0 0
+TRANS       -1 1.5 3
+ROTAT       0 40 0
 SCALE       3 3 3
 
 // Sphere REFR

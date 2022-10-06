@@ -19,11 +19,13 @@
 #define CACHE_FIRST_BOUNCE 0
 #define ANTI_ALIASING 0
 
-#define DOF 1
+#define DOF 0
 #define LENS_RADIUS 0.4
-#define FOCAL_DISTANCE 9.0
+#define FOCAL_DISTANCE 12.0
 
-#define MOTION_BLUR 0
+#define MOTION_BLUR 1
+
+#define BOUNDINGBOX 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -289,20 +291,28 @@ __global__ void computeIntersections(
 			}
 			else if (geom.type == SPHERE)
 			{
-#if MOTION_BLUR
-				thrust::default_random_engine rng = makeSeededRandomEngine(iter, path_index, 0);
-				thrust::uniform_real_distribution<float> u01(0, 1);
-				//Jitter the ray randomly about any axes 
-				Ray jittered = pathSegment.ray;
-				jittered.origin += u01(rng) * glm::vec3(0.25f, 0.75f, 0.f);
-				t = sphereIntersectionTest(geom, jittered, tmp_intersect, tmp_normal, outside);
-#else
-				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
-#endif
+				if (MOTION_BLUR && geom.materialid == 8) {
+					thrust::default_random_engine rng = makeSeededRandomEngine(iter, path_index, 0);
+					thrust::uniform_real_distribution<float> u01(0, 1);
+					//Jitter the ray randomly about any axes 
+					Ray jittered = pathSegment.ray;
+					jittered.origin += u01(rng) * glm::vec3(0.75f, 0.75f, 0.f);
+					t = sphereIntersectionTest(geom, jittered, tmp_intersect, tmp_normal, outside);
+				}
+				else {
+					t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				}
 			}
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 			else if (geom.type == MESH) {
+#if BOUNDINGBOX
+				// If intersect with the boundingbox of the obj, then compute the actual intersection point
+				if (boundingBoxIntersectionTest(geom.boundingbBox, pathSegment.ray)) {
+					t = meshIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, triangles, outside);
+				}
+#else
 				t = meshIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, triangles, outside);
+#endif
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.

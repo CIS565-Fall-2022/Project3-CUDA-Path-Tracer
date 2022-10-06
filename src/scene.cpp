@@ -234,12 +234,18 @@ int Scene::loadObj(string filename, Geom& geo) {
             for (int j = 0; j < 3; j++) {
                 int idx = indices[i][j];
                 pos.push_back(positions[idx]);
+                glm::vec3 worldPos (geo.transform * glm::vec4(positions[idx], 1.f));
+                geo.boundingbBox.lowerPt = glm::min(geo.boundingbBox.lowerPt, worldPos);
+                geo.boundingbBox.upperPt = glm::max(geo.boundingbBox.upperPt, worldPos);
             }
             //form triangles
             t.v1.pos = pos[0];
             t.v2.pos = pos[1];
             t.v3.pos = pos[2];
+
             geo.triangles[i] = t;
+            /*geo.boundingbBox.lowerPt = glm::min(geo.boundingbBox.lowerPt, glm::min(pos[0], glm::min(pos[1], pos[2])));
+            geo.boundingbBox.upperPt = glm::max(geo.boundingbBox.upperPt, glm::max(pos[0], glm::max(pos[1], pos[2])));*/
         }
     }
     

@@ -143,11 +143,11 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     return glm::length(r.origin - intersectionPoint);
 }
 
-__host__ __device__ float meshIntersectionTest(Geom mesh, Ray r, glm::vec3& intersectionPoint, glm::vec3& normal, Triangle* tirangles, bool& outside) {
-
-    glm::vec3 intersectionBaryPos;
+__host__ __device__ float meshIntersectionTest(Geom mesh, Ray r, glm::vec3& intersectionPoint, glm::vec3& normal, Triangle* tirangles, bool& outside) 
+{
     float tMin = FLT_MAX;
-    glm::vec3 tMinNormal;
+    glm::vec3 tMinNor;
+    glm::vec3 isectPt;
     bool isIntersect = false;
 
     // do intersection test with every triangle
@@ -160,27 +160,71 @@ __host__ __device__ float meshIntersectionTest(Geom mesh, Ray r, glm::vec3& inte
         glm::vec3 p2 = multiplyMV(mesh.transform, glm::vec4(tri.v3.pos, 1.0f));
 
         
-        bool intersection = glm::intersectRayTriangle(r.origin, r.direction, p0, p1, p2, intersectionBaryPos);
+        bool intersection = glm::intersectRayTriangle(r.origin, r.direction, p0, p1, p2, isectPt);
+        
         if (!intersection) {
             continue;
         }
         
-        float t = glm::length(r.origin - intersectionBaryPos);
-      
+        float t = glm::length(r.origin - isectPt);
 
         glm::vec3 intersectionNormal = glm::normalize(glm::cross(p1-p0, p2-p0));
         
         if (t < tMin) {
             tMin = t;
-            tMinNormal = intersectionNormal;
+            tMinNor = intersectionNormal;
             isIntersect = true;
         }
     }
 
     if (isIntersect) {
         intersectionPoint = getPointOnRay(r, tMin);
-        normal = tMinNormal;
+        normal = tMinNor;
         return glm::length(r.origin - intersectionPoint);
     }
     return -1.f;
+}
+
+__host__ __device__ void swap(float &a, float &b) {
+    float tmp = a;
+    a = b;
+    b = tmp;
+}
+
+// reference: https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
+__host__ __device__ bool boundingBoxIntersectionTest(BoundingBox box, Ray r) {
+    float tmin = (box.lowerPt.x - r.origin.x) / r.direction.x;
+    float tmax = (box.upperPt.x - r.origin.x) / r.direction.x;
+
+    if (tmin > tmax) swap(tmin, tmax);
+
+    float tymin = (box.lowerPt.y - r.origin.y) / r.direction.y;
+    float tymax = (box.upperPt.y - r.origin.y) / r.direction.y;
+
+    if (tymin > tymax) swap(tymin, tymax);
+
+    if ((tmin > tymax) || (tymin > tmax))
+        return false;
+
+    if (tymin > tmin)
+        tmin = tymin;
+
+    if (tymax < tmax)
+        tmax = tymax;
+
+    float tzmin = (box.lowerPt.z - r.origin.z) / r.direction.z;
+    float tzmax = (box.upperPt.z - r.origin.z) / r.direction.z;
+
+    if (tzmin > tzmax) swap(tzmin, tzmax);
+
+    if ((tmin > tzmax) || (tzmin > tmax))
+        return false;
+
+    if (tzmin > tmin)
+        tmin = tzmin;
+
+    if (tzmax < tmax)
+        tmax = tzmax;
+
+    return true;
 }

@@ -19,15 +19,20 @@ struct Point {
     glm::vec3 uv;
 };
 
+struct Ray {
+    glm::vec3 origin;
+    glm::vec3 direction;
+};
+
 struct Triangle {
     Point v1;
     Point v2;
     Point v3;
 };
 
-struct Ray {
-    glm::vec3 origin;
-    glm::vec3 direction;
+struct BoundingBox {
+    glm::vec3 lowerPt = glm::vec3(FLT_MIN);
+    glm::vec3 upperPt = glm::vec3(FLT_MAX);
 };
 
 struct Geom {
@@ -42,6 +47,8 @@ struct Geom {
 
     Triangle*  triangles;
     int numOfTriangles;
+
+    BoundingBox boundingbBox;
 };
 
 struct Material {
