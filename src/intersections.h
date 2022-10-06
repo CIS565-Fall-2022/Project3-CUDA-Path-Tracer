@@ -199,7 +199,7 @@ __host__ __device__ float MeshIntersectionTest(Geom mesh, Ray r,
     glm::vec3 temp_normal;
 
     // test for tirangles belong to this mesh
-    for (int i = mesh.triangleStartIndex; i < mesh.totaltriangles; i++)
+    for (unsigned int i = mesh.triangleStartIndex; i < mesh.triangleEndIndex; i++)
     {
         glm::vec3 bary;
         if (!glm::intersectRayTriangle(q.origin, q.direction, allTriangles[i].pos1, allTriangles[i].pos2, allTriangles[i].pos3, bary))

@@ -39,7 +39,7 @@ struct Geom {
     glm::vec3 boxMin;
     glm::vec3 boxMax;
     unsigned int triangleStartIndex;
-    unsigned int totaltriangles;
+    unsigned int triangleEndIndex;
 };
 
 

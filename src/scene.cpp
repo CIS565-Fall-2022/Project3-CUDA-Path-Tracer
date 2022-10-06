@@ -249,7 +249,7 @@ int Scene::loadTrianglesForMesh(string filename, Geom& thisMesh)
         for (size_t face = 0; face < shapes[shape].mesh.num_face_vertices.size(); face++)
         {
             //vertex count of current face
-            size_t vertexCount = size_t(shapes[shape].mesh.num_face_vertices[face]);
+            size_t vertexCount = 3;// size_t(shapes[shape].mesh.num_face_vertices[face]);
 
             glm::vec3 current_ver{ 0 };
             glm::vec3 current_norm{ 0 };
@@ -304,7 +304,7 @@ int Scene::loadTrianglesForMesh(string filename, Geom& thisMesh)
             globalTriangles->push_back(current_triangle);
             globalTriangleCount++;
         }
-        thisMesh.totaltriangles = globalTriangleCount - thisMesh.triangleStartIndex;
+        thisMesh.triangleEndIndex = globalTriangleCount;
         thisMesh.boxMin = boundMin;
         thisMesh.boxMax = boundMax;
     }

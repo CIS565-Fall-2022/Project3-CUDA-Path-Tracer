@@ -123,7 +123,7 @@ void firstTimePathTraceInit(Scene* scene) {
 
 	cudaMalloc(&dev_triangles, scene->globalTriangleCount * sizeof(Triangle));
 	cudaMemcpy(dev_triangles, scene->globalTriangles->data(), scene->globalTriangleCount * sizeof(Triangle), cudaMemcpyHostToDevice);
-
+	std::cout << "geom count: " << scene->geoms.size() << std::endl;
 #if DIRECT_LIGHT
 	totalLights = scene->lightIndices.size();
 	cudaMalloc(&dev_lightIndices, totalLights * sizeof(unsigned int));

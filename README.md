@@ -7,6 +7,8 @@ CUDA Path Tracer
   * [LinkedIn](https://www.linkedin.com/in/runshi-gu-445648194/)
 * Tested on: Windows 10, AMD Ryzen 7 5800X 8-Core Processor @ 3.80 GHz 32GB, RTX3070 24538MB, Personal
 
+![](img/Siggraph.png)
+
 ## Features Implementation
 * Basic pathtracer
 
@@ -24,14 +26,9 @@ CUDA Path Tracer
 
 ## Direct Lighting
 
-* With Direct Lighting
+* Left With Direct Lighting; Right Without Direct Lighting
 
-![](img/withDirectLighting.png)
-
-* Without Direct Lighting
-
-![](img/withoutDirectLight.png)
-
+![](img/DirectLightCompare.png)
 
 ## Anti Aliasing
 
