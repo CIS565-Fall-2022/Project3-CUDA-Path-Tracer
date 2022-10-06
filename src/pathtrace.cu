@@ -20,9 +20,10 @@
 
 #define ERRORCHECK 1
 #define SORT_MATERIAL 1
+#define STREAM_COMPACTION 1
 #define CACHE_INTERSECTION 1
 #define ANTI_ALIASING 1
-#define DOF 1
+#define DOF 0
 #define MOTION_BLUR_OBJECT 0
 #define MOTION_BLUR_CAMERA 0
 #define BOUNDING_BOX 1
@@ -159,7 +160,7 @@ void pathtraceFree() {
 	checkCUDAError("pathtraceFree");
 }
 
-__global__ void kernBlur(Geom* geoms, int geoms_size, int num_paths, glm::vec3 offset, int iter) {
+__global__ void kernBlur(Geom* geoms, int geoms_size, int num_paths, glm::vec3 moveDir, int iter) {
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
 	if (path_index < num_paths) {
 		float dt = iter * 0.00001f;
@@ -169,7 +170,7 @@ __global__ void kernBlur(Geom* geoms, int geoms_size, int num_paths, glm::vec3 o
 		for (int i = 0; i < geoms_size; ++i) {
 			Geom& geom = geoms[i];
 			if (geom.type == SPHERE) {
-				geom.translation -= glm::clamp(offset * dt, glm::vec3(0.0f), offset);
+				geom.translation -= glm::clamp(moveDir * dt, glm::vec3(0.0f), moveDir);
 				geom.transform[3] = glm::vec4(geom.translation, geom.transform[3].w);
 				geom.inverseTransform = glm::inverse(geom.transform);
 				geom.invTranspose = glm::transpose(geom.inverseTransform);
@@ -240,7 +241,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		glm::vec2 randomSample{ 0 };
 		float ft = glm::abs((cam.focalDistance) / segment.ray.direction.z);
 
-		// point of focus
+		// point of focus using original ray direction
 		glm::vec3 pFocus = ft * segment.ray.direction;
 
 		// sample a point on the lens
@@ -256,35 +257,36 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.remainingBounces = traceDepth;
 	}
 }
-__host__ __device__ bool checkWithinMeshBoundingBox(Geom& object,
+__host__ __device__ bool isInBoundingBox(Geom& object,
 	glm::vec3 min, glm::vec3 max, Ray& r) {
-	//Basically the same thing as boxIntersectionTest
 	Ray q;
 	q.origin = multiplyMV(object.inverseTransform, glm::vec4(r.origin, 1.0f));
 	q.direction = glm::normalize(multiplyMV(object.inverseTransform, glm::vec4(r.direction, 0.0f)));
 
-	float tmin = -1e38f;
-	float tmax = 1e38f;
+	float tmin = FLT_MIN;
+	float tmax = FLT_MAX;
 	glm::vec3 tmin_n;
 	glm::vec3 tmax_n;
 	for (int xyz = 0; xyz < 3; ++xyz) {
 		float qdxyz = q.direction[xyz];
-		if (glm::abs(qdxyz) > 0.00001f) {
-			float t1 = (min[xyz] - q.origin[xyz]) / qdxyz;
-			float t2 = (max[xyz] - q.origin[xyz]) / qdxyz;
-			float ta = glm::min(t1, t2);
-			float tb = glm::max(t1, t2);
-			glm::vec3 n;
-			n[xyz] = t2 < t1 ? +1 : -1;
-			if (ta > 0 && ta > tmin) {
-				tmin = ta;
-				tmin_n = n;
-			}
-			if (tb < tmax) {
-				tmax = tb;
-				tmax_n = n;
-			}
+		if (glm::abs(qdxyz) <= 0.00001f) {
+			break;
 		}
+		float t1 = (min[xyz] - q.origin[xyz]) / qdxyz;
+		float t2 = (max[xyz] - q.origin[xyz]) / qdxyz;
+		float ta = glm::min(t1, t2);
+		float tb = glm::max(t1, t2);
+		glm::vec3 n;
+		n[xyz] = t2 < t1 ? +1 : -1;
+		if (ta > 0 && ta > tmin) {
+			tmin = ta;
+			tmin_n = n;
+		}
+		if (tb < tmax) {
+			tmax = tb;
+			tmax_n = n;
+		}
+		
 	}
 
 	if (tmax >= tmin && tmax > 0) {
@@ -344,7 +346,7 @@ __global__ void computeIntersections(
 			{
 				float z = FLT_MAX;
 #if BOUNDING_BOX
-				if (!checkWithinMeshBoundingBox(geom, min, max, pathSegment.ray)) {
+				if (!isInBoundingBox(geom, min, max, pathSegment.ray)) {
 					break;
 				}
 #endif
@@ -682,6 +684,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_paths,
 			dev_materials
 			);
+#ifdef STREAM_COMPACTION
 
 		// stream compaction
 		dev_path_end = thrust::stable_partition(thrust::device, dev_paths, dev_path_end, isPathCompleted());
@@ -689,6 +692,9 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 		//std::cout << num_paths << "\n";
 		iterationComplete = (num_paths == 0);
+#else
+		iterationComplete = (++depth >= traceDepth);
+#endif // SORT_MATERIAL
 
 		//std::cout << "num_paths: " << num_paths << std::endl;
 
