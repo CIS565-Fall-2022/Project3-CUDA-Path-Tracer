@@ -3,9 +3,12 @@
 #include "Collision/DebugDrawer.h"
 #include "consts.h"
 #include <cstring>
-
+#include <iostream>
 
 static std::string startTimeString;
+
+std::string scene_files_dir = "../scenes/";
+std::string save_files_dir = "../saves/";
 
 // For camera controls
 static bool leftMousePressed = false;
@@ -30,6 +33,15 @@ int height;
 //-------------------------------
 
 int main(int argc, char** argv) {
+
+#ifdef NO_DEFAULT_PATHS
+	std::cout << "Enter Scene Files Dir: \n";
+	std::cin >> scene_files_dir;
+	std::cout << "Enter Save Files Dir: \n";
+	std::cin >> save_files_dir;
+#endif // NO_DEFAULT_PATHS
+
+
 	startTimeString = Preview::currentTimeString();
 	height = width = 800;
 

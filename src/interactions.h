@@ -168,8 +168,52 @@ struct BSDF {
     __device__ __forceinline__ float same_hemisphere(glm::vec3 const& w, glm::vec3 const& wp) const {
         return w.z * wp.z > 0;
     }
+
+    // references for microfacet reflection
+    // https://schuttejoe.github.io/post/ggximportancesamplingpart1/
+    // https://agraphicsguy.wordpress.com/2015/11/01/sampling-microfacet-brdf/
+    // http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
+    __device__ __forceinline__ float microfacet_pdf(glm::vec3 const& wo, glm::vec3 const& wi) const {
+        glm::vec3 wh = glm::normalize(wi + wo);
+        return ggx_D(wh) * wh.z;
+    }
+    __device__ __forceinline__ glm::vec3 sample_ggx(glm::vec3 const& wo) const {
+        thrust::uniform_real_distribution<float> u01;
+        float a2 = m.roughness * m.roughness;
+        float r1 = u01(rng);
+        float r2 = u01(rng);
+        float theta = atanf(m.roughness * sqrtf(r1 / (1 - r1)));
+        float phi = 2 * PI * r2;
+        glm::vec3 wm = glm::normalize(glm::vec3(sinf(theta) * cosf(phi), sinf(theta) * sinf(phi), cosf(theta)));
+        return glm::reflect(-wo, wm);
+    }
+    // ggx distribution
+    __device__ __forceinline__ float ggx_D(glm::vec3 const& wh) const {
+        if (wh.z < 0) {
+            return 0;
+        }
+        float a2 = m.roughness * m.roughness;
+        float cos2 = wh.z * wh.z;
+        float t = (cos2 * (a2 - 1) + 1);
+        return a2 / (PI * t * t);
+    }
+    // shadowing factor
+    __device__ __forceinline__ float ggx_G(glm::vec3 const& v) const {
+        float cosine = v.z;
+        float cos2 = v.z * v.z;
+        float a2 = m.roughness * m.roughness;
+        return 2 * cosine / (cosine + sqrtf(a2 + (1 - a2) * cos2));
+    }
+    __device__ __forceinline__ float ggx_G(glm::vec3 const& wo, glm::vec3 const& wi) const {
+        glm::vec3 wh = glm::normalize(wi + wo);
+        if (wh.z * wo.z <= 0 || wh.z * wi.z <= 0) return 0;
+        return ggx_G(wo) * ggx_G(wi);
+    }
     __device__ color_t sample_f(glm::vec3 const& wo, glm::vec3& wi, float& pdf) const {
         float etaI = 1, etaT = m.ior, eta, F;
+        glm::vec3 wh; // half vector
+        color_t tmp;
+
         thrust::uniform_real_distribution<float> u01;
         if (is_delta) {
             switch (type) {
@@ -212,6 +256,7 @@ struct BSDF {
                 }
             }
         } else {
+            //objects with roughness
             switch (m.type) {
             case Material::Type::DIFFUSE:
                 wi = calculateRandomDirectionInHemisphere(glm::vec3(0, 0, 1), rng);
@@ -220,6 +265,18 @@ struct BSDF {
 
             case Material::Type::GLOSSY:
             case Material::Type::REFL:
+                F = fresnel_dielectric(wo.z, etaI, etaT);
+                if (feq(abs_cos_theta(wo), 0)) {
+                    break;
+                }
+                wi = sample_ggx(wo);
+                if (!same_hemisphere(wo, wi)) {
+                    break;
+                }
+                wh = glm::normalize(wi + wo);
+                pdf = microfacet_pdf(wo, wi) / (4 * abs_cos_theta(wh));
+//                printf("D=%f,G=%f,F=%f,denom=%f,%f,%f,%f\n", ggx_D(wh), ggx_G(wo, wi), (4.0f * abs_cos_theta(wi) * abs_cos_theta(wo)), tmp.x, tmp.y, tmp.z);
+                return (reflectance * ggx_D(wh) * ggx_G(wo, wi) * F) / (4.0f * cos_theta(wi) * cos_theta(wo)) * abs_cos_theta(wi);
             case Material::Type::REFR:
             case Material::Type::SUBSURFACE:
             case Material::Type::TRANSPARENT:
@@ -300,6 +357,7 @@ void scatterRay(
         color = bsdf.sample_f(wo, wi, pdf);
 
         if (is_zero(wi) || feq(pdf, 0)) {
+            // degenerate cases
             path.color = glm::vec3(0);
             path.terminate();
             return;

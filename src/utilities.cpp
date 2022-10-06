@@ -58,8 +58,8 @@ GuiDataContainer::GuiDataContainer() :
 {
     memset(buf, 0, sizeof(buf));
 
-    auto scene_files = getFilesInDir(scene_files_dir);
-    auto save_files = getFilesInDir(save_files_dir);
+    auto scene_files = getFilesInDir(scene_files_dir.c_str());
+    auto save_files = getFilesInDir(save_files_dir.c_str());
 
     num_scenes = scene_files.size();
     num_saves = save_files.size();

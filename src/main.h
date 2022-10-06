@@ -27,8 +27,8 @@ using namespace std;
 //----------PATH TRACER----------
 //-------------------------------
 
-constexpr char const* scene_files_dir = "../scenes/";
-constexpr char const* save_files_dir = "../saves/";
+extern std::string scene_files_dir;
+extern std::string save_files_dir;
 
 extern Scene* scene;
 extern int iteration;

@@ -87,7 +87,7 @@ static bool initMaterial(
     else field = default_val;\
     } while(0)
 
-    PARSE_F("refl", mat.hasReflective, 0);
+    PARSE_F("reflect", mat.hasReflective, 0);
     PARSE_F("refr", mat.hasRefractive, 0);
     PARSE_F("ior", mat.ior, 1);
     PARSE_F("emit", mat.emittance, 0);
@@ -160,7 +160,8 @@ static bool initMaterial(
         << "refr =         " << mat.hasRefractive << "\n"
         << "roughness =    " << mat.roughness << "\n"
         << "spec_color=   {" << mat.specular.color[0] << "," << mat.specular.color[1] << "," << mat.specular.color[2] << "}\n"
-        << "spec_exp   =   " << mat.specular.exponent << "\n\n";
+        << "spec_exp   =   " << mat.specular.exponent << "\n"
+        << "type =         " << mat.type << "\n\n";
 
     if(mat.textures.diffuse != -1)
         std::cout << "diffuse tex = {" << " id = " << mat.textures.diffuse << ", npixels = " << self.textures[mat.textures.diffuse].pixels.size() << "}\n";

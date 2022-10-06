@@ -4,7 +4,7 @@ Ks 1 1 1
 Ns 0
 
 ior 1
-refl 0
+reflect 0
 refr 0
 emit 10
 rough 0
