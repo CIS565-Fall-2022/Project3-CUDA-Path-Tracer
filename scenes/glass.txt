@@ -7,6 +7,7 @@ REFL        0
 REFR        0
 REFRIOR     0
 EMITTANCE   5
+ABSORPTION  0
 
 // Diffuse white
 MATERIAL 1
@@ -17,6 +18,7 @@ REFL        0
 REFR        0
 REFRIOR     0
 EMITTANCE   0
+ABSORPTION  0
 
 // Diffuse red
 MATERIAL 2
@@ -27,6 +29,7 @@ REFL        0
 REFR        0
 REFRIOR     0
 EMITTANCE   0
+ABSORPTION  0
 
 // Diffuse green
 MATERIAL 3
@@ -37,6 +40,7 @@ REFL        0
 REFR        0
 REFRIOR     0
 EMITTANCE   0
+ABSORPTION  0
 
 // Specular white
 MATERIAL 4
@@ -47,6 +51,7 @@ REFL        1
 REFR        0
 REFRIOR     0
 EMITTANCE   0
+ABSORPTION  0
 
 // Refractive
 MATERIAL 5
@@ -57,6 +62,18 @@ REFL        1
 REFR        1
 REFRIOR     1.5
 EMITTANCE   0
+ABSORPTION  0
+
+// SSS
+MATERIAL 6
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     1.35
+EMITTANCE   0
+ABSORPTION  .03
 
 // Camera
 CAMERA
@@ -74,7 +91,7 @@ UP          0 1 0
 OBJECT 0
 cube
 material 0
-TRANS       0 10 0
+TRANS       0 7 0
 ROTAT       0 0 0
 SCALE       3 .3 3
 
@@ -121,7 +138,7 @@ SCALE       .01 10 10
 // Sphere
 OBJECT 6
 sphere
-material 5
-TRANS       0 3 2
+material 1
+TRANS       0 3 0
 ROTAT       0 0 0
 SCALE       5 5 5

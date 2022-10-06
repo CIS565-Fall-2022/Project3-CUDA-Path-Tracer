@@ -20,6 +20,7 @@
 #define ERRORCHECK 1
 #define RAYCACHE 0
 #define MEMSORT 0
+#define AA 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -43,6 +44,12 @@ void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #endif
 }
 
+__host__ __device__
+thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int depth) {
+	int h = utilhash((1 << 31) | (depth << 22) | iter) ^ utilhash(index);
+	return thrust::default_random_engine(h);
+}
+
 /**
 * Generate PathSegments with rays from the camera through the screen into the
 * scene, which is the first bounce of rays.
@@ -64,20 +71,25 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		// TODO: implement antialiasing by jittering the ray
+		glm::vec2 jitter(0, 0);
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
+#if RAYCACHE 
+#else
+#if AA
+		const float stochasticWeight = .5;
+		thrust::normal_distribution<float> norm(0, stochasticWeight);
+		jitter = glm::vec2(norm(rng), norm(rng));
+#else
+#endif
+#endif
 		segment.ray.direction = glm::normalize(cam.view
-			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
+			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f + jitter[0])
+			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f + jitter[1])
 		);
 
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
 	}
-}
-
-__host__ __device__
-thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int depth) {
-	int h = utilhash((1 << 31) | (depth << 22) | iter) ^ utilhash(index);
-	return thrust::default_random_engine(h);
 }
 
 //Kernel that writes the image to the OpenGL PBO directly.
