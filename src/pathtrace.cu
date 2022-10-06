@@ -21,7 +21,7 @@
 #define SORT_BY_MATERIAL 1
 #define DEPTH_OF_FIELD 0
 #define LENS_RADIUS 0.2f
-#define FOCAL_LENGTH 6.0f
+#define FOCAL_LENGTH 10.0f
 #define DIRECT_LIGHT 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
@@ -123,7 +123,6 @@ void firstTimePathTraceInit(Scene* scene) {
 
 	cudaMalloc(&dev_triangles, scene->globalTriangleCount * sizeof(Triangle));
 	cudaMemcpy(dev_triangles, scene->globalTriangles->data(), scene->globalTriangleCount * sizeof(Triangle), cudaMemcpyHostToDevice);
-	std::cout << "geom count: " << scene->geoms.size() << std::endl;
 #if DIRECT_LIGHT
 	totalLights = scene->lightIndices.size();
 	cudaMalloc(&dev_lightIndices, totalLights * sizeof(unsigned int));

@@ -229,22 +229,15 @@ int Scene::loadTrianglesForMesh(string filename, Geom& thisMesh)
     if (!success) return -1;
 
 
-    // Loop over shapes, should be only one shape
-    for (size_t shape = 0; shape < shapes.size(); shape++) {
-        //check for only one shape
-        if (shape > 0)
-        {
-            std::cout << "TinyObjReader: more than one shape in "<< filename << std::endl;
-            return -1;
-        }
+    thisMesh.triangleStartIndex = globalTriangleCount;
 
-        thisMesh.triangleStartIndex = globalTriangleCount;
+    glm::vec3 boundMin{ FLT_MAX };
+    glm::vec3 boundMax{ FLT_MIN };
+    // Loop over shapes
+    for (size_t shape = 0; shape < shapes.size(); shape++) {
 
         // Loop over faces(polygon)
         size_t index_offset = 0;
-
-        glm::vec3 boundMin{ FLT_MAX };
-        glm::vec3 boundMax{ FLT_MIN };
 
         for (size_t face = 0; face < shapes[shape].mesh.num_face_vertices.size(); face++)
         {
@@ -304,10 +297,10 @@ int Scene::loadTrianglesForMesh(string filename, Geom& thisMesh)
             globalTriangles->push_back(current_triangle);
             globalTriangleCount++;
         }
-        thisMesh.triangleEndIndex = globalTriangleCount;
-        thisMesh.boxMin = boundMin;
-        thisMesh.boxMax = boundMax;
     }
+    thisMesh.triangleEndIndex = globalTriangleCount;
+    thisMesh.boxMin = boundMin;
+    thisMesh.boxMax = boundMax;
 
     return 1;
 }
