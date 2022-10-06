@@ -36,8 +36,12 @@ Using Radix Sort by material ID, we can batch rays according to material type. T
 Anti-aliasing
 ===========
 | With AA | No AA |
-|:-------:|:-------:|
+:-------:|:-------:
 |![](img/aa.png)|![](img/NO_AA.png)|
+
+With AA           |  No AA              
+:-------------------------:|:-------------------------:
+![](img/aa.png)|![](img/NO_AA.png)
 
 
 #### Sort by Materials Type 
