@@ -36,7 +36,7 @@ I initially tested with the Cornell Box scene and it does not seem to have a dif
 
 | With vs Without Stream Compaction |
 :-------:|
-|![](img/figure/sc.png){:width="800px"}|
+|![](img/figure/sc.png)|
 
 Sort by Materials Type 
 ============
@@ -46,7 +46,7 @@ We tested the method in a scene that has more than 10 material types. We can see
 
 | With vs Without Material Sorting |
 :-------:|
-|![](img/figure/ms.png){:width="800px"}|
+|![](img/figure/ms.png)|
 
 
 First Bounce Intersection Cache
@@ -57,7 +57,7 @@ From the figure below, we don't see a sigificant difference with our single bunn
 
 | With vs Without First Bounce Intersection Cache |
 :-------:|
-|![](img/figure/cache.png){:width="800px"}|
+|![](img/figure/cache.png)|
 
 Refraction
 ===========
