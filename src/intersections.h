@@ -213,7 +213,14 @@ __host__ __device__ float MeshIntersectionTest(Geom mesh, Ray r,
         float z = 1.0f - bary.x - bary.y;
 
         //glm::vec3 intersection_current = bary.x * tri->pos1 + bary.y * tri->pos2 + z * tri->pos3;
-        temp_normal = glm::normalize(bary.x * allTriangles[i].normal1 + bary.y * allTriangles[i].normal2 + z * allTriangles[i].normal3);
+        if (allTriangles[i].normal1 == glm::vec3(0))// no normal imported
+        {
+            temp_normal = glm::normalize(glm::cross(allTriangles[i].pos2 - allTriangles[i].pos1, allTriangles[i].pos3 - allTriangles[i].pos1));
+        }
+        else
+        {
+            temp_normal = glm::normalize(bary.x * allTriangles[i].normal1 + bary.y * allTriangles[i].normal2 + z * allTriangles[i].normal3);
+        }
     }
 
     if (t == FLT_MAX)
@@ -234,4 +241,18 @@ __host__ __device__ float MeshIntersectionTest(Geom mesh, Ray r,
     intersectionPoint = multiplyMV(mesh.transform, glm::vec4(getPointOnRay(q, t), 1.0f));
     normal = glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(temp_normal,1.0f)));
     return glm::length(r.origin - intersectionPoint);
+}
+
+
+__host__ __device__ glm::vec3 randomPointOnCube(Geom cube, thrust::default_random_engine& rng)
+{
+    thrust::uniform_real_distribution<float> u1(-0.5, 0.5);
+    glm::vec3 pos(u1(rng), u1(rng), u1(rng));
+    return glm::vec3(cube.transform * glm::vec4(pos, 1.f));
+}
+
+__host__ __device__ void generateRayToCube(Ray& r, Geom cube, thrust::default_random_engine& rng)
+{
+    glm::vec3 target = randomPointOnCube(cube, rng);
+    r.direction = glm::normalize(target - r.origin);
 }

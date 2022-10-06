@@ -111,9 +111,9 @@ SCALE       .01 10 10
 // Mesh
 OBJECT 6
 mesh
-../meshs/suzanne.obj
+../meshs/bunny.obj
 material 2
-TRANS       7 1 -15
+TRANS       0 0 0
 ROTAT       0 0 0
-SCALE       3 3 3
+SCALE       10 10 10
 

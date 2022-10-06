@@ -8,6 +8,7 @@
 #include "tiny_obj_loader.h"
 
 Scene::Scene(string filename) {
+    globalTriangles = new std::vector<Triangle>;
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;
     char* fname = (char*)filename.c_str();
@@ -31,6 +32,14 @@ Scene::Scene(string filename) {
                 loadCamera();
                 cout << " " << endl;
             }
+        }
+    }
+    // determine lights
+    for (unsigned int i = 0; i < geoms.size(); i++)
+    {
+        if (materials[geoms[i].materialid].emittance > 0)
+        {
+            lightIndices.push_back(i);
         }
     }
 }
@@ -292,7 +301,7 @@ int Scene::loadTrianglesForMesh(string filename, Geom& thisMesh)
             }
 
             index_offset += vertexCount;
-            globalTriangles.push_back(current_triangle);
+            globalTriangles->push_back(current_triangle);
             globalTriangleCount++;
         }
         thisMesh.totaltriangles = globalTriangleCount - thisMesh.triangleStartIndex;
@@ -305,7 +314,7 @@ int Scene::loadTrianglesForMesh(string filename, Geom& thisMesh)
 
 void Scene::freeObjs()
 {
-    //delete globalTriangles;
+    delete globalTriangles;
 }
 
 Scene::~Scene()

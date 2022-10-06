@@ -22,10 +22,11 @@ public:
     ~Scene();
     void freeObjs();
 
+    std::vector<unsigned int> lightIndices;
     std::vector<Geom> geoms;
     std::vector<Material> materials;
 
-    std::vector<Triangle> globalTriangles;
+    std::vector<Triangle>* globalTriangles;
     unsigned int globalTriangleCount = 0;
     RenderState state;
 };

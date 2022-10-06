@@ -19,9 +19,10 @@
 #define ERRORCHECK 1
 #define FIRST_BOUNCE 0
 #define SORT_BY_MATERIAL 1
-#define DEPTH_OF_FIELD 1
+#define DEPTH_OF_FIELD 0
 #define LENS_RADIUS 0.2f
 #define FOCAL_LENGTH 6.0f
+#define DIRECT_LIGHT 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -102,6 +103,8 @@ static ShadeableIntersection* dev_intersections = NULL;
 // ...
 static ShadeableIntersection* dev_first_intersections = NULL;
 static Triangle* dev_triangles = NULL;
+static unsigned int* dev_lightIndices = NULL;
+static unsigned int totalLights;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -118,10 +121,15 @@ void firstTimePathTraceInit(Scene* scene) {
 	cudaMalloc(&dev_materials, scene->materials.size() * sizeof(Material));
 	cudaMemcpy(dev_materials, scene->materials.data(), scene->materials.size() * sizeof(Material), cudaMemcpyHostToDevice);
 
-	std::cout << "count: "<< scene->globalTriangleCount << std::endl;
-	std::cout << "size: " << scene->globalTriangles.size() << std::endl;
 	cudaMalloc(&dev_triangles, scene->globalTriangleCount * sizeof(Triangle));
-	cudaMemcpy(dev_triangles, scene->globalTriangles.data(), scene->globalTriangleCount * sizeof(Triangle), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_triangles, scene->globalTriangles->data(), scene->globalTriangleCount * sizeof(Triangle), cudaMemcpyHostToDevice);
+
+#if DIRECT_LIGHT
+	totalLights = scene->lightIndices.size();
+	cudaMalloc(&dev_lightIndices, totalLights * sizeof(unsigned int));
+	cudaMemcpy(dev_lightIndices, scene->lightIndices.data(), totalLights * sizeof(unsigned int), cudaMemcpyHostToDevice);
+#endif 
+
 
 	pathtraceInit(hst_scene);
 	checkCUDAError("firstTimePathtraceInit");
@@ -156,6 +164,9 @@ void lastTimePathTraceFree()
 	cudaFree(dev_materials);
 	cudaFree(dev_triangles);
 	pathtraceFree();
+#if DIRECT_LIGHT
+	cudaFree(dev_lightIndices);
+#endif
 	checkCUDAError("lastTimePathtraceFree");
 }
 
@@ -365,10 +376,21 @@ __global__ void shadeBSDFMaterial(
 	, ShadeableIntersection* shadeableIntersections
 	, PathSegment* pathSegments
 	, Material* materials
+	, unsigned int* lights
+	, Geom* objects
+	, unsigned int lightnum
 )
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
-	if (idx < num_paths && pathSegments[idx].remainingBounces > 0)
+	if (idx >= num_paths)
+	{
+		return;
+	}
+#if DIRECT_LIGHT
+	if (pathSegments[idx].remainingBounces > 2)
+#else
+	if (pathSegments[idx].remainingBounces > 0)
+#endif
 	{
 		ShadeableIntersection intersection = shadeableIntersections[idx];
 		if (intersection.t > 0.0f) { // if the intersection exists...
@@ -385,9 +407,23 @@ __global__ void shadeBSDFMaterial(
 				pathSegments[idx].remainingBounces = 0;
 			}
 			else {
-				scatterRay(pathSegments[idx],getPointOnRay(pathSegments[idx].ray, intersection.t),
-					intersection.surfaceNormal,intersection.outside, material,rng);
 				pathSegments[idx].remainingBounces--;
+#if DIRECT_LIGHT
+				if (pathSegments[idx].remainingBounces == 2)
+				{
+					//direct ray to a raondom point on a random light
+					int lightIdx = glm::min((int)glm::floor(u01(rng) * lightnum), (int)lightnum - 1);
+
+					generateRayToCube(pathSegments[idx].ray, objects[lights[lightIdx]], rng);
+				}
+				else
+				{
+#endif
+					scatterRay(pathSegments[idx], getPointOnRay(pathSegments[idx].ray, intersection.t),
+						intersection.surfaceNormal, intersection.outside, material, rng);
+#if DIRECT_LIGHT
+				}
+#endif
 			}
 		}
 		else {
@@ -395,6 +431,17 @@ __global__ void shadeBSDFMaterial(
 			pathSegments[idx].remainingBounces = 0;
 		}
 	}
+#if DIRECT_LIGHT
+	else if (pathSegments[idx].remainingBounces == 2)
+	{
+		//final bounce to test if the ray can hit light
+		ShadeableIntersection intersection = shadeableIntersections[idx];
+		if (intersection.t > 0.0f) { // if the intersection exists...
+		}
+
+		pathSegments[idx].remainingBounces--;
+	}
+#endif
 }
 
 // Add the current iteration's output to the overall image
@@ -531,7 +578,10 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			num_paths,
 			intersections,
 			dev_paths,
-			dev_materials
+			dev_materials,
+			dev_lightIndices,
+			dev_geoms,
+			totalLights
 			);
 		checkCUDAError("BSDF shade");
 		cudaDeviceSynchronize();
