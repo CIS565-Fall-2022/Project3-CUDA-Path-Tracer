@@ -20,7 +20,8 @@ enum ImplicitObj {
     IMP_BOOKPAGES,
     IMP_MUG,
     IMP_COFFEE,
-    IMP_BOX
+    IMP_BOX,
+    IMP_LIGHT
 };
 
 struct Ray {
@@ -59,6 +60,7 @@ struct Material {
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+    int proceduralTex;
 };
 
 struct Camera {

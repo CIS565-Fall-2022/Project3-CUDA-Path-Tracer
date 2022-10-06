@@ -231,17 +231,16 @@ __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r
 #define MAX_DIST 100.f
 #define SURF_DIST 0.01
 
+ /*
+  ******************************************************
+  * Procedural Primitive SDFs
+  ******************************************************
+  */
 
 __host__ __device__ float roundedCylinderSDF(glm::vec3 queryPos, float ra, float rb, float h)
 {
     glm::vec2 d = glm::vec2(glm::length(glm::vec2(queryPos.x, queryPos.z)) - 2.0 * ra + rb, abs(queryPos.y) - h);
     return min(max(d.x, d.y), 0.f) + glm::length(max(d, 0.f)) - rb;
-}
-
-__host__ __device__ glm::mat2 rot(float a) {
-    float s = sin(a);
-    float c = cos(a);
-    return glm::mat2(c, -s, s, c);
 }
 
 __host__ __device__ float sphereSDF(glm::vec3 p) {
@@ -275,7 +274,23 @@ __host__ __device__ float roundBoxSDF(glm::vec3 p, glm::vec3 b, float r)
     return glm::length(max(q, 0.f)) + min(max(q.x, max(q.y, q.z)), 0.f) - r;
 }
 
+/*
+ ******************************************************
+ * Procedural Operators
+ ******************************************************
+ */
 
+__host__ __device__ glm::mat2 rot(float a) {
+    float s = sin(a);
+    float c = cos(a);
+    return glm::mat2(c, -s, s, c);
+}
+
+/*
+ ******************************************************
+ * Scene SDFs
+ ******************************************************
+ */
 
 __host__ __device__ float mugSDF(glm::vec3 p) {
     // coffee mug
@@ -321,6 +336,12 @@ __host__ __device__ float bookPagesSDF(glm::vec3 p) {
     return dCBookPages;
 }
 
+__host__ __device__ float lightSDF(glm::vec3 p) {
+    glm::vec3 pLight = p + glm::vec3(2.5f, 0.80, 0.0);
+    float dLight =boxSDF(pLight, glm::vec3(0.1f, 0.9f, 0.1f));
+    return dLight;
+}
+
 __host__ __device__ float penSDF(glm::vec3 p) {
     glm::vec3 sphereCenter = glm::vec3(0, 0, 0);    // center.xyz,radius
     float sphereRadius = 1.f;
@@ -344,7 +365,7 @@ __host__ __device__ float sceneSDF(glm::vec3 p, Geom impGeom) {
                                 break;
         case IMP_BOOKPAGES:     d = bookPagesSDF(transP3);
                                 break;
-        case IMP_BOX:           d = boxSDF(transP3, glm::vec3(0.1f, 0.9f, 0.1f));
+        case IMP_LIGHT:         d = lightSDF(transP3);
                                 break;
      }
      return d;
