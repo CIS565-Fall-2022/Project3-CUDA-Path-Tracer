@@ -6,6 +6,8 @@
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
+#define OCTREE_DEPTH 4
+#define OCTREE
 
 enum GeomType {
     SPHERE,
@@ -23,9 +25,32 @@ struct Texture {
   int offsetEmissive = 0;
 };
 
+struct OctreeNode {
+  glm::vec3 boundingMax;
+  glm::vec3 boundingMin;
+
+  int maxDepth = 4;
+
+  bool isLeaf = 0;
+  int startIndex;
+  int count;
+
+  OctreeNode(glm::vec3 maxBB, glm::vec3 minBB) {
+    this->boundingMax = maxBB;
+    this->boundingMin = minBB;
+  }
+};
+
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
+};
+
+struct Triangle {
+  glm::vec3 pos[3];
+  glm::vec3 normal[3];
+  glm::vec2 uv[3];
+  glm::vec4 tangent[3];
 };
 
 struct SceneMeshesData {
@@ -54,7 +79,9 @@ struct Geom {
     glm::mat4 invTranspose;
 
     int startIndex;
+    int startTriIndex;
     int count;
+    int octreeStartIndex;
 
     glm::vec3 boundingMin;
     glm::vec3 boundingMax;

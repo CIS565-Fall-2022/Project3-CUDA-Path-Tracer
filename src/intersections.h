@@ -6,6 +6,8 @@
 #include "sceneStructs.h"
 #include "utilities.h"
 
+#define OCTREE 0
+
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
  */
@@ -171,7 +173,8 @@ __host__ __device__ int boundingBoxIntersection(const Ray r, const glm::vec3& bo
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ float meshIntersectionTest(Geom geom, const SceneMeshesData sceneMeshesData, Ray r,
+__host__ __device__ float meshIntersectionTest(Geom geom, int* triangleIndice, OctreeNode* octree,
+  const SceneMeshesData sceneMeshesData, Triangle* triangles, Ray r,
   glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2& uv, glm::vec4& tangent) {
   float t = FLT_MAX;
 
@@ -182,6 +185,78 @@ __host__ __device__ float meshIntersectionTest(Geom geom, const SceneMeshesData 
   rt.origin = ro;
   rt.direction = rd;
 
+#if OCTREE
+  if (!boundingBoxIntersection(rt, octree[0].boundingMax, octree[0].boundingMin)) {
+    return -1;
+  }
+
+  int rootIndex = geom.octreeStartIndex;
+  int maxDepth = octree[rootIndex].maxDepth;
+  int levelStartIndex = rootIndex;
+  for (int level = 0; level < maxDepth - 1; level++) {
+    levelStartIndex += pow(8, level);
+  }
+
+  int levelNum = pow(8, maxDepth - 1);
+  for (int i = 0; i < levelNum; i++) {
+    int idx = levelStartIndex + i;
+
+    if (boundingBoxIntersection(rt, octree[idx].boundingMax, octree[idx].boundingMin)) {
+      int startIdx = octree[idx].startIndex, count = octree[idx].count;
+      for (int j = 0; j < count; j++) {
+        int index = triangleIndice[j + startIdx];
+
+        // get the 3 normal vectors for that face
+        glm::vec3 v0, v1, v2;
+        //v0 = sceneMeshesData.positions[idx + 0];
+        //v1 = sceneMeshesData.positions[idx + 1];
+        //v2 = sceneMeshesData.positions[idx + 2];
+        v0 = triangles[index].pos[0];
+        v1 = triangles[index].pos[1];
+        v2 = triangles[index].pos[2];
+
+        glm::vec3 bary;
+        if (glm::intersectRayTriangle(ro, rd, v0, v1, v2, bary) && bary.z < t) {
+          glm::vec3 n0, n1, n2;
+          //n0 = sceneMeshesData.normals[idx + 0];
+          //n1 = sceneMeshesData.normals[idx + 1];
+          //n2 = sceneMeshesData.normals[idx + 2];
+          n0 = triangles[index].normal[0];
+          n1 = triangles[index].normal[1];
+          n2 = triangles[index].normal[2];
+
+          normal = (1 - bary.x - bary.y) * n0 + bary.x * n1 + bary.y * n2;
+
+          if (geom.useTex == 1) {
+            glm::vec2 uv0, uv1, uv2;
+            //uv0 = sceneMeshesData.uvs[idx + 0];
+            //uv1 = sceneMeshesData.uvs[idx + 1];
+            //uv2 = sceneMeshesData.uvs[idx + 2];
+            uv0 = triangles[index].uv[0];
+            uv1 = triangles[index].uv[1];
+            uv2 = triangles[index].uv[2];
+
+            uv = (1 - bary.x - bary.y) * uv0 + bary.x * uv1 + bary.y * uv2;
+          }
+
+          if (geom.hasTangent) {
+            glm::vec4 t0, t1, t2;
+            //t0 = sceneMeshesData.tangents[idx + 0];
+            //t1 = sceneMeshesData.tangents[idx + 1];
+            //t2 = sceneMeshesData.tangents[idx + 2];
+            t0 = triangles[index].tangent[0];
+            t1 = triangles[index].tangent[1];
+            t2 = triangles[index].tangent[2];
+
+            tangent = (1 - bary.x - bary.y) * t0 + bary.x * t1 + bary.y * t2;
+          }
+
+          t = bary.z;
+        }
+      }
+    }
+  }
+#else
   if (!boundingBoxIntersection(rt, geom.boundingMax, geom.boundingMin)) {
     return -1;
   }
@@ -194,37 +269,55 @@ __host__ __device__ float meshIntersectionTest(Geom geom, const SceneMeshesData 
     int idx = i * 3 + geom.startIndex;
     // get the 3 normal vectors for that face
     glm::vec3 v0, v1, v2;
-    v0 = sceneMeshesData.positions[idx + 0];
-    v1 = sceneMeshesData.positions[idx + 1];
-    v2 = sceneMeshesData.positions[idx + 2];
+    //v0 = sceneMeshesData.positions[idx + 0];
+    //v1 = sceneMeshesData.positions[idx + 1];
+    //v2 = sceneMeshesData.positions[idx + 2];
+
+    int index = i + geom.startTriIndex;
+    v0 = triangles[index].pos[0];
+    v1 = triangles[index].pos[1];
+    v2 = triangles[index].pos[2];
 
     glm::vec3 bary;
     if (glm::intersectRayTriangle(ro, rd, v0, v1, v2, bary) && bary.z < t) {
       glm::vec3 n0, n1, n2;
-      n0 = sceneMeshesData.normals[idx + 0];
-      n1 = sceneMeshesData.normals[idx + 1];
-      n2 = sceneMeshesData.normals[idx + 2];
+      //n0 = sceneMeshesData.normals[idx + 0];
+      //n1 = sceneMeshesData.normals[idx + 1];
+      //n2 = sceneMeshesData.normals[idx + 2];
+      n0 = triangles[index].normal[0];
+      n1 = triangles[index].normal[1];
+      n2 = triangles[index].normal[2];
+
       normal = (1 - bary.x - bary.y) * n0 + bary.x * n1 + bary.y * n2;
       
       if (geom.useTex == 1) {
         glm::vec2 uv0, uv1, uv2;
-        uv0 = sceneMeshesData.uvs[idx + 0];
-        uv1 = sceneMeshesData.uvs[idx + 1];
-        uv2 = sceneMeshesData.uvs[idx + 2];
+        //uv0 = sceneMeshesData.uvs[idx + 0];
+        //uv1 = sceneMeshesData.uvs[idx + 1];
+        //uv2 = sceneMeshesData.uvs[idx + 2];
+        uv0 = triangles[index].uv[0];
+        uv1 = triangles[index].uv[1];
+        uv2 = triangles[index].uv[2];
+
         uv = (1 - bary.x - bary.y) * uv0 + bary.x * uv1 + bary.y * uv2;
       }
 
       if (geom.hasTangent) {
         glm::vec4 t0, t1, t2;
-        t0 = sceneMeshesData.tangents[idx + 0];
-        t1 = sceneMeshesData.tangents[idx + 1];
-        t2 = sceneMeshesData.tangents[idx + 2];
+        //t0 = sceneMeshesData.tangents[idx + 0];
+        //t1 = sceneMeshesData.tangents[idx + 1];
+        //t2 = sceneMeshesData.tangents[idx + 2];
+        t0 = triangles[index].tangent[0];
+        t1 = triangles[index].tangent[1];
+        t2 = triangles[index].tangent[2];
+
         tangent = (1 - bary.x - bary.y) * t0 + bary.x * t1 + bary.y * t2;
       }
 
       t = bary.z;
     }
   }
+#endif
 
   glm::vec3 objspaceIntersection = getPointOnRay(rt, t);
 

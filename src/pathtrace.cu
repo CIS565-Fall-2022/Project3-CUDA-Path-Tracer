@@ -93,7 +93,12 @@ static glm::vec3* dev_emissiveTexture;
 
 static glm::vec4* dev_lightSourceSampled;
 
+static Triangle* dev_triangles;
 static SceneMeshesData dev_sceneMeshesData;
+
+// Octree
+static int* dev_triangleIndice;
+static OctreeNode* dev_octree;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -127,6 +132,9 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_first_intersections, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_first_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
+	cudaMalloc(&dev_triangles, scene->triangles.size() * sizeof(Triangle));
+	cudaMemcpy(dev_triangles, scene->triangles.data(), scene->triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice);
+
 	cudaMalloc(&dev_sceneMeshesData.indices, scene->indices.size() * sizeof(unsigned short));
 	cudaMemcpy(dev_sceneMeshesData.indices, scene->indices.data(), scene->indices.size() * sizeof(unsigned short), cudaMemcpyHostToDevice);
 
@@ -159,6 +167,13 @@ void pathtraceInit(Scene* scene) {
 
 	cudaMalloc(&dev_lightSourceSampled, pixelcount * sizeof(glm::vec4));
 	cudaMemset(dev_lightSourceSampled, 0, pixelcount * sizeof(glm::vec4));
+
+	// Octree
+	cudaMalloc(&dev_triangleIndice, scene->trianglesIndices.size() * sizeof(int));
+	cudaMemcpy(dev_triangleIndice, scene->trianglesIndices.data(), scene->trianglesIndices.size() * sizeof(int), cudaMemcpyHostToDevice);
+
+	cudaMalloc(&dev_octree, scene->octree.size() * sizeof(OctreeNode));
+	cudaMemcpy(dev_octree, scene->octree.data(), scene->octree.size() * sizeof(OctreeNode), cudaMemcpyHostToDevice);
 
 	checkCUDAError("pathtraceInit");
 }
@@ -244,10 +259,13 @@ __global__ void computeIntersections(
 	, Geom* geoms
 	, int geoms_size
 	, SceneMeshesData sceneMeshesData
+	, Triangle* triangles
 	, ShadeableIntersection* intersections
 	, glm::vec3* normalMap
 	, Texture* textureData
 	, int normalTextureID
+	, int* triangleIndice
+	, OctreeNode* octree
 )
 {
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -284,7 +302,7 @@ __global__ void computeIntersections(
 			}
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 			else if (geom.type == MESH) {
-				t = meshIntersectionTest(geom, sceneMeshesData, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, tmp_tangent);
+				t = meshIntersectionTest(geom, triangleIndice, octree, sceneMeshesData, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, tmp_tangent);
 			}
 
 			// Compute the minimum t from the intersection tests to determine what
@@ -552,10 +570,13 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_geoms
 				, hst_scene->geoms.size()
 				, dev_sceneMeshesData
+				, dev_triangles
 				, intersections
 				, dev_normalTexture
 				, dev_textures
 				, hst_scene->normalTextureID
+				, dev_triangleIndice
+				, dev_octree
 				);
 			checkCUDAError("trace one bounce");
 
@@ -575,10 +596,13 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, dev_geoms
 			, hst_scene->geoms.size()
 			, dev_sceneMeshesData
+			, dev_triangles
 			, intersections
 			, dev_normalTexture
 			, dev_textures
 			, hst_scene->normalTextureID
+			, dev_triangleIndice
+			, dev_octree
 			);
 		checkCUDAError("trace one bounce");
 

@@ -33,14 +33,14 @@ MATERIAL 3
 RGB         .35 .85 .35
 SPECEX      0
 SPECRGB     0 0 0
-REFL        0
+REFL        1
 REFR        0
 REFRIOR     0
 EMITTANCE   0
 
 // Specular white
 MATERIAL 4
-RGB         .35 .85 .35
+RGB         .98 .98 .98
 SPECEX      0
 SPECRGB     .98 .98 .98
 REFL        0
@@ -109,10 +109,27 @@ ROTAT       0 0 0
 SCALE       .01 10 10
 
 // Sphere
+//OBJECT 6
+//mesh
+//GLTF ../scenes/models/bunny/bunny.gltf
+//material 4
+//TRANS       0 3 0
+//ROTAT       0 0 0
+//SCALE       2 2 2
+
+// Lantern
 OBJECT 6
 mesh
-GLTF ../scenes/models/Cube/water.gltf
+GLTF ../scenes/models/Lantern/glTF/Lantern.gltf
 material 4
-TRANS       0 4 1
-ROTAT       0 45 45
-SCALE       3 1 1
+TRANS       -4 0 -2
+ROTAT       0 -50 0 
+SCALE       0.4 0.4 0.4
+
+OBJECT 7
+mesh
+GLTF ../scenes/models/Cube/Cube.gltf
+material 4
+TRANS       -1 3 2
+ROTAT       0 0 0 
+SCALE       2 2 2

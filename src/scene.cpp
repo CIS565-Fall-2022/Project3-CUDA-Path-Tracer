@@ -14,6 +14,215 @@ static std::string GetFilePathExtension(const std::string& FileName) {
   return "";
 }
 
+int getOctStartNode(int level) {
+  int index = 0;
+  for (int i = 0; i <= level - 1; i++) {
+    index += pow(8, i);
+  }
+
+  return index;
+}
+
+float boxIntersection(Ray q, const glm::vec3& boundingMax, glm::vec3& boundingMin) {
+  bool outside;
+
+  float tmin = -1e38f;
+  float tmax = 1e38f;
+
+  for (int xyz = 0; xyz < 3; ++xyz) {
+    float qdxyz = q.direction[xyz];
+    /*if (glm::abs(qdxyz) > 0.00001f)*/ {
+      float t1 = (boundingMin[xyz] - q.origin[xyz]) / qdxyz;
+      float t2 = (boundingMax[xyz] - q.origin[xyz]) / qdxyz;
+      float ta = glm::min(t1, t2);
+      float tb = glm::max(t1, t2);
+
+      if (ta > 0 && ta > tmin) {
+        tmin = ta;
+      }
+      if (tb < tmax) {
+        tmax = tb;
+      }
+    }
+  }
+
+  if (tmax >= tmin && tmax > 0) {
+    outside = true;
+    if (tmin <= 0) {
+      tmin = tmax;
+
+      outside = false;
+    }
+    glm::vec3 intersectionPoint = q.origin + (tmin - .0001f) * glm::normalize(q.direction);
+    return glm::length(q.origin - intersectionPoint);
+  }
+  return -1;
+}
+
+//bool isInside(const Triangle& t, const glm::vec3& boundingMax, glm::vec3& boundingMin) {
+//  bool outside;
+//
+//  for (int i = 0; i < 3; i++) {
+//    float x = t.pos[i].x;
+//    float y = t.pos[i].y;
+//    float z = t.pos[i].z;
+//    
+//    if (x <= boundingMax.x && x >= boundingMin.x && y <= boundingMax.y && y >= boundingMin.y && z <= boundingMax.z && z >= boundingMin.z)
+//      return true;
+//  }
+//
+//  for (int i = 0; i < 3; i++) {
+//    Ray r;
+//    r.origin = t.pos[i];
+//    r.direction = glm::normalize(t.pos[i] - t.pos[(i + 1) % 3]);
+//
+//    float len = boxIntersection(r, boundingMax, boundingMin);
+//    if (len != -1 && len < glm::length(t.pos[i] - t.pos[(i + 1) % 3]))
+//      return true;
+//  }
+//
+//  return false;
+//}
+
+bool isInside(const Triangle& triangle, const glm::vec3& boundingMax, glm::vec3& boundingMin) {
+  // Benchmark 'Triangle_intersects_AABB': Triangle::Intersects(AABB)
+//    Best: 17.282 nsecs / 46.496 ticks, Avg: 17.804 nsecs, Worst: 18.434 nsecs
+
+  for (int i = 0; i < 3; i++) {
+    float x = triangle.pos[i].x;
+    float y = triangle.pos[i].y;
+    float z = triangle.pos[i].z;
+    
+    if (x <= boundingMax.x && x >= boundingMin.x && y <= boundingMax.y && y >= boundingMin.y && z <= boundingMax.z && z >= boundingMin.z)
+      return true;
+  }
+
+  glm::vec3 a = triangle.pos[0];
+  glm::vec3 b = triangle.pos[1];
+  glm::vec3 c = triangle.pos[2];
+
+  float xMin = min(a.x, min(b.x, c.x));
+  float yMin = min(a.y, min(b.y, c.y));
+  float zMin = min(a.z, min(b.z, c.z));
+  float xMax = max(a.x, max(b.x, c.x));
+  float yMax = max(a.y, max(b.y, c.y));
+  float zMax = max(a.z, max(b.z, c.z));
+
+  if (xMin > boundingMax.x || xMax < boundingMin.x
+    || yMin > boundingMax.y || yMax < boundingMin.y
+    || zMin > boundingMax.z || zMax < boundingMin.z)
+    return false;
+
+  float offset = 0.1f;
+  glm::vec3 center = (boundingMax + boundingMin) * 0.5f;
+  glm::vec3 h = boundingMax - center + offset;
+
+  const glm::vec3 t[3] = { b - a, c - a, c - b };
+
+  glm::vec3 ac = a - center;
+
+  glm::vec3 n = glm::cross(t[0], t[1]);
+  float s = glm::dot(n, ac);
+  float r = glm::abs(glm::dot(h, glm::abs(n)));
+  if (glm::abs(s) >= r)
+    return false;
+
+  const glm::vec3 at[3] = { glm::abs(t[0]), glm::abs(t[1]), glm::abs(t[2]) };
+
+  glm::vec3 bc = b - center;
+  glm::vec3 cc = c - center;
+
+  // SAT test all cross-axes.
+  // The following is a fully unrolled loop of this code, stored here for reference:
+  /*
+  float d1, d2, a1, a2;
+  const vec e[3] = { DIR_VEC(1, 0, 0), DIR_VEC(0, 1, 0), DIR_VEC(0, 0, 1) };
+  for(int i = 0; i < 3; ++i)
+    for(int j = 0; j < 3; ++j)
+    {
+      vec axis = Cross(e[i], t[j]);
+      ProjectToAxis(axis, d1, d2);
+      aabb.ProjectToAxis(axis, a1, a2);
+      if (d2 <= a1 || d1 >= a2) return false;
+    }
+  */
+
+  // eX <cross> t[0]
+  float d1 = t[0].y * ac.z - t[0].z * ac.y;
+  float d2 = t[0].y * cc.z - t[0].z * cc.y;
+  float tc = (d1 + d2) * 0.5f;
+  r = glm::abs(h.y * at[0].z + h.z * at[0].y);
+  if (r + glm::abs(tc - d1) < glm::abs(tc))
+    return false;
+
+  // eX <cross> t[1]
+  d1 = t[1].y * ac.z - t[1].z * ac.y;
+  d2 = t[1].y * bc.z - t[1].z * bc.y;
+  tc = (d1 + d2) * 0.5f;
+  r = glm::abs(h.y * at[1].z + h.z * at[1].y);
+  if (r + glm::abs(tc - d1) < glm::abs(tc))
+    return false;
+
+  // eX <cross> t[2]
+  d1 = t[2].y * ac.z - t[2].z * ac.y;
+  d2 = t[2].y * bc.z - t[2].z * bc.y;
+  tc = (d1 + d2) * 0.5f;
+  r = glm::abs(h.y * at[2].z + h.z * at[2].y);
+  if (r + glm::abs(tc - d1) < glm::abs(tc))
+    return false;
+
+  // eY <cross> t[0]
+  d1 = t[0].z * ac.x - t[0].x * ac.z;
+  d2 = t[0].z * cc.x - t[0].x * cc.z;
+  tc = (d1 + d2) * 0.5f;
+  r = glm::abs(h.x * at[0].z + h.z * at[0].x);
+  if (r + glm::abs(tc - d1) < glm::abs(tc))
+    return false;
+
+  // eY <cross> t[1]
+  d1 = t[1].z * ac.x - t[1].x * ac.z;
+  d2 = t[1].z * bc.x - t[1].x * bc.z;
+  tc = (d1 + d2) * 0.5f;
+  r = glm::abs(h.x * at[1].z + h.z * at[1].x);
+  if (r + glm::abs(tc - d1) < glm::abs(tc))
+    return false;
+
+  // eY <cross> t[2]
+  d1 = t[2].z * ac.x - t[2].x * ac.z;
+  d2 = t[2].z * bc.x - t[2].x * bc.z;
+  tc = (d1 + d2) * 0.5f;
+  r = glm::abs(h.x * at[2].z + h.z * at[2].x);
+  if (r + glm::abs(tc - d1) < glm::abs(tc))
+    return false;
+
+  // eZ <cross> t[0]
+  d1 = t[0].x * ac.y - t[0].y * ac.x;
+  d2 = t[0].x * cc.y - t[0].y * cc.x;
+  tc = (d1 + d2) * 0.5f;
+  r = glm::abs(h.y * at[0].x + h.x * at[0].y);
+  if (r + glm::abs(tc - d1) < glm::abs(tc))
+    return false;
+
+  // eZ <cross> t[1]
+  d1 = t[1].x * ac.y - t[1].y * ac.x;
+  d2 = t[1].x * bc.y - t[1].y * bc.x;
+  tc = (d1 + d2) * 0.5f;
+  r = glm::abs(h.y * at[1].x + h.x * at[1].y);
+  if (r + glm::abs(tc - d1) < glm::abs(tc))
+    return false;
+
+  // eZ <cross> t[2]
+  d1 = t[2].x * ac.y - t[2].y * ac.x;
+  d2 = t[2].x * bc.y - t[2].y * bc.x;
+  tc = (d1 + d2) * 0.5f;
+  r = glm::abs(h.y * at[2].x + h.x * at[2].y);
+  if (r + glm::abs(tc - d1) < glm::abs(tc))
+    return false;
+
+  // No separating axis exists, the AABB and triangle intersect.
+  return true;
+}
+
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;
@@ -585,11 +794,115 @@ int Scene::loadGLTF(const string& filename, Geom& geom) {
       //meshes->push_back(loadedMesh);
       ret = true;
     }
+
+    cout << "Convert to triangle ..." << endl;
+    newGeom.startTriIndex = triangles.size();
+    for (int i = 0; i < newGeom.count / 3; i++) {
+      Triangle t;
+      if (!positions.empty()) {
+        t.pos[0] = positions[newGeom.startIndex + 3 * i + 0];
+        t.pos[1] = positions[newGeom.startIndex + 3 * i + 1];
+        t.pos[2] = positions[newGeom.startIndex + 3 * i + 2];
+      }
+
+      if (!normals.empty()) {
+        t.normal[0] = normals[newGeom.startIndex + 3 * i + 0];
+        t.normal[1] = normals[newGeom.startIndex + 3 * i + 1];
+        t.normal[2] = normals[newGeom.startIndex + 3 * i + 2];
+      }
+
+      if (newGeom.useTex) {
+        t.uv[0] = uvs[newGeom.startIndex + 3 * i + 0];
+        t.uv[1] = uvs[newGeom.startIndex + 3 * i + 1];
+        t.uv[2] = uvs[newGeom.startIndex + 3 * i + 2];
+      }
+
+      if (newGeom.hasTangent) {
+        t.tangent[0] = tangents[newGeom.startIndex + 3 * i + 0];
+        t.tangent[1] = tangents[newGeom.startIndex + 3 * i + 1];
+        t.tangent[2] = tangents[newGeom.startIndex + 3 * i + 2];
+      }
+
+      triangles.push_back(t);
+    }
+
+    // Octree
+    int octreeOffset = octree.size();
+
+    octree.push_back(OctreeNode(newGeom.boundingMax, newGeom.boundingMin));
+    octree[octreeOffset].maxDepth = this->treeDepth;
+    for (int i = 1; i < treeDepth; i++) {
+      int parentNum = pow(8, i - 1);
+      for (int j = 0; j < parentNum; j++) {
+        int childIdx = getOctStartNode(i) + j * 8;
+        int parentIdx = (childIdx - 1) / 8;
+
+        addChild(parentIdx);
+      }
+    }
+    cout << "Octree Size: " << octree.size() << endl;
+    int numLeaf = pow(8, treeDepth - 1);
+    for (int i = 0; i < numLeaf; i++) {
+      int idx = i + getOctStartNode(treeDepth - 1) + octreeOffset;
+      octree[idx].isLeaf = 1;
+      octree[idx].startIndex = trianglesIndices.size();
+
+      for (int j = 0; j < newGeom.count / 3; j++) {
+        int k = j + newGeom.startTriIndex;
+
+        if (isInside(triangles[k], octree[idx].boundingMax, octree[idx].boundingMin)) {
+          trianglesIndices.push_back(k);
+        }
+      }
+
+      octree[idx].count = trianglesIndices.size() - octree[idx].startIndex;
+    }
+
+    newGeom.octreeStartIndex = octreeOffset;
+
     cout << "Load into Geometry list" << endl;
     geoms.push_back(newGeom);
   }
 
   return 1;
+}
+
+void Scene::addChild(int parentIdx) {
+  OctreeNode node = octree[parentIdx];
+  float offset = 0.f;
+
+  float x1 = node.boundingMax.x + offset;
+  float y1 = node.boundingMax.y + offset;
+  float z1 = node.boundingMax.z + offset;
+
+  float x2 = node.boundingMin.x - offset;
+  float y2 = node.boundingMin.y - offset;
+  float z2 = node.boundingMin.z - offset;
+
+  float xm = (x1 + x2) / 2.f;
+  if (abs(xm) < 1e-6)
+    xm = 0.f;
+
+  float ym = (y1 + y2) / 2.f;
+  if (abs(ym) < 1e-6)
+    ym = 0.f;
+
+  float zm = (z1 + z2) / 2.f;
+  if (abs(zm) < 1e-6)
+    zm = 0.f;
+
+
+  octree.push_back(OctreeNode(glm::vec3(x1, y1, z1), glm::vec3(xm - offset, ym - offset, zm - offset)));
+
+  octree.push_back(OctreeNode(glm::vec3(x1, y1, zm + offset), glm::vec3(xm - offset, ym - offset, z2)));
+  octree.push_back(OctreeNode(glm::vec3(x1, ym + offset, z1), glm::vec3(xm - offset, y2, zm - offset)));
+  octree.push_back(OctreeNode(glm::vec3(xm + offset, y1, z1), glm::vec3(x2, ym - offset, zm - offset)));
+
+  octree.push_back(OctreeNode(glm::vec3(x1, ym + offset, zm + offset), glm::vec3(xm - offset, y2, z2)));
+  octree.push_back(OctreeNode(glm::vec3(xm + offset, y1, zm + offset), glm::vec3(x2, ym - offset, z2)));
+  octree.push_back(OctreeNode(glm::vec3(xm + offset, ym + offset, z1), glm::vec3(x2, y2, zm - offset)));
+
+  octree.push_back(OctreeNode(glm::vec3(xm + offset, ym + offset, zm + offset), glm::vec3(x2, y2, z2)));
 }
 
 int Scene::loadCamera() {

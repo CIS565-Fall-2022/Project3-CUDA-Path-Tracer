@@ -21,6 +21,7 @@ private:
     int loadCamera();
     int loadGLTF(const string &filename, Geom &newGeom);
     int loadNodes(const vector<tinygltf::Node>& nodes, int index, glm::mat4& transform);
+    void addChild(const int parentIdx);
 public:
     Scene(string filename);
     ~Scene();
@@ -32,6 +33,11 @@ public:
 
     std::unordered_map<int, glm::mat4> nodeToTransform;
     std::unordered_map<int, int> geomIdMap;
+
+    std::vector<Triangle> triangles;
+    std::vector<OctreeNode> octree;
+    const int treeDepth = 3;
+    std::vector<int> trianglesIndices;
 
     std::vector<unsigned short> indices;
     std::vector<glm::vec3> positions;
