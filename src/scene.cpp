@@ -4,6 +4,7 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
 
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
@@ -11,6 +12,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #endif
 #include <stb_image.h>
+
 
 
 Scene::Scene(string filename) {
@@ -43,6 +45,7 @@ Scene::Scene(string filename) {
 
 Scene::~Scene()
 {
+       
 }
 
 int Scene::loadGeom(string objectid) {
@@ -279,6 +282,40 @@ int Scene::loadGeomTriangles(Geom& geom, string filePath)
     }
     geom.triangleEndIndex = this->triangles.size();
 
+
+#if ENABLE_BVH
+
+    geom.bvhNodeStartIndex = bvhNodes.size();
+
+    // Init PrimInfo vector
+    std::vector<BVHPrimitiveInfo> bvhPrimInfos;
+    std::vector<Triangle> reorderPrims;
+    for (int i = geom.triangleStartIndex; i < geom.triangleEndIndex; ++i)
+    {
+        bvhPrimInfos.push_back(BVHPrimitiveInfo{ i, triangles[i].getBound(), triangles[i].getCentriod()});
+    }
+
+    // Build BVH
+    int count = 0;
+    BVHNode* root = recursiveBuildBVH(0, bvhPrimInfos.size(), count, bvhPrimInfos, reorderPrims);
+    for (int i = geom.triangleStartIndex; i < geom.triangleEndIndex; ++i)
+    {
+        triangles[i] = reorderPrims[i - geom.triangleStartIndex];
+    }
+    
+    // Transfer BVHNode to LinearBVHNode
+    int offset = 0;
+    std::vector<LinearBVHNode> tmpVec(count);
+    flattenBVHNode(root, &offset, tmpVec);
+    bvhNodes.insert(bvhNodes.end(), tmpVec.begin(), tmpVec.end());
+
+    // Delete the BVHNode
+    deleteBVHNode(root);
+
+    geom.bvhNodeEndIndex = bvhNodes.size();
+
+#endif
+
     return 1;
 }
 
@@ -310,4 +347,196 @@ int Scene::markTextureNormal(string filePath)
     textureNormalIds.emplace_back(filePath);
 
     return textureNormalIds.size() - 1;
+}
+
+BVHNode* Scene::recursiveBuildBVH(int st, int ed, int& count,
+    std::vector<BVHPrimitiveInfo>& primInfos, std::vector<Triangle>& reorderPrims)
+{
+    int mid = (st + ed) / 2;        // Default split
+    BVHNode* node = new BVHNode();
+    count++;
+
+    // Calc bound for current node
+    Bound3 bound;
+    for (int i = st; i < ed; ++i)
+    {
+        bound = bound.Union(primInfos[i].bound);
+    }
+    node->bound = bound;
+    
+    // If there is only one primitive, then no need to divide
+    int nPrimitive = ed - st;
+    if (nPrimitive <= 1)
+    {      
+        node->nPrimitives = nPrimitive;
+        node->firstPrimOffset = reorderPrims.size();
+        reorderPrims.push_back(triangles[primInfos[st].triangleId]);
+        return node;
+    }
+
+    // Calc centriod bound and get split dim
+    Bound3 centriodBound;
+    for (int i = st; i < ed; ++i)
+    {
+        centriodBound = centriodBound.Union(primInfos[i].centroid);
+    }
+    int dim = centriodBound.MaxExtent();
+    
+    // If all primitive centriods are the same, then no need to divide
+    if (centriodBound.pMax[dim] == centriodBound.pMin[dim])
+    {
+        node->nPrimitives = nPrimitive;
+        node->firstPrimOffset = reorderPrims.size();
+        for (int i = st; i < ed; ++i)
+        {
+            reorderPrims.push_back(triangles[primInfos[i].triangleId]);
+        }
+        return node;
+    }
+    
+    // If there is only a few primitive, we can just sort them and divide in the middle
+    if (nPrimitive <= 4)
+    {
+        std::nth_element(&primInfos[st], &primInfos[mid], &primInfos[ed - 1] + 1,
+            [dim](const BVHPrimitiveInfo&a, const BVHPrimitiveInfo&b)
+            {
+                return a.centroid[dim] < b.centroid[dim];
+            });
+    }
+    else
+    {
+        // SAH method to divide and reorder primitives
+
+        // 1. Init bucket arrays and partition primitives into buckets by centriods
+        const int nBucket = SAH_BUCKET_SIZE;
+        struct BuckerInfo {
+            int count = 0;
+            Bound3 bounds;
+        };
+        BuckerInfo buckets[nBucket];
+        for (int i = st; i < ed; ++i)
+        {
+            int b = nBucket * centriodBound.Offset(primInfos[i].centroid)[dim];
+            if (b == nBucket) b = nBucket - 1;
+            buckets[b].count++;
+            buckets[b].bounds = buckets[b].bounds.Union(primInfos[i].bound);
+        }
+
+        // 2. Compute cost for splitting after each bucket
+        const float primCost = 1.0f;    // The cost of intersection with a prim
+        const float nodeCost = 0.125f;  // The cost of intersectino with the BVHNode
+        float costs[nBucket - 1];
+        for (int i = 0; i < nBucket - 1; ++i)
+        {
+            Bound3 b0;
+            Bound3 b1;
+            int count0 = 0, count1 = 0;
+            for (int j = 0; j <= i; ++j)
+            {
+                b0 = b0.Union(buckets[j].bounds);
+                count0 += buckets[j].count;
+            }
+
+            for (int j = i + 1; j < nBucket; ++j)
+            {
+                b1 = b1.Union(buckets[j].bounds);
+                count1 +=  buckets[j].count;
+            }
+
+            costs[i] = nodeCost + 
+                (count0 * primCost * b0.SurfaceArea() + count1 * primCost * b1.SurfaceArea()) / bound.SurfaceArea();
+        }
+
+        // 3. Find the minimum cost
+        float minCost = costs[0];
+        int minCostBucketIndex = 0;
+        for (int i = 1; i < nBucket - 1; ++i)
+        {
+            if (costs[i] < minCost)
+            {
+                minCost = costs[i];
+                minCostBucketIndex = i;
+            }
+        }
+
+        // 4. Compare it with the cost of no division
+        float leaveCost = primCost * nPrimitive;
+        if (minCost < leaveCost || nPrimitive > MAX_PRIM_IN_BVH_NODE)
+        {
+            // a. When dividing by bucket yeilds min cost
+            BVHPrimitiveInfo* pmid = std::partition(&primInfos[st], &primInfos[ed - 1] + 1,
+                [=](const BVHPrimitiveInfo& p)
+                {
+                    int b = nBucket * centriodBound.Offset(p.centroid)[dim];
+                    if (b == nBucket) b = nBucket - 1;
+                    return b <= minCostBucketIndex;
+                });
+
+            mid = pmid - &primInfos[0];
+
+            // No need to partition
+            if (mid == st || mid == ed)
+            {
+                node->nPrimitives = nPrimitive;
+                node->firstPrimOffset = reorderPrims.size();
+                for (int i = st; i < ed; ++i)
+                {
+                    reorderPrims.push_back(triangles[primInfos[i].triangleId]);
+                }
+                return node;
+            }
+        }
+        else
+        {
+            // b. When no division yeilds min cost
+            node->nPrimitives = nPrimitive;
+            node->firstPrimOffset = reorderPrims.size();
+            for (int i = st; i < ed; ++i)
+            {
+                reorderPrims.push_back(triangles[primInfos[i].triangleId]);
+            }
+            return node;
+        }
+    }
+
+    // 5. Construct interior node
+    node->splitAxis = dim;
+    node->leftChild = recursiveBuildBVH(st, mid, count, primInfos, reorderPrims);
+    node->rightChild = recursiveBuildBVH(mid, ed, count, primInfos, reorderPrims);
+
+    return node;
+}
+
+int Scene::flattenBVHNode(BVHNode* node, int *offset, std::vector<LinearBVHNode>& vec)
+{
+    LinearBVHNode* linearNode = &vec[*offset];
+    linearNode->bound = node->bound;
+    int myOffset = *offset;
+    (*offset) = (*offset) + 1;
+
+    if (node->nPrimitives > 0)  // Node is leaf node
+    {
+        linearNode->firstPrimOffset = node->firstPrimOffset;
+        linearNode->nPrimitives = node->nPrimitives;
+    }
+    else    // Node is interior node
+    {
+        linearNode->axis = node->splitAxis;
+        linearNode->nPrimitives = 0;
+
+        // Left child is always the next element, so no need to store offset
+        flattenBVHNode(node->leftChild, offset, vec);
+
+        // Store right child offset
+        linearNode->rightChildOffset = flattenBVHNode(node->rightChild, offset, vec);
+    }
+
+    return myOffset;
+}
+
+void Scene::deleteBVHNode(BVHNode* node)
+{
+    if (node->leftChild != nullptr) deleteBVHNode(node->leftChild);
+    if (node->rightChild != nullptr) deleteBVHNode(node->rightChild);
+    delete node;
 }

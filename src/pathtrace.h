@@ -11,3 +11,7 @@ void pathtrace(uchar4 *pbo, int frame, int iteration);
 // Textures load and free
 void LoadTexturesToDevice(Scene* scene);
 void FreeTextures();
+
+// BVH load and free
+void LoadBVHToDevice(Scene* scene);
+void FreeBVH();

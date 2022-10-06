@@ -74,6 +74,7 @@ set(headers
     src/preview.h
     src/utilities.h
     src/ImGui/imconfig.h
+    src/setting.h
 	
 	src/ImGui/imgui.h
     src/ImGui/imconfig.h

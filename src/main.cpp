@@ -1,5 +1,6 @@
 #include "main.h"
 #include "preview.h"
+#include "setting.h"
 #include <cstring>
 
 #include <Windows.h>
@@ -79,12 +80,25 @@ int main(int argc, char** argv) {
 	InitImguiData(guiData);
 	InitDataContainer(guiData);
 
+
+#if ENABLE_TEXTURE || ENABLE_NORMAL_MAP
 	LoadTexturesToDevice(scene);
+#endif
+
+#if ENABLE_BVH
+	LoadBVHToDevice(scene);
+#endif
 
 	// GLFW main loop
 	mainLoop();
 
+#if ENABLE_TEXTURE || ENABLE_NORMAL_MAP
 	FreeTextures();
+#endif
+
+#if ENABLE_BVH
+	FreeBVH();
+#endif
 
 	return 0;
 }

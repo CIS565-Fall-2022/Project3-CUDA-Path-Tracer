@@ -9,6 +9,7 @@
 #include <thrust/random.h>
 #include <thrust/remove.h>
 
+#include "setting.h"
 #include "sceneStructs.h"
 #include "scene.h"
 #include "glm/glm.hpp"
@@ -25,15 +26,9 @@
 #include <stb_image.h>
 
 
-
 #define ERRORCHECK 1
 
-// Texture setting
-#define ENABLE_TEXTURE 1
-#define ENABLE_NORMAL_MAP 1
 
-#define CACHE_FIRST_INTERSECTIONS 1
-#define SORT_MATERIALS 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -124,6 +119,10 @@ static glm::vec3* dev_pixels = NULL;
 static TextureInfo* dev_textureNormals = NULL;
 static glm::vec3* dev_normals = NULL;
 
+// BVH
+static int* dev_bvhIndexArrayToUse = NULL;
+static LinearBVHNode* dev_bvhNodes = NULL;
+
 #if CACHE_FIRST_INTERSECTIONS
 static ShadeableIntersection* dev_intersectionsCache = NULL;
 #endif
@@ -142,6 +141,7 @@ void LoadTexturesToDevice(Scene* scene)
 {
     std::cout << "Load Textures to device starts..." << std::endl;
 
+#if ENABLE_TEXTURE
     // Load texture into CPU
     int totalPixelCount = 0;
     std::vector<TextureInfo> textures;
@@ -176,6 +176,18 @@ void LoadTexturesToDevice(Scene* scene)
         stbi_image_free(img);
     }
 
+    // Send Texture to GPU
+    cudaMalloc((void**)&dev_textures, textures.size() * sizeof(TextureInfo));
+    cudaMemcpy(dev_textures, textures.data(), textures.size() * sizeof(TextureInfo), cudaMemcpyHostToDevice);
+    checkCUDAError("Copy texture infos to device");
+
+    cudaMalloc((void**)&dev_pixels, totalPixelCount * sizeof(glm::vec3));
+    cudaMemcpy(dev_pixels, pixels.data(), totalPixelCount * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+    checkCUDAError("Copy pixels to device");
+
+#endif
+
+#if ENABLE_NORMAL_MAP
     // Load normal map into CPU
     int totalNormalCount = 0;
     std::vector<TextureInfo> textureNormals;
@@ -183,6 +195,7 @@ void LoadTexturesToDevice(Scene* scene)
     for (int i = 0; i < scene->textureNormalIds.size(); ++i)
     {
         int width, height, channels;
+        stbi_hdr_to_ldr_gamma(1.0f);
         unsigned char* img = stbi_load(scene->textureNormalIds[i].c_str(), &width, &height, &channels, 3);
 
         if (img == NULL)
@@ -209,15 +222,6 @@ void LoadTexturesToDevice(Scene* scene)
         }
         stbi_image_free(img);  
     }
-    
-    // Send Texture to GPU
-    cudaMalloc((void**)&dev_textures, textures.size() * sizeof(TextureInfo));
-    cudaMemcpy(dev_textures, textures.data(), textures.size() * sizeof(TextureInfo), cudaMemcpyHostToDevice);
-    checkCUDAError("Copy texture infos to device");
-
-    cudaMalloc((void**)&dev_pixels, totalPixelCount * sizeof(glm::vec3));
-    cudaMemcpy(dev_pixels, pixels.data(), totalPixelCount * sizeof(glm::vec3), cudaMemcpyHostToDevice);
-    checkCUDAError("Copy pixels to device");
 
     // Send Texture normal to GPU
     cudaMalloc((void**)&dev_textureNormals, textureNormals.size() * sizeof(TextureInfo));
@@ -228,11 +232,7 @@ void LoadTexturesToDevice(Scene* scene)
     cudaMemcpy(dev_normals, normals.data(), normals.size() * sizeof(glm::vec3), cudaMemcpyHostToDevice);
     checkCUDAError("Copy normals to device");
 
-    // Check if texture has been copied to device successfully
-    //Texture2D* checkTex = (Texture2D*)malloc(sizeof(Texture2D));
-    //cudaMemcpy(checkTex, dev_textures, sizeof(Texture2D), cudaMemcpyDeviceToHost);
-    //std::cout << "check tex = " << checkTex[0].id << std::endl;
-    //delete[] checkTex;
+#endif
 
     cudaDeviceSynchronize();
 
@@ -243,10 +243,15 @@ void FreeTextures()
 {
     std::cout << "Free Texures " << std::endl;
     
+#if ENABLE_TEXTURE
     cudaFree(dev_textures);
     cudaFree(dev_pixels);
+#endif
+
+#if ENABLE_NORMAL_MAP
     cudaFree(dev_textureNormals);
     cudaFree(dev_normals);
+#endif
 }
 
 __host__ __device__ int getTextureElementIndex(const TextureInfo&tex, glm::vec2 uv)
@@ -259,6 +264,31 @@ __host__ __device__ int getTextureElementIndex(const TextureInfo&tex, glm::vec2 
     int pixelIndex = h * tex.width + w;
 
     return pixelIndex + tex.startIndex;
+}
+
+
+// ====================================================
+
+// ============== BVH related =========================
+
+void LoadBVHToDevice(Scene* scene)
+{
+    std::cout << "Loading BVH nodes to device." << std::endl;
+
+    cudaMalloc((void**)&dev_bvhNodes, scene->bvhNodes.size() * sizeof(LinearBVHNode));
+    cudaMemcpy(dev_bvhNodes, scene->bvhNodes.data(), scene->bvhNodes.size() * sizeof(LinearBVHNode), cudaMemcpyHostToDevice);
+
+    int pixelCount = scene->state.camera.resolution.x * scene->state.camera.resolution.y;
+    cudaMalloc((void**)&dev_bvhIndexArrayToUse, BVH_INTERSECT_STACK_SIZE * pixelCount * sizeof(int));
+    cudaMemset(dev_bvhIndexArrayToUse, -1, BVH_INTERSECT_STACK_SIZE * pixelCount * sizeof(int));
+}
+
+void FreeBVH()
+{
+    std::cout << "Free BVH" << std::endl;
+
+    cudaFree(dev_bvhNodes);
+    cudaFree(dev_bvhIndexArrayToUse);
 }
 
 // ====================================================
@@ -285,8 +315,10 @@ void pathtraceInit(Scene* scene) {
 
 	// TODO: initialize any extra device memeory you need
 
+#if CACHE_FIRST_INTERSECTIONS
     cudaMalloc((void**)&dev_intersectionsCache, pixelcount * sizeof(ShadeableIntersection));
     cudaMemset(dev_intersectionsCache, 0, pixelcount * sizeof(ShadeableIntersection));
+#endif
 
     cudaMalloc((void**)&dev_triangles, scene->triangles.size() * sizeof(Triangle));
     cudaMemcpy(dev_triangles, scene->triangles.data(), scene->triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice);
@@ -305,7 +337,11 @@ void pathtraceFree() {
 	cudaFree(dev_intersections);
 
 	// TODO: clean up any extra device memory you created
+
+#if CACHE_FIRST_INTERSECTIONS
     cudaFree(dev_intersectionsCache);
+#endif
+
     cudaFree(dev_triangles);
 
 	checkCUDAError("pathtraceFree");
@@ -348,11 +384,13 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 // Generating new rays is handled in your shader(s).
 // Feel free to modify the code below.
 __global__ void computeIntersections(
-	int depth
-	, int num_paths
-	, PathSegment* pathSegments
-	, Geom* geoms
+    int depth
+    , int num_paths
+    , PathSegment* pathSegments
+    , Geom* geoms
     , Triangle* triangles
+    , LinearBVHNode* bvhNodes
+    , int* bvhIndexArrayToUse
 	, int geoms_size
 	, ShadeableIntersection* intersections
 )
@@ -369,41 +407,45 @@ __global__ void computeIntersections(
         glm::vec2 uv(0.f);
 		float t_min = FLT_MAX;
 		int hit_geom_index = -1;
+        int triangleId = -1;
 		bool outside = true;
 
 		glm::vec3 tmp_intersect;
 		glm::vec3 tmp_normal;
+	
+        // naive parse through global geoms
+        for (int i = 0; i < geoms_size; i++)
+        {
+            Geom& geom = geoms[i];
 
-		// naive parse through global geoms
-
-		for (int i = 0; i < geoms_size; i++)
-		{
-			Geom& geom = geoms[i];
-
-			if (geom.type == CUBE)
-			{
-				t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
-			}
-			else if (geom.type == SPHERE)
-			{
-				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
-			}
-			// TODO: add more intersection tests here... triangle? metaball? CSG?
+            if (geom.type == CUBE)
+            {
+                t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+            }
+            else if (geom.type == SPHERE)
+            {
+                t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+            }
+            // TODO: add more intersection tests here... triangle? metaball? CSG?
             else if (geom.type == OBJECT)
             {
-                t = objIntersectionTest(geom, pathSegment.ray, triangles, tmp_intersect, tmp_normal, uv, outside);
+                t = objIntersectionTest(geom, pathSegment.ray, triangles, bvhNodes, bvhIndexArrayToUse, path_index,
+                    tmp_intersect, tmp_normal, uv, triangleId, outside);
             }
-
-			// Compute the minimum t from the intersection tests to determine what
-			// scene geometry object was hit first.
-			if (t > 0.0f && t_min > t)
-			{
-				t_min = t;
-				hit_geom_index = i;
-				intersect_point = tmp_intersect;
-				normal = tmp_normal;
-			}
-		}
+            else
+            {
+                continue;
+            }
+            // Compute the minimum t from the intersection tests to determine what
+            // scene geometry object was hit first.
+            if (t > 0.0f && t_min > t)
+            {
+                t_min = t;
+                hit_geom_index = i;
+                intersect_point = tmp_intersect;
+                normal = tmp_normal;
+            }
+        }
 
 		if (hit_geom_index == -1)
 		{
@@ -417,7 +459,9 @@ __global__ void computeIntersections(
 			intersections[path_index].surfaceNormal = normal;
             intersections[path_index].uv = uv;
             intersections[path_index].geomId = hit_geom_index;
+            intersections[path_index].triangleId = triangleId;
 		}
+
 	}
 }
 
@@ -434,6 +478,7 @@ __global__ void shadeFakeMaterial(
     int iter
     , int num_paths
     , Geom* geoms
+    , Triangle* triangles
     , ShadeableIntersection* shadeableIntersections
     , PathSegment* pathSegments
     , Material* materials
@@ -489,7 +534,32 @@ __global__ void shadeFakeMaterial(
                     Geom geom = geoms[intersection.geomId];
                     TextureInfo norMap = textureNormals[material.normalMapIndex];
                     int index = getTextureElementIndex(norMap, intersection.uv);
-                    normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(normals[index], 0.f)));
+
+                    normal = normals[index];
+
+                    // Tagent space to model space
+                    if (intersection.triangleId >= 0)
+                    {
+                        Triangle t = triangles[intersection.triangleId];
+
+                        glm::vec3 deltaPos1 = t.v1 - t.v0;
+                        glm::vec3 deltaPos2 = t.v2 - t.v0;
+                        glm::vec2 deltaUV1 = t.tex1 - t.tex0;
+                        glm::vec2 deltaUV2 = t.tex2 - t.tex0;
+                        
+                        float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+                        glm::vec3 tagent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r;
+                        glm::vec3 bitangent = (deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * r;
+                        glm::vec3 nor = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(normal, 0.0f)));
+                        //glm::cross(tagent, bitangent);
+
+                        glm::mat3 TBN = glm::transpose(glm::mat3(tagent, bitangent, nor));
+
+                        normal = glm::normalize(TBN * normal);
+                    }
+
+                    // Model space to world space
+                    normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(normal, 0.f)));
                 }
 #endif
 
@@ -604,6 +674,8 @@ void pathtrace(uchar4* pbo, int frame, int iter)
                     , dev_paths
                     , dev_geoms
                     , dev_triangles
+                    , dev_bvhNodes
+                    , dev_bvhIndexArrayToUse
                     , hst_scene->geoms.size()
                     , dev_intersections
                     );
@@ -625,6 +697,8 @@ void pathtrace(uchar4* pbo, int frame, int iter)
                 , dev_paths
                 , dev_geoms
                 , dev_triangles
+                , dev_bvhNodes
+                , dev_bvhIndexArrayToUse
                 , hst_scene->geoms.size()
                 , dev_intersections
                 );
@@ -638,6 +712,8 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             , dev_paths
             , dev_geoms
             , dev_triangles
+            , dev_bvhNodes
+            , dev_bvhIndexArrayToUse
             , hst_scene->geoms.size()
             , dev_intersections
             );
@@ -655,6 +731,7 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             iter,
             num_paths,
             dev_geoms,
+            dev_triangles,
             dev_intersections,
             dev_paths,
             dev_materials,
@@ -663,6 +740,7 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             dev_textureNormals,
             dev_normals
             );
+        checkCUDAError("trace one bounce");
 
         dev_path_end = thrust::partition(thrust::device, dev_paths, dev_paths + num_paths, pathPartition);
         num_paths = dev_path_end - dev_paths;
@@ -685,4 +763,6 @@ void pathtrace(uchar4* pbo, int frame, int iter)
         pixelcount * sizeof(glm::vec3), cudaMemcpyDeviceToHost);
 
     checkCUDAError("pathtrace");
+
+    //std::cout << "path trace one iteration" << std::endl;
 }
