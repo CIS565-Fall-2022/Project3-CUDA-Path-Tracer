@@ -551,6 +551,7 @@ int Scene::loadTexture(string textureid) {
 
             //pixelData = new glm::vec3[width * height];
             pixelData = new unsigned char[width * height * channels * sizeof(unsigned char)];
+            //pixelData = new unsigned char[width * height * 4 * sizeof(unsigned char)]
 
             // ... process data if not NULL ..
             if (data != nullptr && width > 0 && height > 0)

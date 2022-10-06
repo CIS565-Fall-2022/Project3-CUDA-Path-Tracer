@@ -40,7 +40,7 @@ EMITTANCE   0
 
 // Box texture
 TEXTURE 0
-PATH ../Project3-CUDA-Path-Tracer/objs/textures/ore.png
+PATH ../Project3-CUDA-Path-Tracer/objs/textures/wahooRotatedFlipped.png
 
 // Camera
 CAMERA
@@ -104,9 +104,9 @@ SCALE       .01 10 10
 
 // texture obj
 OBJECT 6
-../Project3-CUDA-Path-Tracer/objs/box.obj
+../Project3-CUDA-Path-Tracer/objs/wahoo.obj
 material 1
 TRANS		0 2 0
-ROTAT	      0 0 0
-SCALE		3 3 3
+ROTAT	      -45 0 0
+SCALE		1 1 1
 TEXTURE 0
