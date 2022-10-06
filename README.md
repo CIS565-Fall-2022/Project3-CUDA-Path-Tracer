@@ -17,12 +17,13 @@ Features:
 	* Diffusive
 	* [Reflective](#specular--imperfect-specular) (specular + imperfect specular)
 	* [Refractive](#dielectric) (dielectric)
-	* [Translucent](#translucent) (subsurface ray scattering)
+	* [Simple translucent/subsurface](#simple-subsurface)
 * [Visual effects](#visual-effects)
 	* [Motion blur](#motion-blur)
 	* [Anti-aliasing](#antialiasing)
 	* [Depth of field](#depth-of-field)
 * [Toggle-able sampling options](#sampling-options)
+	* [Simple adaptive sampling](#simple-adaptive-sampling)
 	* [Stratified diffuse sampling](#stratified-diffuse-sampling)
 * [Toggle-able performance enhancement options](#performance-enhancement-options)
 	* [Stream compaction](#stream-compaction)<sup>1</sup>
@@ -39,9 +40,9 @@ Material types can be specified in the scene text files.
 A material type is means a different BSDF, an inherent part of the ray tracing evaluation. Any CPU path tracer that tries to implement the same thing will be orders of magnitude slower.  
 Adding approximations to respective material types could improve performance, at the cost of physical accuracy (e.g., Schlick approximation for Fresnel equations). The implementations of different material types here are all quite approximated already, and therefore don't have huge performance impacts.
 
-#### Translucent
+#### Simple subsurface
 The material type TRANSLUCENT enables subsurface scattering of rays beneath the surface of the material, the degree of which is determined by SPECEX, IOR, ABSORPTION of the material in the scene file. IOR and SPECEX determine how rays are either reflected or refracted by the material, and absorption determines how easily light travels through the object (lower is easier). The parameter TRANSRGB determines the transmission color of the material, which colors the light ray depending on how far into the material it goes.   
-Subsurface scattering is enabled by a very approximate interpretation of the BSSRDF, assuming that the internal geometry of the object is uniform and diffuses evenly. The implementation is inspired by [PBRT](https://github.com/mmp/pbrt-v3) and Disney BRDF. The polynomial fit for the "first moment" of the Fresnel reflectance function used to determine if a ray enters the material is pulled directly from the PBRT implementation.     
+This simple subsurface scattering material is enabled by a very approximate interpretation of the BSSRDF, assuming that the internal geometry of the object is uniform and diffuses evenly. The implementation is inspired by [PBRT](https://github.com/mmp/pbrt-v3) and Disney BRDF. The polynomial fit for the "first moment" of the Fresnel reflectance function used to determine if a ray enters the material is pulled directly from the PBRT implementation.     
 | Material | Diffuse | Translucent(ABSORPTION = 0.3) | Translucent(ABSORPTION = 0.03) | 
 | :------- | :-------: | :-------: | :-------: |
 | FPS | 49.7 | 47.5 | 47.4 |
@@ -60,7 +61,7 @@ The frames per second(FPS) - a rough benchmark of rendering speed - of this mate
 Note the subtle reflection of the light on the dielectric spheres; that is the light reflection contribution.   
 
 #### Specular / Imperfect Specular
-The material type SPECULAR specifies a material to reflect light; the degree of this is determined by the specular exponent(SPECEX). The higher the SPECEX, the more reflective.
+The material type SPECULAR specifies a material to reflect light; the degree of this is determined by the specular exponent(SPECEX). The higher the SPECEX, the more reflective (past 10000, the material becomes perfectly specular).
 
 | Material | Diffuse | SPECEX = 80 | SPECEX = 5000 | 
 | :------- | :-------: | :-------: | :-------: |
@@ -111,10 +112,32 @@ FOCAL_DIST and LENS_RAD are specified as part of the camera values in the scene 
 The scene dielectrics have IOR = 2.42 (diamond). The FOCAL_DIST is kept constant, at 12.5. Note how as LENS_RAD = 0.2 increases, the clarity decreases on everything not on the plane defined by the focal distance.      
 
 ### Sampling Options
-Sampling options are performed as a core part of the ray tracing evaluation, so it benefits greatly from the GPU. 
+Changing sampling options is in pursuit of performance, but they are not without tradeoffs.
+
+#### Simple adaptive sampling
+In a render, some pixels are in a simpler lighting situation than others, so their true color is arrived at early on in the rendering process. Adapting on-the-fly to stop sampling the simpler pixels, devoting more hardware power to pixels with more complex lighting, is called "adaptive sampling".   
+This project explores an extremely simple implementation of adaptive sampling based on pixel variance. If the variance of a pixel is low, few samples per pixel (spp) are needed to arrive with  good certainty at the true color. These can be found by gathering some minimum spp to estimate the true variance of the pixel. We can skip calculations for those pixels by tuning some target variance, per-scene. "Finished" pixels naively exit in their respective kernels.
+
+| Sampling | None | Adaptive | 
+| :------- | :-------: | :-------: |
+| FPS | 36.2 | 43.0 |
+| Scene | <img src="img/noadap_bench.png"> | <img src="img/adapcov4_bench.png"> | 
+
+The above adaptive sampling is performed with minimum spp of 64 and a pixel covariance target of 4. Notice how the adaptive sampling version, with a high covariance target, introduces a severe amount of noise on the red and green walls, but improves rendering time.
+
+Below are linear heatmaps of the scene, where a pixel is equal to `pixel spp / max scene spp`. Thus, the lighter the pixel, the greater the number of samples it has. Note that since a sample for a pixel is only counted if the ray terminates, the heatmap also visualizes likelihood of ray termination (less likely rays to terminate are darker).        
+
+| Target covariance | 4 | 1 | 
+| :------- | :-------: | :-------: |
+| Heatmap | <img src="img/adapcov4_heat.png"> | <img src="img/adapcov1_heat.png"> | 
+
+The high pixel covariance tolerance (4) means that the left and right walls are not sampled many times (it appears black, since the heatmap is linear - they are still sampled more than the direct lights). Meanwhile, with target pixel covariance 1, we have more evenly set coloration on the walls. In this case, however, we would expect a minimal improvement on framerate/rendering time.
+
+A more sophisticated sampling method would produce a more interesting heatmap, and intelligently launching kernels inversely scaling with "finished" pixels would offer better performance benefits.
 
 #### Stratified diffuse sampling
-The diffusive material type is implemented with a simple BSDF that returns a ray, cosine-weighted on the hemisphere of the normal. By default, the inputs to that mapping come uniformly from [0, 1). If unlucky, clumping of samples and empty regions could mean that many iterations are needed to get a satisfying result. Stratified/jittered sampling breaks down the intervals into equal sections; returned rays correspond to jittering within a section. In essence, the returned rays are "smoothed" to be more uniform.
+The diffusive material type is implemented with a simple BSDF that returns a ray, cosine-weighted on the hemisphere of the normal. By default, the inputs to that mapping come uniformly from [0, 1). If unlucky, clumping of samples and empty regions could mean that many iterations are needed to get a satisfying result. Stratified/jittered sampling breaks down the intervals into equal sections; returned rays correspond to jittering within a section.   
+In essence, the returned rays are "smoothed" to be more uniform. This is performed as a core part of the ray tracing evaluation, so it benefits greatly from the GPU. 
 
 | Sampling | Default(500 iterations) | Stratified(500 iterations) | 
 | :------- | :-------: | :-------: |
@@ -164,4 +187,5 @@ As expected, caching the first intersection provides a general speedup, with bet
 [Ray Tracing Gems II](http://www.realtimerendering.com/raytracinggems/rtg2/)     
 [Ray Tracing in One Weekend](https://raytracing.github.io/)      
 [Fresnel Equations, Schlick Approximation, Metals, and Dielectrics](http://psgraphics.blogspot.com/2020/03/fresnel-equations-schlick-approximation.html)      
+[CSE 168 Slide Deck](https://cseweb.ucsd.edu/classes/sp17/cse168-a/CSE168_07_Random.pdf)
 [GPU Gems III](https://developer.nvidia.com/gpugems/gpugems3/part-iii-rendering/chapter-20-gpu-based-importance-sampling)     

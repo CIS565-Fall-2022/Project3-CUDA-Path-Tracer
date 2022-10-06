@@ -11,6 +11,12 @@
 #define _GROUP_RAYS_BY_MATERIAL_	0
 #define _CACHE_FIRST_BOUNCE_		0
 #define _STRATIFIED_SAMPLING_		0
+#define _ADAPTIVE_SAMPLING_         0
+#if _ADAPTIVE_SAMPLING_
+    #define _MIN_SPP_           64
+    #define _ADAPTIVE_DEBUG_    1
+    #define _PIX_COV_TO_SKIP_   1
+#endif
 // --- end toggleable things ---
 
 enum GeomType {
@@ -82,6 +88,12 @@ struct PathSegment {
     glm::vec3 color;
     int pixelIndex;
     int remainingBounces;
+
+    glm::vec3 colorSum;
+    float magColorSumSq;
+    int spp;
+    bool skip;
+    bool terminate;
 };
 
 // Use with a corresponding PathSegment to do:

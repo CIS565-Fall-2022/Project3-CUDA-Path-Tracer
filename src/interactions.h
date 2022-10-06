@@ -62,6 +62,8 @@ __device__ void imperfectSpecularScatter(
     thrust::default_random_engine& rng,
     thrust::uniform_real_distribution<float>& u01,
     float exp) {
+    if (exp > 10000.f) { *ray = glm::reflect(*ray, normal); return; }
+
     float theta = acos(powf(u01(rng), 1.0 / (exp + 1)));
     float phi = 2.f * PI * u01(rng);
     glm::vec3 untransformedRef(

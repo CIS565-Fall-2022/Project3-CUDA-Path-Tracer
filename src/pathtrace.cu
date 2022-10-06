@@ -4,6 +4,7 @@
 #include <thrust/execution_policy.h>
 #include <thrust/random.h>
 #include <thrust/partition.h>
+#include <thrust/extrema.h>
 
 #include "sceneStructs.h"
 #include "scene.h"
@@ -48,24 +49,52 @@ thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int de
 
 //Kernel that writes the image to the OpenGL PBO directly.
 __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
-	int iter, glm::vec3* image) {
+	int iter, glm::vec3* image, PathSegment* paths
+#if _ADAPTIVE_DEBUG_
+	, PathSegment* s) {
+#else
+	) {
+#endif
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
-
 	if (x < resolution.x && y < resolution.y) {
 		int index = x + (y * resolution.x);
-		glm::vec3 pix = image[index];
+		PathSegment& path = paths[index];
 
-		glm::ivec3 color;
-		color.x = glm::clamp((int)(pix.x / iter * 255.0), 0, 255);
-		color.y = glm::clamp((int)(pix.y / iter * 255.0), 0, 255);
-		color.z = glm::clamp((int)(pix.z / iter * 255.0), 0, 255);
-
+		// contribution based on iter is inherently a bit scuffed
+		glm::vec3 pix((image[index] * (float)(iter - 1) + path.color) / (float)iter);
+#if _ADAPTIVE_DEBUG_
+		// a inverse heatmap to exaggerate greys (not a lot of them though)
+		//pix = glm::vec3((_MIN_SPP_ + 1) / (float)paths[index].spp);
+		// linear ver. note that likelihood of termination plays a role in heat map.
+		pix = glm::vec3((float)paths[index].spp / (float)s->spp);
+		image[index] = pix;
+#endif
+#if _ADAPTIVE_SAMPLING_
+		if (!path.skip) {
+			image[index] = pix;
+			if (path.terminate) {
+				path.spp += 1;
+				path.colorSum += path.color;
+				path.magColorSumSq += glm::length2(path.color);
+				if (_MIN_SPP_ < path.spp) {
+					// mean and var per color
+					float mean2 = glm::length2(path.colorSum / (float)path.spp);
+					float variance = path.magColorSumSq / (float)path.spp - mean2;
+					if (variance < _PIX_COV_TO_SKIP_) { // pixelIndex covariance or low  enough to assume OK
+						path.skip = true; // skip on all future iterations
+					}
+				}
+			}
+		}
+#else
+		image[index] = pix;
+#endif
 		// Each thread writes one pixel location in the texture (textel)
 		pbo[index].w = 0;
-		pbo[index].x = color.x;
-		pbo[index].y = color.y;
-		pbo[index].z = color.z;
+		pbo[index].x = glm::clamp((int)(image[index].x * 255.0), 0, 255);
+		pbo[index].y = glm::clamp((int)(image[index].y * 255.0), 0, 255);
+		pbo[index].z = glm::clamp((int)(image[index].z * 255.0), 0, 255);
 	}
 }
 
@@ -98,6 +127,15 @@ struct compare_intersection_mat {
 };
 #endif
 
+#if _ADAPTIVE_DEBUG_
+struct compare_path_spp {
+	__host__ __device__
+	bool operator()(const PathSegment& p1, const PathSegment p2) {
+		return p1.spp < p2.spp;
+	}
+};
+#endif
+
 void InitDataContainer(GuiDataContainer* imGuiData) { guiData = imGuiData; }
 
 void pathtraceInit(Scene* scene) {
@@ -110,7 +148,6 @@ void pathtraceInit(Scene* scene) {
 	cudaMemset(dev_image, 0, pixelcount * sizeof(glm::vec3));
 
 	cudaMalloc(&dev_paths, pixelcount * sizeof(PathSegment));
-
 	cudaMalloc(&dev_geoms, scene->geoms.size() * sizeof(Geom));
 	cudaMemcpy(dev_geoms, scene->geoms.data(), scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
 
@@ -176,6 +213,13 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		int index = x + (y * cam.resolution.x);
 		PathSegment& segment = pathSegments[index];
 
+#if _ADAPTIVE_SAMPLING_
+		if (segment.skip) { // dont do anything for thisone
+			segment.remainingBounces = 0;
+			return;
+		}
+#endif
+		segment.terminate = false;
 		segment.ray.origin = cam.position;
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
@@ -227,7 +271,9 @@ __global__ void computeIntersections(
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
 	if (path_index < num_paths) {
 		PathSegment pathSegment = pathSegments[path_index];
-
+#if _ADAPTIVE_SAMPLING_
+		if (pathSegment.skip) { return; }
+#endif
 		float t;
 		glm::vec3 intersect_point;
 		glm::vec3 normal;
@@ -259,8 +305,6 @@ __global__ void computeIntersections(
 					pathSegment.ray, tmp_intersect, tmp_normal, tmp_outside);
 			}
 #endif		
-			// TODO: add more intersection tests here... triangle? metaball? CSG?
-
 			// Compute minimum t from intersection tests to determine what
 			// scene geometry object was hit first.
 			if (t > 0.0f && t_min > t) {
@@ -295,7 +339,7 @@ __global__ void shadeMaterial (
 	int depth) {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 #if _STREAM_COMPACTION_
-#else
+#else // below skips if .skip = true (see generateRay)
 	if (pathSegments[idx].remainingBounces == 0) { return; }
 #endif
 	if (idx < num_paths) {
@@ -303,6 +347,7 @@ __global__ void shadeMaterial (
 		if (intersection.t > 0.0f) { // if the intersection exists...
 			Material material = materials[intersection.materialId];
 			if (material.emittance > 0.0f) { // material is bright; "light" the ray
+				pathSegments[idx].terminate = true;
 				pathSegments[idx].color *= (material.color * material.emittance);
 				pathSegments[idx].remainingBounces = 0; // terminate if hit light
 			} else {
@@ -327,15 +372,6 @@ __global__ void shadeMaterial (
 			pathSegments[idx].color = glm::vec3(0.0f);
 			pathSegments[idx].remainingBounces = 0; // terminate if hit nothing
 		}
-	}
-}
-
-// Add the current iteration's output to the overall image
-__global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iterationPaths) {
-	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
-	if (index < nPaths) {
-		PathSegment iterationPath = iterationPaths[index];
-		image[iterationPath.pixelIndex] += iterationPath.color;
 	}
 }
 
@@ -442,12 +478,12 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			guiData->TracedDepth = depth;
 		}
 	}
-	// Assemble this iteration and apply it to the image
-	dim3 numBlocksPixels = (pixelcount + blockSize1d - 1) / blockSize1d;
-	finalGather<<<numBlocksPixels, blockSize1d>>>(pixelcount, dev_image, dev_paths);
-
-	// Send results to OpenGL buffer for rendering
-	sendImageToPBO<<<blocksPerGrid2d, blockSize2d>>>(pbo, cam.resolution, iter, dev_image);
+#if _ADAPTIVE_DEBUG_
+	PathSegment* s = thrust::max_element(thrust::device, dev_paths, dev_paths + pixelcount, compare_path_spp());
+	sendImageToPBO<<<blocksPerGrid2d, blockSize2d>>>(pbo, cam.resolution, iter, dev_image, dev_paths, s);
+#else 
+	sendImageToPBO<<<blocksPerGrid2d, blockSize2d>>>(pbo, cam.resolution, iter, dev_image, dev_paths);
+#endif
 
 	// Retrieve image from GPU
 	cudaMemcpy(hst_scene->state.image.data(), dev_image,

@@ -18,10 +18,10 @@ IOR     0
 ABSORPTION	0
 EMITTANCE   0
 
-// Diffuse b
+// Diffuse left wall
 MATERIAL	2
 MAT_TYPE    DIFFUSE
-RGB         .35 .35 .85
+RGB         .85 .35 .35
 SPECEX      0
 TRANSRGB    0 0 0
 IOR     0
@@ -40,15 +40,22 @@ EMITTANCE   0
 
 // Sphere mat
 MATERIAL	4
-MAT_TYPE    DIFFUSE
-RGB         .91 .74 .67
-SPECEX      30
-TRANSRGB    .98 .5 .5
-IOR     	1.45 			//skin?			
-ABSORPTION	0.03
+MAT_TYPE    DIELECTRIC
+RGB         .98 .98 .98
+SPECEX      0
+TRANSRGB    0 0 0
+IOR     	2.42	
+ABSORPTION	0
 EMITTANCE   0
 
-
+MATERIAL	5
+MAT_TYPE    SPECULAR
+RGB         .98 .98 .98
+SPECEX      30000
+TRANSRGB    0 0 0
+IOR     	0	
+ABSORPTION	0
+EMITTANCE   0
 
 
 
@@ -60,7 +67,7 @@ FOCAL_DIST	12.5
 ANTIALIAS	0
 FOVY        45
 ITERATIONS  5000
-DEPTH       8
+DEPTH       10
 FILE        cornell
 EYE         0.0 5 9
 LOOKAT      0 5 0
@@ -132,9 +139,9 @@ VELOCITY    0 0 0
 OBJECT
 cube
 material 0
-TRANS       10 8 -3
+TRANS       0 12 -3
 ROTAT       0 0 0
-SCALE       0.25 3 3
+SCALE       4 0.25 4
 VELOCITY    0 0 0
 
 // objects
@@ -148,7 +155,7 @@ VELOCITY    0 0 0
 
 OBJECT
 cube
-material 	4
+material 	5
 TRANS       -2 2 -5.5
 ROTAT       0 -20 0
 SCALE       4 4 4 
@@ -156,8 +163,8 @@ VELOCITY    0 0 0
 
 OBJECT
 sphere
-material 	4
-TRANS       -5 1.5 3
+material 	5
+TRANS       -4 1.5 3
 ROTAT       0 0 0
-SCALE       3 3 3
+SCALE       4 4 4
 VELOCITY    0 0 0 
