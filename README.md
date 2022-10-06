@@ -9,7 +9,7 @@
 - [x] Simple Diffuse
 - [x] Perfect Reflection
 - [x] Fresnel-Modulated Specular Reflection and Refraction
-- [ ] Microfacet Reflection
+- [x] Microfacet Reflection
 - [x] Transparency
 - [x] Antialiasing
 - [ ] Depth of Field
@@ -25,7 +25,7 @@
 - [x] Pausable, Restartable Ray Tracing
 - [x] Arbitrary .obj file Loading
 - [x] Diffuse, Normal Texture, Per-face Material
-- [ ] Octree/AABB Visualization using ImGui
+- [x] Octree/AABB Visualization using ImGui
 
 ## Showcase
 ### Simple Diffuse, Refraction, Transparency, and Microfacet
