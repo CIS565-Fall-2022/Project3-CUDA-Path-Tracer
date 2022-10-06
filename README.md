@@ -57,14 +57,19 @@ I jitter the direction of sample ray to reduce the aliasing effects
 
 Mesh Loading
 ===========
-I used [tinyObj](https://github.com/tinyobjloader/tinyobjloader) to load obj file.
+I used [tinyObj](https://github.com/tinyobjloader/tinyobjloader) to load obj file. During the loading, we determine the min and max bound of the mesh for bounding box check so that ray does not have to compute intersection with every triangle. 
 
-| Bunny | No AA |
+For each ray, there may be multiple intersection with the mesh. Therefore, we need to select the closest one.
+
+| Bunny | Refraction |
 :-------:|:-------:
 |![](img/AA.png)|![](img/bunny_refract.png)|
 
 Depth of Field
 ============
+| Focal Distance: 10, Lens Radius: 0.5 | Focal Distance: 10, Lens Radius: 1.0 |
+:-------:|:-------:
+|![](img/FD10_R05.png)|![](img/FD10_R1.png)|
 
 Motion Blur
 ===========

@@ -22,7 +22,7 @@
 #define SORT_MATERIAL 1
 #define CACHE_INTERSECTION 1
 #define ANTI_ALIASING 1
-#define DOF 0
+#define DOF 1
 #define MOTION_BLUR_OBJECT 0
 #define MOTION_BLUR_CAMERA 0
 #define BOUNDING_BOX 1
@@ -235,7 +235,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 #if DOF
 		// code from CIS 561
 		cam.focalDistance = 10.f;
-		cam.radius = 1.5f;
+		cam.radius = 0.9f;
 
 		glm::vec2 randomSample{ 0 };
 		float ft = glm::abs((cam.focalDistance) / segment.ray.direction.z);
