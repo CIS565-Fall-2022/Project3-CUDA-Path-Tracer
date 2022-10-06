@@ -8,8 +8,6 @@
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 
-typedef glm::vec3 Color;
-
 enum GeomType {
     SPHERE,
     CUBE,
@@ -49,6 +47,8 @@ struct Geom {
     //for culling
     glm::vec3 aabb_min;
     glm::vec3 aabb_max;
+    //for extra storing
+    int matId;
 };
 
 struct TextureInfo {
@@ -65,14 +65,14 @@ struct TextureInfo {
 
 // pbrMetallicRoughness class defined in glTF 2.0 spec.
 struct PbrMetallicRoughness {
-    Color baseColorFactor = Color(1.0f);  // len = 4. default [1,1,1,1]
+    glm::vec3 baseColorFactor = glm::vec3(1.0f);  // len = 4. default [1,1,1,1]
     TextureInfo baseColorTexture;
     double metallicFactor;   // default 1
     double roughnessFactor;  // default 1
     TextureInfo metallicRoughnessTexture;
 
-    PbrMetallicRoughness()
-        : baseColorFactor(Color(1.0f)),
+    __host__ __device__ PbrMetallicRoughness()
+        : baseColorFactor(glm::vec3(1.0f)),
         metallicFactor(1.0f),
         roughnessFactor(1.0f) {}
 };
@@ -116,7 +116,7 @@ struct Material {
 
     //for gltf extra factor
     bool gltf = false;
-    int texIndex;
+    int texIndex = 0;
     PbrMetallicRoughness pbrMetallicRoughness;
 
     NormalTextureInfo normalTexture;

@@ -22,21 +22,20 @@
 #include "intersections.h"
 #include "interactions.h"
 
-
-
 #define ERRORCHECK 1
 #define CACHE_INTERSECTION 1
 #define SORT_RAY 1
 #define ANTI_ALIASING 1
 #define DOF 0
 #define DIRECTLIGHTING 0
-#define POSTPROCESS 1
+#define POSTPROCESS 0
 #define RED 0
 #define GREEN 0
 #define BLUE 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
+
 void checkCUDAErrorFn(const char *msg, const char *file, int line) {
 #if ERRORCHECK
     cudaDeviceSynchronize();
@@ -109,12 +108,46 @@ static Material * dev_materials = NULL;
 static PathSegment * dev_paths = NULL;
 static ShadeableIntersection * dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
-// ...
 static ShadeableIntersection* dev_cache_intersections = NULL;//for first round cache
 static Primitive* dev_primitives = NULL;//for mesh
 static Texture* dev_textures = NULL;
 static glm::vec3* dev_texData = nullptr;
+//for more detailed GLTF(loading multiple textures without actually referening them in txt file
 static glm::vec3* dev_lightPoint = nullptr;
+static cudaTextureObject_t* dev_cudaTexObjs = NULL;
+static std::vector<cudaArray_t> dev_arrays;
+static std::vector<cudaTextureObject_t> dev_texs;
+
+//learned from GPU Gem
+__host__ void textureInitGPU(Texture& tex, int i) {
+    cudaTextureObject_t texObj;
+    int width = tex.width;
+    int height = tex.height;
+    cudaChannelFormatDesc desc = cudaCreateChannelDesc<uchar4>();
+    cudaMallocArray(&dev_arrays[i], &desc, width, height);
+    cudaMemcpyToArray(dev_arrays[i], 0, 0, tex.image, width * height * tex.components * sizeof(unsigned char), cudaMemcpyHostToDevice);
+
+    struct cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeArray;
+    resDesc.res.array.array = dev_arrays[i];
+
+    struct cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    texDesc.addressMode[0] = cudaAddressModeWrap;
+    texDesc.addressMode[1] = cudaAddressModeWrap;
+    texDesc.filterMode = cudaFilterModeLinear;
+    texDesc.readMode = cudaReadModeNormalizedFloat;
+    texDesc.sRGB = 1;
+    texDesc.normalizedCoords = 1;
+
+    cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
+    cudaMemcpy(dev_cudaTexObjs + i, &texObj, sizeof(cudaTextureObject_t), cudaMemcpyHostToDevice);
+    checkCUDAError("textureInit failed");
+
+    dev_texs.push_back(texObj);
+}
+
 void pathtraceInit(Scene *scene) {
     hst_scene = scene;
     const Camera &cam = hst_scene->state.camera;
@@ -140,11 +173,19 @@ void pathtraceInit(Scene *scene) {
     cudaMemcpy(dev_primitives, scene->primitives.data(), scene->primitives.size() * sizeof(Primitive), cudaMemcpyHostToDevice);
     cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
     cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
-
+    //I use two different method for texture selecting, one is gltf auto loading(referenced from GPU Gem CudaTextureObj Part) and one is custom selected;
     if (scene->texData.size() > 0)
     {
         cudaMalloc(&dev_texData, scene->texData.size() * sizeof(glm::vec3));
         cudaMemcpy(dev_texData, scene->texData.data(), scene->texData.size() * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+    }
+    //auto gltf loading
+    //create texture memory
+    dev_arrays.clear(); dev_texs.clear();
+    cudaMalloc(&dev_cudaTexObjs, scene->textures.size() * sizeof(cudaTextureObject_t));
+    dev_arrays.resize(scene->textures.size());
+    for (int i = 0; i < scene->textures.size(); i++) {
+        textureInitGPU(scene->textures[i], i);
     }
 
     cudaMalloc(&dev_lightPoint, pixelcount * sizeof(glm::vec3));
@@ -167,6 +208,11 @@ void pathtraceFree() {
     cudaFree(dev_primitives);
     cudaFree(dev_textures);
     cudaFree(dev_lightPoint);
+
+    for (int i = 0; i < dev_texs.size(); i++) {
+        cudaFreeArray(dev_arrays[i]);
+        cudaDestroyTextureObject(dev_texs[i]);
+    }
     checkCUDAError("pathtraceFree");
 }
 
@@ -191,8 +237,9 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
         segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
         thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
         thrust::uniform_real_distribution<float> u01(0, 1);
-        // TODO: implement antialiasing by jittering the ray
-#if ANTI_ALIASING
+
+        
+#if ANTI_ALIASING//Stochastic Anti Aliasing Implementation
         segment.ray.direction = glm::normalize(cam.view
             - cam.right * cam.pixelLength.x * ((float)x + u01(rng) - (float)cam.resolution.x * 0.5f)
             - cam.up * cam.pixelLength.y * ((float)y + u01(rng) - (float)cam.resolution.y * 0.5f)
@@ -202,9 +249,10 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
             - cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
             - cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
         );
-#endif // ANTI_ALIASINGs
+#endif
 
-#if DOF//Will Modify and test later but mark done for now
+
+#if DOF//Depth of Field Implementation
         cam.focal_length = 10.0f;
         cam.aperture_radius = 0.2f;
 
@@ -254,6 +302,8 @@ __global__ void computeIntersections(
         float t_min = FLT_MAX;
         int hit_geom_index = -1;
         bool outside = true;
+        int tmp_matId = -1;
+        int matId = -1;
 
         glm::vec3 tmp_intersect;
         glm::vec3 tmp_normal;
@@ -261,7 +311,6 @@ __global__ void computeIntersections(
         glm::vec4 tmp_tangent;
 
         // naive parse through global geoms
-
         for (int i = 0; i < geoms_size; i++)
         {
             Geom & geom = geoms[i];
@@ -269,13 +318,16 @@ __global__ void computeIntersections(
             if (geom.type == CUBE)
             {
                 t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+                tmp_matId = geom.materialid;
             }
             else if (geom.type == SPHERE)
             {
                 t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+                tmp_matId = geom.materialid;
             }
             else if (geom.type == MESH) {
                 t = primitiveIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, tmp_tangent, prims, material, texData);
+                tmp_matId = geom.matId;
             }
             // TODO: add more intersection tests here... triangle? metaball? CSG?
 
@@ -287,11 +339,13 @@ __global__ void computeIntersections(
                 hit_geom_index = i;
                 intersect_point = tmp_intersect;
                 normal = tmp_normal;
+                matId = tmp_matId;
                 uv = tmp_uv;
                 tangent = tmp_tangent;
             }
         }
 
+        ShadeableIntersection& intersection = intersections[path_index];
         if (hit_geom_index == -1)
         {
             intersections[path_index].t = -1.0f;
@@ -299,15 +353,16 @@ __global__ void computeIntersections(
         else
         {
             //The ray hits something
-            intersections[path_index].t = t_min;
-            intersections[path_index].materialId = geoms[hit_geom_index].materialid;
-            intersections[path_index].surfaceNormal = normal;
-            intersections[path_index].uv = uv;
-            intersections[path_index].tangent = tangent;
+            intersection.t = t_min;
+            intersection.materialId = matId;
+            intersection.surfaceNormal = normal;
+            intersection.uv = uv;
+            intersection.tangent = tangent;
         }
     }
 }
 
+//ShadeDirectLight: Do a per-pixel light scan to get every dev_lightPoint
 __global__ void shadeDirectLight(int iter, int num_paths, ShadeableIntersection* shadeableIntersections
     , PathSegment* pathSegments
     , Material* materials, Texture* textures, glm::vec3* dev_texData, glm::vec3* dev_lightPoint) {
@@ -327,7 +382,11 @@ __global__ void shadeDirectLight(int iter, int num_paths, ShadeableIntersection*
     //__syncthreads();
 }
 
-__device__ glm::vec3 findClosestLight(int numPath, glm::vec3* dev_lightPoint) {
+//findClosestLight tries to find either the light position at the point or the earliest light position in the screen coordinates
+__device__ glm::vec3 findClosestLight(int idx, int numPath, glm::vec3* dev_lightPoint) {
+    if (dev_lightPoint[idx] != glm::vec3(0, 0, 0)) {
+        return dev_lightPoint[idx];
+    }
     for (int i = 0; i < numPath; i++) {
         if (dev_lightPoint[i] != glm::vec3(0, 0, 0)) {
             return dev_lightPoint[i];
@@ -335,6 +394,7 @@ __device__ glm::vec3 findClosestLight(int numPath, glm::vec3* dev_lightPoint) {
     }
     return glm::vec3(0.f, 0.f, 0.f);
 }
+
 // LOOK: shader demonstrating what you might do with the info in
 // a ShadeableIntersection, as well as how to use thrust's random number
 // generator. Observe that since the thrust random number generator basically
@@ -346,35 +406,55 @@ __device__ glm::vec3 findClosestLight(int numPath, glm::vec3* dev_lightPoint) {
 // bump mapping.
 __global__ void shadeMaterial(int iter, int num_paths, ShadeableIntersection* shadeableIntersections
     , PathSegment* pathSegments
-    , Material* materials, Texture* textures, glm::vec3* dev_texData, glm::vec3* dev_lightPoint) {
+    , Material* materials, Texture* textures, glm::vec3* dev_texData, glm::vec3* dev_lightPoint, cudaTextureObject_t* cudaTex) {
+
+    
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < num_paths)
     {
+        PathSegment& pathSegment = pathSegments[idx];
         ShadeableIntersection intersection = shadeableIntersections[idx];
         if (intersection.t > 0.0f) { 
             thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
             thrust::uniform_real_distribution<float> u01(0, 1);
 
             Material material = materials[intersection.materialId];
-            glm::vec3 materialColor = material.color;
+            glm::vec3 materialColor = material.gltf ? material.pbrMetallicRoughness.baseColorFactor : material.color;
 
             // If the material indicates that the object was a light, "light" the ray
-            if (material.emittance > 0.0f) {
-                pathSegments[idx].color *= (materialColor * material.emittance);
-                pathSegments[idx].remainingBounces = 0;
+            if (material.emittance > 0.0f || material.emissiveTexture.index >= 0) {
+                if (material.gltf) {
+                    glm::vec3 EmissiveColor = material.emissiveFactor * sample(cudaTex[material.emissiveTexture.index], intersection.uv);
+                    if (glm::length(EmissiveColor) > 0.0f) {
+                        pathSegment.color *= EmissiveColor;
+                        pathSegment.remainingBounces = 0;
+                    }
+                    else {
+                        scatterRayGLTF(pathSegment, getPointOnRay(pathSegment.ray, intersection.t), intersection.surfaceNormal, intersection.uv, intersection.tangent, material, rng, cudaTex);
+                        pathSegment.remainingBounces--;
+                    }
+                }
+                else {
+                    pathSegment.color *= (materialColor * material.emittance);
+                    pathSegment.remainingBounces = 0;
+                }
             }
             // Otherwise, do some pseudo-lighting computation. This is actually more
             // like what you would expect from shading in a rasterizer like OpenGL.
-            // TODO: replace this! you should be able to start with basically a one-liner
             else {
-                scatterRay(pathSegments[idx], getPointOnRay(pathSegments[idx].ray, intersection.t), intersection.surfaceNormal, intersection.uv, material, rng, textures, dev_texData);
-                if (DIRECTLIGHTING && pathSegments[idx].remainingBounces == 2) {
-                    glm::vec3 lightPoint = findClosestLight(num_paths, dev_lightPoint);
-                    if (lightPoint != glm::vec3(0.f, 0.f, 0.f)) {
-                        pathSegments[idx].ray.direction = glm::normalize(lightPoint - pathSegments[idx].ray.origin);
-                    }
+                if (material.gltf) {
+                    scatterRayGLTF(pathSegment, getPointOnRay(pathSegment.ray, intersection.t), intersection.surfaceNormal, intersection.uv, intersection.tangent, material, rng, cudaTex);
                 }
-                pathSegments[idx].remainingBounces--;
+                else {
+                    scatterRay(pathSegment, getPointOnRay(pathSegment.ray, intersection.t), intersection.surfaceNormal, intersection.uv, material, rng, textures, dev_texData, cudaTex);
+                }
+                if (DIRECTLIGHTING && pathSegment.remainingBounces == 2) {
+                    glm::vec3 lightPoint = findClosestLight(idx, num_paths, dev_lightPoint);
+                    if (lightPoint != glm::vec3(0.f, 0.f, 0.f)) {
+                        pathSegment.ray.direction = glm::normalize(lightPoint - pathSegment.ray.origin);
+                    }//just change the direction so next ray it either cast to object or the light(very basic so we dont worry about the former)
+                }
+                pathSegment.remainingBounces--;
             }
             // If there was no intersection, color the ray black.
             // Lots of renderers use 4 channel color, RGBA, where A = alpha, often
@@ -382,8 +462,8 @@ __global__ void shadeMaterial(int iter, int num_paths, ShadeableIntersection* sh
             // This can be useful for post-processing and image compositing.
         }
         else {
-            pathSegments[idx].color = glm::vec3(0.0f);
-            pathSegments[idx].remainingBounces = 0;
+            pathSegment.color = glm::vec3(0.0f);
+            pathSegment.remainingBounces = 0;
         }
     }
 }
@@ -400,6 +480,7 @@ __global__ void finalGather(int nPaths, glm::vec3 * image, PathSegment * iterati
     }
 }
 
+//basic Post Process Color Tinting process
 __global__ void shadePostProcess(int iter, int num_paths, ShadeableIntersection* shadeableIntersections
     , PathSegment* pathSegments) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -547,7 +628,6 @@ void pathtrace(uchar4 *pbo, int frame, int iter) {
             dev_texData,
             dev_lightPoint
             );
-
         shadeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
             iter,
             new_num_paths,
@@ -556,7 +636,8 @@ void pathtrace(uchar4 *pbo, int frame, int iter) {
             dev_materials,
             dev_textures,
             dev_texData,
-            dev_lightPoint
+            dev_lightPoint,
+            dev_cudaTexObjs
             );
 #if POSTPROCESS
         shadePostProcess << <numblocksPathSegmentTracing, blockSize1d >> > (
@@ -594,3 +675,5 @@ void pathtrace(uchar4 *pbo, int frame, int iter) {
 
     checkCUDAError("pathtrace");
 }
+
+

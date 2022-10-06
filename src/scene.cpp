@@ -8,6 +8,8 @@
 #include <tiny_gltf.h>
 #include <stb_image.h>
 
+using namespace std;
+
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;
@@ -70,15 +72,16 @@ int Scene::loadGeom(string objectid) {
         utilityCore::safeGetline(fp_in, line);
         if (!line.empty() && fp_in.good()) {
             vector<string> tokens = utilityCore::tokenizeString(line);
-            newGeom.materialid = atoi(tokens[1].c_str());
-            cout << "Connecting Geom " << objectid << " to Material " << newGeom.materialid << "..." << endl;
+            if (newGeom.type != MESH || strcmp(tokens[1].c_str(), "-1") != 0) {
+                newGeom.materialid = atoi(tokens[1].c_str());
+                std::cout << "Connecting Geom " << objectid << " to Material " << newGeom.materialid << "..." << endl;
+            }
         }
 
         //load transformations
         utilityCore::safeGetline(fp_in, line);
         while (!line.empty() && fp_in.good()) {
             vector<string> tokens = utilityCore::tokenizeString(line);
-
             //load tranformations
             if (strcmp(tokens[0].c_str(), "TRANS") == 0) {
                 newGeom.translation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
@@ -101,6 +104,7 @@ int Scene::loadGeom(string objectid) {
         }
 
         geoms.push_back(newGeom);
+        //cout << "mat size" << materials.size() << endl;
         return 1;
     }
 }
@@ -278,12 +282,12 @@ int Scene::loadGLTF(string filename, Geom& geom) {
         << model.lights.size() << " lights\n";*/
     int texIndex = textures.size();
     int matIndex = materials.size();
-
+    //cout << textures.size() << materials.size() << endl;
     //copy materials in model to host
     for (const tinygltf::Material& material : model.materials) {
         Material newMat;
         newMat.gltf = true;
-        newMat.texIndex = texIndex++;
+        newMat.texIndex = texIndex;
         newMat.pbrMetallicRoughness.baseColorTexture = material.pbrMetallicRoughness.baseColorTexture;
         newMat.pbrMetallicRoughness.baseColorFactor = glm::make_vec3(material.pbrMetallicRoughness.baseColorFactor.data());
         newMat.pbrMetallicRoughness.metallicRoughnessTexture = material.pbrMetallicRoughness.metallicRoughnessTexture;
@@ -292,6 +296,8 @@ int Scene::loadGLTF(string filename, Geom& geom) {
         newMat.normalTexture = material.normalTexture;
         newMat.emissiveFactor = glm::make_vec3(material.emissiveFactor.data());
         newMat.emissiveTexture = material.emissiveTexture;
+        newMat.emittance = 0.f;
+        //cout << newMat.emissiveTexture.index << endl;
         materials.push_back(newMat);
     }
     //copy textures in model to host
@@ -306,6 +312,7 @@ int Scene::loadGLTF(string filename, Geom& geom) {
         memcpy(newTex.image, image.image.data(), newTex.size);
         textures.push_back(newTex);
     }
+    //cout << textures.size() << materials.size() << endl;
     geom.primBegin = primitives.size();
     const unsigned short* indices = nullptr;
     const float* mesh_vertices = nullptr;
@@ -377,14 +384,15 @@ int Scene::loadGLTF(string filename, Geom& geom) {
                     }
                 }
                 prim.mat_id = matIndex + primitive.material;
+                //cout << prim.mat_id;
                 primitives.push_back(prim);
             }
         }
     }
-    
     geom.primEnd = primitives.size();
+    
     /*std::cout << geom.aabb_min.x << " " << geom.aabb_min.y << " " << geom.aabb_min.z << endl;
     std::cout << geom.aabb_max.x << " " << geom.aabb_max.y << " " << geom.aabb_max.z << endl;*/
-    std::cout << primitives.size() << " " << geom.primBegin << " " << geom.primEnd << std::endl;
+    //std::cout << primitives.size() << " " << geom.primBegin << " " << geom.primEnd << std::endl;
     return 1;
 }

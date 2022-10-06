@@ -182,7 +182,7 @@ __host__ __device__ bool intersectionCheck(glm::vec3 aabb_min, glm::vec3 aabb_ma
     return true;
 }
 
-__host__ __device__ float primitiveIntersectionTest(Geom geom, Ray r,
+__host__ __device__ float primitiveIntersectionTest(Geom& geom, Ray r,
     glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2& uv, glm::vec4& tangent, Primitive* prims, Material* material, glm::vec3* texData) {
 #if CULLING
     if (!intersectionCheck(geom.aabb_min, geom.aabb_max, r)) {
@@ -199,7 +199,7 @@ __host__ __device__ float primitiveIntersectionTest(Geom geom, Ray r,
 
     for (int primId = geom.primBegin; primId < geom.primEnd; primId++) {
         const Primitive& prim = prims[primId];
-
+        
         //TODO aabb here?
         if (glm::intersectRayTriangle(q.origin, q.direction, prim.pos[0], prim.pos[1], prim.pos[2], bary)) {
             intersect = true;
@@ -208,6 +208,7 @@ __host__ __device__ float primitiveIntersectionTest(Geom geom, Ray r,
             }
             t1 = bary.z;
             bary.z = 1.0f - bary.x - bary.y;
+            geom.matId = prim.mat_id;
             //we interpolate three vectors 
             if (prim.hasNormal) {
                 normal = glm::normalize(prim.normal[0] * bary.z + prim.normal[1] * bary.x + prim.normal[2] * bary.y);
@@ -222,7 +223,7 @@ __host__ __device__ float primitiveIntersectionTest(Geom geom, Ray r,
                 tangent = prim.tangent[0] * bary.z + prim.tangent[1] * bary.x + prim.tangent[2] * bary.y;
             }
             else {//or we have to calculate Tangent for the mesh
-                //https://www.cs.upc.edu/~virtual/G/1.%20Teoria/06.%20Textures/Tangent%20Space%20Calculation.pdf and inspired by TA Wayne Wu
+                //https://www.cs.upc.edu/~virtual/G/1.%20Teoria/06.%20Textures/Tangent%20Space%20Calculation.pdf
                 glm::vec3 q1 = prim.pos[1] - prim.pos[0];
                 glm::vec3 q2 = prim.pos[2] - prim.pos[0];
                 glm::vec2 st1 = prim.uv[1] - prim.uv[0];
