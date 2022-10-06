@@ -4,6 +4,9 @@
 #define CACHE_FIRST_INTERSECTIONS 1
 #define SORT_MATERIALS 0
 
+// Anti-Aliasing
+#define ENABLE_ANTI_ALIASING 1
+
 // BVH setting
 #define ENABLE_BVH  1
 #define SAH_BUCKET_SIZE 12

@@ -109,6 +109,8 @@ static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
+
+// Mesh
 static Triangle* dev_triangles = NULL;
 
 // Texture map
@@ -123,6 +125,7 @@ static glm::vec3* dev_normals = NULL;
 static int* dev_bvhIndexArrayToUse = NULL;
 static LinearBVHNode* dev_bvhNodes = NULL;
 
+// Cache first bounce
 #if CACHE_FIRST_INTERSECTIONS
 static ShadeableIntersection* dev_intersectionsCache = NULL;
 #endif
@@ -369,13 +372,26 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
         segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		// TODO: implement antialiasing by jittering the ray
-		segment.ray.direction = glm::normalize(cam.view
-			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
-		);
+#if ENABLE_ANTI_ALIASING
 
-		segment.pixelIndex = index;
-		segment.remainingBounces = traceDepth;
+        thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, pathSegments->remainingBounces);
+        thrust::uniform_real_distribution<float> r(-0.5f, 0.5f);
+        float xRandom = r(rng);
+        float yRandom = r(rng);
+
+        segment.ray.direction = glm::normalize(cam.view
+            - cam.right * cam.pixelLength.x * ((float)x + xRandom - (float)cam.resolution.x * 0.5f)
+            - cam.up * cam.pixelLength.y * ((float)y + yRandom - (float)cam.resolution.y * 0.5f)
+        );
+#else
+        segment.ray.direction = glm::normalize(cam.view
+            - cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
+            - cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
+        );
+#endif
+
+        segment.pixelIndex = index;
+        segment.remainingBounces = traceDepth;
 	}
 }
 
