@@ -110,3 +110,37 @@ std::istream& utilityCore::safeGetline(std::istream& is, std::string& t) {
         }
     }
 }
+glm::vec3 utilityCore::readVec3(std::ifstream& is)
+{
+    char first_bracket;
+    double x_value;
+    double y_value;
+    double z_value;
+    char second_bracket;
+    char comma;
+    is >> first_bracket >> x_value >> comma >> y_value >> comma >> z_value >> second_bracket;
+    return glm::vec3(x_value, y_value, z_value);
+    
+}
+glm::vec2 utilityCore::readVec2(std::ifstream& is)
+{
+    char first_bracket;
+    double x_value;
+    double y_value;
+    char second_bracket;
+    char comma;
+    is >> first_bracket >> x_value >> comma >> y_value >> second_bracket;
+    return glm::vec2(x_value, y_value);
+}
+//Make this a template
+glm::ivec2 utilityCore::readIVec2(std::ifstream& is)
+{
+    char first_bracket;
+    int x_value;
+    int y_value;
+    char second_bracket;
+    char comma;
+    is >> first_bracket >> x_value >> comma >> y_value>> second_bracket;
+    return glm::ivec2(x_value, y_value);
+
+}

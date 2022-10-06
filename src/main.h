@@ -8,6 +8,7 @@
 #include <fstream>
 #include <glm/glm.hpp>
 #include <glm/gtx/transform.hpp>
+#include <glm/gtx/io.hpp>
 #include "glslUtility.hpp"
 #include <iostream>
 #include <sstream>
@@ -36,3 +37,6 @@ void runCuda();
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
 void mousePositionCallback(GLFWwindow* window, double xpos, double ypos);
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+void saveState();
+void loadState(string checkpointFolder);
+

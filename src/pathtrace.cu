@@ -18,7 +18,7 @@
 
 #define ERRORCHECK 1
 #define SORTMATERIALS 1
-#define CACHE 1
+#define CACHE 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -121,6 +121,19 @@ void pathtraceInit(Scene* scene) {
 
 	checkCUDAError("pathtraceInit");
 }
+void pathtraceInitCheckpoint(Scene* scene)
+{
+	hst_scene = scene;
+
+	const Camera& cam = hst_scene->state.camera;
+	const int pixelcount = cam.resolution.x * cam.resolution.y;
+
+	cudaMemcpy(dev_image, hst_scene->state.image.data(),
+		pixelcount * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+	checkCUDAError("pathtraceCheckpointInit");
+
+}
+
 
 void pathtraceFree() {
 	cudaFree(dev_image);  // no-op if dev_image is null
@@ -149,19 +162,37 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 {
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
-
+	float lens_radius = 0.1f; //??
+	float focal_length = 2.00f;
+	bool dof = false;
 	if (x < cam.resolution.x && y < cam.resolution.y) {
 		int index = x + (y * cam.resolution.x);
 		PathSegment& segment = pathSegments[index];
-
+		thrust::uniform_real_distribution<float> u01(0, 1);
+		thrust::uniform_real_distribution<float> uNeg11(-1, 1);
+		auto rng = makeSeededRandomEngine(iter, index, traceDepth);
+;
 		segment.ray.origin = cam.position;
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		// TODO: implement antialiasing by jittering the ray
+		// implemented antialiasing by jittering the ray
 		segment.ray.direction = glm::normalize(cam.view
-			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
+			- cam.right * cam.pixelLength.x * ((float)x + u01(rng) - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)y + u01(rng) - (float)cam.resolution.y * 0.5f)
 		);
+		if (dof)
+		{
+			auto lens = makeSeededRandomEngine(iter, index, focal_length);
+			glm::vec3 offset(lens_radius * uNeg11(lens), lens_radius * uNeg11(lens), 0.0f);
+			offset = glm::normalize(offset);
+			//segment.ray.direction *= focal_length;
+			//segment.ray.origin.x += cool.x;
+			//segment.ray.origin.y += cool.y;
+			//segment.ray.direction = glm::normalize(segment.ray.direction - segment.ray.origin);
+		}
+
+
+
 
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;

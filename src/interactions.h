@@ -82,11 +82,12 @@ void scatterRay(
     {
         pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
         pathSegment.ray.origin = intersect;
-        pathSegment.color *= (m.color); //* glm::dot(normal, pathSegment.ray.direction);
+        pathSegment.color *= (m.specular.color); //* glm::dot(normal, pathSegment.ray.direction);
+
     }
-    else if (m.hasRefractive > rand)
+    else if (m.hasRefractive)
     {
-        pathSegment.color *= (m.color);
+        pathSegment.color *= (m.color) ;
         pathSegment.ray.origin = intersect;
         pathSegment.ray.direction = glm::refract(pathSegment.ray.direction, normal, 1.0f / m.indexOfRefraction);
     }
