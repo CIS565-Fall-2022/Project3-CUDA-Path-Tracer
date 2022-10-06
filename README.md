@@ -1,13 +1,45 @@
 CUDA Path Tracer
-================
+============================
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 3**
 
-* (TODO) YOUR NAME HERE
-* Tested on: (TODO) Windows 22, i7-2222 @ 2.22GHz 22GB, GTX 222 222MB (Moore 2222 Lab)
+* Runshi Gu
+  * [LinkedIn](https://www.linkedin.com/in/runshi-gu-445648194/)
+* Tested on: Windows 10, AMD Ryzen 7 5800X 8-Core Processor @ 3.80 GHz 32GB, RTX3070 24538MB, Personal
 
-### (TODO: Your README)
+## Features Implementation
+* Basic pathtracer
 
-*DO NOT* leave the README to the last minute! It is a crucial part of the
-project, and we will not be able to grade you without a good README.
+* Diffuse surface
+* Specular reflective
+* Specular refractive (Fresnel dielectric)
+* OBJ Loading with bounding volume
+* Toggleable Camera Depth of Field
+* Toggleable Direct Lighting
+* Anti-Aliasing
+* Thread termination using Stream Compaction
+* Toggleable thread sorting by material type
+* Toggleable first bounce intersection cache
+
+
+## Direct Lighting
+
+* With Direct Lighting
+
+![](img/withDirectLighting.png)
+
+* Without Direct Lighting
+
+![](img/withoutDirectLight.png)
+
+
+## Anti Aliasing
+
+* With Anti-Aliasing
+
+![](img/AntiAliasing.png)
+
+* Without Anti-Aliasing
+
+![](img/NoAntiAliasing.png)
 
