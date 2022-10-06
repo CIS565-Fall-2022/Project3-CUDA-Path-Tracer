@@ -20,7 +20,9 @@
 #define SORT_BY_MATERIAL 0
 #define FIRST_BOUNCE_CACHE 0
 #define ANTIALIASING 1
-#define DIRECT_LIGHTING 0
+#define DIRECT_LIGHTING 1
+
+#define DEPTH_OF_FIELD 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -204,6 +206,31 @@ void pathtraceFree() {
 	checkCUDAError("pathtraceFree");
 }
 
+__device__
+glm::vec2 ConcentricSampleDisk(thrust::default_random_engine& rng) {
+	thrust::uniform_real_distribution<float> u01(0, 1);
+
+	glm::vec2 uOffset;
+	uOffset.x = 2.f * u01(rng) - 1;
+	uOffset.y = 2.f * u01(rng) - 1;
+
+	// << Handle degeneracy at the origin >>
+	if (uOffset.x == 0 && uOffset.y == 0)
+		return glm::vec2(0.f, 0.f);
+
+	// << Apply concentric mapping to point >>
+	float theta, r;
+	if (std::abs(uOffset.x) > std::abs(uOffset.y)) {
+		r = uOffset.x;
+		theta = (PI / 4.f) * (uOffset.y / uOffset.x);
+	}
+	else {
+		r = uOffset.y;
+		theta = (PI / 2.f) - (PI / 4.f) * (uOffset.x / uOffset.y);
+	}
+	return r * glm::vec2(std::cos(theta), std::sin(theta));
+}
+
 /**
 * Generate PathSegments with rays from the camera through the screen into the
 * scene, which is the first bounce of rays.
@@ -224,9 +251,10 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.ray.origin = cam.position;
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, iter + 7, iter * 7);
+
 		// TODO: implement antialiasing by jittering the ray
 #if ANTIALIASING && !(FIRST_BOUNCE_CACHE)
-		thrust::default_random_engine rng = makeSeededRandomEngine(iter, iter + 7, iter * 7);
 		thrust::uniform_real_distribution<float> u01(-0.5, 0.5);
 
 		float sampleX = u01(rng);
@@ -241,6 +269,21 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
 		);
+#endif
+
+#if DEPTH_OF_FIELD && !(FIRST_BOUNCE_CACHE)
+		if (cam.aperture > 0) {
+			// <<Sample point on lens>> 
+			glm::vec2 pLens = cam.aperture * ConcentricSampleDisk(rng);
+
+			//<< Compute point on plane of focus >>
+			float ft = abs(cam.focal / segment.ray.direction.z);
+			glm::vec3 pFocus = getPointOnRay(segment.ray, ft);
+
+			// << Update ray for effect of lens >>
+			segment.ray.origin += glm::vec3(pLens.x, pLens.y, 0);
+			segment.ray.direction = glm::normalize(pFocus - segment.ray.origin);
+		}
 #endif
 
 		segment.pixelIndex = index;
@@ -320,7 +363,9 @@ __global__ void computeIntersections(
 					FetchTexture(textureData[geom.normalMapID], textureData[geom.normalMapID].offsetNormal, normalMap, uv, normalMapValue);
 					normalMapValue = (2.f * normalMapValue - 1.f);
 					//normal += normalMapValue;
-					normalMapping(normal, normalMapValue, tmp_tangent);
+					glm::vec3 outputNormal;
+					normalMapping(normal, normalMapValue, tmp_tangent, outputNormal);
+					normal = outputNormal;
 				}
 			}
 		}

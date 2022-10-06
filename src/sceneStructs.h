@@ -111,6 +111,9 @@ struct Camera {
     glm::vec3 right;
     glm::vec2 fov;
     glm::vec2 pixelLength;
+
+    float focal = 0;
+    float aperture = 0;
 };
 
 struct RenderState {

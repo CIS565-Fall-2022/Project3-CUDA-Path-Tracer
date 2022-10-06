@@ -44,6 +44,41 @@ glm::vec3 calculateRandomDirectionInHemisphere(
 }
 
 __host__ __device__
+glm::vec3 calculateImperfectSpecularDirection(
+  glm::vec3 normal, float shininess, thrust::default_random_engine& rng) {
+  thrust::uniform_real_distribution<float> u01(0, 1);
+
+  float theta = 1.f / cos(1.f / pow(u01(rng), shininess + 1));
+  float phi = u01(rng) * TWO_PI;
+
+  // Find a direction that is not the normal based off of whether or not the
+  // normal's components are all equal to sqrt(1/3) or whether or not at
+  // least one component is less than sqrt(1/3). Learned this trick from
+  // Peter Kutz.
+
+  glm::vec3 directionNotNormal;
+  if (abs(normal.x) < SQRT_OF_ONE_THIRD) {
+    directionNotNormal = glm::vec3(1, 0, 0);
+  }
+  else if (abs(normal.y) < SQRT_OF_ONE_THIRD) {
+    directionNotNormal = glm::vec3(0, 1, 0);
+  }
+  else {
+    directionNotNormal = glm::vec3(0, 0, 1);
+  }
+
+  // Use not-normal direction to generate two perpendicular directions
+  glm::vec3 perpendicularDirection1 =
+    glm::normalize(glm::cross(normal, directionNotNormal));
+  glm::vec3 perpendicularDirection2 =
+    glm::normalize(glm::cross(normal, perpendicularDirection1));
+
+  return cos(theta) * normal
+    + cos(phi) * sin(theta) * perpendicularDirection1
+    + sin(phi) * sin(theta) * perpendicularDirection2;
+}
+
+__host__ __device__
 void FetchTexture(const Texture& texture, const int offset, const glm::vec3* texImage, const glm::vec2& uv, glm::vec3 &color) {
   int tx = uv.x * (texture.width - 1);
   int ty = (uv.y) * (texture.height - 1);
@@ -51,7 +86,7 @@ void FetchTexture(const Texture& texture, const int offset, const glm::vec3* tex
 
   //int offset = (isNormal) ? texture.offsetNormal : texture.offsetColor;
 
-#if PROCEDURAL_TEXTURE
+#if PROCEDURAL_TEXTURE == 1
   color = texImage[idx + offset];
 #else
   color = texImage[idx + offset];
@@ -59,11 +94,12 @@ void FetchTexture(const Texture& texture, const int offset, const glm::vec3* tex
 }
 
 __host__ __device__
-void normalMapping(glm::vec3& normalSurface, const glm::vec3& normalMap, const glm::vec4& tangent) {
+void normalMapping(glm::vec3& normalSurface, const glm::vec3& normalMap, const glm::vec4& tangent, glm::vec3 &normal) {
   glm::vec3 t = glm::vec3(tangent);
   glm::vec3 b = glm::cross(normalSurface, t) * tangent.w;
   glm::mat3 TBN = glm::mat3(t, b, normalSurface);
-  normalSurface = glm::normalize(TBN * normalMap);
+
+  normal = glm::normalize(TBN * normalMap);
 }
 
 /**
@@ -133,7 +169,6 @@ void scatterRay(
 
   // TODO: implement this.
   thrust::uniform_real_distribution<float> u01(0, 1);
-  float prob = u01(rng);
   if (m.hasRefractive) {
     float ior = m.indexOfRefraction;
     float cosAngle = glm::dot(pathSegment.ray.direction, -normal);
@@ -141,7 +176,11 @@ void scatterRay(
     reflectCoeff = reflectCoeff + (1.f - reflectCoeff) * powf(1.f - cosAngle, 5);
 
     if (u01(rng) < reflectCoeff) {
-      pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+      glm::vec3 reflect = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+      glm::vec3 imperfect = glm::normalize(calculateImperfectSpecularDirection(reflect, m.hasReflective, rng));
+
+      pathSegment.ray.direction = m.hasReflective * reflect + (1 - m.hasReflective) * imperfect;
+
       pathSegment.color *= (color);
       pathSegment.ray.origin = intersect;
     }
@@ -152,8 +191,13 @@ void scatterRay(
       // pathSegment.ray.origin = intersect;
     }
   }
-  else if (m.hasReflective) {
-    pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+  else if (m.hasReflective > 0) {
+    glm::vec3 reflect = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+    glm::vec3 imperfect = glm::normalize(calculateImperfectSpecularDirection(reflect, m.hasReflective, rng));
+
+    pathSegment.ray.direction = m.hasReflective * reflect + (1 - m.hasReflective) * imperfect;
+
+    
     pathSegment.color *= (color);
     pathSegment.ray.origin = intersect;
   }
