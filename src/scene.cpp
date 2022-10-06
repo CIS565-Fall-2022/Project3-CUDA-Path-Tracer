@@ -64,6 +64,11 @@ int Scene::loadGeom(string objectid) {
             vector<string> tokens = utilityCore::tokenizeString(line);
             newGeom.materialid = atoi(tokens[1].c_str());
             cout << "Connecting Geom " << objectid << " to Material " << newGeom.materialid << "..." << endl;
+
+            // if the geom is light push it back to scene lights vector
+            if (materials[newGeom.materialid].emittance > 0.f) {
+                lights.push_back(newGeom);
+            }
         }
 
         //load transformations

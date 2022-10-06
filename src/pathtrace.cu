@@ -30,6 +30,8 @@
 #define FOCAL_DISTANCE 8.5f
 #define PI 3.141592654f
 
+#define DIRECT_LIGHTING 1
+
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
@@ -124,6 +126,17 @@ glm::vec3 squareToDiskConcentric(const glm::vec2& sample)
 	return glm::vec3(x, y, 0.f);
 }
 
+__device__ __host__ 
+glm::vec3 pointOnSquarePlane(thrust::default_random_engine& rng, Geom light)
+{
+	thrust::uniform_real_distribution<float> u01(0, 1);
+	glm::vec2 randpoint(u01(rng), u01(rng));
+	glm::vec3 pointOnPlane = glm::vec3((randpoint - glm::vec2(0.5f)), 0.f);
+	//from -0.5, 0.5 to world space
+	glm::vec3 pointOnPlaneWorld = glm::vec3(light.transform * glm::vec4(pointOnPlane, 1.f));
+	return pointOnPlaneWorld;
+}
+
 __host__ __device__
 float heartFunction(const glm::vec2& sample) {
 	float tmp = (sample.x * sample.x + sample.y * sample.y - 1.0f);
@@ -176,6 +189,10 @@ static ShadeableIntersection* dev_intersections = NULL;
 // ...
 static Triangle* dev_triangles = NULL;
 
+#if DIRECT_LIGHTING
+static Geom* dev_lights = NULL;
+#endif
+
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
 	guiData = imGuiData;
@@ -212,6 +229,11 @@ void pathtraceInit(Scene* scene) {
 		cudaMemcpy(dev_triangles, mesh.triangles, mesh.numTris * sizeof(Triangle), cudaMemcpyHostToDevice);
 	}
 
+#if DIRECT_LIGHTING
+	cudaMalloc(&dev_lights, scene->lights.size() * sizeof(Geom));
+	cudaMemcpy(dev_lights, scene->lights.data(), scene->lights.size() * sizeof(Geom), cudaMemcpyHostToDevice);
+#endif
+
 	checkCUDAError("pathtraceInit");
 }
 
@@ -225,6 +247,9 @@ void pathtraceFree() {
 	cudaFree(dev_first_intersections);
 	// TODO: clean up any extra device memory you created
 	cudaFree(dev_triangles);
+#if DIRECT_LIGHTING
+	cudaFree(dev_lights);
+#endif
 	checkCUDAError("pathtraceFree");
 }
 
@@ -456,7 +481,7 @@ __global__ void shadeBaseOnMaterial(
 		ShadeableIntersection intersection = shadeableIntersections[idx];
 
 		// if intersection
-		if (intersection.t > 0.0f) {
+		if (pathSegment.remainingBounces > 0 && intersection.t > 0.0f) {
 			Material material = materials[intersection.materialId];
 			glm::vec3 materialColor = material.color;
 
@@ -475,6 +500,83 @@ __global__ void shadeBaseOnMaterial(
 				glm::vec3 intersectionPoint = getPointOnRay(pathSegment.ray, intersection.t);
 				scatterRay(pathSegment, intersectionPoint, intersection.surfaceNormal, material, rng);
 				pathSegment.remainingBounces --;
+			}
+		}
+		// if not intersection
+		else {
+			// terminate ray
+			pathSegment.remainingBounces = 0;
+			// color black
+			pathSegment.color = glm::vec3(0.f, 0.f, 0.f);
+		}
+	}
+}
+
+__global__ void shadeBaseOnMaterialDirectLighting(
+	int iter,
+	int num_paths,
+	ShadeableIntersection* shadeableIntersections,
+	PathSegment* pathSegments,
+	Material* materials,
+	Geom* lights,
+	int numLights)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx < num_paths) {
+		PathSegment& pathSegment = pathSegments[idx];
+		ShadeableIntersection intersection = shadeableIntersections[idx];
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
+
+		// if intersection and is not the last two boundce
+		// do as usual
+		if (pathSegment.remainingBounces != 2 && pathSegment.remainingBounces > 0 && intersection.t > 0.0f) {
+			Material material = materials[intersection.materialId];
+			glm::vec3 materialColor = material.color;
+			// if hit light
+			if (material.emittance > 0.0f) {
+				// multiple the material color with ray color
+				pathSegment.color *= (materialColor * material.emittance);
+				// terminate the ray
+				pathSegment.remainingBounces = 0;
+			}
+			else if (material.emittance > 0.0f && pathSegment.remainingBounces == 1) {
+				pathSegment.color *= (materialColor * material.emittance * (float)numLights);
+			}
+			else {
+				//sample the material BSDFs to generate a new ray, update the pathSegment with the new ray
+				glm::vec3 intersectionPoint = getPointOnRay(pathSegment.ray, intersection.t);
+				scatterRay(pathSegment, intersectionPoint, intersection.surfaceNormal, material, rng);
+				pathSegment.remainingBounces--;
+			}
+		}
+		// if is the bounce before the last bounce
+		// randomly select a light
+		// randomly select a point on it
+		// scatter ray to that point
+		else if (pathSegment.remainingBounces == 2 && intersection.t > 0.0f) {
+			Material material = materials[intersection.materialId];
+			glm::vec3 materialColor = material.color;
+
+			// if hit light
+			if (material.emittance > 0.0f) {
+				// multiple the material color with ray color
+				pathSegment.color *= (materialColor * material.emittance);
+				// terminate the ray
+				pathSegment.remainingBounces = 0;
+			}
+			else {
+				//sample the material BSDFs to generate a new ray, update the pathSegment with the new ray
+				glm::vec3 intersectionPoint = getPointOnRay(pathSegment.ray, intersection.t);
+				scatterRay(pathSegment, intersectionPoint, intersection.surfaceNormal, material, rng);
+				// select a light randomly
+				thrust::uniform_real_distribution<float> u01(0, 1);
+				float rand = u01(rng);
+				int lightNum = glm::min((int)(rand * numLights), numLights - 1);
+				Geom light = lights[lightNum];
+				glm::vec3 pointOnLight = pointOnSquarePlane(rng, light);
+				glm::vec3 newRayDir = glm::normalize(pointOnLight - pathSegment.ray.origin);
+				pathSegment.ray.direction = newRayDir;
+				pathSegment.remainingBounces--;
 			}
 		}
 		// if not intersection
@@ -628,7 +730,18 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	  // materials you have in the scenefile.
 	  // TODO: compare between directly shading the path segments and shading
 	  // path segments that have been reshuffled to be contiguous in memory.
-
+#if DIRECT_LIGHTING
+		shadeBaseOnMaterialDirectLighting << <numblocksPathSegmentTracing, blockSize1d >> > (
+			iter,
+			num_paths,
+			dev_intersections,
+			dev_paths,
+			dev_materials,
+			dev_lights,
+			hst_scene->lights.size()
+			);
+		checkCUDAError("shade base on material direct lighting");
+#else
 		shadeBaseOnMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
 			iter,
 			num_paths,
@@ -637,7 +750,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_materials
 			);
 		checkCUDAError("shade base on material");
-
+#endif
 		// stream compaction to remove the terminated pathSegment
 		//dev_path_end = thrust::remove_if(thrust::device, dev_paths, dev_path_end, pathTerminated());
 		//num_paths = dev_path_end - dev_paths;
