@@ -28,15 +28,16 @@ CUDA can only launch a finite number of blocks at a time. Some threads end with 
 
 To solve this problem, we  launch a kernel that traces ONE bounce for every ray in the pool. According to the results, we remove terminated rays from the ray pool with stream compaction. 
 
-#### Sort by Materials Type 
+Sort by Materials Type 
+============
 Using Radix Sort by material ID, we can batch rays according to material type. Therefore, we can further parallelize rays and perform intersection testing and shading evaluation in separate kernels. 
 
 
 Anti-aliasing
-======
+===========
 | With AA | No AA |
-|:-----:|:-------:|
-|![](img/aa_large.png)|![](img/noaa_large.png)|
+|:-------:|:-------:|
+|![](img/aa.png)|![](img/NO_AA.png)|
 
 
 #### Sort by Materials Type 
