@@ -66,6 +66,7 @@ struct PathSegment {
     glm::vec3 color;
     int pixelIndex;
     int remainingBounces;
+    bool transmitted;
 };
 
 // Use with a corresponding PathSegment to do:

@@ -163,6 +163,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
+		segment.transmitted = false;
 	}
 }
 
@@ -338,7 +339,6 @@ __global__ void shadeBSDF(
 			// like what you would expect from shading in a rasterizer like OpenGL.
 			// TODO: replace this! you should be able to start with basically a one-liner
 			else {
-				pathSegments[idx].color *= materialColor / 0.5f;
 				scatterRay(pathSegments[idx],
 					getPointOnRay(pathSegments[idx].ray, intersection.t),
 					intersection.surfaceNormal,

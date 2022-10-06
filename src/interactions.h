@@ -66,6 +66,12 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  *
  * You may need to change the parameter list for your purposes!
  */
+
+__host__ __device__ glm::vec3 jitterRay(glm::vec3 direction, thrust::default_random_engine& rng, float radius) {
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    return glm::normalize(direction + glm::normalize(glm::vec3(u01(rng), u01(rng), u01(rng))) * radius);
+}
+
 __host__ __device__
 void scatterRay(
         PathSegment & pathSegment,
@@ -75,14 +81,34 @@ void scatterRay(
         thrust::default_random_engine &rng,
         int idx) {
 
+    pathSegment.color *= m.color;
+    thrust::uniform_real_distribution<float> u01(0, 1);
+
     if (m.hasReflective) {
-        pathSegment.ray.direction = (rng() > 0.5) ? glm::reflect(pathSegment.ray.direction, normal) : calculateRandomDirectionInHemisphere(normal, rng);
+        pathSegment.ray.direction = (u01(rng) > 0.5) ? jitterRay(glm::reflect(pathSegment.ray.direction, normal), rng, 0.2f) : calculateRandomDirectionInHemisphere(normal, rng);
+    }
+    else if (m.hasRefractive) {
+        float n1 = (pathSegment.transmitted), n2 = 1.5;
+        float costheta = glm::dot(normal, -pathSegment.ray.direction);
+        bool entering = costheta > 0;
+        float r_not = glm::pow((1.5 - 1) / (1.5 + 1), 2);
+        float r_theta = r_not + (1 - r_not) * glm::pow((1 - costheta), 5);
+        float eta = (entering) ? 1 / 1.5 : 1.5 / 1;
+
+        glm::vec3 refracted = glm::refract(pathSegment.ray.direction, normal, eta);
+        glm::vec3 reflected = jitterRay(glm::reflect(pathSegment.ray.direction, normal), rng, 0.f);
+
+        if (u01(rng) < r_theta || glm::abs(glm::dot(normal, refracted)) < 0.001) {
+            pathSegment.ray.direction = jitterRay(glm::reflect(pathSegment.ray.direction, normal), rng, 0.f);
+        }
+        else {
+            pathSegment.ray.direction = glm::refract(pathSegment.ray.direction, normal, eta);
+        }
     }
     else {
         pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
     }
-    //pathSegment.ray.direction = (m.hasReflective) ? glm::reflect(pathSegment.ray.direction, normal) : calculateRandomDirectionInHemisphere(normal, rng);
 
-    pathSegment.ray.origin = intersect;
+    pathSegment.ray.origin = intersect + pathSegment.ray.direction * 0.001f;
  }
 
