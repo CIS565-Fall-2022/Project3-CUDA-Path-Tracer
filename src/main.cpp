@@ -1,6 +1,8 @@
 #include "main.h"
 #include "preview.h"
 #include <cstring>
+#include <iostream>
+#include <string>
 
 static std::string startTimeString;
 
@@ -26,6 +28,10 @@ int iteration;
 
 int width;
 int height;
+
+bool load = false;
+
+void loadState();
 
 //-------------------------------
 //-------------MAIN--------------
@@ -84,6 +90,69 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
+void loadState() {
+	std::ifstream ifs;
+	std::string str;
+	ifs.open("./states.txt", std::ios::in);
+	std::getline(ifs, str); iteration = std::stof(str);
+	std::getline(ifs, str); renderState->camera.resolution.x = std::stof(str);
+	std::getline(ifs, str); renderState->camera.resolution.y = std::stof(str);
+	std::getline(ifs, str); renderState->camera.position.x = std::stof(str);
+	std::getline(ifs, str); renderState->camera.position.y = std::stof(str);
+	std::getline(ifs, str); renderState->camera.position.z = std::stof(str);
+	std::getline(ifs, str); renderState->camera.lookAt.x = std::stof(str);
+	std::getline(ifs, str); renderState->camera.lookAt.y = std::stof(str);
+	std::getline(ifs, str); renderState->camera.lookAt.z = std::stof(str);
+	std::getline(ifs, str); renderState->camera.view.x = std::stof(str);
+	std::getline(ifs, str); renderState->camera.view.y = std::stof(str);
+	std::getline(ifs, str); renderState->camera.view.z = std::stof(str);
+	std::getline(ifs, str); renderState->camera.up.x = std::stof(str);
+	std::getline(ifs, str); renderState->camera.up.y = std::stof(str);
+	std::getline(ifs, str); renderState->camera.up.z = std::stof(str);
+	std::getline(ifs, str); renderState->camera.fov.x = std::stof(str);
+	std::getline(ifs, str); renderState->camera.fov.y = std::stof(str);
+	std::getline(ifs, str); renderState->camera.pixelLength.x = std::stof(str);
+	std::getline(ifs, str); renderState->camera.pixelLength.y = std::stof(str);
+	for (int i = 0; i < renderState->camera.resolution.x * renderState->camera.resolution.y; i++) {
+		std::getline(ifs, str); renderState->image[i].x = std::stof(str);
+		std::getline(ifs, str); renderState->image[i].y = std::stof(str);
+		std::getline(ifs, str); renderState->image[i].z = std::stof(str);
+	}
+}
+
+void saveState() {
+	std::ofstream ofs;
+
+	ofs.open("./states.txt",std::ios::out);
+
+	ofs << to_string(iteration) <<  std::endl;
+	ofs << to_string(renderState->camera.resolution.x) << std::endl;
+	ofs << to_string(renderState->camera.resolution.y) << std::endl;
+	ofs << to_string(renderState->camera.position.x) << std::endl;
+	ofs << to_string(renderState->camera.position.y) << std::endl;
+	ofs << to_string(renderState->camera.position.z) << std::endl;
+	ofs << to_string(renderState->camera.lookAt.x) << std::endl;
+	ofs << to_string(renderState->camera.lookAt.y) << std::endl;
+	ofs << to_string(renderState->camera.lookAt.z) << std::endl;
+	ofs << to_string(renderState->camera.view.x) << std::endl;
+	ofs << to_string(renderState->camera.view.y) << std::endl;
+	ofs << to_string(renderState->camera.view.z) << std::endl;
+	ofs << to_string(renderState->camera.up.x) << std::endl;
+	ofs << to_string(renderState->camera.up.y) << std::endl;
+	ofs << to_string(renderState->camera.up.z) << std::endl;
+	ofs << to_string(renderState->camera.fov.x) << std::endl;
+	ofs << to_string(renderState->camera.fov.y) << std::endl;
+	ofs << to_string(renderState->camera.pixelLength.x) << std::endl;
+	ofs << to_string(renderState->camera.pixelLength.y) << std::endl;
+	for (int i=0; i < renderState->camera.resolution.x * renderState->camera.resolution.y; i++) {
+		ofs << to_string(renderState->image[i].x) << std::endl;
+		ofs << to_string(renderState->image[i].y) << std::endl;
+		ofs << to_string(renderState->image[i].z) << std::endl;
+	}
+	ofs.close();
+
+}
+
 void saveImage() {
 	float samples = iteration;
 	// output image file
@@ -135,7 +204,11 @@ void runCuda() {
 		pathtraceFree();
 		pathtraceInit(scene);
 	}
-
+	if (load) {
+		loadState();
+		pathtraceLoad(scene);
+		load = false;
+	}
 	if (iteration < renderState->iterations) {
 		uchar4* pbo_dptr = NULL;
 		iteration++;
@@ -161,10 +234,14 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 		switch (key) {
 		case GLFW_KEY_ESCAPE:
 			saveImage();
+			saveState();
 			glfwSetWindowShouldClose(window, GL_TRUE);
 			break;
 		case GLFW_KEY_S:
 			saveImage();
+			break;
+		case GLFW_KEY_L:
+			load = true;
 			break;
 		case GLFW_KEY_SPACE:
 			camchanged = true;

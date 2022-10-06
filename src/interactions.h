@@ -42,57 +42,7 @@ glm::vec3 calculateRandomDirectionInHemisphere(
 }
 
 
-__host__ __device__
-void reflect(PathSegment& pathSegment,
-    glm::vec3 intersect,
-    glm::vec3 normal,
-    const Material& m) {
-    if (glm::dot(normal, pathSegment.ray.direction) > 0) {
-        normal = -normal;
-    }
-    pathSegment.color *= m.specular.color;
-    pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
-    pathSegment.remainingBounces--;
-    pathSegment.ray.origin = intersect;
-}
 
-__host__ __device__ 
-void refract(PathSegment& pathSegment,
-    glm::vec3 intersect,
-    glm::vec3 normal,
-    const Material& m) {
-
-    float index = m.indexOfRefraction;
-    if (index == 0.f) {
-        index = 0.0001f;
-    }
-
-    if (glm::dot(normal, pathSegment.ray.direction) > 0) {
-        normal = -normal;
-        index = 1.f / index;
-    }
-    glm::vec3 out = glm::refract(pathSegment.ray.direction, normal, 1.f / index);
-    if (glm::length(out) == 0.f) {
-        reflect(pathSegment, intersect, normal, m);
-        return;
-    }
-    pathSegment.color *= m.specular.color;
-    pathSegment.ray.direction = glm::normalize(out);
-    pathSegment.remainingBounces--;
-    pathSegment.ray.origin = intersect;
-}
-
-__host__ __device__
-void difuse(PathSegment& pathSegment,
-    glm::vec3 intersect,
-    glm::vec3 normal,
-    const Material& m,
-    thrust::default_random_engine& rng) {
-    pathSegment.color *= m.color;
-    pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
-    pathSegment.remainingBounces--;
-    pathSegment.ray.origin = intersect;
-}
 /**
  * Scatter a ray with some probabilities according to the material properties.
  * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
@@ -129,19 +79,40 @@ void scatterRay(
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
     if (pathSegment.remainingBounces > 0) {
-        thrust::uniform_real_distribution<float> u01(0, 1);
-        float n = u01(rng);
-        if (n < m.hasReflective) {
-            reflect(pathSegment, intersect, normal, m);
+        float n = m.indexOfRefraction;
+        if (glm::dot(normal, pathSegment.ray.direction) > 0) {
+            normal = -normal;
+            n = 1.f / n;
         }
-        else if (n < m.hasReflective + m.hasRefractive) {
-            refract(pathSegment, intersect, normal, m);
-        }
-        else {
-            difuse(pathSegment, intersect, normal, m, rng);
+        if (m.hasRefractive) {
+            thrust::uniform_real_distribution<float> u01(0, 1);
+            float R0 = glm::pow((1.f - n) / (1.f + n), 2.f);
+            float R = R0 + (1 - R0) * glm::pow(1.f + glm::dot(normal, pathSegment.ray.direction), 5.f);
+            if (u01(rng) > R) {
+                glm::vec3 out = glm::refract(pathSegment.ray.direction, normal, 1.f / n);
+                if (glm::length(out) > 0.f){
+                    pathSegment.color *= m.specular.color;
+                    pathSegment.ray.direction = glm::normalize(out);
+                    pathSegment.remainingBounces--;
+                    pathSegment.ray.origin = intersect + 0.0001f * pathSegment.ray.direction;
+                    return;
+                }
+            }
         }
 
-        //slight populate the ray
-        pathSegment.ray.origin +=  0.0001f * pathSegment.ray.direction;
+        if (m.hasReflective || m.hasRefractive) {
+            pathSegment.color *= m.specular.color;
+            pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+            pathSegment.remainingBounces--;
+            pathSegment.ray.origin = intersect + 0.0001f * pathSegment.ray.direction;
+        }
+
+        else {
+            pathSegment.color *= m.color;
+            pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
+            pathSegment.remainingBounces--;
+            pathSegment.ray.origin = intersect + 0.0001f * pathSegment.ray.direction;
+        }
+
     }
 }

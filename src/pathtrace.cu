@@ -110,6 +110,11 @@ void pathtraceInit(Scene* scene) {
 	checkCUDAError("pathtraceInit");
 }
 
+void pathtraceLoad(Scene* scene) {
+	hst_scene = scene;
+	cudaMemcpy(dev_image, scene->state.image.data(), scene->state.camera.resolution.x* scene->state.camera.resolution.y * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+}
+
 void pathtraceFree() {
 	cudaFree(dev_image);  // no-op if dev_image is null
 	cudaFree(dev_paths);

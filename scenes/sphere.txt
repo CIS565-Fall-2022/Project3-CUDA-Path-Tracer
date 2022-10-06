@@ -8,6 +8,17 @@ REFR        0
 REFRIOR     0
 EMITTANCE   5
 
+
+// Specular white
+MATERIAL 4
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0
+REFR        0
+REFRIOR     1.5
+EMITTANCE   0
+
 // Camera
 CAMERA
 RES         800 800
@@ -15,14 +26,23 @@ FOVY        45
 ITERATIONS  5000
 DEPTH       8
 FILE        sphere
-EYE         0.0 5 10.5
+EYE         0.0 0 10
 LOOKAT      0 5 0
 UP          0 1 0
 
 // Sphere
 OBJECT 0
 sphere
-material 0
-TRANS       0 0 0
+material 4
+TRANS       0 5 -1
 ROTAT       0 0 0
-SCALE       3 3 3
+SCALE       1 1 1
+
+
+// Ceiling light
+OBJECT 1
+sphere
+material 0
+TRANS       0 10 1
+ROTAT       0 0 0
+SCALE       1 1 1
