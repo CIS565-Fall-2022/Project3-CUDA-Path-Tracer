@@ -35,11 +35,8 @@ CUDA Path Tracer
 
 ## Anti Aliasing
 
-* With Anti-Aliasing
+* Left With Anti-Aliasing; Right without Anti-Aliasing
 
-![](img/AntiAliasing.png)
+![](img/AntiAliasingCompare.png)
 
-* Without Anti-Aliasing
-
-![](img/NoAntiAliasing.png)
 
