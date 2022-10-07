@@ -92,7 +92,7 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
 }
 
 #if BVH
-__host__ __device__ float BoundingBoxIntersectionTest(const Geom& geom, const Ray& r, const BBox& box) {
+__host__ __device__ float BoundingBoxIntersectionTest(const Ray& r, const BBox& box) {
 #else
 __host__ __device__ bool meshBoundingBoxIntersectionTest(Geom geom, Ray r) {
 #endif
@@ -284,36 +284,40 @@ __host__ __device__ float meshIntersectionTest(Geom geom, Triangle* tri, Ray r,
 }
 #endif
 #if BVH
-__host__ __device__ float bvhIntersectionTest(const Geom& geom, Triangle* tri, bvhNode* bvh, const Ray& r,
-    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside, int bvhSize) {
-    //transformation
-    glm::vec3 ro = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
-    glm::vec3 rd = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));
+__host__ __device__ float bvhIntersectionTest(Geom* geoms, Triangle* tri, bvhNode* bvh, const Ray& r,
+    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside, int bvhSize, int& geomID) {
 
-    Ray rt;
-    rt.origin = ro;
-    rt.direction = rd;
+    
+    //transformation
+    
     float closest_t = -1;
     float t = 0;
     glm::vec3 bary;
     glm::vec3 baryPosition(0.f, 0.f, 0.f);
     Triangle closestTri;
 
-    int stack[32];
+    int stack[64];
     int top = 0, cur = 0;
-    
+    Ray rnm;
     //push root onto the stack
     stack[top++] = 0;
     while (top) {
         cur = stack[--top];
         //pop top
         auto curNode = bvh[cur];
-        t = BoundingBoxIntersectionTest(geom, r, curNode.box);
+        t = BoundingBoxIntersectionTest(r, curNode.box);
         if (t > 0) {
             //if hit the leaf, try intersecting with the triangle
             if (curNode.triID >= 0) {
                 Triangle curTri = tri[curNode.triID];
+                //cur geom
+                Geom* geom = geoms + curTri.geomID;
+                glm::vec3 ro = multiplyMV(geom->inverseTransform, glm::vec4(r.origin, 1.0f));
+                glm::vec3 rd = glm::normalize(multiplyMV(geom->inverseTransform, glm::vec4(r.direction, 0.0f)));
 
+                Ray rt;
+                rt.origin = ro;
+                rt.direction = rd;
                 if (glm::intersectRayTriangle(rt.origin, rt.direction, curTri.v1, curTri.v2, curTri.v3, baryPosition)) {
                     glm::vec3 localIntersectionPoint = (1.f - baryPosition.x - baryPosition.y) * curTri.v1 + baryPosition.x * curTri.v2 + baryPosition.y * curTri.v3;
                     //local t
@@ -321,6 +325,7 @@ __host__ __device__ float bvhIntersectionTest(const Geom& geom, Triangle* tri, b
                     if (t > 0 && (t < closest_t || closest_t < 0)) {
                         closest_t = t;
                         closestTri = curTri;
+                        rnm = rt;
                         bary = localIntersectionPoint;
                     }
                 }
@@ -329,22 +334,20 @@ __host__ __device__ float bvhIntersectionTest(const Geom& geom, Triangle* tri, b
                 int left = 2 * cur + 1;
                 int right = 2 * cur + 2;
 
-                if (right > 0 && right < bvhSize) {
-                    stack[top++] = right;
-                }
-                if (left > 0 && left < bvhSize) {
-                    stack[top++] = left;
-                }
-
+                //push on stack
+                stack[top++] = right;
+                stack[top++] = left;
             }
         }
     }
 
      if (closest_t > 0) {
-        glm::vec3 objspaceIntersection = getPointOnRay(rt, closest_t);
-        intersectionPoint = multiplyMV(geom.transform, glm::vec4(objspaceIntersection, 1.f));
+        Geom* geom = geoms + closestTri.geomID;
+        geomID = closestTri.geomID;
+        glm::vec3 objspaceIntersection = getPointOnRay(rnm, closest_t);
+        intersectionPoint = multiplyMV(geom->transform, glm::vec4(objspaceIntersection, 1.f));
         normal = getNormal(closestTri, bary);
-        normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(normal, 0.f)));
+        normal = glm::normalize(multiplyMV(geom->invTranspose, glm::vec4(normal, 0.f)));
     
         if (glm::dot(normal, r.direction) > 0) {
             normal = -normal;

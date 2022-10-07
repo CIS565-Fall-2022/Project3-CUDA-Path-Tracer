@@ -33,13 +33,7 @@ Scene::Scene(string filename) {
 
     //getglobalbounding box
     for (auto& t : triangles) {
-        std::cout << "geomID: " << t.geomID << std::endl;
         t.setGlobalBBox(geoms[t.geomID]);
-      /*printf("box={<%f,%f,%f>, <%f,%f,%f>} with geoms[%d]\n",           
-           t.bbox.minCorner.x, t.bbox.minCorner.y, t.bbox.minCorner.z,
-            t.bbox.maxCorner.x, t.bbox.maxCorner.y, t.bbox.maxCorner.z,
-            t.geomID);*/
-
     }
     sceneBVH.buildTree(triangles);
 }

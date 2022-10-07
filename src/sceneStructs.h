@@ -23,7 +23,6 @@ struct Ray {
 struct BBox {
     glm::vec3 minCorner;
     glm::vec3 maxCorner;
-    bool isValid = -1;
     BBox(): minCorner(glm::vec3(0)), maxCorner(glm::vec3(0)){}
     BBox(const glm::vec3& p1, const glm::vec3& p2)
         : minCorner(std::min(p1.x, p2.x), std::min(p1.y, p2.y),
@@ -55,8 +54,6 @@ struct BBox {
     
 };
 struct Mesh {
-    //Triangle* faces;
-    //bounding box
     glm::vec3 max{ FLT_MIN };
     glm::vec3 min{ FLT_MAX };
     int faceCount;
@@ -66,8 +63,6 @@ struct Mesh {
 struct Geom {
     enum GeomType type;
     int materialid;
-    // for indexing scene->triangles indexing
-
     Mesh mesh;
     glm::vec3 translation;
     glm::vec3 rotation;

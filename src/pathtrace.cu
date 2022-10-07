@@ -104,28 +104,12 @@ void pathtraceInit(Scene* scene) {
 
 	cudaMalloc(&dev_paths, pixelcount * sizeof(PathSegment));
 
-	
-
 	cudaMalloc(&dev_tris, scene->triangles.size() * sizeof(Triangle));
 	cudaMemcpy(dev_tris, scene->triangles.data(), scene->triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice);
-//
-//	Geom* tmp = new Geom[scene->geoms.size()];
-//	memcpy(tmp, scene->geoms.data(), scene->geoms.size() * sizeof(Geom));
-//	for (int i = 0; i < scene->geoms.size(); i++) {
-//		if (scene->geoms[i].type == MODEL) {
-//			cudaMalloc(&(tmp[i].mesh.faces), scene->geoms[i].mesh.faceCount * sizeof(Triangle));
-//			cudaMemcpy(tmp[i].mesh.faces, scene->geoms[i].mesh.faces, scene->geoms[i].mesh.faceCount * sizeof(Triangle), cudaMemcpyHostToDevice);
-//		}
-//	}
-//
 
 	cudaMalloc(&dev_geoms, scene->geoms.size() * sizeof(Geom));
 	cudaMemcpy(dev_geoms, scene->geoms.data(), scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
-//#else
-//	cudaMalloc(&dev_geoms, scene->geoms.size() * sizeof(Geom));
-//	cudaMemcpy(dev_geoms, tmp, scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
-//	delete[] tmp;
-//#endif
+
 	cudaMalloc(&dev_materials, scene->materials.size() * sizeof(Material));
 	cudaMemcpy(dev_materials, scene->materials.data(), scene->materials.size() * sizeof(Material), cudaMemcpyHostToDevice);
 
@@ -151,6 +135,7 @@ void pathtraceFree() {
 	cudaFree(dev_intersections);
 	// TODO: clean up any extra device memory you created
 	cudaFree(dev_intersections_cache);
+	cudaFree(dev_tris);
 	checkCUDAError("pathtraceFree");
 }
 
@@ -197,8 +182,6 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 
 		// TODO: implement antialiasing by jittering the ray
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
-
-
 		
 #if ANTIALIASING
 		float dx = 0.f, dy = 0.f;
@@ -223,8 +206,6 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 
 		}
 #endif
-
-
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
 	}
@@ -258,16 +239,16 @@ __global__ void computeIntersections(
 		float t_min = FLT_MAX;
 		int hit_geom_index = -1;
 		bool outside = true;
-
+		bool bvhSearched = false;
 		glm::vec3 tmp_intersect;
 		glm::vec3 tmp_normal;
-
+		
 		// naive parse through global geoms
 
 		for (int i = 0; i < geoms_size; i++)
 		{
 			Geom& geom = geoms[i];
-
+			int geomID = -1;
 			if (geom.type == CUBE)
 			{
 				t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
@@ -280,8 +261,13 @@ __global__ void computeIntersections(
 			else if (geom.type == MODEL)
 			{
 #if BVH
-				t = bvhIntersectionTest(geom, tri, bvh, pathSegment.ray,
-					tmp_intersect, tmp_normal, outside, bvhSize);
+				
+				if (!bvhSearched) {
+					t = bvhIntersectionTest(geoms, tri, bvh, pathSegment.ray,
+						tmp_intersect, tmp_normal, outside, bvhSize, geomID);
+					bvhSearched = true;
+				}
+				
 #else
 				t = meshIntersectionTest(geom, tri, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 #endif
@@ -291,7 +277,8 @@ __global__ void computeIntersections(
 			if (t > 0.0f && t_min > t)
 			{
 				t_min = t;
-				hit_geom_index = i;
+				
+				hit_geom_index = geom.type == MODEL ? geomID : i;
 				intersect_point = tmp_intersect;
 				normal = tmp_normal;
 			}

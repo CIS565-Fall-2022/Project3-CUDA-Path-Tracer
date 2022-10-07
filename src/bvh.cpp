@@ -11,12 +11,8 @@ __host__ void bvhTree::buildTree(const std::vector<Triangle>& triangles) {
 	int allocSize = glm::pow(2, depth+1) - 1;
 	//allocate memory for nodes
 	bvhNodes.resize(allocSize);
-
 	recursiveBuild(primitiveInfo, 0, triangles.size(), 0);
-	
 	nodeCount = allocSize;
-	//cout << "NodeCount: " << nodeCount << endl;
-
 }
 
 __host__ void bvhTree::recursiveBuild(std::vector<BVHPrimitiveInfo>& primitiveInfo, int start, int end, int cur) {
@@ -26,40 +22,23 @@ __host__ void bvhTree::recursiveBuild(std::vector<BVHPrimitiveInfo>& primitiveIn
 	//create leaf node
 	if (end - start == 1) {
 		initLeaf(primitiveInfo, cur, start);
-		//BBox box = bvhNodes[cur].box;
-		printf("==Leaf: nodes[%d].box={<%f,%f,%f>, <%f,%f,%f>} with geoms leaf[%d]\n",
-			cur,
-			bvhNodes[cur].box.minCorner.x, bvhNodes[cur].box.minCorner.y, bvhNodes[cur].box.minCorner.z,
-			bvhNodes[cur].box.maxCorner.x, bvhNodes[cur].box.maxCorner.y, bvhNodes[cur].box.maxCorner.z,
-			start);
 		return;
 	}
 	else {
 		BBox centroidBounds = primitiveInfo[start].bounds;
-		//centroidBounds.isValid = 1;
-		/*centroidBounds.minCorner = glm::vec3{ FLT_MAX };
-		centroidBounds.maxCorner = glm::vec3{ FLT_MIN };*/
 		for (int i = start + 1; i < end; ++i) {
-			//BBox tmp = primitiveInfo[i].bounds;
-			//centroidBounds += tmp;
 			centroidBounds.minCorner = glm::min(centroidBounds.minCorner, primitiveInfo[i].bounds.minCorner);
 			centroidBounds.maxCorner = glm::max(centroidBounds.maxCorner, primitiveInfo[i].bounds.maxCorner);
 		}
 			
-
 		int dim = centroidBounds.MaximumExtent();
-
 		int mid = (start + end) / 2;
 
 		//preorder 
 		int left = cur * 2 + 1;
 		int right = cur * 2 + 2;
-		/*if (centroidBounds.maxCorner[dim] == centroidBounds.minCorner[dim]) {
-			initLeaf(primitiveInfo, cur, start);
-			cout << "im here ! " << endl;
-		}
-		else {*/
-			//split
+		
+		//split
 		std::nth_element(&primitiveInfo[start], &primitiveInfo[mid],
 			&primitiveInfo[(size_t)end - 1] + 1,
 			[dim](const BVHPrimitiveInfo& a, const BVHPrimitiveInfo& b) {
@@ -68,18 +47,9 @@ __host__ void bvhTree::recursiveBuild(std::vector<BVHPrimitiveInfo>& primitiveIn
 		bvhNodes[cur].box = centroidBounds;
 		bvhNodes[cur].left = left;
 		bvhNodes[cur].right = right;
-
-		printf("==NODE: nodes[%d].box={<%f,%f,%f>, <%f,%f,%f>} with left: [%d], right: [%d], geomID is [%d]\n",
-			cur,
-			centroidBounds.minCorner.x, centroidBounds.minCorner.y, centroidBounds.minCorner.z,
-			centroidBounds.maxCorner.x, centroidBounds.maxCorner.y, centroidBounds.maxCorner.z,
-			left, right, bvhNodes[cur].triID);
-		printf("a:[%d], b:[%d]\n", start, mid);
+		
 		recursiveBuild(primitiveInfo, start, mid, left);
 		recursiveBuild(primitiveInfo, mid, end, right);
-		//}
-
-
 	}
 }
 

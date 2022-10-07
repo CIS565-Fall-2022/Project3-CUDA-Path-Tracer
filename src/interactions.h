@@ -112,7 +112,7 @@ void scatterRay(
             glm::vec3 refractiveDir = glm::refract(rayDir, normal, etaT / etaI);
             pathSegment.ray.direction = refractiveDir;
             pathSegment.ray.origin = intersect + EPSILON * pathSegment.ray.direction;
-            pathSegment.color *= m.specular.color;
+            pathSegment.color *= m.color;
         }
              
     }//only reflective
