@@ -17,7 +17,8 @@ In this project, I implemented a CUDA path tracer for the GPU. Previously in Adv
 2. Path continuation/termination using Stream Compaction
 3. Contiguous arrangement of materials based on materialId
 4. First bounce caching
-![](img/fixedPart1Noisy.png)
+
+![](img/part1Final.png)
 
 ## Additional Features
 ### Refractive Material
