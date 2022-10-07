@@ -119,7 +119,7 @@ static ShadeableIntersection* dev_intersections = NULL;
 // TODO:o static variables for device memory, any extra info you need, etc
 // ...
 static ShadeableIntersection* dev_cache = NULL;
-
+static Geom* dev_lights = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -150,6 +150,9 @@ void pathtraceInit(Scene* scene) {
 
 	cudaMalloc(&dev_cache, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_cache, 0, pixelcount * sizeof(ShadeableIntersection));
+
+	cudaMalloc(&dev_lights, scene->lights.size() * sizeof(Geom));
+	cudaMemcpy(dev_lights, scene->lights.data(), scene->lights.size() * sizeof(Geom), cudaMemcpyHostToDevice);
 
 	checkCUDAError("pathtraceInit");
 }
@@ -191,8 +194,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 #if ANTIALIASING == 1
 		thrust::uniform_real_distribution<float> u01(0, 1);
 		segment.ray.direction = glm::normalize(cam.view
-			- cam.right * cam.pixelLength.x * ((float)x + u01(rng) * 3.f - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)y + u01(rng) * 3.f - (float)cam.resolution.y * 0.5f)
+			- cam.right * cam.pixelLength.x * ((float)x + u01(rng) * cam.pixelLength.x - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)y + u01(rng) * cam.pixelLength.y - (float)cam.resolution.y * 0.5f)
 		);
 #else
 		segment.ray.direction = glm::normalize(cam.view
@@ -217,7 +220,6 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 //#endif
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
-		segment.transmitted = false;
 	}
 }
 
@@ -365,9 +367,11 @@ __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iteration
 __global__ void shadeBSDF(
 	int iter
 	, int num_paths
+	, int num_lights
 	, ShadeableIntersection* shadeableIntersections
 	, PathSegment* pathSegments
 	, Material* materials
+	, Geom *lights
 )
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -396,14 +400,13 @@ __global__ void shadeBSDF(
 				scatterRay(pathSegments[idx],
 					getPointOnRay(pathSegments[idx].ray, intersection.t),
 					intersection.surfaceNormal,
-					material, rng, idx);
+					material, lights, rng, num_lights, idx);
 				pathSegments[idx].remainingBounces--;
 			}
 			// If there was no intersection, color the ray black.
 			// Lots of renderers use 4 channel color, RGBA, where A = alpha, often
 			// used for opacity, in which case they can indicate "no opacity".
 			// This can be useful for post-processing and image compositing.
-			//pathSegments[idx].remainingBounces--;
 		}
 		else {
 			pathSegments[idx].color = glm::vec3(0.0f);
@@ -558,9 +561,11 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		shadeBSDF << <numblocksPathSegmentTracing, blockSize1d >> > (
 			iter,
 			num_paths,
+			hst_scene->lights.size(),
 			dev_isects,
 			dev_paths,
-			dev_materials
+			dev_materials,
+			dev_lights
 			);
 #endif
 

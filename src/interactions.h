@@ -41,6 +41,29 @@ glm::vec3 calculateRandomDirectionInHemisphere(
         + sin(around) * over * perpendicularDirection2;
 }
 
+__host__ __device__
+glm::vec3 sampleSphereLight(
+    glm::vec3 pos, glm::vec3 scale, thrust::default_random_engine& rng) {
+    thrust::uniform_real_distribution<float> u01(0, 1);
+
+    float phi = u01(rng) * 2.f * glm::pi<float>();
+    float theta = u01(rng) * 2.f * glm::pi<float>();
+    glm::vec3 unit_cartesian = glm::vec3(glm::cos(theta) * glm::sin(phi),
+        glm::sin(theta) * glm::sin(phi),
+        glm::cos(phi));
+    return unit_cartesian * scale + pos;
+}
+
+__host__ __device__
+glm::vec3 sampleCubeLight(
+    glm::vec3 pos, glm::vec3 scale, thrust::default_random_engine& rng) {
+    thrust::uniform_real_distribution<float> u01(0, 1);
+
+    glm::vec3 sample(u01(rng), u01(rng), u01(rng));
+    return sample * scale + pos;
+}
+
+
 /**
  * Scatter a ray with some probabilities according to the material properties.
  * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
@@ -78,17 +101,18 @@ void scatterRay(
         glm::vec3 intersect,
         glm::vec3 normal,
         const Material &m,
+        Geom *lights,
         thrust::default_random_engine &rng,
+        int num_lights,
         int idx) {
 
     pathSegment.color *= m.color;
     thrust::uniform_real_distribution<float> u01(0, 1);
-
+    
     if (m.hasReflective) {
         pathSegment.ray.direction = (u01(rng) > 0.3) ? jitterRay(glm::reflect(pathSegment.ray.direction, normal), rng, 0.f) : calculateRandomDirectionInHemisphere(normal, rng);
     }
     else if (m.hasRefractive) {
-        float n1 = (pathSegment.transmitted), n2 = 1.5;
         float costheta = glm::dot(normal, -pathSegment.ray.direction);
         bool entering = costheta > 0;
         float r_not = glm::pow((1.5 - 1) / (1.5 + 1), 2);
@@ -104,6 +128,20 @@ void scatterRay(
         else {
             pathSegment.ray.direction = glm::refract(pathSegment.ray.direction, normal, eta);
         }
+    }
+    else if (pathSegment.remainingBounces == 1) {
+        int light_idx = glm::floor(u01(rng) * num_lights);
+        Geom light = lights[light_idx];
+        glm::vec3 sample;
+        switch (light.type) {
+        case SPHERE:
+            sample = sampleSphereLight(light.translation, light.scale, rng);
+            break;
+        case CUBE:
+            sample = sampleCubeLight(light.translation, light.scale, rng);
+            break;
+        }
+        pathSegment.ray.direction = glm::normalize(sample - pathSegment.ray.origin);
     }
     else {
         pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
