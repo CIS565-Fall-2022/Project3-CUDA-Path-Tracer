@@ -15,7 +15,7 @@ The Cuda Path Tracer Project - The Big Boi
 ### Requirements Fulfilled
 #### Core Features
 - Ideal Diffuse
-- Perfect Specular
+- Specular (perfect and imperfect)
 - Ray Termination using Stream Compaction
 - Contiguous Memory Usage for Difference Materials
 - Caching the first ray bounce
