@@ -53,8 +53,8 @@ MATERIAL 5
 RGB         .98 .98 .98
 SPECEX      0
 SPECRGB     .98 .98 .98
-REFL        0.1
-REFR        0.9
+REFL        0.0
+REFR        1.0
 REFRIOR     1.5
 EMITTANCE   0
 
@@ -68,6 +68,10 @@ FILE        cornell
 EYE         0.0 5 10.5
 LOOKAT      0 5 0
 UP          0 1 0
+DOF         0
+LENSR       0.1
+FOCAL       4.5
+
 
 
 // Ceiling light
@@ -130,6 +134,6 @@ SCALE       3 3 3
 OBJECT 7
 sphere
 material 5
-TRANS       0 1 0
+TRANS       1 3 1
 ROTAT       0 0 0
 SCALE       3 3 3
