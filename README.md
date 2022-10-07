@@ -10,7 +10,19 @@ CUDA Path Tracer
 
 ## Introduction
 
-In this project, I implemented a CUDA path tracer for the GPU. Previously in Advanced Rendering, I implemented a Monte-Carlo Path Tracer on the CPU. 
+In this project, I implemented a CUDA path tracer for the GPU. Previously in Advanced Rendering, I implemented a Monte Carlo Path Tracer for the CPU. In this project, the path tracer is
+
+## Core Features
+1. Shading kernel with BSDF Evaluation for Diffuse and Specular
+2. Path continuation/termination using Stream Compaction
+3. Contiguous arrangement of materials based on materialId
+4. First bounce caching
+
+## Additional Features
+### Refractive Material
+### Depth of Field
+### Stochastic Sampled Anti-Aliasing
+
 
 ## Bloopers! :)
 
