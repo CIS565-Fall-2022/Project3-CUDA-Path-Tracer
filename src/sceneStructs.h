@@ -38,6 +38,7 @@ struct Material {
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+    glm::vec3 refractionColor;
 };
 
 struct Camera {
@@ -49,6 +50,8 @@ struct Camera {
     glm::vec3 right;
     glm::vec2 fov;
     glm::vec2 pixelLength;
+    float lensRadius;
+    float focalDistance;
 };
 
 struct RenderState {

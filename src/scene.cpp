@@ -124,6 +124,10 @@ int Scene::loadCamera() {
             camera.lookAt = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
         } else if (strcmp(tokens[0].c_str(), "UP") == 0) {
             camera.up = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        } else if (strcmp(tokens[0].c_str(), "LENS") == 0) {
+            camera.lensRadius = atof(tokens[1].c_str());
+        } else if (strcmp(tokens[0].c_str(), "FOCAL") == 0) {
+            camera.focalDistance = atof(tokens[1].c_str());
         }
 
         utilityCore::safeGetline(fp_in, line);
@@ -160,9 +164,9 @@ int Scene::loadMaterial(string materialid) {
         Material newMaterial;
 
         //load static properties
-        for (int i = 0; i < 7; i++) {
-            string line;
-            utilityCore::safeGetline(fp_in, line);
+        string line;
+        utilityCore::safeGetline(fp_in, line);
+        while (!line.empty() && fp_in.good()) {
             vector<string> tokens = utilityCore::tokenizeString(line);
             if (strcmp(tokens[0].c_str(), "RGB") == 0) {
                 glm::vec3 color( atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()) );
@@ -181,6 +185,11 @@ int Scene::loadMaterial(string materialid) {
             } else if (strcmp(tokens[0].c_str(), "EMITTANCE") == 0) {
                 newMaterial.emittance = atof(tokens[1].c_str());
             }
+            else if (strcmp(tokens[0].c_str(), "REFRRGB") == 0) {
+                newMaterial.refractionColor = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+            }
+            utilityCore::safeGetline(fp_in, line);
+
         }
         materials.push_back(newMaterial);
         return 1;
