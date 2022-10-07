@@ -53,7 +53,6 @@ int main(int argc, char** argv) {
 	{
 		checkpoint_folder = argv[2];
 		hasCheckpoint = true;
-		checkpoint_folder = "./checkpoint";
 	}
 
 	tinygltf::Model model;
@@ -224,6 +223,7 @@ void saveState()
 	//glm::vec3 right;
 	//glm::vec2 fov;
 	//glm::vec2 pixelLength;
+	camera_output_file << " " << camera.dof << " " << camera.lens_radius << " " << camera.focal_length;
 	std::cout << "Checkpoint Complete" << std::endl;
 	
 }
@@ -259,8 +259,11 @@ void loadState(string checkpoint_folder)
 	glm::vec3 right = utilityCore::readVec3(camera_file);
 	glm::vec2 fov = utilityCore::readVec2(camera_file);
 	glm::vec2 pixelLength = utilityCore::readVec2(camera_file);
-
-	scene->state.camera = { resolution, position, lookAt, view, up, right, fov, pixelLength};
+	bool dof;
+	float lens_radius;
+	float focal_length;
+	camera_file >> dof >> lens_radius >> focal_length;
+	scene->state.camera = { resolution, position, lookAt, view, up, right, fov, pixelLength, dof, lens_radius, focal_length};
 	std::cout << "Loading Checkpoint Complete" << std::endl;
 }
 

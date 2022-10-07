@@ -19,6 +19,7 @@
 #define ERRORCHECK 1
 #define SORTMATERIALS 1
 #define CACHE 0
+#define ANTIALIAS 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -79,9 +80,11 @@ static Geom* dev_geoms = NULL;
 static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
+
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
 #if CACHE
+static bool hasCache = false;
 static ShadeableIntersection* dev_intersectionsFirstCache = NULL;
 #endif
 
@@ -158,13 +161,38 @@ void pathtraceFree() {
 * motion blur - jitter rays "in time"
 * lens effect - jitter ray origin positions based on a lens
 */
+
+__device__ __host__ glm::vec2 concentricDisc(glm::vec2 u, thrust::default_random_engine rng)
+{
+	thrust::uniform_real_distribution<float> uNeg11(-1, 1);
+	glm::vec2 offset(uNeg11(rng), uNeg11(rng));
+	float theta;
+	float r;
+	if (offset.x == 0.0f && offset.y == 0.0f)
+	{
+		return glm::vec2(0, 0);
+	}
+	if (std::abs(offset.x) > std::abs(offset.y))
+	{
+		r = offset.x;
+		theta = PI / 4.0f * (offset.y / offset.x);
+
+	}
+	else
+	{
+		r = offset.y;
+		theta = PI / 2.0f - PI / 4.0f * (offset.x / offset.y);
+	}
+	return r * glm::vec2(cos(theta), sin(theta));
+}
+
 __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, PathSegment* pathSegments)
 {
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
-	float lens_radius = 0.1f; //??
-	float focal_length = 2.00f;
-	bool dof = false;
+	float lens_radius = cam.lens_radius; 
+	float focal_length = cam.focal_length;
+	bool dof = cam.dof;
 	if (x < cam.resolution.x && y < cam.resolution.y) {
 		int index = x + (y * cam.resolution.x);
 		PathSegment& segment = pathSegments[index];
@@ -176,22 +204,29 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		// implemented antialiasing by jittering the ray
+#if ANTIALIAS && !CACHE
 		segment.ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)x + u01(rng) - (float)cam.resolution.x * 0.5f)
 			- cam.up * cam.pixelLength.y * ((float)y + u01(rng) - (float)cam.resolution.y * 0.5f)
 		);
+#else
+		segment.ray.direction = glm::normalize(cam.view
+			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)y  - (float)cam.resolution.y * 0.5f)
+		);
+#endif
+#if !CACHE
 		if (dof)
 		{
 			auto lens = makeSeededRandomEngine(iter, index, focal_length);
-			glm::vec3 offset(lens_radius * uNeg11(lens), lens_radius * uNeg11(lens), 0.0f);
-			offset = glm::normalize(offset);
-			//segment.ray.direction *= focal_length;
-			//segment.ray.origin.x += cool.x;
-			//segment.ray.origin.y += cool.y;
-			//segment.ray.direction = glm::normalize(segment.ray.direction - segment.ray.origin);
+			glm::vec2 offset = concentricDisc(glm::vec2(), lens) * lens_radius;
+			glm::vec3 focal_point = getPointOnRay(segment.ray, focal_length);
+			segment.ray.origin.x += offset.x;
+			segment.ray.origin.y += offset.y;
+			segment.ray.direction = glm::normalize(focal_point - segment.ray.origin);
 		}
 
-
+#endif
 
 
 		segment.pixelIndex = index;
@@ -265,6 +300,8 @@ __global__ void computeIntersections(
 			intersections[path_index].t = t_min;
 			intersections[path_index].materialId = geoms[hit_geom_index].materialid;
 			intersections[path_index].surfaceNormal = normal;
+			intersections[path_index].outside = outside;
+
 		}
 	}
 }
@@ -315,7 +352,7 @@ __global__ void shadeFakeMaterial(
 				//pathSegments[idx].color *= u01(rng); // apply some noise because why not
 				//glm::vec3 intersection_point = pathSegments[idx].ray.origin + (intersection.t * pathSegments[idx].ray.direction);
 				glm::vec3 intersection_point = getPointOnRay(pathSegments[idx].ray, intersection.t);
-				scatterRay(pathSegments[idx], intersection_point, intersection.surfaceNormal, material, rng);
+				scatterRay(pathSegments[idx], intersection_point, intersection.surfaceNormal, material, rng, intersection.outside);
 			}
 			// If there was no intersection, color the ray black.
 			// Lots of renderers use 4 channel color, RGBA, where A = alpha, often
@@ -408,7 +445,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 
 #if CACHE
-		if (iter != 1 && depth == 0)
+		if (hasCache && depth == 0)
 		{
 			cudaMemcpy(dev_intersections, dev_intersectionsFirstCache, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
 		}
@@ -423,7 +460,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_intersections
 				);
 		}
-		if (iter == 1 && depth == 0)
+		if (!hasCache && depth == 0)
 		{
 			cudaMemcpy(dev_intersectionsFirstCache, dev_intersections, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
 		}

@@ -50,6 +50,9 @@ struct Camera {
     glm::vec3 right;
     glm::vec2 fov;
     glm::vec2 pixelLength;
+    bool dof;
+    float lens_radius;
+    float focal_length;
 };
 
 struct RenderState {
@@ -74,4 +77,5 @@ struct ShadeableIntersection {
   float t;
   glm::vec3 surfaceNormal;
   int materialId;
+  bool outside;
 };
