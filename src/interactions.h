@@ -56,38 +56,11 @@ bool Refract(const glm::vec3 &wi, const glm::vec3& n, float eta,
     return true;
 }
 
-__host__ __device__
-float FrDielectric(float cosThetaI, float etaI, float etaT)
-{
-    cosThetaI = glm::clamp(cosThetaI, -1.f, 1.f);
-    bool entering = cosThetaI > 0.f;
-    if (!entering) {
-        std::swap(etaI, etaT);
-        cosThetaI = std::abs(cosThetaI);
-    }
-    //printf("\n### 4 ###");
-    float sinThetaI = std::sqrt(max((float)0.f, 1.f - cosThetaI * cosThetaI));
-    float sinThetaT = etaI / etaT * sinThetaI;
-    if (sinThetaT >= 1.f)
-        return 1.f;
-    //printf("\n### 5 ###");
-    float cosThetaT = std::sqrt(max((float)0.f,
-        1.f - sinThetaT * sinThetaT));
-
-    float Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
-        ((etaT * cosThetaI) + (etaI * cosThetaT));
-    float Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
-        ((etaI * cosThetaI) + (etaT * cosThetaT));
-    float retval = (Rparl * Rparl + Rperp * Rperp) / 2.f;
-    //printf("\n### %f ###", retval);
-    return retval;
-    //    return 0.f;
-}
-
-__host__ __device__
-glm::vec3 Faceforward(const glm::vec3& n, const glm::vec3& v) {
-    //printf("\n### 2 ###");
-    return (glm::dot(n, v) < 0.f) ? -n : n;
+__device__ float schlickApproximation(double cosine, double ref_idx) {
+    // Use Schlick's approximation for reflectance.
+    auto r0 = (1 - ref_idx) / (1 + ref_idx);
+    r0 = r0 * r0;
+    return r0 + (1 - r0) * pow((1 - cosine), 5);
 }
 
 /**
@@ -115,7 +88,7 @@ glm::vec3 Faceforward(const glm::vec3& n, const glm::vec3& v) {
  *
  * You may need to change the parameter list for your purposes!
  */
-__host__ __device__
+__device__
 void scatterRay(    // similar to sample_f, calculate the new wi and f
     PathSegment& pathSegment,
     glm::vec3 intersect,
@@ -134,19 +107,16 @@ void scatterRay(    // similar to sample_f, calculate the new wi and f
     glm::vec3 color;
     float airIOR = 1.0f;
     float eta = m.indexOfRefraction / airIOR;
-    eta = 1.f / m.indexOfRefraction;
     thrust::uniform_real_distribution<float> u01(0, 1);
     float random = u01(rng);
 
-    //float etaA = 1.f;
-    //float etaB = m.indexOfRefraction;
     if (m.proceduralTex == 1) {
         color = getProceduralColor(pathSegment, intersect, normal);
     }
     else {
         color = glm::vec3(1.f, 1.f, 1.f);
     }
-    
+
     if (random <= m.hasReflective) {
         wi_scatteredRayDir = glm::reflect(glm::normalize(wo), normal);
         if (m.specular.exponent > 0 && random > 0.7)
@@ -157,51 +127,31 @@ void scatterRay(    // similar to sample_f, calculate the new wi and f
         {
             color *= m.specular.color * m.color;
         }
-        //color *= m.specular.color * m.hasReflective * m.color;
-        //color = normal;
     }
     else if (random <= m.hasReflective + m.hasRefractive) {
-        //
-        //float cosTheta = glm::dot(glm::normalize(wo), normal);
-        ////float cosTheta = glm::normalize(wo).z;
-        //bool entering = cosTheta > 0.f;
-        //float etaI = entering ? 1.f : m.indexOfRefraction;
-        //float etaT = entering ? m.indexOfRefraction : 1.f;
-        ////printf("\n### 1 ###");
-        //Refract(wo, Faceforward(glm::vec3(0, 0, 1), wo), etaI / etaT, wi_scatteredRayDir);
-        ///*if (!Refract(wo, Faceforward(glm::vec3(0, 0, 1), wo), etaI / etaT, wi_scatteredRayDir)) {
-        //    color *= glm::vec3(0.f, 0.f, 0.f);
-        //}
-        //float cosThetaWi = glm::dot(glm::normalize(wi_scatteredRayDir), normal);
-        //color *= m.color * (glm::vec3(1.) - FrDielectric(cosThetaWi, 1.0f, m.indexOfRefraction));
-        //color *= (etaI * etaI) / (etaT * etaT);
-        //color /= std::abs(cosThetaWi);*/
 
-        //color *= m.specular.color * m.color;
+        float cosTheta = glm::dot(-glm::normalize(wo), glm::normalize(normal));
+        if (cosTheta > 1.0f)
+        {
+            cosTheta = 1.0f;
+        }
 
-        float cosTheta = glm::dot(glm::normalize(wo), normal);
-
-        bool entering = cosTheta > 0;
-        eta = entering ? m.indexOfRefraction : 1.f / m.indexOfRefraction;
+        bool entering = glm::dot(glm::normalize(pathSegment.ray.direction), glm::normalize(normal)) < 0.0f;
+        eta = entering ? 1.f / m.indexOfRefraction : m.indexOfRefraction;
 
         float sinThetaI = sqrt(1 - pow(cosTheta, 2));
         float sinThetaT = eta * sinThetaI;
 
-        if (sinThetaT > 1) {
-            wi_scatteredRayDir = glm::normalize(glm::reflect(glm::normalize(wo), normal));
+        if (sinThetaT > 1.0f || schlickApproximation(cosTheta, eta) > u01(rng)) {
+            wi_scatteredRayDir = glm::normalize(glm::reflect(glm::normalize(wo), glm::normalize(normal)));
+            color *= m.color;
         }
         else {
-            wi_scatteredRayDir = glm::normalize(glm::refract(glm::normalize(wo), normal, eta));
-        }
-
-        // specular
-        if (m.specular.exponent > 0 && random > 0.7)
-        {
-            color *= m.specular.color;
-        }
-        else
-        {
-            color *= m.specular.color * m.color;
+            wi_scatteredRayDir = glm::normalize(glm::refract(glm::normalize(wo), glm::normalize(normal), eta));
+            pathSegment.color *= m.color;
+            if (m.specular.exponent > 0) {
+                color *= m.specular.color;
+            }
         }
     }
     else {

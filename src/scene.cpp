@@ -68,8 +68,8 @@ int Scene::getImplicitType(Geom* newGeom) {
             newGeom->implicitobj = IMP_BOOKPAGES;
             return 0;
         }
-        else if (strcmp(tokens[0].c_str(), "IMP_BOX") == 0) {
-            newGeom->implicitobj = IMP_BOX;
+        else if (strcmp(tokens[0].c_str(), "IMP_LIGHT") == 0) {
+            newGeom->implicitobj = IMP_LIGHT;
             return 0;
         }
         else {
@@ -146,7 +146,11 @@ int Scene::loadObjFile(string objectPath, Geom *newGeom)
     auto& shapes = reader.GetShapes();
     auto& materials = reader.GetMaterials();
     std::vector<Triangle> triangles;
-    // Loop over shapes
+
+    glm::vec3 minPos = newGeom->boundingBox.min;
+    glm::vec3 maxPos = newGeom->boundingBox.max;
+
+    // Loop over shapess
     for (size_t s = 0; s < shapes.size(); s++) {
         // Loop over faces(polygon)
         size_t index_offset = 0;
@@ -164,6 +168,14 @@ int Scene::loadObjFile(string objectPath, Geom *newGeom)
                 tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
 
                 triangle.pos[vertCnt] = glm::vec3(vx, vy, vz);
+
+                if (minPos.x > vx) { minPos.x = vx; }
+                if (minPos.y > vy) { minPos.y = vy; }
+                if (minPos.z > vz) { minPos.z = vz; }
+                
+                if (maxPos.x < vx) { maxPos.x = vx; }
+                if (maxPos.y < vy) { maxPos.y = vy; }
+                if (maxPos.z < vz) { maxPos.z = vz; }
 
                 // Check if `normal_index` is zero or positive. negative = no normal data
                 if (idx.normal_index >= 0) {
@@ -196,6 +208,8 @@ int Scene::loadObjFile(string objectPath, Geom *newGeom)
             index_offset += fv;
         }
     }
+    newGeom->boundingBox.min = minPos;
+    newGeom->boundingBox.max = maxPos;
     newGeom->triCount = triangles.size();
     newGeom->triangles = new Triangle[triangles.size()];
     Triangle* t = newGeom->triangles;
@@ -226,6 +240,9 @@ int Scene::loadGeom(string objectid) {
         string line;
         int retVal = 0;
         //load object type
+        newGeom.boundingBox.min = glm::vec3(INT_MAX, INT_MAX, INT_MAX);
+        newGeom.boundingBox.max = glm::vec3(INT_MIN, INT_MIN, INT_MIN);
+
         utilityCore::safeGetline(fp_in, line);
         if (!line.empty() && fp_in.good()) {
             if (strcmp(line.c_str(), "implicit") == 0) {

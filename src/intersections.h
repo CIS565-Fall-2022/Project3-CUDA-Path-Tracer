@@ -148,10 +148,60 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
  * OBJECT INTERSECTION TEST FOR OBJ
  ******************************************************
  */
+
+__host__ __device__ float boundingBoxIntersectionTest(Geom box, Ray r,
+    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+    Ray q;
+    q.origin = multiplyMV(box.inverseTransform, glm::vec4(r.origin, 1.0f));
+    q.direction = glm::normalize(multiplyMV(box.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+    float tmin = -1e38f;
+    float tmax = 1e38f;
+    glm::vec3 tmin_n;
+    glm::vec3 tmax_n;
+    for (int xyz = 0; xyz < 3; ++xyz) {
+        float qdxyz = q.direction[xyz];
+        /*if (glm::abs(qdxyz) > 0.00001f)*/ {
+            float t1 = (box.boundingBox.min[xyz] - q.origin[xyz]) / qdxyz;
+            float t2 = (box.boundingBox.max[xyz] - q.origin[xyz]) / qdxyz;
+            float ta = glm::min(t1, t2);
+            float tb = glm::max(t1, t2);
+            glm::vec3 n;
+            n[xyz] = t2 < t1 ? +1 : -1;
+            if (ta > 0 && ta > tmin) {
+                tmin = ta;
+                tmin_n = n;
+            }
+            if (tb < tmax) {
+                tmax = tb;
+                tmax_n = n;
+            }
+        }
+    }
+
+    if (tmax >= tmin && tmax > 0) {
+        outside = true;
+        if (tmin <= 0) {
+            tmin = tmax;
+            tmin_n = tmax_n;
+            outside = false;
+        }
+        intersectionPoint = multiplyMV(box.transform, glm::vec4(getPointOnRay(q, tmin), 1.0f));
+        normal = glm::normalize(multiplyMV(box.invTranspose, glm::vec4(tmin_n, 0.0f)));
+        return glm::length(r.origin - intersectionPoint);
+    }
+    return -1.f;
+}
+
 __host__ __device__ float objIntersectionTest(Geom obj, Triangle *dev_tri, Ray r,
     glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
     
     bool isectFound = false;
+
+    if (boundingBoxIntersectionTest(obj, r, intersectionPoint, normal, outside) == -1.f) {
+        return -1;
+    }
+
     int triCount = obj.triCount;
     glm::vec3 minVal = glm::vec3(INT_MAX, INT_MAX, INT_MAX);
     glm::vec3 barycentric;
@@ -274,6 +324,24 @@ __host__ __device__ float roundBoxSDF(glm::vec3 p, glm::vec3 b, float r)
     return glm::length(max(q, 0.f)) + min(max(q.x, max(q.y, q.z)), 0.f) - r;
 }
 
+__host__ __device__ float cappedConeSDF(glm::vec3 p, glm::vec3 a, glm::vec3 b, float ra, float rb)
+{
+    float rba = rb - ra;
+    float baba = dot(b - a, b - a);
+    float papa = dot(p - a, p - a);
+    float paba = dot(p - a, b - a) / baba;
+    float x = sqrt(papa - paba * paba * baba);
+    float cax = max(0.f, x - ((paba < 0.5f) ? ra : rb));
+    float cay = abs(paba - 0.5) - 0.5;
+    float k = rba * rba + baba;
+    float f = glm::clamp((rba * (x - ra) + paba * baba) / k, 0.f, 1.f);
+    float cbx = x - ra - f * rba;
+    float cby = paba - f;
+    float s = (cbx < 0.0 && cay < 0.0) ? -1.0 : 1.0;
+    return s * sqrt(min(cax * cax + cay * cay * baba,
+        cbx * cbx + cby * cby * baba));
+}
+
 /*
  ******************************************************
  * Procedural Operators
@@ -310,19 +378,15 @@ __host__ __device__ float mugSDF(glm::vec3 p) {
     float dMugTemp = min(dMugOuter, dMugHandle);//smoothUnion(dMugOuter, dMugHandle, 0.2f);
     float dMug = max(dMugTemp, -dMugInner);
     return dMug;
-
-    //float dCoffee = cappedCylinderSDF(p - glm::vec3(0.f, 0.4f, 0.f), 1.f, 0.01f);
-    //float dCoffeeMug = min(dCoffee, dMug);
-    //return dCoffeeMug; // dist from sphere = dist from center - radius
 }
 
 __host__ __device__ float coffeeSDF(glm::vec3 p) {
-    float dCoffee = cappedCylinderSDF(p - glm::vec3(0.f, 0.4f, 0.f), 1.f, 0.01f);
+    float dCoffee = cappedCylinderSDF(p - glm::vec3(0.f, 0.7f, 0.f), 1.f, 0.01f);
     return dCoffee; // dist from sphere = dist from center - radius
 }
 
 __host__ __device__ float bookCoverSDF(glm::vec3 p) {
-    glm::vec3 pCBook = p + glm::vec3(2.5f, 0.80, 0.0);
+    glm::vec3 pCBook = p;// +glm::vec3(2.5f, 0.80, 0.0);
 
     float dCBookCover = roundBoxSDF(pCBook, glm::vec3(0.8f, 0.25f, 1.1f), 0.2);
     float dCBookPagesCut = boxSDF(pCBook + glm::vec3(-0.2f, 0.f, 0.f), glm::vec3(1.1f, 0.28f, 1.8f));
@@ -331,22 +395,45 @@ __host__ __device__ float bookCoverSDF(glm::vec3 p) {
 }
 
 __host__ __device__ float bookPagesSDF(glm::vec3 p) {
-    glm::vec3 pCBook = p + glm::vec3(2.5f, 0.80, 0.0);
+    glm::vec3 pCBook = p;// +glm::vec3(2.5f, 0.80, 0.0);
     float dCBookPages = boxSDF(pCBook, glm::vec3(0.9f, 0.28f, 1.2f));
     return dCBookPages;
 }
 
 __host__ __device__ float lightSDF(glm::vec3 p) {
-    glm::vec3 pLight = p + glm::vec3(2.5f, 0.80, 0.0);
-    float dLight =boxSDF(pLight, glm::vec3(0.1f, 0.9f, 0.1f));
-    return dLight;
-}
 
-__host__ __device__ float penSDF(glm::vec3 p) {
-    glm::vec3 sphereCenter = glm::vec3(0, 0, 0);    // center.xyz,radius
-    float sphereRadius = 1.f;
-    //normal = glm::normalize(p - sphereCenter);
-    return glm::length(p - sphereCenter) - sphereRadius; // dist from sphere = dist from center - radius
+    p -= glm::vec3(0.f, 0.f, 0.f);
+
+    glm::vec3 pRotOLightHead = p + glm::vec3(0.3f, 1.8f, 0.f);
+    glm::mat2 rotOLightHeadTransform = rot(30.f * 3.14f / 180.f);
+    glm::vec2 pRotOLightHeadTemp = glm::vec2(pRotOLightHead.x, pRotOLightHead.y) * rotOLightHeadTransform;
+    pRotOLightHead.x = pRotOLightHeadTemp.x;
+    pRotOLightHead.y = pRotOLightHeadTemp.y;
+    float dOLightHead = cappedConeSDF(pRotOLightHead, glm::vec3(-1.2f, 5.f, 0.f), glm::vec3(0.f, 5.f, 0.f), 0.2f, 1.f);
+
+    glm::vec3 pRotILightHead = p + glm::vec3(0.3f, 1.8f, 0.f);
+    glm::mat2 rotILightHeadTransform = rot(30.f * 3.14f / 180.f);
+    glm::vec2 pRotILightHeadTemp = glm::vec2(pRotILightHead.x, pRotILightHead.y) * rotILightHeadTransform;
+    pRotILightHead.x = pRotILightHeadTemp.x;
+    pRotILightHead.y = pRotILightHeadTemp.y;
+    float dILightHead = cappedConeSDF(pRotILightHead, glm::vec3(-0.8f, 5.f, 0.f), glm::vec3(0.1f, 5.f, 0.f), 0.17f, 0.9f);
+
+    float dLightHead = max(dOLightHead, -dILightHead);
+
+    glm::vec3 pRotULightStand = p - glm::vec3(0.6f, 3.5f, 0.f);
+    glm::mat2 rotULightStandTransform = rot(-60.f * 3.14f / 180.f);
+    glm::vec2 pRotULightStandTemp = glm::vec2(pRotULightStand.x, pRotULightStand.y) * rotULightStandTransform;
+    pRotULightStand.x = pRotULightStandTemp.x;
+    pRotULightStand.y = pRotULightStandTemp.y;
+    float dULightStand = cappedCylinderSDF(pRotULightStand, 0.1f, 0.7f);
+
+    glm::vec3 pLLightStand = p - glm::vec3(0.f, 2.f, 0.f);
+    float dLLightStand = cappedCylinderSDF(pLLightStand, 0.1f, 2.3f);
+
+    glm::vec3 pLightBase = p - glm::vec3(0.f, 0.f, 0.f);
+    float dLightBase = cappedCylinderSDF(pLightBase, 1.2f, 0.2f);
+
+    return min(min(min(dLightHead, dULightStand), dLLightStand), dLightBase);
 }
 
 __host__ __device__ float sceneSDF(glm::vec3 p, Geom impGeom) {

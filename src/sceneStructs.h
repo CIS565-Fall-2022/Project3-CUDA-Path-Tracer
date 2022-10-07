@@ -6,6 +6,8 @@
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
+#define FLOAT_MIN -1e38f
+#define FLOAT_MAX 1e38f;
 
 enum GeomType {
     SPHERE,
@@ -20,7 +22,6 @@ enum ImplicitObj {
     IMP_BOOKPAGES,
     IMP_MUG,
     IMP_COFFEE,
-    IMP_BOX,
     IMP_LIGHT
 };
 
@@ -35,6 +36,11 @@ struct Triangle {
     glm::vec2 uv[3];
 };
 
+struct BoundingBox {
+    glm::vec3 min;
+    glm::vec3 max;
+};
+
 struct Geom {
     enum GeomType type;
     int materialid;
@@ -47,6 +53,7 @@ struct Geom {
     int triCount;
     Triangle* triangles;
     Triangle* dev_triangles;
+    BoundingBox boundingBox;
     ImplicitObj implicitobj;
 };
 
