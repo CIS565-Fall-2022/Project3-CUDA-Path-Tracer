@@ -131,6 +131,7 @@ struct PathSegment {
     int remainingBounces;
 
     int isDifuse = 0;
+    int firstHitReflect = 0;
 };
 
 // Use with a corresponding PathSegment to do:

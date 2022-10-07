@@ -36,7 +36,7 @@ public:
 
     std::vector<Triangle> triangles;
     std::vector<OctreeNode> octree;
-    const int treeDepth = 3;
+    const int treeDepth = 5;
     std::vector<int> trianglesIndices;
 
     std::vector<unsigned short> indices;

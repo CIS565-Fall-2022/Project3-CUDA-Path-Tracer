@@ -2,7 +2,7 @@
 
 #include "intersections.h"
 
-#define PROCEDURAL_TEXTURE 1
+#define PROCEDURAL_TEXTURE 0
 
 // CHECKITOUT
 /**
@@ -115,7 +115,8 @@ void FetchTexture(const Texture& texture, const int offset, const glm::vec3* tex
   float f2 = cos(v) + cos(2 * v) + cos(3 * v) + cos(4 * v);
   bool c1 = int(f1 * r) % 2 == 0 && int(f2 * r) % 2 == 0;
 
-  float xx = (uv.x - 0.5) * (uv.x - 0.5) + (uv.y - 0.5) * (uv.y - 0.5);
+  float xx = (uv.x - 0.5) * (uv.x - 0.5);
+  float yy = (uv.y - 0.5) * (uv.y - 0.5);
 
   float o = 0.15;
   float xy = (uv.x - 0.5 + o) * (uv.x - 0.5 + o) + (uv.y - 0.5 + o) * (uv.y - 0.5 + o);
@@ -123,9 +124,9 @@ void FetchTexture(const Texture& texture, const int offset, const glm::vec3* tex
 
   float d = 0.1;
 
-  bool c2 = xy < d && yx < d;
+  bool c2 = xy < d && yx < d && (uv.x < 0.99999) && (uv.y < 0.99999);
 
-  color = c1 || c2 ? glm::vec3(1.f) : glm::vec3(0.6f, 0.2f, 0.2f);
+  color = c1 || c2 ? glm::vec3(1.f) : glm::vec3(4 * sqrt(xx + yy), 1.5 * xx, 1.5 * yy);
 
 #else
   color = texImage[idx + offset];
@@ -200,8 +201,12 @@ void scatterRay(
         lightSourceSampled[idx] = glm::vec4(intersect, 1);
 
         if (pathSegment.remainingBounces != traceDepth) {
-          color = 40.f*color;
+          color = 40.f*color; // 40
         }
+        if (pathSegment.firstHitReflect == 1 && pathSegment.remainingBounces == traceDepth - 1) {
+          color = emissiveColor;
+        }
+
         pathSegment.remainingBounces = 0;
       }
     }
@@ -232,6 +237,10 @@ void scatterRay(
       pathSegment.ray.origin = intersect + 0.001f * glm::normalize(pathSegment.ray.direction);
       // pathSegment.ray.origin = intersect;
     }
+
+    if (pathSegment.remainingBounces == traceDepth) {
+      pathSegment.firstHitReflect = 1;
+    }
   }
   else if (m.hasReflective > 0) {
     glm::vec3 reflect = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
@@ -242,6 +251,10 @@ void scatterRay(
     
     pathSegment.color *= (color);
     pathSegment.ray.origin = intersect;
+
+    if (pathSegment.remainingBounces == traceDepth) {
+      pathSegment.firstHitReflect = 1;
+    }
   }
   else {
     // A basic implementation of pure-diffuse shading will just call the
@@ -250,6 +263,7 @@ void scatterRay(
     pathSegment.color *= (color);
     pathSegment.ray.origin = intersect;
     pathSegment.isDifuse = 1;
+    pathSegment.firstHitReflect = 0;
   }
   
 

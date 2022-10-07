@@ -20,9 +20,9 @@
 #define SORT_BY_MATERIAL 0
 #define FIRST_BOUNCE_CACHE 0
 #define ANTIALIASING 1
-#define DIRECT_LIGHTING 1
+#define DIRECT_LIGHTING 0
 
-#define DEPTH_OF_FIELD 0
+#define DEPTH_OF_FIELD 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -190,6 +190,8 @@ void pathtraceFree() {
 	cudaFree(dev_stencil);
 	cudaFree(dev_first_intersections);
 
+	cudaFree(dev_triangles);
+
 	cudaFree(dev_sceneMeshesData.indices);
 	cudaFree(dev_sceneMeshesData.positions);
 	cudaFree(dev_sceneMeshesData.normals);
@@ -202,6 +204,9 @@ void pathtraceFree() {
 	cudaFree(dev_emissiveTexture);
 
 	cudaFree(dev_lightSourceSampled);
+
+	cudaFree(dev_octree);
+	cudaFree(dev_triangleIndice);
 
 	checkCUDAError("pathtraceFree");
 }
