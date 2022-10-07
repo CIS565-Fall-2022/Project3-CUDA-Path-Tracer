@@ -125,6 +125,6 @@ material 5
 TRANS       -1 4 -1
 ROTAT       0 0 0
 SCALE       3 3 3
-END      2 -1 2
+END      -1 4 -1
 
 
