@@ -199,8 +199,8 @@ int Scene::loadMaterial(string materialid) {
             } else if (strcmp(tokens[0].c_str(), "REFL") == 0) {
                 float r = atof(tokens[1].c_str());
                 newMaterial.hasReflective = r;
-                newMaterial.pbrVal.metallicFactor = r;
-                newMaterial.pbrVal.roughnessFactor = 0;
+                newMaterial.pbrMetallicRoughness.metallicFactor = r;
+                newMaterial.pbrMetallicRoughness.roughnessFactor = 0;
             } else if (strcmp(tokens[0].c_str(), "REFR") == 0) {
                 newMaterial.hasRefractive = atof(tokens[1].c_str());
             } else if (strcmp(tokens[0].c_str(), "REFRIOR") == 0) {
@@ -336,12 +336,15 @@ int Scene::loadGLTF(const std::string filename)
     {
         Material newMat;
         newMat.gltf = true;
+        newMat.color = glm::vec3(0.3f, 0.3f, 1.f);
+        newMat.specular.color = glm::vec3(0.98f, 0.98f, 0.98f);
+        newMat.hasReflective = 0.5f;
 
         newMat.texOffset = textureOffset;
-        newMat.pbrVal.baseColorTexture = gltfMat.pbrMetallicRoughness.baseColorTexture;
-        newMat.pbrVal.metallicRoughnessTexture = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture;
-        newMat.pbrVal.metallicFactor = gltfMat.pbrMetallicRoughness.metallicFactor;
-        newMat.pbrVal.roughnessFactor = gltfMat.pbrMetallicRoughness.roughnessFactor;
+        newMat.pbrMetallicRoughness.baseColorTexture = gltfMat.pbrMetallicRoughness.baseColorTexture;
+        newMat.pbrMetallicRoughness.metallicRoughnessTexture = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture;
+        newMat.pbrMetallicRoughness.metallicFactor = gltfMat.pbrMetallicRoughness.metallicFactor;
+        newMat.pbrMetallicRoughness.roughnessFactor = gltfMat.pbrMetallicRoughness.roughnessFactor;
         newMat.normalTexture = gltfMat.normalTexture;
         newMat.emissiveFactor = glm::make_vec3(gltfMat.emissiveFactor.data());
         newMat.emissiveTexture = gltfMat.emissiveTexture;

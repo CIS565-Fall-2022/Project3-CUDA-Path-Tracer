@@ -164,7 +164,7 @@ struct Material {
 
     TextureInfo emissiveTexture;
     NormalTextureInfo normalTexture;
-    PBRShadingAttribute pbrVal;
+    PBRShadingAttribute pbrMetallicRoughness;
 
     glm::vec3 emissiveFactor;
 
