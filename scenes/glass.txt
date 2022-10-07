@@ -45,7 +45,7 @@ ABSORPTION  0
 // Specular white
 MATERIAL 4
 RGB         .98 .98 .98
-SPECEX      0
+SPECEX      5
 SPECRGB     .98 .98 .98
 REFL        1
 REFR        0
@@ -82,8 +82,8 @@ FOVY        45
 ITERATIONS  5000
 DEPTH       8
 FILE        cornell
-FOCAL       10
-LENS_LEN    1
+FOCAL       0
+LENS_LEN    0
 EYE         0.0 5 10.5
 LOOKAT      0 5 0
 UP          0 1 0
@@ -94,7 +94,7 @@ UP          0 1 0
 OBJECT 0
 cube
 material 0
-TRANS       0 7 0
+TRANS       0 10 2
 ROTAT       0 0 0
 SCALE       3 .3 3
 
@@ -141,7 +141,7 @@ SCALE       .01 10 10
 // Sphere
 OBJECT 6
 sphere
-material 1
+material 4
 TRANS       0 3 0
 ROTAT       0 0 0
 SCALE       5 5 5

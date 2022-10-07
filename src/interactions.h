@@ -210,7 +210,13 @@ void scatterRay(
         
     }
     else if (m.hasReflective) {
-        pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+        if (m.specular.exponent != 0){
+            pathSegment.ray.direction = glm::normalize(imperfectSpecularScatter(normal, rng, uniform, m.specular.exponent));
+        }
+        else {
+            pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+        }
+        
         pathSegment.color *= m.specular.color;
         pathSegment.ray.origin = intersect + (glm::normalize(pathSegment.ray.direction) * .0001f);
     }
