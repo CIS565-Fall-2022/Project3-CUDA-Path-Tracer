@@ -20,8 +20,10 @@
 
 #define ERRORCHECK 1
 
-#define CACHE 1
+#define CACHE 0
 #define SORT 0
+#define ANTIALIASING 1
+#define DEPTH 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -141,6 +143,25 @@ void pathtraceFree() {
 	checkCUDAError("pathtraceFree");
 }
 
+__host__ __device__
+glm::vec2  ConcentricSampleDisk(float u0, float u1) {
+	glm::vec2 uOffset = glm::vec2(2.f * u0 - 1.f, 2.f * u1 - 1.f);
+	if (uOffset.x == 0 && uOffset.y == 0) {
+		return glm::vec2(0, 0);
+	}
+
+	float theta, r;
+	if (std::abs(uOffset.x) > std::abs(uOffset.y)) {
+		r = uOffset.x;
+		theta = PI / 4.f * (uOffset.y / uOffset.x);
+	}
+	else {
+		r = uOffset.y;
+		theta = PI / 2.f - PI / 4.f * (uOffset.x / uOffset.y);
+	}
+	return r * glm::vec2(cos(theta),sin(theta));
+}
+
 /**
 * Generate PathSegments with rays from the camera through the screen into the
 * scene, which is the first bounce of rays.
@@ -162,11 +183,31 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		// TODO: implement antialiasing by jittering the ray
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+		thrust::uniform_real_distribution<float> u01(0, 1);
+#if ANTIALIASING
+		segment.ray.direction = glm::normalize(cam.view
+			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f + u01(rng))
+			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f + u01(rng))
+		);
+#else 
 		segment.ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
 		);
+#endif
+#if DEPTH
+		float lensRadius = 1.0f;
+		float focalDistance = 2.0f;
+		glm::vec2 pLens = lensRadius * ConcentricSampleDisk(u01(rng), u01(rng));
 
+		float ft = focalDistance / segment.ray.direction.z;
+		glm::vec3 pFocus = ft*segment.ray.direction;
+
+		segment.ray.origin += glm::vec3(pLens.x, pLens.y, 0);
+		segment.ray.direction = glm::normalize(pFocus - glm::vec3(pLens.x, pLens.y, 0));
+
+#endif
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
 	}
@@ -384,9 +425,10 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		generateRayFromCamera <<<blocksPerGrid2d, blockSize2d>>> (cam, iter, traceDepth, dev_paths);
 		checkCUDAError("generate camera ray");
 		cudaMemcpy(dev_first_paths, dev_paths, pixelcount * sizeof(PathSegment), cudaMemcpyDeviceToDevice);
+		first = false;
 	}
 	else {
-		cudaMemcpy(dev_first_paths, dev_paths, pixelcount * sizeof(PathSegment), cudaMemcpyDeviceToDevice);
+		cudaMemcpy(dev_paths, dev_first_paths, pixelcount * sizeof(PathSegment), cudaMemcpyDeviceToDevice);
 	}
 
 #else
@@ -420,7 +462,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 		// tracing
 		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
-		computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+		computeIntersections <<<numblocksPathSegmentTracing, blockSize1d >> > (
 			depth
 			, num_paths
 			, dev_paths
