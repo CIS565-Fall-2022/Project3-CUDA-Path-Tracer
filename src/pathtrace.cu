@@ -597,8 +597,6 @@ struct RemoveInvalidPaths {
 	}
 };
 
-static 
-
 void pathTrace(uchar4* pbo, int frame, int iter) {
 	const Camera& cam = hstScene->camera;
 	const int pixelCount = cam.resolution.x * cam.resolution.y;

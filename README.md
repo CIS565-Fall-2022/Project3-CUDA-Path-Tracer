@@ -18,7 +18,7 @@ This is our third project of CIS 565 Fall 2022. In this project, we implemented 
 
 ![](./img/photo_realistic.jpg)
 
-<p align="center">"Photoly" realistic!</p>
+<p align="center">A virtual camera is capturing another virtual camera</p>
 
 | Scene Specs             | [[./scenes/pbr_texture.txt]](./scenes/pbr_texture.txt) |
 | ----------------------- | ------------------------------------------------------ |
@@ -27,13 +27,22 @@ This is our third project of CIS 565 Fall 2022. In this project, we implemented 
 | Render Time             | < 7 minutes (> 7.5 frames per second)                  |
 | Million Rays Per Second | > 32.4                                                 |
 | Triangle Count          | 25637                                                  |
-| Lighting                | HDR Environment Map                                    |
 
+![](./img/sponza_pano.jpg)
 
+<p align="center">Twisted Sponza rendered with panorama camera</p>
+
+| Scene Specs             |             |
+| ----------------------- | ----------- |
+| Resolution              | 2400 x 1200 |
+| Samples Per Pixel       | 8000        |
+| Render Time             | 38 minutes  |
+| Million Rays Per Second | 10          |
+| Triangle Count          | 262193      |
 
 ![](./img/aperture_custom.jpg)
 
-<p align="center">Star-shaped bokehs</p>
+<p align="center">Lens effect: star-shaped bokehs</p>
 
 
 
@@ -112,7 +121,7 @@ Implementing gamma correction is very trivial. But it is necessary if we want ou
 
 #### Fast Intersection: Stackless SAH-Based Bounding Volume Hierarchy
 
-Ray-scene intersection is probably the best time consuming part of 
+Ray-scene intersection is probably the best time consuming part of of ray tracing process. In a naive method we try to intersect every ray with every object in the scene, which is 
 
 I did two levels of optimization.
 
@@ -144,7 +153,7 @@ In general, it's a tradeoff between thread concurrency and time spent accessing 
 
 There is a paper stressing this point, from which I also got the idea to additionally implement a single kernel tracer
 
-- [[Progressive Light Transport Simulation on the GPU: Survey and Improvements]](https://cgg.mff.cuni.cz/~jaroslav/papers/2014-gpult/2014-gpult-paper.pdf)
+- [*Progressive Light Transport Simulation on the GPU: Survey and Improvements*](https://cgg.mff.cuni.cz/~jaroslav/papers/2014-gpult/2014-gpult-paper.pdf)
 
 
 
