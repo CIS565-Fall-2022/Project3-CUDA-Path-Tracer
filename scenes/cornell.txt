@@ -58,9 +58,19 @@ REFR        0
 REFRIOR     0
 EMITTANCE   0
 
+// Refractive yellow
+MATERIAL 6
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 0
+REFL        1
+REFR        1
+REFRIOR     1.5
+EMITTANCE   0
+
 // Camera
 CAMERA
-RES         1920 1080
+RES         800 800
 FOVY        45
 ITERATIONS  5000
 DEPTH       8
@@ -121,7 +131,7 @@ SCALE       .01 10 10
 // Sphere
 OBJECT 6
 ../scenes/objFiles/wahoo.obj
-material 5
+material 6
 TRANS       2 4 0
 ROTAT       0 0 0
 SCALE       0.35 0.35 0.35
@@ -149,43 +159,29 @@ ROTAT       0 0 0
 SCALE       0.35 0.35 0.35
 
 OBJECT 10
-../scenes/objFiles/StylizedShedNoIvy.obj
-material 3
-TRANS       -2 1 2
-ROTAT       0 0 0
-SCALE       0.3 0.3 0.3
-
-OBJECT 11
 ../scenes/objFiles/wahoo.obj
 material 5
 TRANS       3 1 2
 ROTAT       0 0 0
 SCALE       0.35 0.35 0.35
 
-OBJECT 12
+OBJECT 11
 ../scenes/objFiles/wahoo.obj
 material 5
 TRANS       -2 4 -2
 ROTAT       0 0 0
 SCALE       0.35 0.35 0.35
 
-OBJECT 13
+OBJECT 12
 ../scenes/objFiles/Caitlyn.obj
 material 5
 TRANS       1 1 0
 ROTAT       0 0 0
 SCALE       2 2 2
 
-OBJECT 14
+OBJECT 13
 ../scenes/objFiles/melina.obj
 material 5
 TRANS       -1 1 0
 ROTAT       0 0 0
 SCALE       2 2 2
-
-OBJECT 15
-../scenes/objFiles/bike.obj
-material 5
-TRANS       -2 1 3
-ROTAT       0 0 0
-SCALE       1.5 1.5 1.5
