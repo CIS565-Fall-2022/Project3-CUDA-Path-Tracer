@@ -77,6 +77,7 @@ int main(int argc, char** argv) {
 
 	// Set up camera stuff from loaded path tracer settings
 	iteration = 0;
+	Camera old = scene->state.camera;
 	if (hasCheckpoint)
 	{
 		loadState(checkpoint_folder);
@@ -205,15 +206,18 @@ void runCuda() {
 
 void saveState()
 {
+	glm::io::precision(9);
 	std::cout << "Begining Checkpoint" << std::endl;
 	auto state = scene->state;
 	auto camera = state.camera;
 	std::ofstream image_output_file("./checkpoint/image.data");
+	image_output_file<< std::fixed << std::setprecision(6) << glm::io::precision(6);
 	std::ostream_iterator<glm::vec3> output_iterator(image_output_file, ",");
 	std::copy(state.image.begin(), state.image.end(), output_iterator);
 	std::ofstream iterations_output_file("./checkpoint/iterations.data");
 	iterations_output_file << iteration;
 	std::ofstream camera_output_file("./checkpoint/camera.data");
+	camera_output_file << std::fixed << std::setprecision(6) << glm::io::precision(9);
 	camera_output_file << camera.resolution << camera.position << camera.lookAt << camera.view << camera.up << camera.right << camera.fov << camera.pixelLength;
 	//glm::ivec2 resolution;
 	//glm::vec3 position;

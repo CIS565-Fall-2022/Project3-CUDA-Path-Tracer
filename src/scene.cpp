@@ -162,7 +162,6 @@ int Scene::loadCamera() {
         else if (strcmp(tokens[0].c_str(), "FOCAL") == 0) {
             camera.focal_length = atof(tokens[1].c_str());
         }
-
         utilityCore::safeGetline(fp_in, line);
     }
 
