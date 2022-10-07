@@ -19,6 +19,7 @@ In this project, I implemented a CUDA path tracer for the GPU. Previously in Adv
 4. First bounce caching
 
 ![](img/part1Final.png)
+![](img/part1FinalSpecular.png)
 
 ## Additional Features
 ### Refractive Material
@@ -27,6 +28,8 @@ In this project, I implemented a CUDA path tracer for the GPU. Previously in Adv
 ### Direct Lighting
 ### Arbitrary Mesh Loading with TinyObjLoader
 ### Texture and Bump Mapping
+
+## Performance Analysis
 
 ## Bloopers! :)
 
