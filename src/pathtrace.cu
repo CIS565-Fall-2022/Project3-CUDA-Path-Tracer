@@ -507,14 +507,14 @@ __global__ void BSDFShading(
 			thrust::uniform_real_distribution<float> u01(0, 1);
 
 			Material material = materials[intersection.materialId];
-			glm::vec3 materialColor = glm::vec3(material.pbrVal.baseColor);
-			glm::vec3 emissiveColor = material.emissiveFactor;
+			//glm::vec3 materialColor = glm::vec3(material.pbrVal.baseColor);
+	
 
 
 			//Ray ends when ray hit the light
-			if (glm::length(emissiveColor) > 0.0f)
+			if (material.emittance>0.0)
 			{
-				pathSegments[index].color *= (materialColor * material.emittance);
+				pathSegments[index].color *= (material.color * material.emittance);
 				pathSegments[index].remainingBounces = 0;
 			}
 			else

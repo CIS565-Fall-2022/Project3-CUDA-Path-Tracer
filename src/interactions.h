@@ -165,20 +165,12 @@ void scatterRay(
     //use this act as pdf
     glm::vec3 nextRayDir;;
     float eta;
-   // Specular BRDF/BTDF here
-
-    //PBR Material Properties
-    glm::vec3 albedo;
-    float pM, pR;
-    float ao;
-    normal = i.surfaceNormal;
-
-
+    // Specular BRDF/BTDF here
     float random = u01(rng);
     if (random <= m.hasReflective)
     {
-        nextRayDir = glm::reflect(pathSegment.ray.direction,normal);
-        if (m.specular.exponent > 0 && random>0.5)
+        nextRayDir = glm::reflect(pathSegment.ray.direction, normal);
+        if (m.specular.exponent > 0 && random > 0.5)
         {
             pathSegment.color *= m.specular.color;
         }
@@ -189,7 +181,7 @@ void scatterRay(
     }
     else if (random <= m.hasReflective + m.hasRefractive)
     {
-        nextRayDir = dielectricEvaluation(pathSegment,intersect,normal,m,rng);
+        nextRayDir = dielectricEvaluation(pathSegment, intersect, normal, m, rng);
     }
     else
     {

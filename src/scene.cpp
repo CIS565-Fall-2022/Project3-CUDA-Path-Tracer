@@ -336,6 +336,7 @@ int Scene::loadGLTF(const std::string filename)
     {
         Material newMat;
         newMat.gltf = true;
+
         newMat.texOffset = textureOffset;
         newMat.pbrVal.baseColorTexture = gltfMat.pbrMetallicRoughness.baseColorTexture;
         newMat.pbrVal.metallicRoughnessTexture = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture;
