@@ -37,10 +37,13 @@ Specular materials showcase the characteristics of being polished or shiny. Refl
 
 ### Perfect
 \[insert image\] 
+![](img/perfspec.png)
 
 Perfectly specular materials are like mirrors since reflection angles are deterministic.
 ### Imperfect
 \[insert image\] 
+![](img/imperfspec.png)
+
 
 Imperfectly specular materials are just shiny since reflection angles are, while more focused than diffuse materials, nondeterministic.
 ## Stream Compaction
@@ -61,10 +64,20 @@ The first rays cast into the scene are deterministic based on the camera's posit
 Loads in an arbitrary, but untextured mesh. Implemented bounding box acceleration data structure as well.
 ## Refractive
 \[insert image\] 
+![](img/refractive.png)
+
 
 Refractive materials like glass both refract and reflect light. Using schlick approximation, we nondeterministically have some rays get refracted into the object while other rays are reflected away.
 ## Depth of Field
 \[insert image\] 
+![](img/DOF.png)
+Focal Dist of 10
+Lens Radius of 1
+
+![](img/DOF5.png)
+Focal Dist of 5
+Lens Radius of 1
+
 
 Lenses in real life have radii and focal distances (based on their concavity) which bend light rays in a way that only certain objects a certain distance away are actually in focus. This is approximated using random disk sampling to artificially bend cameras cast into screen space.
 ## Antialiasing
