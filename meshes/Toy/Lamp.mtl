@@ -1,0 +1,23 @@
+newmtl lambert2SG
+illum 4
+Kd 0.24 0.24 0.24
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
+ior 1
+reflect 0
+refr 0
+emit 0
+rough 0
+
+newmtl lambert3SG
+illum 4
+Kd 1 1 1
+Ka 0.00 0.00 0.00
+Tf 1.00 1.00 1.00
+Ni 1.00
+ior 1
+reflect 0
+refr 0
+emit 10
+rough 0

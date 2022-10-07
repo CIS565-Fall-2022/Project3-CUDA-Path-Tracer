@@ -29,7 +29,7 @@
 // #define DEPTH_OF_FIELD
 
 // #define ANTI_ALIAS_JITTER
-#define FAKE_SHADE
+// #define FAKE_SHADE
 
 #define CACHE_FIRST_BOUNCE
 #if (defined(CACHE_FIRST_BOUNCE) && defined(ANTI_ALIAS_JITTER)) || (defined(CACHE_FIRST_BOUNCE) && defined(DEPTH_OF_FIELD)) 

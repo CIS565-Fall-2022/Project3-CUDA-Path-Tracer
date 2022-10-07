@@ -9,17 +9,17 @@
 #include "../ImGui/imgui_impl_opengl3.h"
 #include "../consts.h"
 
-extern RenderState* renderState;
+extern RenderState* g_renderState;
 extern JunksFromMain g_mainJunks;
 extern int width;
 extern int height;
 
 // world to screen
 static glm::vec2 w2s(glm::mat4 const& model, glm::vec3 const& point) {
-	glm::vec2 const& pixel_len = renderState->camera.pixelLength;
-	glm::vec3 const& look_point = renderState->camera.lookAt;
+	glm::vec2 const& pixel_len = g_renderState->camera.pixelLength;
+	glm::vec3 const& look_point = g_renderState->camera.lookAt;
 	glm::vec3 const& eye = g_mainJunks.cameraPosition;
-	float fov = glm::radians(renderState->camera.fov.y * 2.0f);
+	float fov = glm::radians(g_renderState->camera.fov.y * 2.0f);
 
 	glm::mat4 view = glm::lookAt(eye, look_point, WORLD_UP);
 	glm::mat4 proj = glm::perspective(fov, width / (float)height, 0.12f, 100.0f);

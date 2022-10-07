@@ -125,6 +125,7 @@ __global__ void sendImageToPBO(int iter, glm::vec3* pixs, uchar4* pbo, glm::ivec
 
 static RenderState* renderState = nullptr;
 static Scene* hst_scene = nullptr;
+static std::string cur_scene;
 
 static Span<glm::vec3>             dev_image;
 static Span<Geom>                  dev_geoms;
@@ -148,10 +149,11 @@ static octreeGPU dev_tree;
 static bool render_paused = false;
 static int cur_iter;
 
-void PathTracer::pathtraceInit(Scene* scene, RenderState* state) {
-	bool scene_change = hst_scene != scene;
-
+void PathTracer::pathtraceInit(Scene* scene, RenderState* state, bool force_change) {
+	if (!scene) throw;
+	bool scene_changed = force_change || cur_scene != scene->filename;
 	hst_scene = scene;
+	cur_scene = scene->filename;
 	renderState = state;
 
 	const Camera& cam = hst_scene->state.camera;
@@ -165,7 +167,7 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state) {
 #endif // CACHE_FIRST_BOUNCE
 	dev_thrust_paths = thrust::device_ptr<PathSegment>((PathSegment*)dev_paths);
 
-	if (scene_change) {
+	if (scene_changed) {
 		dev_geoms = make_span(scene->geoms);
 		dev_lights = make_span(scene->lights);
 		dev_mesh_info.vertices = make_span(scene->vertices);
@@ -186,12 +188,11 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state) {
 		dev_tree.init(*tree, dev_mesh_info, dev_geoms);
 #endif // OCTREE_CULLING
 	}
-
     checkCUDAError("pathtraceInit");
 }
 
-void PathTracer::pathtraceFree(Scene* scene) {
-	bool scene_changed = hst_scene != scene;
+void PathTracer::pathtraceFree(Scene* scene, bool force_change) {
+	bool scene_changed = force_change || !scene || cur_scene != scene->filename;
 
 	FREE(dev_image);
 	FREE(dev_paths);
@@ -199,9 +200,7 @@ void PathTracer::pathtraceFree(Scene* scene) {
 #ifdef CACHE_FIRST_BOUNCE
 	FREE(dev_cached_intersections);
 #endif // CACHE_FIRST_BOUNCE
-
 	if (scene_changed) {
-
 		FREE(dev_geoms);
 		FREE(dev_lights);
 		FREE(dev_mesh_info.vertices);
@@ -222,7 +221,6 @@ void PathTracer::pathtraceFree(Scene* scene) {
 		delete tree;
 #endif
 	}
-
     checkCUDAError("pathtraceFree");
 }
 

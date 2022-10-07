@@ -2,10 +2,10 @@
 CAMERA
 RES         800 800
 FOVY        45
-ITERATIONS  5000
+ITERATIONS  1000
 DEPTH       8
-FILE        cornell
-EYE         0.0 5 4.43
+FILE        norm_test
+EYE         0.0 5 5
 LOOKAT      0 5 0
 UP          0 1 0
 
@@ -13,7 +13,7 @@ UP          0 1 0
 OBJECT 
 cube
 material    ../materials/emissive_white.mtl
-TRANS       0 10 0
+TRANS       0 10 3
 ROTAT       0 0 0
 SCALE       3 .3 3
 
@@ -57,49 +57,10 @@ TRANS       5 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
-// Front wall
+
 OBJECT
 cube
-material    ../materials/diffuse_red.mtl
-TRANS       0 5 5
-ROTAT       0 0 0
-SCALE       10 10 .01
-
-// Sphere
-OBJECT
-sphere
-material    ../materials/diffuse_white.mtl
-TRANS       3 4 -2
-ROTAT       0 0 0
-SCALE       3 3 3
-
-// perfect refractive sphere
-OBJECT
-sphere
-material    ../materials/perfect_refr.mtl
-TRANS       -3 7.6 -2
-ROTAT       0 0 0
-SCALE       3 3 3
-
-// rough reflective sphere
-OBJECT
-sphere
 material    ../materials/rough_refl.mtl
-TRANS       -1 5 -2
+TRANS       0 5 3
 ROTAT       0 0 0
-SCALE       3 3 3
-
-// cup
-OBJECT
-obj         ../meshes/Simple/cup.obj
-material    ../materials/rough_transparent.mtl
-TRANS       0 0.4 -1.7
-ROTAT       0 0 0
-SCALE       0.2 0.3 0.2
-
-OBJECT
-obj         ../meshes/Toy/Lamp.obj
-material    ../materials/diffuse_white.mtl
-TRANS       3.8 0 -2
-ROTAT       0 0 0
-SCALE       0.3 1 0.2
+SCALE       1 1 1

@@ -206,7 +206,7 @@ void Preview::InitImguiData() {
 
 // LOOK: Un-Comment to check ImGui Usage
 void RenderImGui() {
-	extern Scene* scene;
+	extern Scene* g_scene;
 
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
@@ -220,6 +220,10 @@ void RenderImGui() {
 
 		lastScene = guiData->cur_scene;
 		ImGui::Combo("Switch Scenes", &guiData->cur_scene, guiData->scene_file_names, guiData->num_scenes);
+
+		if (ImGui::Button("Reload Scene")) {
+			switchScene(guiData->scene_file_names[guiData->cur_scene], true);
+		}
 
 		if (PathTracer::isPaused()) {
 			if (ImGui::Button("Resume Render")) {
@@ -292,7 +296,7 @@ void RenderImGui() {
 					guiData->test_tree = nullptr;
 				}
 
-				guiData->test_tree = new octree(*scene, scene->world_AABB, guiData->octree_depth);
+				guiData->test_tree = new octree(*g_scene, g_scene->world_AABB, guiData->octree_depth);
 			}
 			if (ImGui::Button("Pull Octree From GPU")) {
 				if (guiData->test_tree) {
@@ -312,22 +316,22 @@ void RenderImGui() {
 	}
 
 	if (guiData->draw_coord_frame) {
-		float x = scene->world_AABB.min().x + 1.f;
-		float y = scene->world_AABB.min().y + 1.f;
+		float x = g_scene->world_AABB.min().x + 1.f;
+		float y = g_scene->world_AABB.min().y + 1.f;
 		glm::vec3 origin{ x, y, 0 };
 		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(2, 0, 0), { 1,0,0 });
 		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(0, 2, 0), { 0,1,0 });
 		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(0, 0, 2), { 0,0,1 });
 	}
 	if (guiData->draw_debug_aabb) {
-		for (Geom const& g : scene->geoms) {
+		for (Geom const& g : g_scene->geoms) {
 			if (g.type == MESH) {
 				DebugDrawer::DrawAABB(g.bounds, { 1,0,0 });
 			}
 		}
 	}
 	if (guiData->draw_world_aabb) {
-		DebugDrawer::DrawAABB(scene->world_AABB, { 0,0,1 });
+		DebugDrawer::DrawAABB(g_scene->world_AABB, { 0,0,1 });
 	}
 
 	if (guiData->test_tree) {
@@ -350,7 +354,7 @@ void RenderImGui() {
 			}
 		});
 		std::string info = "intersection cnt: " + std::to_string(guiData->octree_intersection_cnt) + 
-			"\ntotal triangles: " + std::to_string(scene->triangles.size());
+			"\ntotal triangles: " + std::to_string(g_scene->triangles.size());
 
 		ImGui::Text(info.c_str());
 	}
@@ -415,8 +419,8 @@ void Preview::DoPreloadMenu() {
 		} else {
 			if (guiData->num_saves > 0) {
 				int iter;
-				if (read_state(guiData->save_file_names[guiData->cur_save], iter, scene)) {
-					switchScene(scene, iter, true);
+				if (read_state(guiData->save_file_names[guiData->cur_save], iter, g_scene)) {
+					switchScene(g_scene, iter, true, true);
 				}
 			} else {
 				cout << "No Saves Found !!" << endl;

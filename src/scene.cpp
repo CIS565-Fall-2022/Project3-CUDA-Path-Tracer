@@ -55,7 +55,7 @@ Scene::Scene(std::string filename, bool load_render_state) : filename(filename) 
         }
     }
 
-    if (attrib_flags != 3) {
+    if (load_render_state && attrib_flags != 3) {
         std::cerr << dye::red("Scene " + filename + " is Malformed") << std::endl;
         throw;
     }

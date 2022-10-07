@@ -21,8 +21,8 @@ static bool camchanged = true;
 
 JunksFromMain g_mainJunks;
 
-Scene* scene;
-RenderState* renderState;
+Scene* g_scene;
+RenderState* g_renderState;
 int iteration;
 
 int width;
@@ -63,8 +63,30 @@ int main(int argc, char** argv) {
 
 	return EXIT_SUCCESS;
 }
+void resetCamState() {
+	Camera& cam = g_renderState->camera;
+	auto& cameraPosition = g_mainJunks.cameraPosition;
+	auto& zoom = g_mainJunks.zoom;
+	auto& phi = g_mainJunks.phi;
+	auto& theta = g_mainJunks.theta;
 
-bool switchScene(Scene* scene, int start_iter, bool from_save) {
+	cameraPosition.x = zoom * sin(phi) * sin(theta);
+	cameraPosition.y = zoom * cos(theta);
+	cameraPosition.z = zoom * cos(phi) * sin(theta);
+
+	cam.view = -glm::normalize(cameraPosition);
+	glm::vec3 v = cam.view;
+	glm::vec3 u = WORLD_UP;//glm::normalize(cam.up);
+	glm::vec3 r = glm::cross(v, u);
+	cam.up = glm::cross(r, v);
+	cam.right = r;
+
+	cam.position = cameraPosition;
+	cameraPosition += cam.lookAt;
+	cam.position = cameraPosition;
+	camchanged = false;
+}
+bool switchScene(Scene* scene, int start_iter, bool from_save, bool force) {
 	// Set up camera stuff from loaded path tracer settings
 	auto& phi = g_mainJunks.phi;
 	auto& theta = g_mainJunks.theta;
@@ -73,10 +95,10 @@ bool switchScene(Scene* scene, int start_iter, bool from_save) {
 	auto& ogLookAt = g_mainJunks.ogLookAt;
 
 	iteration = start_iter;
-	renderState = &scene->state;
+	g_renderState = &scene->state;
 
 	if (!from_save) {
-		Camera const& cam = renderState->camera;
+		Camera const& cam = g_renderState->camera;
 		width = cam.resolution.x;
 		height = cam.resolution.y;
 
@@ -104,16 +126,20 @@ bool switchScene(Scene* scene, int start_iter, bool from_save) {
 	lastX = lastY = 0;
 	Preview::InitImguiData();
 
+	resetCamState();
+	PathTracer::pathtraceFree(scene, force);
+	PathTracer::pathtraceInit(scene, g_renderState, force);
+
 	return true;
 }
 
-bool switchScene(char const* path) {
+bool switchScene(char const* path, bool force) {
 	// Load scene file
-	if (scene) {
-		delete scene;
+	if (g_scene) {
+		delete g_scene;
 	}
-	scene = new Scene(path);
-	return switchScene(scene, 0, false);
+	g_scene = new Scene(path);
+	return switchScene(g_scene, 0, false, force);
 }
 
 void saveImage() {
@@ -124,12 +150,12 @@ void saveImage() {
 	for (int x = 0; x < width; x++) {
 		for (int y = 0; y < height; y++) {
 			int index = x + (y * width);
-			glm::vec3 pix = renderState->image[index];
+			glm::vec3 pix = g_renderState->image[index];
 			img.setPixel(width - 1 - x, y, glm::vec3(pix) / samples);
 		}
 	}
 
-	std::string filename = renderState->imageName;
+	std::string filename = g_renderState->imageName;
 	std::ostringstream ss;
 	ss << filename << "." << startTimeString << "." << samples << "samp";
 	filename = ss.str();
@@ -140,45 +166,24 @@ void saveImage() {
 }
 
 void runCuda(bool init) {
-	auto& cameraPosition = g_mainJunks.cameraPosition;
-	auto& zoom = g_mainJunks.zoom;
-	auto& phi = g_mainJunks.phi;
-	auto& theta = g_mainJunks.theta;
 
 	if (camchanged) {
+		iteration = 0;
+
 		if (!init) {
-			iteration = 0;
 			// clear image buffer
-			std::fill(renderState->image.begin(), renderState->image.end(), glm::vec3(0));
+			std::fill(g_renderState->image.begin(), g_renderState->image.end(), glm::vec3(0));
 		}
-		Camera& cam = renderState->camera;
+		PathTracer::pathtraceFree(g_scene);
+		PathTracer::pathtraceInit(g_scene, g_renderState);
 
-		cameraPosition.x = zoom * sin(phi) * sin(theta);
-		cameraPosition.y = zoom * cos(theta);
-		cameraPosition.z = zoom * cos(phi) * sin(theta);
-
-		cam.view = -glm::normalize(cameraPosition);
-		glm::vec3 v = cam.view;
-		glm::vec3 u = WORLD_UP;//glm::normalize(cam.up);
-		glm::vec3 r = glm::cross(v, u);
-		cam.up = glm::cross(r, v);
-		cam.right = r;
-
-		cam.position = cameraPosition;
-		cameraPosition += cam.lookAt;
-		cam.position = cameraPosition;
-		camchanged = false;
+		resetCamState();
 	}
 
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
-	if (iteration == 0 || init) {
-		PathTracer::pathtraceFree(scene);
-		PathTracer::pathtraceInit(scene, renderState);
-	}
-
-	if (iteration < renderState->iterations) {
+	if (iteration < g_renderState->iterations) {
 		uchar4* pbo_dptr = NULL;
 		cudaGLMapBufferObject((void**)&pbo_dptr, pbo);
 
@@ -212,8 +217,8 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 			break;
 		case GLFW_KEY_SPACE:
 			camchanged = true;
-			renderState = &scene->state;
-			renderState->camera.lookAt = ogLookAt;
+			g_renderState = &g_scene->state;
+			g_renderState->camera.lookAt = ogLookAt;
 			break;
 		case GLFW_KEY_P:
 			PathTracer::togglePause();
@@ -250,8 +255,8 @@ void mousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
 		zoom = std::fmax(0.1f, zoom);
 		camchanged = true;
 	}  else if (middleMousePressed) {
-		renderState = &scene->state;
-		Camera& cam = renderState->camera;
+		g_renderState = &g_scene->state;
+		Camera& cam = g_renderState->camera;
 		glm::vec3 forward = cam.view;
 		forward.y = 0.0f;
 		forward = glm::normalize(forward);

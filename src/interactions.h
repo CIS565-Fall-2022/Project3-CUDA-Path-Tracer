@@ -116,7 +116,21 @@ struct SamplePointSpace {
     glm::mat3x3 l2w, w2l; // local to world
 
     __device__ SamplePointSpace(glm::vec3 const& n) {
-        // constructs sampling point coordinate system tr matrix
+        // constructs an orthonormal coordinate system
+        // with +z direction same as n
+
+        // precondition : n is normalized
+#define JCGT_IMPL // https://graphics.pixar.com/library/OrthonormalB/paper.pdf
+        float sign = copysignf(1.f, n.z);
+        float a = 1.f / (sign + n.z);
+        float b = n.x * n.y * a;
+        l2w = glm::mat3x3(
+            glm::vec3(1.f + sign * n.x * n.x * a, sign * b, -sign * n.x),
+            glm::vec3(b, sign + n.y * n.y * a, -n.y),
+            n
+        );
+#ifdef JCGT_IMPL
+#else
         glm::vec3 y, x;
         if (fabs(n.x) <= fabs(n.y) && fabs(n.x) <= fabs(n.z)) {
             y = glm::cross(glm::vec3(1, n.y, n.z), n);
@@ -128,8 +142,9 @@ struct SamplePointSpace {
         l2w = glm::mat3x3(
             glm::normalize(glm::cross(n, y)),
             glm::normalize(y),
-            glm::normalize(n)
+            n
         );
+#endif // JCGT_IMPL
         // inverse same as transpose
         w2l = glm::transpose(l2w);
     }
@@ -173,41 +188,44 @@ struct BSDF {
     // https://schuttejoe.github.io/post/ggximportancesamplingpart1/
     // https://agraphicsguy.wordpress.com/2015/11/01/sampling-microfacet-brdf/
     // http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
-    __device__ __forceinline__ float microfacet_pdf(glm::vec3 const& wo, glm::vec3 const& wi) const {
-        glm::vec3 wh = glm::normalize(wi + wo);
-        return ggx_D(wh) * wh.z;
+    // https://sites.cs.ucsb.edu/~lingqi/teaching/resources/GAMES202_Lecture_10.pdf
+    __device__ __forceinline__ float microfacet_pdf(glm::vec3 const& wh) const {
+        return ggx_D(wh) * abs_cos_theta(wh);
     }
     __device__ __forceinline__ glm::vec3 sample_ggx(glm::vec3 const& wo) const {
-        thrust::uniform_real_distribution<float> u01;
+        thrust::uniform_real_distribution<float> u01(0,1);
         float a2 = m.roughness * m.roughness;
         float r1 = u01(rng);
         float r2 = u01(rng);
         float theta = atanf(m.roughness * sqrtf(r1 / (1 - r1)));
         float phi = 2 * PI * r2;
+        // spherical to cartesian
         glm::vec3 wm = glm::normalize(glm::vec3(sinf(theta) * cosf(phi), sinf(theta) * sinf(phi), cosf(theta)));
         return glm::reflect(-wo, wm);
     }
     // ggx distribution
     __device__ __forceinline__ float ggx_D(glm::vec3 const& wh) const {
-        if (wh.z < 0) {
+        if (cos_theta(wh) < 0) {
             return 0;
         }
         float a2 = m.roughness * m.roughness;
-        float cos2 = wh.z * wh.z;
+        float cos2 = cos_theta(wh) * cos_theta(wh);
         float t = (cos2 * (a2 - 1) + 1);
         return a2 / (PI * t * t);
     }
     // shadowing factor
-    __device__ __forceinline__ float ggx_G(glm::vec3 const& v) const {
-        float cosine = v.z;
-        float cos2 = v.z * v.z;
+    __device__ __forceinline__ float ggx_G1(glm::vec3 const& v) const {
+        float cosine = abs_cos_theta(v);
+        float cos2 = cosine * cosine;
         float a2 = m.roughness * m.roughness;
         return 2 * cosine / (cosine + sqrtf(a2 + (1 - a2) * cos2));
     }
     __device__ __forceinline__ float ggx_G(glm::vec3 const& wo, glm::vec3 const& wi) const {
         glm::vec3 wh = glm::normalize(wi + wo);
-        if (wh.z * wo.z <= 0 || wh.z * wi.z <= 0) return 0;
-        return ggx_G(wo) * ggx_G(wi);
+        if (!same_hemisphere(wh, wo) || !same_hemisphere(wh, wi)) {
+            return 0;
+        }
+        return ggx_G1(wo) * ggx_G1(wi);
     }
     __device__ color_t sample_f(glm::vec3 const& wo, glm::vec3& wi, float& pdf) const {
         float etaI = 1, etaT = m.ior, eta, F;
@@ -274,16 +292,37 @@ struct BSDF {
                     break;
                 }
                 wh = glm::normalize(wi + wo);
-                pdf = microfacet_pdf(wo, wi) / (4 * abs_cos_theta(wh));
-//                printf("D=%f,G=%f,F=%f,denom=%f,%f,%f,%f\n", ggx_D(wh), ggx_G(wo, wi), (4.0f * abs_cos_theta(wi) * abs_cos_theta(wo)), tmp.x, tmp.y, tmp.z);
+                pdf = microfacet_pdf(wh) / (4 * glm::abs(glm::dot(wo, wh)));
+                //printf("D=%f,G=%f,F=%f,denom=%f,%f,%f,%f\n", ggx_D(wh), ggx_G(wo, wi), (4.0f * abs_cos_theta(wi) * abs_cos_theta(wo)), tmp.x, tmp.y, tmp.z);
                 return (reflectance * ggx_D(wh) * ggx_G(wo, wi) * F) / (4.0f * cos_theta(wi) * cos_theta(wo)) * abs_cos_theta(wi);
-            case Material::Type::REFR:
-            case Material::Type::SUBSURFACE:
-            case Material::Type::TRANSPARENT:
-                break;
+            case Material::Type::REFR: // TODO
+            case Material::Type::SUBSURFACE: // TODO
+            case Material::Type::TRANSPARENT: // this case has bugs
+                F = fresnel_dielectric(wo.z, etaI, etaT);
+                if (u01(rng) < F) { // reflect
+                    wi = glm::vec3(-wo.x, -wo.y, wo.z);
+                    if (!same_hemisphere(wi, wo)) {
+                        break;
+                    }
+                    wh = glm::normalize(wi + wo);
+                    pdf = F * microfacet_pdf(wh) / (4 * glm::abs(glm::dot(wo, wh)));
+                    return (color_t(1,1,1) * ggx_D(wh) * ggx_G(wo, wi) * F) / (4.0f * cos_theta(wi) * cos_theta(wo)) * abs_cos_theta(wi);
+                } else { // refract
+                    wi = sample_ggx(wo);
+                    if (!same_hemisphere(wi, wo)) {
+                        break;
+                    }
+                    wi.z = -wi.z;
+                    wh = glm::normalize(wi + wo);
+                    pdf = (1 - F) * microfacet_pdf(wh) / (4 * glm::abs(glm::dot(wo, wh)));
+                    return (reflectance * ggx_D(wh) * ggx_G(wo, wi) * (1 - F)) / (4.0f * cos_theta(wi) * cos_theta(wo)) * abs_cos_theta(wi);
+                }
             }
         }
 
+        wi = -wo;
+        pdf = 1;
+        return reflectance;
         wi = glm::vec3(0);
         pdf = 0;
         return glm::vec3(0);
@@ -350,7 +389,7 @@ void scatterRay(
     float pdf;
     glm::vec3 wi;
 
-    SamplePointSpace space(normal);
+    SamplePointSpace space(up_norm);
     {
         glm::vec3 wo = space.world_to_local(-ray.direction);
         BSDF bsdf(m, inters, rng);
