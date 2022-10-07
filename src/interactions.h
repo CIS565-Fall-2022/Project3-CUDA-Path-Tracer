@@ -79,6 +79,8 @@ void scatterRay(
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
 
+    pathSegment.isRefrectiveRay = false;
+
     thrust::uniform_real_distribution<float> u01(0, 1);
     float chance = u01(rng);
 
@@ -123,6 +125,7 @@ void scatterRay(
         {
             pathSegment.ray.direction = reflectDir;
             col *= m.specular.color;
+            pathSegment.isRefrectiveRay = true;
         }
         else
         {
@@ -137,6 +140,7 @@ void scatterRay(
         glm::vec3 reflectDir = glm::reflect(pathSegment.ray.direction, normal);
         pathSegment.ray.direction = reflectDir;
         col *= m.specular.color;
+        pathSegment.isRefrectiveRay = true;
     }
     else // Pure diffuse
     {
@@ -150,7 +154,7 @@ void scatterRay(
         col *= m.color * m.hasMetallic;
     }
 
-    col = glm::clamp(col, glm::vec3(0.f), glm::vec3(1.f));
+    //col = glm::clamp(col, glm::vec3(0.f), glm::vec3(1.f));
 
     pathSegment.color *= col;
     pathSegment.remainingBounces -= 1;

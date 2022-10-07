@@ -161,6 +161,7 @@ struct PathSegment {
     int remainingBounces;
     bool hitLightSource;
     bool insightMat;
+    bool isRefrectiveRay;
 };
 
 // Use with a corresponding PathSegment to do:

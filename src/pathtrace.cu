@@ -587,7 +587,7 @@ __global__ void shadeFakeMaterial(
 
             // If the material indicates that the object was a light, "light" the ray
             if (material.emittance > 0.0f) {
-                pathSegments[idx].color *= glm::clamp((materialColor * material.emittance), glm::vec3(0), glm::vec3(1.f));
+                pathSegments[idx].color *= materialColor * material.emittance;
                 pathSegments[idx].hitLightSource = true;    // Terminate light
                 pathSegments[idx].remainingBounces = -1;
             }
@@ -652,9 +652,13 @@ __global__ void shadeFakeMaterial(
         }
         else {
 #if ENABLE_SKYBOX
-            glm::vec2 uv = DirectionToSpereUV(pathSegments[idx].ray.direction);
-            int index = getTextureElementIndex(*skyboxInfo, uv);
-            pathSegments[idx].color *= skyboxPixels[index]; //* (1.0f * pathSegments[idx].remainingBounces / traceDepth);
+
+            if (pathSegments[idx].isRefrectiveRay || depth == 0)
+            {
+                glm::vec2 uv = DirectionToSpereUV(pathSegments[idx].ray.direction);
+                int index = getTextureElementIndex(*skyboxInfo, uv);
+                pathSegments[idx].color *= skyboxPixels[index] * (pathSegments[idx].remainingBounces * 1.f) / (traceDepth * 1.f);
+            }
 #else
             pathSegments[idx].color = glm::vec3(DEFAULT_SKY_COLOR);
 #endif
@@ -673,7 +677,6 @@ __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iteration
 	if (index < nPaths)
 	{
 		PathSegment iterationPath = iterationPaths[index];
-
         image[iterationPath.pixelIndex] += iterationPath.color;
 	}
 }
