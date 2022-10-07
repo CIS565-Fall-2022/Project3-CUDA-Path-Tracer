@@ -39,6 +39,9 @@ Scene::Scene(string filename) {
                 loadCamera();
                 cout << " " << endl;
             }
+            else if ((strcmp(tokens[0].c_str(), "SKYBOX") == 0)) {
+                markSkyBox(tokens[1]);
+            }
         }
     }
 }
@@ -218,6 +221,9 @@ int Scene::loadMaterial(string materialid) {
                 newMaterial.normalMapIndex = markTextureNormal(tokens[1]);
                 cout << "material bind to textureNormalId: " << newMaterial.normalMapIndex << endl;
             }
+            else if (strcmp(tokens[0].c_str(), "METALLIC") == 0) {
+                newMaterial.hasMetallic = atof(tokens[1].c_str());
+            }
         }
         materials.push_back(newMaterial);
         return 1;
@@ -347,6 +353,12 @@ int Scene::markTextureNormal(string filePath)
     textureNormalIds.emplace_back(filePath);
 
     return textureNormalIds.size() - 1;
+}
+
+int Scene::markSkyBox(string filePath)
+{
+    skyboxId = filePath;
+    return 1;
 }
 
 BVHNode* Scene::recursiveBuildBVH(int st, int ed, int& count,

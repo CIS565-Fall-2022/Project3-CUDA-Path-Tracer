@@ -1,11 +1,16 @@
 #pragma once
 
+#define DEFAULT_SKY_COLOR 0
+
+// Skybox setting
+#define ENABLE_SKYBOX 1
+
 // Path trace setting
 #define CACHE_FIRST_INTERSECTIONS 1
 #define SORT_MATERIALS 0
 
 // Anti-Aliasing
-#define ENABLE_ANTI_ALIASING 1
+#define ENABLE_ANTI_ALIASING 0
 
 // BVH setting
 #define ENABLE_BVH  1

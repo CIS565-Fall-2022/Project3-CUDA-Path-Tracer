@@ -15,3 +15,7 @@ void FreeTextures();
 // BVH load and free
 void LoadBVHToDevice(Scene* scene);
 void FreeBVH();
+
+// Skybox
+void LoadSkyboxTextureToDevice(Scene* scene);
+void FreeSkyboxTexure();

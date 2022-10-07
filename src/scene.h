@@ -32,6 +32,9 @@ private:
     int flattenBVHNode(BVHNode* node, int *offset, std::vector<LinearBVHNode>& vec);
     void deleteBVHNode(BVHNode* node);
 
+    // Skybox
+    int markSkyBox(string filePath);
+
 public:
     Scene(string filename);
     ~Scene();
@@ -47,6 +50,8 @@ public:
     // BVH
     std::vector<LinearBVHNode> bvhNodes;
     
+    // Skybox
+    string skyboxId;
 
     RenderState state;
 };

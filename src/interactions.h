@@ -82,14 +82,13 @@ void scatterRay(
     thrust::uniform_real_distribution<float> u01(0, 1);
     float chance = u01(rng);
 
+    float reflectChance = m.hasReflective + u01(rng) > 1.0001f;
+
     pathSegment.ray.origin = intersect; // Default origin
 
-    glm::vec3 col(1.0f, 1.0f, 1.0f);
+    glm::vec3 col = textureColor;
 
-    // Texture
-    col *= textureColor;
-
-    if (m.hasReflective && m.hasRefractive)
+    if (reflectChance && m.hasRefractive)
     {
         // Pick between reflection or refratcion
 
@@ -132,8 +131,9 @@ void scatterRay(
             col *= m.specular.color;
         }
     }
-    else if (m.hasReflective) // Pure reflection
+    else if (reflectChance) // Pure reflection
     {
+        //printf("reflect!");
         glm::vec3 reflectDir = glm::reflect(pathSegment.ray.direction, normal);
         pathSegment.ray.direction = reflectDir;
         col *= m.specular.color;
@@ -145,7 +145,12 @@ void scatterRay(
         col *= m.color;
     }
 
+    if (reflectChance && m.hasMetallic > 0.001f)
+    {
+        col *= m.color * m.hasMetallic;
+    }
 
+    col = glm::clamp(col, glm::vec3(0.f), glm::vec3(1.f));
 
     pathSegment.color *= col;
     pathSegment.remainingBounces -= 1;

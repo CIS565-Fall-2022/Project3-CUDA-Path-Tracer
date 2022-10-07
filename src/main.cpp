@@ -79,7 +79,10 @@ int main(int argc, char** argv) {
 	// Initialize ImGui Data
 	InitImguiData(guiData);
 	InitDataContainer(guiData);
-
+	
+#if ENABLE_SKYBOX
+	LoadSkyboxTextureToDevice(scene);
+#endif
 
 #if ENABLE_TEXTURE || ENABLE_NORMAL_MAP
 	LoadTexturesToDevice(scene);
@@ -98,6 +101,10 @@ int main(int argc, char** argv) {
 
 #if ENABLE_BVH
 	FreeBVH();
+#endif
+
+#if ENABLE_SKYBOX
+	FreeSkyboxTexure();
 #endif
 
 	return 0;

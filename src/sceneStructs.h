@@ -129,6 +129,8 @@ struct Material {
     float indexOfRefraction;
     float emittance;
 
+    float hasMetallic = 0;
+
     int textureIndex = -1;
     int normalMapIndex = -1;
 };

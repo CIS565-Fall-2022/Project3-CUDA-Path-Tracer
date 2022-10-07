@@ -72,6 +72,20 @@ struct MaterialSort
     }
 }materialSort;
 
+
+
+__host__ __device__ glm::vec2 DirectionToSpereUV(glm::vec3 dir)
+{
+    float phi = glm::atan(dir.z, dir.x);
+    if (phi < 0)
+    {
+        phi += TWO_PI;
+    }
+
+    float theta = glm::acos(dir.y);
+    return glm::vec2(1 - phi / TWO_PI, 1 - theta / PI);
+}
+
 __host__ __device__
 thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int depth) {
 	int h = utilhash((1 << 31) | (depth << 22) | iter) ^ utilhash(index);
@@ -124,6 +138,10 @@ static glm::vec3* dev_normals = NULL;
 // BVH
 static int* dev_bvhIndexArrayToUse = NULL;
 static LinearBVHNode* dev_bvhNodes = NULL;
+
+// Skybox texture
+static TextureInfo* dev_skyBbxTexture = NULL;
+static glm::vec3* dev_skyboxPixels = NULL;
 
 // Cache first bounce
 #if CACHE_FIRST_INTERSECTIONS
@@ -295,6 +313,51 @@ void FreeBVH()
 }
 
 // ====================================================
+
+void LoadSkyboxTextureToDevice(Scene* scene)
+{
+    int width, height, channels;
+    stbi_hdr_to_ldr_gamma(1.0f);
+    unsigned char* img = stbi_load(scene->skyboxId.c_str(), &width, &height, &channels, 3);
+
+    if (img == NULL)
+    {
+        cout << "Load skybox texture normal [" << scene->skyboxId << "] fails." << endl;
+        return;
+    }
+
+    TextureInfo skyboxTextureInfo;
+    skyboxTextureInfo.id = scene->skyboxId.c_str();
+    skyboxTextureInfo.width = width;
+    skyboxTextureInfo.height = height;
+    skyboxTextureInfo.channels = channels;
+    skyboxTextureInfo.startIndex = 0;
+
+    int totalPixelCount = width * height;
+
+    std::vector<glm::vec3> pixels;
+    for (int i = 0; i < totalPixelCount; ++i)
+    {
+        pixels.emplace_back(glm::vec3(img[3 * i + 0] / 255.0f, img[3 * i + 1] / 255.0f, img[3 * i + 2] / 255.0f));
+    }
+    stbi_image_free(img);
+
+    cudaMalloc((void**)&dev_skyBbxTexture, sizeof(TextureInfo));
+    cudaMemcpy(dev_skyBbxTexture, &skyboxTextureInfo, sizeof(TextureInfo), cudaMemcpyHostToDevice);
+
+    cudaMalloc((void**)&dev_skyboxPixels, totalPixelCount * sizeof(glm::vec3));
+    cudaMemcpy(dev_skyboxPixels, pixels.data(), totalPixelCount * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+
+    checkCUDAError("Load Skybox To Device");
+
+    std::cout << "Skybox texture [" << scene->skyboxId << "] loaded." << std::endl;
+}
+
+void FreeSkyboxTexure()
+{
+    cudaFree(dev_skyBbxTexture);
+    cudaFree(dev_skyboxPixels);
+}
 
 void pathtraceInit(Scene* scene) {
 	hst_scene = scene;
@@ -492,6 +555,8 @@ __global__ void computeIntersections(
 // bump mapping.
 __global__ void shadeFakeMaterial(
     int iter
+    , int depth
+    , int traceDepth
     , int num_paths
     , Geom* geoms
     , Triangle* triangles
@@ -502,6 +567,8 @@ __global__ void shadeFakeMaterial(
     , glm::vec3* pixels
     , TextureInfo* textureNormals
     , glm::vec3* normals
+    , TextureInfo* skyboxInfo
+    , glm::vec3* skyboxPixels
 )
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -520,7 +587,7 @@ __global__ void shadeFakeMaterial(
 
             // If the material indicates that the object was a light, "light" the ray
             if (material.emittance > 0.0f) {
-                pathSegments[idx].color *= (materialColor * material.emittance);
+                pathSegments[idx].color *= glm::clamp((materialColor * material.emittance), glm::vec3(0), glm::vec3(1.f));
                 pathSegments[idx].hitLightSource = true;    // Terminate light
                 pathSegments[idx].remainingBounces = -1;
             }
@@ -558,14 +625,14 @@ __global__ void shadeFakeMaterial(
                     {
                         Triangle t = triangles[intersection.triangleId];
 
-                        glm::vec3 deltaPos1 = t.v1 - t.v0;
+                        glm::vec3 deltaPos1 = t.v1 - t.v0;  // In model space
                         glm::vec3 deltaPos2 = t.v2 - t.v0;
                         glm::vec2 deltaUV1 = t.tex1 - t.tex0;
                         glm::vec2 deltaUV2 = t.tex2 - t.tex0;
                         
                         float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
                         glm::vec3 tagent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r;
-                        glm::vec3 bitangent = (deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * r;
+                        glm::vec3 bitangent = (deltaPos2 * deltaUV1.x + deltaPos1 * deltaUV2.x) * r;
                         glm::vec3 nor = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(normal, 0.0f)));
                         //glm::cross(tagent, bitangent);
 
@@ -582,17 +649,21 @@ __global__ void shadeFakeMaterial(
                 scatterRay(pathSegments[idx], intersect, normal,
                     material, textureColor, rng);
             }
-            // If there was no intersection, color the ray black.
-            // Lots of renderers use 4 channel color, RGBA, where A = alpha, often
-            // used for opacity, in which case they can indicate "no opacity".
-            // This can be useful for post-processing and image compositing.
         }
         else {
-            pathSegments[idx].color = glm::vec3(0.0f);
+#if ENABLE_SKYBOX
+            glm::vec2 uv = DirectionToSpereUV(pathSegments[idx].ray.direction);
+            int index = getTextureElementIndex(*skyboxInfo, uv);
+            pathSegments[idx].color *= skyboxPixels[index]; //* (1.0f * pathSegments[idx].remainingBounces / traceDepth);
+#else
+            pathSegments[idx].color = glm::vec3(DEFAULT_SKY_COLOR);
+#endif
             pathSegments[idx].remainingBounces = -1;
         }
     }
 }
+
+
 
 // Add the current iteration's output to the overall image
 __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iterationPaths)
@@ -745,6 +816,8 @@ void pathtrace(uchar4* pbo, int frame, int iter)
 
         shadeFakeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
             iter,
+            depth,
+            traceDepth,
             num_paths,
             dev_geoms,
             dev_triangles,
@@ -754,7 +827,9 @@ void pathtrace(uchar4* pbo, int frame, int iter)
             dev_textures,
             dev_pixels,
             dev_textureNormals,
-            dev_normals
+            dev_normals,
+            dev_skyBbxTexture,
+            dev_skyboxPixels
             );
         checkCUDAError("trace one bounce");
 
