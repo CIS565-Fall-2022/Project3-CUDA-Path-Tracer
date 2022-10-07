@@ -26,7 +26,9 @@
 #define DEBUG 0
 #define BOUNCES 4
 #define MATERIALSORT 1
-#define CACHING 1
+#define CACHING 0
+#define ANTIALIASING 1
+#define THINLENS 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -79,6 +81,34 @@ __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
 	}
 }
 
+__device__ glm::vec2 concentricDiskSample(thrust::default_random_engine rng, float radius)
+{
+	thrust::uniform_real_distribution<float> u01(0, 1);
+	
+	glm::vec2 random = glm::vec2(u01(rng), u01(rng));
+	
+	// Map [0, 1] to [-1, 1]
+	glm::vec2 rOffset = random * 2.f - glm::vec2(1.f);
+	
+	// Handle degeneracy at the origin
+	if (rOffset == glm::vec2(0.f)) {
+		return glm::vec2(0.f);
+	}
+
+	float r, theta;
+
+	if (std::abs(rOffset.x) > std::abs(rOffset.y)) {
+		r = rOffset.x;
+		theta = glm::quarter_pi<float>() * (rOffset.y / rOffset.x);
+	}
+	else {
+		r = rOffset.y;
+		theta = glm::half_pi<float>() - glm::quarter_pi<float>() * (rOffset.x / rOffset.y);
+	}
+	
+	return radius * r * glm::vec2(std::cos(theta), std::sin(theta));
+}
+
 static Scene* hst_scene = NULL;
 static GuiDataContainer* guiData = NULL;
 static glm::vec3* dev_image = NULL;
@@ -86,7 +116,7 @@ static Geom* dev_geoms = NULL;
 static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
-// TODO: static variables for device memory, any extra info you need, etc
+// TODO:o static variables for device memory, any extra info you need, etc
 // ...
 static ShadeableIntersection* dev_cache = NULL;
 
@@ -152,15 +182,39 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		int index = x + (y * cam.resolution.x);
 		PathSegment& segment = pathSegments[index];
 
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+
 		segment.ray.origin = cam.position;
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		// TODO: implement antialiasing by jittering the ray
+#if ANTIALIASING == 1
+		thrust::uniform_real_distribution<float> u01(0, 1);
+		segment.ray.direction = glm::normalize(cam.view
+			- cam.right * cam.pixelLength.x * ((float)x + u01(rng) * 3.f - (float)cam.resolution.x * 0.5f)
+			- cam.up * cam.pixelLength.y * ((float)y + u01(rng) * 3.f - (float)cam.resolution.y * 0.5f)
+		);
+#else
 		segment.ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
 		);
+#endif
 
+#if THINLENS == 1
+		// Thin Lens Approximation
+		if (cam.lensRadius > 0.f) {
+			glm::vec2 pLens = concentricDiskSample(rng, cam.lensRadius);
+			glm::vec3 pFocus = segment.ray.origin + segment.ray.direction * cam.focalDistance;
+			segment.ray.origin += glm::vec3(pLens, 0.f);
+			segment.ray.direction = glm::normalize(pFocus - segment.ray.origin);
+		}
+#endif
+		// antialiasing
+//#if ANTIALIASING == 1
+//		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+//		segment.ray.direction = jitterRay(segment.ray.direction, rng, 0.01);
+//#endif
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
 		segment.transmitted = false;

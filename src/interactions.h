@@ -85,7 +85,7 @@ void scatterRay(
     thrust::uniform_real_distribution<float> u01(0, 1);
 
     if (m.hasReflective) {
-        pathSegment.ray.direction = (u01(rng) > 0.5) ? jitterRay(glm::reflect(pathSegment.ray.direction, normal), rng, 0.2f) : calculateRandomDirectionInHemisphere(normal, rng);
+        pathSegment.ray.direction = (u01(rng) > 0.3) ? jitterRay(glm::reflect(pathSegment.ray.direction, normal), rng, 0.f) : calculateRandomDirectionInHemisphere(normal, rng);
     }
     else if (m.hasRefractive) {
         float n1 = (pathSegment.transmitted), n2 = 1.5;
