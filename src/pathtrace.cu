@@ -27,7 +27,7 @@
 
 #define ANTIALIASING 0
 #define CACHEINTERSECTIONS 1
-#define DOF 0
+#define DOF 1
 
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {

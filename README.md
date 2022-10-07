@@ -12,13 +12,13 @@ CUDA Path Tracer
 
 ## Features
 
-Material Types
-Mesh OBJ loading
-Procedural Shapes
-Procedural Textures
-Depth of Field
-Anti-aliasing
-First bounce cache
+- Material Types
+- Mesh OBJ loading
+- Procedural Shapes
+- Procedural Textures
+- Depth of Field
+- Anti-aliasing
+- First bounce cache
 
 
 ### Material Types
@@ -35,3 +35,19 @@ Implemented OBJ mesh loading tested within bounding box
 
 ![](img/objLoading.png)
  
+
+### Depth of Field
+---
+
+Following image shows depth of field with focal length 10 and lens radius 0.5. The scene is 20 units in length along z
+Nearest and farthest spheres are blurred, spheres in the middle are in focus
+
+![](img/dof.png)
+
+
+### Procedural Shapes
+---
+
+Using sdf operations
+
+![](img/implicit.png)
