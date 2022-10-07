@@ -30,6 +30,7 @@ The Cuda Path Tracer Project - The Big Boi
 
 ## Ideal Diffuse
 \[insert image\] 
+![](img/diffuse.png)
 
 An ideal diffuse material shows the characteristics of being a perfectly smooth matte surface; approximated by lambertian shading in rasterization but it only judged by multiplicative color accumilation in this path tracer.
 ## Specular
@@ -95,3 +96,5 @@ Improve random hemisphere sampling by using a grid to stratify the portions of t
 * [Sampling notes](http://graphics.ucsd.edu/courses/cse168_s14/) from Steve Rotenberg and Matteo Mannino, University of California, San Diego, CSE168: Rendering Algorithms
 
 ## Bloopers
+![](img/GlassBlooper.png)
+![](img/GlassBlooper1.png)
