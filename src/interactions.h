@@ -121,15 +121,16 @@ struct SamplePointSpace {
 
         // precondition : n is normalized
 #define JCGT_IMPL // https://graphics.pixar.com/library/OrthonormalB/paper.pdf
+
+#ifdef JCGT_IMPL
         float sign = copysignf(1.f, n.z);
         float a = 1.f / (sign + n.z);
         float b = n.x * n.y * a;
         l2w = glm::mat3x3(
-            glm::vec3(1.f + sign * n.x * n.x * a, sign * b, -sign * n.x),
-            glm::vec3(b, sign + n.y * n.y * a, -n.y),
+            glm::normalize(glm::vec3(1.f + sign * n.x * n.x * a, sign * b, -sign * n.x)),
+            glm::normalize(glm::vec3(b, sign + n.y * n.y * a, -n.y)),
             n
         );
-#ifdef JCGT_IMPL
 #else
         glm::vec3 y, x;
         if (fabs(n.x) <= fabs(n.y) && fabs(n.x) <= fabs(n.z)) {
@@ -312,7 +313,7 @@ struct BSDF {
                     if (!same_hemisphere(wi, wo)) {
                         break;
                     }
-                    wi.z = -wi.z;
+                    wi = -glm::reflect(wi, glm::vec3(0, 0, 1));
                     wh = glm::normalize(wi + wo);
                     pdf = (1 - F) * microfacet_pdf(wh) / (4 * glm::abs(glm::dot(wo, wh)));
                     return (reflectance * ggx_D(wh) * ggx_G(wo, wi) * (1 - F)) / (4.0f * cos_theta(wi) * cos_theta(wo)) * abs_cos_theta(wi);

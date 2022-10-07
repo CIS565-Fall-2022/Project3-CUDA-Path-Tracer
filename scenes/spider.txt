@@ -17,6 +17,13 @@ TRANS       0 10 3
 ROTAT       0 0 0
 SCALE       3 .3 3
 
+OBJECT 
+cube
+material    ../materials/emissive_white.mtl
+TRANS       -5 3 3
+ROTAT       0 0 0
+SCALE       .3 3 3
+
 // Floor
 OBJECT
 cube
@@ -60,6 +67,6 @@ SCALE       .01 10 10
 OBJECT
 obj         ../meshes/Toy/spider.obj
 material    ../materials/diffuse_white.mtl
-TRANS       2 2 3
+TRANS       2 2 2
 ROTAT       0 45 0
 SCALE       .045 .045 .045
