@@ -27,7 +27,7 @@ In this project, I implemented a CUDA path tracer for the GPU. Previously in Adv
 ### Stochastic Sampled Anti-Aliasing
 ### Direct Lighting
 ### Arbitrary Mesh Loading with TinyObjLoader
-### Texture and Bump Mapping
+### UV Texture and Bump Mapping
 
 ## Performance Analysis
 
