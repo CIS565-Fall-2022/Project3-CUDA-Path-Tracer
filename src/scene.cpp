@@ -158,17 +158,7 @@ int Scene::loadObj(const char* filename,
                     vertC.uv = glm::vec2(txc, tyc);
                 }
 
-                //printf("u: %f, v: %f \n", vertA.uv[0], vertA.uv[1]);
-                //printf("u: %f, v: %f \n", vertB.uv[0], vertB.uv[1]);
-                //printf("u: %f, v: %f \n", vertC.uv[0], vertC.uv[1]);
 #endif
-                // Optional: vertex colors
-                // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
-                // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
-                // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
-
-                // do the tangent calculations always
-
 
                 Triangle triangle = {
                     vertA,

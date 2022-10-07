@@ -7,9 +7,9 @@
 #include "image.h"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
-#define USE_BOUND_BOX 1
-#define USE_UV 1
-#define BUMP_MAP 1
+#define USE_BOUND_BOX 0
+#define USE_UV 0
+#define BUMP_MAP 0
 
 enum GeomType {
     SPHERE,

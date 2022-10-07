@@ -242,7 +242,6 @@ __device__ float triangleIntersectionTest(Geom* geom, Triangle* triangle, Ray r,
     glm::vec3 tangent = cross(prevNormal, r.direction);
 
     normal = glm::normalize(prevNormal + colorDiffDown * cross(prevNormal, glm::vec3(1, 0, 0)) + colorDiffRight * cross(prevNormal, glm::vec3(0, 1, 0)));
-    // printf("prevnormal x: %f, y: %f, z: %f \n normal x: %f, y: %f, z: %f \n", prevNormal[0], prevNormal[1], prevNormal[2], normal[0], normal[1], normal[2]);
 
     if (geom->textureid != -1) {
         uv = glm::vec2((1 - u - v) * triangle->pointA.uv + u * triangle->pointB.uv + v * triangle->pointC.uv);

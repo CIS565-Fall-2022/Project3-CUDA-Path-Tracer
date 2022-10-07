@@ -80,7 +80,7 @@ EMITTANCE   0
 
 // Box texture
 TEXTURE 0
-PATH ../Project3-CUDA-Path-Tracer/objs/textures/bump1.png
+PATH ../Project3-CUDA-Path-Tracer/objs/textures/grid.png
 
 // Camera
 CAMERA
