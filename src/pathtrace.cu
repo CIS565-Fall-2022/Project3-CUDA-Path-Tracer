@@ -197,16 +197,18 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		);
 #endif
 #if DEPTH
-		float lensRadius = 1.0f;
-		float focalDistance = 2.0f;
+		float lensRadius = 0.5f;
+		float focalDistance = 4.0f;
 		glm::vec2 pLens = lensRadius * ConcentricSampleDisk(u01(rng), u01(rng));
 
-		float ft = focalDistance / segment.ray.direction.z;
+		float ft = glm::abs(focalDistance / segment.ray.direction.z);
+		
 		glm::vec3 pFocus = ft*segment.ray.direction;
-
-		segment.ray.origin += glm::vec3(pLens.x, pLens.y, 0);
-		segment.ray.direction = glm::normalize(pFocus - glm::vec3(pLens.x, pLens.y, 0));
-
+		glm::vec3 newdir = glm::normalize(pFocus - glm::vec3(pLens.x, pLens.y, 0.f));
+	//	printf("%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n", ft, pFocus.x, pFocus.y, pFocus.z, segment.ray.direction.x, segment.ray.direction.y, segment.ray.direction.z,newdir.x, newdir.y, newdir.z);
+		
+		segment.ray.origin += glm::vec3(pLens.x, pLens.y, 0.f);
+		segment.ray.direction = newdir;
 #endif
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
