@@ -10,9 +10,9 @@ CUDA Path Tracer
   - i7-12700 @ 4.90GHz with 16GB RAM
   - RTX 3070 Ti Laptop 8GB
 
-## Introduction
+## Overview
 
-This is our third project of CIS 565 Fall 2022. In this project, we implemented a GPU-based path tracer with stream compaction
+This is our third project of CIS 565 Fall 2022. This project is about implementing a path tracer running on GPU with CUDA programming library. 
 
 ## Representative Outcome
 
@@ -20,29 +20,42 @@ This is our third project of CIS 565 Fall 2022. In this project, we implemented 
 
 <p align="center">A virtual camera is capturing another virtual camera</p>
 
-| Scene Specs             | [[./scenes/pbr_texture.txt]](./scenes/pbr_texture.txt) |
-| ----------------------- | ------------------------------------------------------ |
-| Resolution              | 2400 x 1800                                            |
-| Samples Per Pixel       | 3000                                                   |
-| Render Time             | < 7 minutes (> 7.5 frames per second)                  |
-| Million Rays Per Second | > 32.4                                                 |
-| Triangle Count          | 25637                                                  |
+<div align="center">
+    <table>
+    <tr>
+        <th>Scene Specs</th>
+        <th><a href="./scenes/pbr_texture.txt">[./scenes/pbr_texture.txt]</a></th>
+    </tr>
+    <tr>
+        <td>Resolution</td>    
+        <td>2400 x 1800</td> 
+    </tr> 
+    <tr> 
+        <td>Samples Per Pixel</td> 
+        <td>3000</td>
+    </tr>
+    <tr> 
+        <td>Render Time</td> 
+        <td>&lt; 7 minutes (&gt; 7.5 frames per second)</td>
+    </tr>
+    <tr> 
+        <td>Million Rays Per Second</td> 
+        <td>32.4</td>
+    </tr>
+    <tr> 
+        <td>Triangle Count</td> 
+        <td>25637</td>
+    </tr>
+</table>
+</div>
 
-![](./img/sponza_pano.jpg)
+![](./img/rungholt_2.jpg)
 
-<p align="center">Twisted Sponza rendered with panorama camera</p>
+<p align="center">Large scene rendering (6,704,264 triangles)</p><br>
 
-| Scene Specs             |             |
-| ----------------------- | ----------- |
-| Resolution              | 2400 x 1200 |
-| Samples Per Pixel       | 8000        |
-| Render Time             | 38 minutes  |
-| Million Rays Per Second | 10          |
-| Triangle Count          | 262193      |
+![](./img/dragon_dof_2.jpg)
 
-![](./img/aperture_custom.jpg)
-
-<p align="center">Lens effect: star-shaped bokehs</p>
+<p align="center">Lens effect: depth of field with heart-shaped bokehs</p>
 
 
 
@@ -56,7 +69,9 @@ This is our third project of CIS 565 Fall 2022. In this project, we implemented 
 
 #### Importance Sampled HDR Environment Map (Skybox)
 
-Tired of "virtual artificial" light sources? Let's introduce some real-world lighting.
+Tired of repeatedly setting up and adjusting "virtual artificial" light sources for the best effect? Let's introduce some natural light from real world that can easily improve our rendering quality at no cost.
+
+
 
 #### Physically-Based Materials
 
@@ -64,19 +79,27 @@ Tired of "virtual artificial" light sources? Let's introduce some real-world lig
 
 ##### Metallic Workflow: Expressive and Artist-Friendly
 
+##### Dielectric
+
 #### Normal Map & PBR Texture
 
 
 
-#### Physically-Based Camera: Depth of Field & Custom Bokeh Shape & Panorama
+#### Physically Based Camera
 
-This is my favorite part of the project.
+##### Depth of Field
+
+
 
 | No DOF                      | DOF                     |
 | --------------------------- | ----------------------- |
 | ![](./img/aperture_off.jpg) | ![](./img/aperture.jpg) |
 
-This idea can even be extended by stochastically sampling a mask image instead of the whole disk area of the aperture:
+##### Custom Bokeh Shape
+
+This is my favorite part of the project.
+
+In DOF, we sample points on the camera's aperture disk to create blurred background and foreground. This idea can even be extended by stochastically sampling a mask image instead of the circle shape of the aperture:
 
 <div align="center">
 	<img src="./scenes/texture/star3.jpg" width="15%"/>
@@ -89,23 +112,17 @@ This idea can even be extended by stochastically sampling a mask image instead o
 
 Which creates very interesting and amazing results.
 
-#### Efficient Sampling: Sobol Quasi-Monte Carlo Sequence
+The sampling method is the same as what is used to pick up 
 
-In path tracing or any other Monte Carlo-based light transport algorithms, apart from improving
-
-the performance from a point of view of programming, we can also improve it mathematically. Quasi-Monte Carlo sequence is a class of quasi-random sequence that is widely used in Monte Carlo simulation. This kind of sequence is mathematically proved to be more efficient than pseudorandom sequences (like what `thrust::default_random_engine` generates).
-
-Theoretically, to maximize the benefit of Sobol sequence, we need to generate unique sequences for every pixel during each sampling iteration at real-time -- this is not trivial. Not to say that computing each number requires at most 32 bit loops. A better choice would be precomputing one pixel's sequence, then use some sort of perturbation to produce different sequences for different pixels.
-
-Here is the result I get from testing the untextured [PBR texture scene](#representative-outcome). With the same number of samples per pixel, path tracing with Sobol sequence produces much less noise (lower variance).
-
-| Pseudorandom Sequence        | Xor-Scrambled Sobol Sequence |
-| ---------------------------- | ---------------------------- |
-| ![](./img/sampler_indep.jpg) | ![](./img/sampler_sobol.jpg) |
+##### Panorama (360 Degree Spherical)
 
 
 
+![](./img/sponza_pano.jpg)
 
+<p align="center">Twisted Sponza rendered with panorama camera</p><br>
+
+Toggle for this feature is compile-time. You can toggle the pragma `CAMERA_PANORAMA` in [`./src/common.h`](./src/common.h)
 
 #### Post Processing
 
@@ -121,9 +138,22 @@ Implementing gamma correction is very trivial. But it is necessary if we want ou
 
 #### Fast Intersection: Stackless SAH-Based Bounding Volume Hierarchy
 
-Ray-scene intersection is probably the best time consuming part of of ray tracing process. In a naive method we try to intersect every ray with every object in the scene, which is 
+Ray-scene intersection is probably the best time consuming part of of ray tracing process. In a naive method we try to intersect every ray with every object in the scene, which is quite inefficient when there are numerous objects.
 
-I did two levels of optimization.
+An alternative is to setup spatial acceleration data structure for the objects. 
+
+I did two levels of optimization. These optimizations allow my path tracer to build BVH for the [Rungholt](https://casual-effects.com/data/) scene (6,704,264 triangles) in 7 seconds and run at 3 FPS, 2560 x 1440. (Click the links to see image details)
+
+<table>
+    <tr>
+        <th><a href="./img/rungholt.jpg">Rungholt Rendering</a></th>
+        <th><a href="./img/rungholt_bvh.png">Bounding Volume Hierarchy</a></th>
+    </tr>
+    <tr>
+        <th><img src="./img/rungholt.jpg"/></th>
+        <th><img src="./img/rungholt_bvh.png"/></th>
+    </tr>
+</table>
 
 ##### Better Tree Structure: Surface Area Heuristic 
 
@@ -132,6 +162,27 @@ First, I implemented a SAH-based BVH. SAH, the Surface Area Heuristic, is a meth
 ##### Faster Tree Traversal on GPU: Multiple-Threaded BVH
 
 The second level of optimization is done on GPU. BVH is a tree after all, so we still have to traverse through it during ray-scene intersection even on GPU.
+
+#### Efficient Sampling: Sobol Quasi-Monte Carlo Sequence
+
+In path tracing or any other Monte Carlo-based light transport algorithms, apart from improving
+
+the performance from a point of view of programming, we can also improve it mathematically. Quasi-Monte Carlo sequence is a class of quasi-random sequence that is widely used in Monte Carlo simulation. This kind of sequence is mathematically proved to be more efficient than pseudorandom sequences (like what `thrust::default_random_engine` generates).
+
+Theoretically, to maximize the benefit of Sobol sequence, we need to generate unique sequences for every pixel during each sampling iteration at real-time -- this is not trivial. Not to say that computing each number requires at most 32 bit loops. A better choice would be precomputing one pixel's sequence, then use some sort of perturbation to produce different sequences for different pixels.
+
+Here is the result I get from testing the untextured [PBR texture scene](#representative-outcome). With the same number of samples per pixel, path tracing with Sobol sequence produces much lower variance (less noise).
+
+<table>
+    <tr>
+        <th>Pseudorandom Sequence</th>
+        <th>Xor-Scrambled Sobol Sequence</th>
+    </tr>
+    <tr>
+        <th><img src="./img/sampler_indep.jpg"/></th>
+        <th><img src="./img/sampler_sobol.jpg"/></th>
+    </tr>
+</table>
 
 ### Other
 
@@ -145,15 +196,11 @@ In real-time rendering, a technique called deferred shading stores scene's geome
 
 ## Performance Analysis
 
-### Why My Multi-Kernel Streamed Path Tracer Not Always Faster Than Single-Kernel?
+### Compare Streamed Path Tracing with Single-Kernel Path Tracing
 
 What got me surprised it wasn't that efficient as expected. In some scenes, it was even worse than the single kernel path tracer. 
 
 In general, it's a tradeoff between thread concurrency and time spent accessing global memory.
-
-There is a paper stressing this point, from which I also got the idea to additionally implement a single kernel tracer
-
-- [*Progressive Light Transport Simulation on the GPU: Survey and Improvements*](https://cgg.mff.cuni.cz/~jaroslav/papers/2014-gpult/2014-gpult-paper.pdf)
 
 
 
@@ -177,6 +224,32 @@ Therefore, in my opinion, material sorting is best applied when:
 ### How Much GPU Improves Path Tracing Efficiency Compared to CPU
 
 ### Image Texture vs. Procedural Texture
+
+
+
+## Third Party Credit
+
+### Code
+
+Apart from what was provided with the base code, two additional third party libraries are included:
+
+- [*tinyobjloader*](https://github.com/tinyobjloader/tinyobjloader)
+- [*tinygltf*](https://github.com/syoyo/tinygltf) (not used. I didn't implement GLTF mesh loading)
+
+### Assets
+
+[*Stanford Dragon*](http://graphics.stanford.edu/data/3Dscanrep/)
+
+The following scene assets are licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). They are modified to fit in the path tracer's scene file structure.
+
+- [*Rungholt*](https://casual-effects.com/data/)
+- [*Crytek Sponza*](https://www.cryengine.com/marketplace/product/crytek/sponza-sample-scene)
+
+The rest of assets all have CC0 license from [*Poly Haven*](https://polyhaven.com/), a very good website where you can download free and public models, textures and HDR images.
+
+## References
+
+
 
 
 
