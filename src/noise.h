@@ -116,13 +116,8 @@ __host__ __device__ float fbm3D(glm::vec3 p, float freq, float persistence) {
  }
 
 __host__ __device__ glm::vec3 getProceduralColor(PathSegment& pathSegment, glm::vec3 intersect, glm::vec3 normal) {
-    /*return glm::mix(glm::vec3(0.f, 0.f, 1.f) * fbm2D(glm::vec2(intersect.y, intersect.z), 5.f, 0.5f, 12.f),
-                    glm::vec3(0.35, 0.35, 0.85) * fbm2D(glm::vec2(intersect.x, intersect.z), 0.5f, 0.5f, 0.8f),
-                    0.5);*/
 
     glm::vec3 isectCpy = glm::normalize(intersect) * 2.f - 1.f;
-    /*printf("\nisectNor: %f, %f, %f\n", isectCpy.x, isectCpy.y, isectCpy.z);
-    printf("\nintersect: %f, %f, %f\n", intersect.x, intersect.y, intersect.z);*/
     glm::vec4 baseCol = glm::vec4(1.0, 1.0, 0.0, 1.0);
     float theta = glm::atan(intersect.x, intersect.y);
     float r = sqrt(pow(intersect.x, 2.0f) + pow(intersect.y, 2.0f));
@@ -130,20 +125,10 @@ __host__ __device__ glm::vec3 getProceduralColor(PathSegment& pathSegment, glm::
     glm::vec4 green = glm::vec4(0.24, abs(sin(0.4 * r * 20.f)), cos(0.22 * r * 90.f), 1.0);
     glm::vec4 blue = glm::vec4(0.0, 0.0, 1.0, 1.0);
 
-    glm::vec4 eye_color = glm::vec4(0.0, 0.0, 0.0, 1.0);
-    glm::vec4 pupil_color = glm::vec4(0.0, 0.0, 0.0, 1.0);
-    glm::vec4 iris_color = glm::vec4(0.0, 0.0, 0.0, 1.0);
-    glm::vec4 eyeball_color = glm::vec4(0.0, 0.0, 0.0, 1.0);
-
-    /*
-     * Pupil Color
-     */
+    glm::vec4 out_color = glm::vec4(0.0, 0.0, 0.0, 1.0);
+   
     float smoothVal = smoothstep(0.9, 0.99f, isectCpy.z);
-    pupil_color = glm::mix(glm::vec4(0.0, 0.0, 0.0, 1.0), glm::vec4(r, r, r, 1.0), 0.98);
-
-    /*
-     * Iris Color
-     */
+   
      // blue with low persistence noise function
     float f_blue = fbm3D(glm::vec3(intersect), 10.f, 0.2f);
     blue *= f_blue;
@@ -152,7 +137,7 @@ __host__ __device__ glm::vec3 getProceduralColor(PathSegment& pathSegment, glm::
     float f_green = fbm3D(glm::vec3(intersect), 20.f, 0.5f);
     green *= f_green;
 
-    // multiplying with cos(theta) makes cos wave look like rays around the circle
+    // multiplying with cos(theta) makes cos wave look like rays around the center
     // use sin function based on z to set a varying phase difference
     //float f_brown = fbm3D(glm::vec3(intersect), 2.f, 0.5f);
     //brown = glm::vec4(0.36, 0.29, 0.01, 1.0) * f_brown;
@@ -162,36 +147,8 @@ __host__ __device__ glm::vec3 getProceduralColor(PathSegment& pathSegment, glm::
     // Subtracting it from 1.0 inverses the effect, so as fs_Pos.z moves towards 0.99, the value increases
     smoothVal = smoothstep(0.98, 0.99f, isectCpy.z);
 
-    iris_color = mix(green, blue, 0.5f);// mix(mix(green, blue, 0.5f), brown, f_brown);
-    iris_color *= (1.f - smoothVal);
+    out_color = mix(green, blue, 0.5f);// mix(mix(green, blue, 0.5f), brown, f_brown);
+    out_color *= (1.f - smoothVal);
 
-    /*
-     * Outer white eyeball color
-     */
-    float f_red = fbm3D(glm::vec3(isectCpy), 1.f, 0.6f);
-    //float f_red = mix(interpNoise3D(vec3(fs_Pos.xyz)), sin(perlinNoise(vec2(fs_Pos.xy)) * 10.f), 0.1);
-    //float f_red = interpNoise3D(vec3(fs_Pos.xyz));
-    eyeball_color = glm::vec4(1.f, 0.f, 0.0f, 1.f) * f_red * (0.4f * (-isectCpy.z + 1.5f));
-
-    //eye_color = eyeball_color + iris_color + pupil_color;
-
-    if (isectCpy.z > 0.998) {
-        eye_color = pupil_color;
-    }
-    else if (isectCpy.z > 0.9 && isectCpy.z < 0.998) {
-        eye_color = pupil_color + iris_color;
-    }
-    else if (isectCpy.z > 0.84 && isectCpy.z < 0.9) {
-        eye_color = mix(iris_color, eyeball_color, (1.f - isectCpy.z) * 0.5f);
-    }
-    // behind the eyeball to get red waves/veins
-    else if (isectCpy.z < 0.0) {
-        eye_color = mix(iris_color, eyeball_color, (1.f - isectCpy.z));
-    }
-    else {
-        eye_color = mix(iris_color, eyeball_color, 0.99f);
-    }
-
-    eye_color = iris_color;
-    return glm::vec3(eye_color.x, eye_color.y, eye_color.z);
+    return glm::vec3(out_color.x, out_color.y, out_color.z);
 }

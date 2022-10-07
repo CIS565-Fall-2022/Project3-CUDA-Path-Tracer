@@ -12,6 +12,15 @@ CUDA Path Tracer
 
 ## Features
 
+Material Types
+Mesh OBJ loading
+Procedural Shapes
+Procedural Textures
+Depth of Field
+Anti-aliasing
+First bounce cache
+
+
 ### Material Types
 ---
 

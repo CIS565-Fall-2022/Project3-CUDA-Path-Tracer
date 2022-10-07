@@ -221,7 +221,7 @@ OBJECT 9
 obj
 ../obj/ballerina.obj
 material 6
-TRANS       -3.5 6 0
+TRANS       -4.5 3 0
 ROTAT       0 0 0
 SCALE       0.8 0.8 0.8
 
@@ -230,7 +230,7 @@ OBJECT 10
 obj
 ../obj/bunny.obj
 material 7
-TRANS       4.5 6 0
+TRANS       4.5 1 0
 ROTAT       0 0 0
 SCALE       20 20 20
 
@@ -239,6 +239,6 @@ OBJECT 11
 obj
 ../obj/wahoo.obj
 material 8
-TRANS       0 4 0
+TRANS       0 5 0
 ROTAT       0 0 0
-SCALE       0.8 0.8 0.8
+SCALE       0.6 0.6 0.6
