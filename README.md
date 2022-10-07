@@ -3,11 +3,16 @@ CUDA Path Tracer
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 3**
 
-* (TODO) YOUR NAME HERE
-* Tested on: (TODO) Windows 22, i7-2222 @ 2.22GHz 22GB, GTX 222 222MB (Moore 2222 Lab)
+(IMAGE)
+An implementation of path tracer including simulated diffuse, speclar, and refractive materials. Loading from checkpoints. DOF. AA, and more
+* Tom Donnelly
+  * [LinkedIn](https://www.linkedin.com/in/the-tom-donnelly/)
+* Tested on: Windows 11, AMD Ryzen 9 5900X, NVIDIA GeForce RTX 3070 (Personal Desktop)
 
-### (TODO: Your README)
+---
 
-*DO NOT* leave the README to the last minute! It is a crucial part of the
-project, and we will not be able to grade you without a good README.
+![]()
+### Analysis + 
+
+### Bloopers
 
