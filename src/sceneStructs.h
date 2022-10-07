@@ -9,6 +9,7 @@
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 #define USE_BOUND_BOX 1
 #define USE_UV 1
+#define BUMP_MAP 1
 
 enum GeomType {
     SPHERE,
@@ -33,6 +34,7 @@ struct Vertex {
     // bool hasUv = false; // by default
     glm::vec2 uv = glm::vec2(-1.f, -1.f);
     //int textureid = -1; // the specific texture associated with this vertex
+    // glm::vec4 tan;
 };
 
 struct Triangle {

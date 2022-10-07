@@ -5,6 +5,7 @@
 
 #include "sceneStructs.h"
 #include "utilities.h"
+#include "cuda_runtime.h"
 
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
@@ -191,6 +192,70 @@ __host__ __device__ float boundBoxIntersectionTest(Geom* geom, Ray r, glm::vec3&
 
 }
 
+#if BUMP_MAP
+__device__ float triangleIntersectionTest(Geom* geom, Triangle* triangle, Ray r,
+    glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2& uv, cudaTextureObject_t& texObject, Texture& tex, bool& outside) {
+
+    glm::vec3 screenPA = glm::vec3(geom->transform * triangle->pointA.pos);
+    glm::vec3 screenPB = glm::vec3(geom->transform * triangle->pointB.pos);
+    glm::vec3 screenPC = glm::vec3(geom->transform * triangle->pointC.pos);
+
+    glm::vec3 baryPosition;
+
+    bool doesIntersect = glm::intersectRayTriangle(r.origin, r.direction, screenPA, screenPB, screenPC, baryPosition);
+
+    float u = baryPosition.r;
+    float v = baryPosition.g;
+    float t = baryPosition.b;
+
+    if (!doesIntersect) {
+        return -1.0f;
+    }
+
+    intersectionPoint = getPointOnRay(r, t);
+
+    // calculate bump map value
+    float4 texColor = tex2D<float4>(texObject, uv[0], uv[1]);
+    glm::vec3 pointColor = glm::vec3(texColor.x, texColor.y, texColor.z);
+
+    float uOffset = 1.f / tex.width;
+    float vOffset = 1.f / tex.height;
+
+    // calculate right neighbor uv:
+    glm::vec2 rightUV = glm::vec2(u + uOffset, v);
+
+    // subtract color from its right neighbor
+    float4 rightColor = tex2D<float4>(texObject, rightUV[0], rightUV[1]);
+    glm::vec3 rightPointColor = glm::vec3(rightColor.x, rightColor.y, rightColor.z);
+    glm::vec3 colorDiffRight = pointColor - rightPointColor;
+
+    // calculate down neighbor uv:
+    glm::vec2 downUV = glm::vec2(u, v + vOffset);
+
+    // subtract color from its down neighbor
+    float4 downColor = tex2D<float4>(texObject, downUV[0], downUV[1]);
+    glm::vec3 downPointColor = glm::vec3(downColor.x, downColor.y, downColor.z);
+    glm::vec3 colorDiffDown = pointColor - downPointColor;
+
+    glm::vec3 prevNormal = glm::vec3((1 - u - v) * triangle->pointA.nor + u * triangle->pointB.nor + v * triangle->pointC.nor);
+
+    glm::vec3 tangent = cross(prevNormal, r.direction);
+
+    normal = glm::normalize(prevNormal + colorDiffDown * cross(prevNormal, glm::vec3(1, 0, 0)) + colorDiffRight * cross(prevNormal, glm::vec3(0, 1, 0)));
+    // printf("prevnormal x: %f, y: %f, z: %f \n normal x: %f, y: %f, z: %f \n", prevNormal[0], prevNormal[1], prevNormal[2], normal[0], normal[1], normal[2]);
+
+    if (geom->textureid != -1) {
+        uv = glm::vec2((1 - u - v) * triangle->pointA.uv + u * triangle->pointB.uv + v * triangle->pointC.uv);
+    }
+
+    if (!outside) {
+        normal *= -1.f;
+    }
+
+    return t;
+
+}
+#else
 __host__ __device__ float triangleIntersectionTest(Geom* geom, Triangle* triangle, Ray r,
     glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2 &uv, bool& outside) {
 
@@ -225,3 +290,4 @@ __host__ __device__ float triangleIntersectionTest(Geom* geom, Triangle* triangl
     return t;
 
 }
+#endif

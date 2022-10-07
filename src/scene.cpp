@@ -167,6 +167,9 @@ int Scene::loadObj(const char* filename,
                 // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
                 // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
 
+                // do the tangent calculations always
+
+
                 Triangle triangle = {
                     vertA,
                     vertB,

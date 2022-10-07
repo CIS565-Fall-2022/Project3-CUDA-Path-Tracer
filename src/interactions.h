@@ -94,6 +94,45 @@ void scatterRay(
 
     float randGen = u01(rng);
 
+    glm::vec3 pointColor;
+
+    if (texid != -1) {
+        float u = uv[0];
+        float v = uv[1];
+
+        // if uv exists, as in, they're both not -1
+        //// if (u > 0 && v >= 0) {
+        //    float ix = u * (tex.width - 1);
+        //    float iy = v * (tex.height - 1);
+        //    int texDataIdx = ceil(iy * tex.width + ix);
+
+        //    // printf("texDataIdx %f \n");
+
+        //    // pointColor = tex.dev_texImage[texDataIdx];
+        //    pointColor = glm::vec3(u, v, 0.f);
+        //    //pointColor = m.color;
+        //    //printf("pointColor: X %f, Y %f, Z %f \n", pointColor[0], pointColor[1], pointColor[2]);
+        ////}
+        //if (numChannels == 3) {
+        //    float4 finalcol = tex2D<float4>(texObject, u, v);
+        //    pointColor = glm::vec3(finalcol.x, finalcol.y, finalcol.z);
+        //}
+        //else if (numChannels == 4) {
+        //    ;                float4 finalcol = tex2D<float4>(texObject, u, v);
+        //    pointColor = glm::vec3(finalcol.x, finalcol.y, finalcol.z);
+        //}
+        //else {
+        //    printf("wtf none channels \n");
+        //}
+        float4 finalcol = tex2D<float4>(texObject, u, v);
+        pointColor = glm::vec3(finalcol.x, finalcol.y, finalcol.z);
+        //printf("x: %f, y: %f, z: %f \n", pointColor[0], pointColor[1], pointColor[2]);
+        // printf("texId: %i \n", texid);
+    }
+    else {
+        pointColor = m.color;
+    }
+
     if (randGen <= m.hasReflective) {
         // take a reflective ray
         glm::vec3 newDirection = glm::reflect(pathSegment.ray.direction, normal);
@@ -104,7 +143,7 @@ void scatterRay(
 
         PathSegment newPath = {
             newRay,
-            m.specular.color * m.color * pathSegment.color * m.hasReflective,
+            m.specular.color * pointColor * pathSegment.color * m.hasReflective,
             pathSegment.pixelIndex,
             pathSegment.remainingBounces
         };
@@ -138,7 +177,7 @@ void scatterRay(
             newDirection = glm::normalize(glm::refract(pathSegment.ray.direction, normal, eta));
         }
 
-        glm::vec3 newColor = pathSegment.color * m.color * m.specular.color;
+        glm::vec3 newColor = pathSegment.color * pointColor * m.specular.color;
 
         Ray newRay = {
             intersect + 0.001f * pathSegment.ray.direction,
@@ -161,45 +200,6 @@ void scatterRay(
             intersect,
             newDirection
         };
-
-        glm::vec3 pointColor;
-
-        if (texid != -1) {
-            float u = uv[0];
-            float v = uv[1];
-
-            // if uv exists, as in, they're both not -1
-            //// if (u > 0 && v >= 0) {
-            //    float ix = u * (tex.width - 1);
-            //    float iy = v * (tex.height - 1);
-            //    int texDataIdx = ceil(iy * tex.width + ix);
-
-            //    // printf("texDataIdx %f \n");
-
-            //    // pointColor = tex.dev_texImage[texDataIdx];
-            //    pointColor = glm::vec3(u, v, 0.f);
-            //    //pointColor = m.color;
-            //    //printf("pointColor: X %f, Y %f, Z %f \n", pointColor[0], pointColor[1], pointColor[2]);
-            ////}
-            //if (numChannels == 3) {
-            //    float4 finalcol = tex2D<float4>(texObject, u, v);
-            //    pointColor = glm::vec3(finalcol.x, finalcol.y, finalcol.z);
-            //}
-            //else if (numChannels == 4) {
-            //    ;                float4 finalcol = tex2D<float4>(texObject, u, v);
-            //    pointColor = glm::vec3(finalcol.x, finalcol.y, finalcol.z);
-            //}
-            //else {
-            //    printf("wtf none channels \n");
-            //}
-            float4 finalcol = tex2D<float4>(texObject, u, v);
-            pointColor = glm::vec3(finalcol.x, finalcol.y, finalcol.z);
-            //printf("x: %f, y: %f, z: %f \n", pointColor[0], pointColor[1], pointColor[2]);
-            // printf("texId: %i \n", texid);
-        }
-        else {
-            pointColor = m.color;
-        }
 
         PathSegment newPath = {
             newRay,
