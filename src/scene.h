@@ -21,6 +21,7 @@ private:
     int loadGeom(string objectid);
     int loadGLTF(const string filename);
     int loadGLTFNodes(const std::vector<tinygltf::Node>& nodes, const tinygltf::Node& node, bool* isLoaded,glm::mat4& transformMat);
+    void setTriangleVector();
     int loadCamera();
 public:
     Scene(string filename);
@@ -37,6 +38,8 @@ public:
     std::vector<glm::vec3> mesh_normals;
     std::vector<glm::vec4> mesh_tangents;
     std::vector<glm::vec2> mesh_uvs;
+
+    std::vector<Triangle> mesh_triangles;
 
     std::vector<Geom> geoms;
     std::vector<Material> materials;

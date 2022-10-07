@@ -49,6 +49,7 @@ Scene::Scene(string filename) {
             {
                 cout << "gltf triggered!" << endl;
                 loadGLTF(tokens[1]);
+                setTriangleVector();
             }
         }
     }
@@ -196,7 +197,10 @@ int Scene::loadMaterial(string materialid) {
                 glm::vec3 specColor(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
                 newMaterial.specular.color = specColor;
             } else if (strcmp(tokens[0].c_str(), "REFL") == 0) {
-                newMaterial.hasReflective = atof(tokens[1].c_str());
+                float r = atof(tokens[1].c_str());
+                newMaterial.hasReflective = r;
+                newMaterial.pbrVal.metallicFactor = r;
+                newMaterial.pbrVal.roughnessFactor = 0;
             } else if (strcmp(tokens[0].c_str(), "REFR") == 0) {
                 newMaterial.hasRefractive = atof(tokens[1].c_str());
             } else if (strcmp(tokens[0].c_str(), "REFRIOR") == 0) {
@@ -216,28 +220,30 @@ int Scene::loadGLTFNodes(const std::vector<tinygltf::Node>& nodes, const tinyglt
     //traverse tree
     if (node.matrix.empty())
     {
-        glm::vec3 translate = node.translation.empty() ? glm::vec3(0.f) : glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
-        glm::quat rotation = node.rotation.empty() ? glm::quat(1,0,0,0) : glm::quat(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
-        glm::vec3 scale = node.scale.empty() ? glm::vec3(0.f) : glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
+        glm::vec3 translate = node.translation.empty() ? glm::vec3(0.f) : glm::make_vec3(node.translation.data());
+        glm::quat rotation = node.rotation.empty() ? glm::quat(1,0,0,0) : glm::make_quat(node.rotation.data());
+        glm::vec3 scale = node.scale.empty() ? glm::vec3(1.f) : glm::make_vec3(node.scale.data());
         tempMatrix = utilityCore::buildTransformationMatrix(translate, rotation, scale);
     }
     else
     {
         tempMatrix = glm::make_mat4(node.matrix.data());
     }
+
     tempMatrix = tempMatrix * previousMat;
 
     int meshOffset = meshes.size();
 
-    for (int i=0;i<nodes.size();i++)
+    //Problem here
+    for (const int child:node.children)
     {
-        if (!isLoaded[i])
+        if (!isLoaded[child])
         {
-            loadGLTFNodes(nodes, nodes[i], isLoaded, tempMatrix);
-            isLoaded[i] = true;
+            loadGLTFNodes(nodes, nodes[child], isLoaded, tempMatrix);
+            isLoaded[child] = true;
         }
     }
-    if (node.mesh == 0)
+    if (node.mesh == -1)
     {
         return 0;
     }
@@ -311,6 +317,8 @@ int Scene::loadGLTF(const std::string filename)
         //begin parsing
     bool* isNodeLoaded = new bool[model.nodes.size()];
     memset(isNodeLoaded, 0, sizeof(bool) * model.nodes.size());
+
+    //Problems here
     for (int i = 0; i < model.nodes.size(); i++)
     {
         if (!isNodeLoaded[i])
@@ -372,6 +380,7 @@ int Scene::loadGLTF(const std::string filename)
             const auto byteStride = indicesAccessor.ByteStride(bufferView);
             const size_t count = indicesAccessor.count;
             prim.count = count;
+
             prim.mat_id = meshPrimitives.material + materialOffset;
 
             //load indices
@@ -385,6 +394,7 @@ int Scene::loadGLTF(const std::string filename)
             {
             case TINYGLTF_MODE_TRIANGLES:
             {
+                Triangle mesh_triangle;
                 std::cout << "Read Triangles" << endl;
                 for (const auto& attribute : meshPrimitives.attributes)
                 {
@@ -394,8 +404,8 @@ int Scene::loadGLTF(const std::string filename)
                     const float* data = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + attributeAccessor.byteOffset]);
                     const int byte_stride = attributeAccessor.ByteStride(bufferView);
                     int offset = byte_stride / sizeof(float);
-                    std::cout << "attribute has count" << count
-                        << "and stride" << byte_stride << " bytes\n";
+                    std::cout << "attribute has count " << count
+                        << " and stride " << byte_stride << " bytes\n";
                     std::cout << "attribute name is: " << attribute.first << std::endl;
                     if (attribute.first == "POSITION")
                     {
@@ -557,5 +567,38 @@ int Scene::loadGLTF(const std::string filename)
         ret = true;
     }
     return ret;
+}
 
+void Scene::setTriangleVector()
+{
+    for (int i = 0; i < mesh_indices.size(); i+=3)
+    {
+        //vertices, normals, tangent size is equal
+        Triangle loadTriangle;
+        if (mesh_vertices.size() != 0)
+        {
+            loadTriangle.vertex_00 = mesh_vertices[mesh_indices[i]];
+            loadTriangle.vertex_01 = mesh_vertices[mesh_indices[i + 1]];
+            loadTriangle.vertex_02 = mesh_vertices[mesh_indices[i + 2]];
+        }
+        if (mesh_normals.size() != 0)
+        {
+            loadTriangle.normal_00 = mesh_normals[mesh_indices[i]];
+            loadTriangle.normal_01 = mesh_normals[mesh_indices[i + 1]];
+            loadTriangle.normal_02 = mesh_normals[mesh_indices[i + 2]];
+        }
+        if (mesh_tangents.size() != 0)
+        {
+            loadTriangle.tangents_00 = mesh_tangents[mesh_indices[i]];
+            loadTriangle.tangents_01 = mesh_tangents[mesh_indices[i + 1]];
+            loadTriangle.tangents_02 = mesh_tangents[mesh_indices[i + 2]];
+        }
+        if (mesh_uvs.size() != 0)
+        {
+            loadTriangle.texCoords_00 = mesh_uvs[mesh_indices[i]];
+            loadTriangle.texCoords_01 = mesh_uvs[mesh_indices[i + 1]];
+            loadTriangle.texCoords_02 = mesh_uvs[mesh_indices[i + 2]];
+        }
+        mesh_triangles.push_back(loadTriangle);
+    }
 }

@@ -30,6 +30,8 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+
+    
 };
 //Added here
 struct Primitive
@@ -55,6 +57,7 @@ struct PrimitiveData
     glm::vec3* normals;
     glm::vec4* tangents;
     uint16_t* indices;
+
     void free()
     {
         cudaFree(primitives);
@@ -64,6 +67,25 @@ struct PrimitiveData
         cudaFree(tangents);
         cudaFree(indices);
     }
+};
+
+struct Triangle
+{
+    glm::vec3 vertex_00;
+    glm::vec3 vertex_01;
+    glm::vec3 vertex_02;
+
+    glm::vec3 normal_00;
+    glm::vec3 normal_01;
+    glm::vec3 normal_02;
+
+    glm::vec2 texCoords_00;
+    glm::vec2 texCoords_01;
+    glm::vec2 texCoords_02;
+
+    glm::vec4 tangents_00;
+    glm::vec4 tangents_01;
+    glm::vec4 tangents_02;
 };
 
 struct Texture
@@ -186,6 +208,8 @@ struct ShadeableIntersection {
   glm::vec3 surfaceNormal;
   bool outSide;
   int materialId;
+  glm::vec4 tangent;
+
 };
 
 //Add for string compaction

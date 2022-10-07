@@ -1,0 +1,11 @@
+Model Information:
+* title:	9 mm
+* source:	https://sketchfab.com/3d-models/9-mm-5124e7fe60fb4d3ab62460609d23f365
+* author:	Slava Zemlyanik (https://sketchfab.com/reijin)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "9 mm" (https://sketchfab.com/3d-models/9-mm-5124e7fe60fb4d3ab62460609d23f365) by Slava Zemlyanik (https://sketchfab.com/reijin) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "intersections.h"
+#include "cuda_runtime.h"
 #include <math.h>
 
 // CHECKITOUT
@@ -85,7 +86,7 @@ __device__ double lengthSquared(glm::vec3 vec)
     return vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2];
 }
 
-//PBRT
+//refract
 __device__ glm::vec3 refractEvaluation(const glm::vec3&dir,const glm::vec3& n,float etai_over_etat)
 {
     float cosTheta = fmin(glm::dot(-dir, n), 1.0f);
@@ -129,12 +130,33 @@ __device__ glm::vec3 dielectricEvaluation
     }
     return glm::normalize(direction);
 }
+
+__device__ void normalMapping(glm::vec3& n, glm::vec3& normalMap,glm::vec4 tangent)
+{
+    glm::vec3 t = glm::vec3(tangent);
+    glm::vec3 b = glm::cross(n, t) * tangent.w;
+    glm::mat3 TBN = glm::mat3(t, b, n);
+    n = glm::normalize(TBN*normalMap);
+}
+
+
+//Helper function for sampling the texture object with the given UV coordinate
+
+__device__ glm::vec3 sampleTexture(cudaTextureObject_t texObj, const glm::vec2 uv) {
+    // NOTE: cudaReadModeNormalizedFloat will convert uchar4 to float4
+    float4 rgba = tex2D<float4>(texObj, uv.x, uv.y);
+    return glm::vec3(rgba.x, rgba.y, rgba.z);
+}
+
+
 __device__
 void scatterRay(
         PathSegment & pathSegment,
+        const ShadeableIntersection& i,
         glm::vec3 intersect,
         glm::vec3 normal,
         const Material &m,
+        cudaTextureObject_t* textures, 
         thrust::default_random_engine &rng) {
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
@@ -144,6 +166,14 @@ void scatterRay(
     glm::vec3 nextRayDir;;
     float eta;
    // Specular BRDF/BTDF here
+
+    //PBR Material Properties
+    glm::vec3 albedo;
+    float pM, pR;
+    float ao;
+    normal = i.surfaceNormal;
+
+
     float random = u01(rng);
     if (random <= m.hasReflective)
     {
