@@ -183,6 +183,24 @@ struct Triangle {
     glm::vec3 n0, n1, n2;       // Normal
     glm::vec2 tex0, tex1, tex2; // UV coordinate
 
+    glm::mat3 TBN;
+
+    void CacheTBN()
+    {
+        glm::vec3 deltaPos1 = v1 - v0;  // In model space
+        glm::vec3 deltaPos2 = v2 - v0;
+        glm::vec2 deltaUV1 = tex1 - tex0;
+        glm::vec2 deltaUV2 = tex2 - tex0;
+
+        float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+        glm::vec3 tagent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r;
+        glm::vec3 bitangent = (deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * r;
+        glm::vec3 nor = glm::normalize(glm::cross(tagent, bitangent));
+        //glm::vec3 nor = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(normal, 0.0f)));
+        
+        TBN = glm::transpose(glm::mat3(tagent, bitangent, nor));
+    }
+
     Bound3 getBound()
     {
         glm::vec3 pMin = glm::vec3(std::min(std::min(v0.x, v1.x), v2.x),

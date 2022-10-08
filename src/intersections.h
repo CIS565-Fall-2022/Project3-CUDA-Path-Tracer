@@ -190,6 +190,7 @@ __host__ __device__ float objIntersectionTest(Geom geom, Ray r, Triangle *triang
 
     int arrayIndexSt = pixelIndex * BVH_INTERSECT_STACK_SIZE;
     int toVisitOffset = 0, currNodeIndex = geom.bvhNodeStartIndex;
+
     for (int i = arrayIndexSt; i < arrayIndexSt + BVH_INTERSECT_STACK_SIZE; ++i)
     {
         bvhArrayToUse[i] = -1;
@@ -269,7 +270,7 @@ __host__ __device__ float objIntersectionTest(Geom geom, Ray r, Triangle *triang
                         outside = glm::dot(localNormal, localRay.direction) < 0;
                         normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(localNormal, 0.f)));
                         intersectionPoint = multiplyMV(geom.transform, glm::vec4(localIntersectionPoint, 1.f));
-                        triangleId = i;
+                        triangleId = geom.triangleStartIndex + node.firstPrimOffset + i;
                     }
                 }
 
@@ -282,11 +283,11 @@ __host__ __device__ float objIntersectionTest(Geom geom, Ray r, Triangle *triang
                 if (dirIsNeg[node.axis])
                 {                   
                     bvhArrayToUse[arrayIndexSt + toVisitOffset++] = currNodeIndex + 1;  // Insert left child
-                    currNodeIndex = node.rightChildOffset;                              // Visit right child first
+                    currNodeIndex = node.rightChildOffset + geom.bvhNodeStartIndex;                              // Visit right child first
                 }
                 else
                 {
-                    bvhArrayToUse[arrayIndexSt + toVisitOffset++] = node.rightChildOffset;
+                    bvhArrayToUse[arrayIndexSt + toVisitOffset++] = node.rightChildOffset + geom.bvhNodeStartIndex;
                     currNodeIndex = currNodeIndex + 1;
                 }
             }

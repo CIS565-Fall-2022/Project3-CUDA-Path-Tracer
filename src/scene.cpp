@@ -244,8 +244,8 @@ int Scene::loadGeomTriangles(Geom& geom, string filePath)
 
     geom.hasUV = attrs.texcoords.size() > 0;
     geom.hasNormal = attrs.normals.size() > 0;
-
-    geom.triangleStartIndex = this->triangles.size();
+    
+    geom.triangleStartIndex = this->triangles.size();  
     for (int i = 0; i < shapes.size(); ++i)
     {
         Triangle t;
@@ -283,16 +283,19 @@ int Scene::loadGeomTriangles(Geom& geom, string filePath)
                 t.tex2 = glm::vec2(attrs.texcoords[2 * index2_tex + 0], attrs.texcoords[2 * index2_tex + 1]);
             }
 
-            triangles.push_back(t);
+#if ENABLE_NORMAL_MAP
+            t.CacheTBN();
+#endif 
+
+            this->triangles.push_back(t);
         }
     }
     geom.triangleEndIndex = this->triangles.size();
-
+    
 
 #if ENABLE_BVH
 
     geom.bvhNodeStartIndex = bvhNodes.size();
-
     // Init PrimInfo vector
     std::vector<BVHPrimitiveInfo> bvhPrimInfos;
     std::vector<Triangle> reorderPrims;

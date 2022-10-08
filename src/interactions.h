@@ -154,8 +154,6 @@ void scatterRay(
         col *= m.color * m.hasMetallic;
     }
 
-    //col = glm::clamp(col, glm::vec3(0.f), glm::vec3(1.f));
-
     pathSegment.color *= col;
     pathSegment.remainingBounces -= 1;
 }
