@@ -42,7 +42,7 @@ glm::vec3 calculateRandomDirectionInHemisphere(
 }
 
 __host__ __device__
-glm::vec3 imperfectReflection(glm::vec3 normal, thrust::default_random_engine& rng) {
+glm::vec3 imperfectReflection(glm::vec3 normal, thrust::default_random_engine& rng, float n) {
     thrust::uniform_real_distribution<float> u01(0, 1);
     glm::vec3 directionNotNormal;
     
@@ -61,7 +61,7 @@ glm::vec3 imperfectReflection(glm::vec3 normal, thrust::default_random_engine& r
         glm::normalize(glm::cross(normal, directionNotNormal));
     glm::vec3 perpendicularDirection2 =
         glm::normalize(glm::cross(normal, perpendicularDirection1));
-    float theta = acos(std::pow(u01(rng), 1.0 / 5.0));
+    float theta = acos(std::pow(u01(rng), 1.f / (1.f + n)));
     float phi = 2 * PI * u01(rng);
     float x = cos(phi) * sin(theta);
     float y = sin(phi) * sin(theta);
@@ -130,8 +130,8 @@ void scatterRay(
 
         if (m.hasReflective || m.hasRefractive) {
             pathSegment.color *= m.specular.color;
-            pathSegment.ray.direction = glm::normalize(imperfectReflection( glm::reflect(pathSegment.ray.direction, normal), rng));
-            //pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+           // pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+            pathSegment.ray.direction = glm::normalize(imperfectReflection(glm::normalize(glm::reflect(pathSegment.ray.direction, normal)), rng, m.shininess));
             pathSegment.remainingBounces--;
             pathSegment.ray.origin = intersect + 0.0001f * pathSegment.ray.direction;
         }

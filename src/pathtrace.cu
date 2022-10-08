@@ -22,8 +22,8 @@
 
 #define CACHE 0
 #define SORT 0
-#define ANTIALIASING 1
-#define DEPTH 1
+#define ANTIALIASING 0
+#define DEPTH 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -197,8 +197,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		);
 #endif
 #if DEPTH
-		float lensRadius = 0.5f;
-		float focalDistance = 4.0f;
+		float lensRadius = cam.radius;
+		float focalDistance = cam.focus;
 		glm::vec2 pLens = lensRadius * ConcentricSampleDisk(u01(rng), u01(rng));
 
 		float ft = glm::abs(focalDistance / segment.ray.direction.z);
@@ -327,7 +327,7 @@ __global__ void shadeFakeMaterial(
 			else {
 				//float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));
 				//pathSegments[idx].color *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f;
-				scatterRay(pathSegments[idx], pathSegments[idx].ray.origin + intersection.t * pathSegments[idx].ray.direction, intersection.surfaceNormal, material,rng);
+				scatterRay(pathSegments[idx], pathSegments[idx].ray.origin + intersection.t * pathSegments[idx].ray.direction, intersection.surfaceNormal, material, rng);
 				//pathSegments[idx].color *= u01(rng); // apply some noise because why not
 			}
 			// If there was no intersection, color the ray black.
