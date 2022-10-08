@@ -25,4 +25,7 @@ public:
     std::vector<Triangle> triangles;
     std::vector<Material> materials;
     RenderState state;
+
+    std::vector<Geom> lights;
+    int lightCount = 0;
 };

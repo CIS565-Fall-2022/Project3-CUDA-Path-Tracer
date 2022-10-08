@@ -98,6 +98,13 @@ int Scene::loadGeom(string objectid) {
         newGeom.inverseTransform = glm::inverse(newGeom.transform);
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
 
+        // Store the light sources
+        if (newGeom.materialid == 0)
+        {
+            this->lights.push_back(newGeom);
+            this->lightCount++;
+        }
+
         geoms.push_back(newGeom);
         return 1;
     }

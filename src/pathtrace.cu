@@ -39,7 +39,9 @@
 #define INVERTED 0
 #define CONTRAST 0
 
-#define MOTIONBLUR 0
+#define MOTION_BLUR 0
+
+#define DIRECT_LIGHTING 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -104,6 +106,9 @@ static ShadeableIntersection* dev_intersections = NULL;
 static ShadeableIntersection* dev_intersection_cache = NULL;
 static Triangle* dev_triangles = NULL;
 
+static Geom* dev_lights = NULL;
+
+
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
 	guiData = imGuiData;
@@ -136,6 +141,9 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_triangles, scene->triangles.size() * sizeof(Triangle));
 	cudaMemcpy(dev_triangles, scene->triangles.data(), scene->triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice);
 
+	cudaMalloc(&dev_lights, scene->lights.size() * sizeof(Geom));
+	cudaMemcpy(dev_lights, scene->lights.data(), scene->lights.size() * sizeof(Geom), cudaMemcpyHostToDevice);
+
 	checkCUDAError("pathtraceInit");
 }
 
@@ -148,6 +156,7 @@ void pathtraceFree() {
 	// TODO: clean up any extra device memory you created
 	cudaFree(dev_intersection_cache);
 	cudaFree(dev_triangles);
+	cudaFree(dev_lights);
 
 	checkCUDAError("pathtraceFree");
 }
@@ -429,6 +438,56 @@ __global__ void shadeMaterial(
 	}
 }
 
+__global__ void shadeMaterialWithDirectLighting(
+	int iter
+	, int num_paths
+	, ShadeableIntersection* shadeableIntersections
+	, PathSegment* pathSegments
+	, Material* materials
+	, Geom* lights
+	, int lightCount
+)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx < num_paths && pathSegments[idx].remainingBounces >= 0)
+	{
+		ShadeableIntersection intersection = shadeableIntersections[idx];
+		// No intersection then return black and no more bounce
+		if (intersection.t <= 0.0f)
+		{
+			pathSegments[idx].color = glm::vec3(0.0f);
+			pathSegments[idx].remainingBounces = 0;
+			return;
+		}
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
+
+		Material material = materials[intersection.materialId];
+		glm::vec3 materialColor = material.color;
+
+		// Light source then return light color 
+		if (material.emittance > 0.0f)
+		{
+			pathSegments[idx].color *= (materialColor * material.emittance);
+			pathSegments[idx].remainingBounces = 0;
+			return;
+		}
+		// ScatterRay and accumulate color
+		else
+		{
+			glm::vec3 i = getPointOnRay(pathSegments[idx].ray, intersection.t);
+			scatterRay(pathSegments[idx], i, intersection.surfaceNormal, material, rng);
+			if (pathSegments[idx].remainingBounces == 1)
+			{
+				thrust::uniform_real_distribution<float> u01(0, 1);
+				thrust::uniform_real_distribution<int> u02(0, lightCount-1);
+				glm::vec3 sampledLight = glm::vec3(lights[u02(rng)].transform * glm::vec4(u01(rng), u01(rng), u01(rng), 1.f));
+				pathSegments[idx].ray.direction = glm::normalize(sampledLight - pathSegments[idx].ray.origin);
+			}
+
+			return;
+		}
+	}
+}
 __global__ void postShade(
 	int iter
 	, int num_paths
@@ -540,7 +599,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	// --- PathSegment Tracing Stage ---
 	// Shoot ray into scene, bounce between objects, push shading chunks
 
-#if MOTIONBLUR
+#if MOTION_BLUR
 	for (int i = 0; i < hst_scene->geoms.size(); i++) {
 		Geom& geom = hst_scene->geoms[i];
 		geom.translation = geom.translation + (geom.endpos - geom.translation) * (float)iter / (float)hst_scene->state.iterations;
@@ -621,27 +680,38 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 		//Sort rays by material
 		#if SORT_RAY
-			thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + num_paths, dev_paths, compareIntersections())
-		#endif
+		thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + num_paths, dev_paths, compareIntersections())
+#endif
 
 
-		// TODO:
-		// --- Shading Stage ---
-		// Shade path segments based on intersections and generate new rays by
-	  // evaluating the BSDF.
-	  // Start off with just a big kernel that handles all the different
-	  // materials you have in the scenefile.
-	  // TODO: compare between directly shading the path segments and shading
-	  // path segments that have been reshuffled to be contiguous in memory.
+			// TODO:
+			// --- Shading Stage ---
+			// Shade path segments based on intersections and generate new rays by
+		  // evaluating the BSDF.
+		  // Start off with just a big kernel that handles all the different
+		  // materials you have in the scenefile.
+		  // TODO: compare between directly shading the path segments and shading
+		  // path segments that have been reshuffled to be contiguous in memory.
 
-		//shadeFakeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
-		//	iter,
-		//	num_paths,
-		//	dev_intersections,
-		//	dev_paths,
-		//	dev_materials
-		//	);
+			//shadeFakeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
+			//	iter,
+			//	num_paths,
+			//	dev_intersections,
+			//	dev_paths,
+			//	dev_materials
+			//	);
 
+#if DIRECT_LIGHTING
+			shadeMaterialWithDirectLighting << <numblocksPathSegmentTracing, blockSize1d >> > (
+				iter,
+				num_paths,
+				dev_intersections,
+				dev_paths,
+				dev_materials,
+				dev_lights,
+				hst_scene->lightCount
+					);
+#else
 		shadeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
 			iter,
 			num_paths,
@@ -649,6 +719,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_paths,
 			dev_materials
 			);
+#endif
 
 #if POST_PROCESS
 
