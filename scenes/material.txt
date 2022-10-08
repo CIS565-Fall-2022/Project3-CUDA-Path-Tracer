@@ -1,0 +1,646 @@
+Camera
+Resolution	1800 1350
+FovY        31
+LensRadius	0.5
+FocalDist	15.8
+ApertureMask Null
+Sample		6000
+Depth		5
+File        Cornell
+Eye         1.25 0 26
+Rotation      -90 0 0
+Up          0 1 0
+
+EnvMap 	texture/photo_studio_loft_hall_4k.hdr
+
+
+Material	00
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.000000
+Roughness	0.020000
+Ior	0
+NormalMap	Null
+
+Object	00
+model/sphere40.obj
+Material	00
+Translate	-7.5 -7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	01
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.000000
+Roughness	0.216000
+Ior	0
+NormalMap	Null
+
+Object	01
+model/sphere40.obj
+Material	01
+Translate	-4.5 -7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	02
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.000000
+Roughness	0.412000
+Ior	0
+NormalMap	Null
+
+Object	02
+model/sphere40.obj
+Material	02
+Translate	-1.5 -7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	03
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.000000
+Roughness	0.608000
+Ior	0
+NormalMap	Null
+
+Object	03
+model/sphere40.obj
+Material	03
+Translate	1.5 -7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	04
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.000000
+Roughness	0.804000
+Ior	0
+NormalMap	Null
+
+Object	04
+model/sphere40.obj
+Material	04
+Translate	4.5 -7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	05
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.000000
+Roughness	1.000000
+Ior	0
+NormalMap	Null
+
+Object	05
+model/sphere40.obj
+Material	05
+Translate	7.5 -7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	06
+Type	Dielectric
+BaseColor	1 1 1
+Metallic	0.000000
+Roughness	1.196000
+Ior	1.2
+NormalMap	Null
+
+Object	06
+model/sphere40.obj
+Material	06
+Translate	10.5 -7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	10
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.200000
+Roughness	0.020000
+Ior	0
+NormalMap	Null
+
+Object	10
+model/sphere40.obj
+Material	10
+Translate	-7.5 -4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	11
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.200000
+Roughness	0.216000
+Ior	0
+NormalMap	Null
+
+Object	11
+model/sphere40.obj
+Material	11
+Translate	-4.5 -4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	12
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.200000
+Roughness	0.412000
+Ior	0
+NormalMap	Null
+
+Object	12
+model/sphere40.obj
+Material	12
+Translate	-1.5 -4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	13
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.200000
+Roughness	0.608000
+Ior	0
+NormalMap	Null
+
+Object	13
+model/sphere40.obj
+Material	13
+Translate	1.5 -4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	14
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.200000
+Roughness	0.804000
+Ior	0
+NormalMap	Null
+
+Object	14
+model/sphere40.obj
+Material	14
+Translate	4.5 -4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	15
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.200000
+Roughness	1.000000
+Ior	0
+NormalMap	Null
+
+Object	15
+model/sphere40.obj
+Material	15
+Translate	7.5 -4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	16
+Type	Dielectric
+BaseColor	1 1 1
+Metallic	0.200000
+Roughness	1.196000
+Ior	1.4
+NormalMap	Null
+
+Object	16
+model/sphere40.obj
+Material	16
+Translate	10.5 -4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	20
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.400000
+Roughness	0.020000
+Ior	0
+NormalMap	Null
+
+Object	20
+model/sphere40.obj
+Material	20
+Translate	-7.5 -1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	21
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.400000
+Roughness	0.216000
+Ior	0
+NormalMap	Null
+
+Object	21
+model/sphere40.obj
+Material	21
+Translate	-4.5 -1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	22
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.400000
+Roughness	0.412000
+Ior	0
+NormalMap	Null
+
+Object	22
+model/sphere40.obj
+Material	22
+Translate	-1.5 -1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	23
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.400000
+Roughness	0.608000
+Ior	0
+NormalMap	Null
+
+Object	23
+model/sphere40.obj
+Material	23
+Translate	1.5 -1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	24
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.400000
+Roughness	0.804000
+Ior	0
+NormalMap	Null
+
+Object	24
+model/sphere40.obj
+Material	24
+Translate	4.5 -1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	25
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.400000
+Roughness	1.000000
+Ior	0
+NormalMap	Null
+
+Object	25
+model/sphere40.obj
+Material	25
+Translate	7.5 -1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	26
+Type	Dielectric
+BaseColor	1 1 1
+Metallic	0.400000
+Roughness	1.196000
+Ior	1.6
+NormalMap	Null
+
+Object	26
+model/sphere40.obj
+Material	26
+Translate	10.5 -1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	30
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.600000
+Roughness	0.020000
+Ior	0
+NormalMap	Null
+
+Object	30
+model/sphere40.obj
+Material	30
+Translate	-7.5 1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	31
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.600000
+Roughness	0.216000
+Ior	0
+NormalMap	Null
+
+Object	31
+model/sphere40.obj
+Material	31
+Translate	-4.5 1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	32
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.600000
+Roughness	0.412000
+Ior	0
+NormalMap	Null
+
+Object	32
+model/sphere40.obj
+Material	32
+Translate	-1.5 1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	33
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.600000
+Roughness	0.608000
+Ior	0
+NormalMap	Null
+
+Object	33
+model/sphere40.obj
+Material	33
+Translate	1.5 1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	34
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.600000
+Roughness	0.804000
+Ior	0
+NormalMap	Null
+
+Object	34
+model/sphere40.obj
+Material	34
+Translate	4.5 1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	35
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.600000
+Roughness	1.000000
+Ior	0
+NormalMap	Null
+
+Object	35
+model/sphere40.obj
+Material	35
+Translate	7.5 1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	36
+Type	Dielectric
+BaseColor	1 1 1
+Metallic	0.600000
+Roughness	1.196000
+Ior	1.8
+NormalMap	Null
+
+Object	36
+model/sphere40.obj
+Material	36
+Translate	10.5 1.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	40
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.800000
+Roughness	0.020000
+Ior	0
+NormalMap	Null
+
+Object	40
+model/sphere40.obj
+Material	40
+Translate	-7.5 4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	41
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.800000
+Roughness	0.216000
+Ior	0
+NormalMap	Null
+
+Object	41
+model/sphere40.obj
+Material	41
+Translate	-4.5 4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	42
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.800000
+Roughness	0.412000
+Ior	0
+NormalMap	Null
+
+Object	42
+model/sphere40.obj
+Material	42
+Translate	-1.5 4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	43
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.800000
+Roughness	0.608000
+Ior	0
+NormalMap	Null
+
+Object	43
+model/sphere40.obj
+Material	43
+Translate	1.5 4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	44
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.800000
+Roughness	0.804000
+Ior	0
+NormalMap	Null
+
+Object	44
+model/sphere40.obj
+Material	44
+Translate	4.5 4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	45
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	0.800000
+Roughness	1.000000
+Ior	0
+NormalMap	Null
+
+Object	45
+model/sphere40.obj
+Material	45
+Translate	7.5 4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	46
+Type	Dielectric
+BaseColor	1 1 1
+Metallic	0.800000
+Roughness	1.196000
+Ior	2
+NormalMap	Null
+
+Object	46
+model/sphere40.obj
+Material	46
+Translate	10.5 4.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	50
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	1.000000
+Roughness	0.020000
+Ior	0
+NormalMap	Null
+
+Object	50
+model/sphere40.obj
+Material	50
+Translate	-7.5 7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	51
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	1.000000
+Roughness	0.216000
+Ior	0
+NormalMap	Null
+
+Object	51
+model/sphere40.obj
+Material	51
+Translate	-4.5 7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	52
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	1.000000
+Roughness	0.412000
+Ior	0
+NormalMap	Null
+
+Object	52
+model/sphere40.obj
+Material	52
+Translate	-1.5 7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	53
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	1.000000
+Roughness	0.608000
+Ior	0
+NormalMap	Null
+
+Object	53
+model/sphere40.obj
+Material	53
+Translate	1.5 7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	54
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	1.000000
+Roughness	0.804000
+Ior	0
+NormalMap	Null
+
+Object	54
+model/sphere40.obj
+Material	54
+Translate	4.5 7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	55
+Type	MetallicWorkflow
+BaseColor	0.7 0.5 0.2
+Metallic	1.000000
+Roughness	1.000000
+Ior	0
+NormalMap	Null
+
+Object	55
+model/sphere40.obj
+Material	55
+Translate	7.5 7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
+Material	56
+Type	Dielectric
+BaseColor	1 1 1
+Metallic	1.000000
+Roughness	1.196000
+Ior	2.2
+NormalMap	Null
+
+Object	56
+model/sphere40.obj
+Material	56
+Translate	10.5 7.5 10
+Rotate	0 0 0
+Scale	1 1 1
+
