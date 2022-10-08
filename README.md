@@ -36,36 +36,38 @@ Some performance improvements implemented include:
 # Visual Improvements
 
 ## Specular refraction and reflection
-
-Implemented diffused, specular reflective, specular refractive, glass
-
-![](img/materialTypes2Annotate.png)
+The following render has a cube placed inside spheres of varying refractive index. Note how the size distortion of the refracted sphere varies
+|Schlick's approximation for varying index of refraction|
+|---|
+|![](img/materialTypes2Annotate.png)|
 
 ## Physically based depth of field
 
 ![](img/dof_focaldist12.png)
 
-The following renders of a string of pearls show depth of field as cameras with different lens radius generate varying depth of field effect.
+|The following renders of a string of pearls show depth of field as cameras with different lens radius generate varying depth of field.|
+|---|
+| ![](img/dof_lensRadius.png) |
 
-![](img/dof_lensRadius.png)
-
-We can set the focal length of our camera to focus on foreground, mid-ground or background. The render comparisons are as follows.
-
-![](img/dof_focalDist.png)
+|We can set the focal length of our camera to focus on foreground, mid-ground or background. The render comparisons are as follows.|
+|---|
+|![](img/dof_focalDist.png)|
 
 ## Stochastic sampled antialiasing
 
-![](img/antialiasingAnnotate.png)
+|Observe aliasing along the surface of the sphere in the left image|
+|---|
+|![](img/antialiasingAnnotate.png)|
 
 ## Procedural shapes and textures
 
-Using sdf operations
-
-![](img/proceduralAnnotate.png)
+|Using SDF operations by [Inigo Quilez](https://iquilezles.org/articles/distfunctions/) and noise functions|
+|---|
+|![](img/proceduralAnnotate.png)|
 
 ## Aritrary obj mesh loading
 
-Implemented OBJ mesh loading tested within bounding box
-
-![](img/objLoading2.png)
+|OBJ mesh loading with bounding box intersection culling|
+|---|
+|![](img/objLoading2.png)|
  
