@@ -140,10 +140,9 @@ __device__ void normalMapping(glm::vec3& n, glm::vec3& normalMap,glm::vec4 tange
 }
 
 
-//Helper function for sampling the texture object with the given UV coordinate
+//sampling the texture object with the given UV coordinate
 
 __device__ glm::vec3 sampleTexture(cudaTextureObject_t texObj, const glm::vec2 uv) {
-    // NOTE: cudaReadModeNormalizedFloat will convert uchar4 to float4
     float4 rgba = tex2D<float4>(texObj, uv.x, uv.y);
     return glm::vec3(rgba.x, rgba.y, rgba.z);
 }
@@ -166,28 +165,80 @@ void scatterRay(
     glm::vec3 nextRayDir;;
     float eta;
     // Specular BRDF/BTDF here
-    float random = u01(rng);
-    if (random <= m.hasReflective)
+
+    glm::vec3 albedo;
+    glm::vec3 color ;
+    float metallic;
+    float roughness;
+
+    normal = i.surfaceNormal;
+    //Add Support for gltf attribute shading
+    int textureID = -1;
+    textureID = m.texOffset + m.pbrShadingAttribute.baseColorTexture.index;
+
+
+    //printf("texture Offset: %d \n", m.pbrShadingAttribute.baseColorTexture.index);
+
+    if (textureID < 0)
     {
-        nextRayDir = glm::reflect(pathSegment.ray.direction, normal);
-        if (m.specular.exponent > 0 && random > 0.5)
-        {
-            pathSegment.color *= m.specular.color;
-        }
-        else
-        {
-            pathSegment.color *= m.color;
-        }
-    }
-    else if (random <= m.hasReflective + m.hasRefractive)
-    {
-        nextRayDir = dielectricEvaluation(pathSegment, intersect, normal, m, rng);
+        albedo = m.pbrShadingAttribute.baseColor;
     }
     else
     {
-        nextRayDir = calculateRandomDirectionInHemisphere(normal, rng);
-        pathSegment.color *= m.color;
+        albedo = sampleTexture(textures[textureID], i.uv);
     }
+    //Metallic and Roughness Texture
+    textureID = m.texOffset + m.pbrShadingAttribute.metallicRoughnessTexture.index;
+
+
+    if (textureID < 0)
+    {
+        metallic = m.pbrShadingAttribute.metallicFactor;
+        roughness = m.pbrShadingAttribute.roughnessFactor;
+    }
+    else
+    {
+        glm::vec3 pbrCol = sampleTexture(textures[textureID], i.uv);
+        metallic = pbrCol.b * m.pbrShadingAttribute.metallicFactor;
+        roughness = pbrCol.g * m.pbrShadingAttribute.roughnessFactor;
+    }
+
+    //Apply normal Map if have
+    textureID = m.texOffset + m.normalTexture.index;
+    if (textureID >= 0)
+    {
+        //have normal texture
+        glm::vec3 normalMap = sampleTexture(textures[textureID], i.uv);
+        normalMap = glm::normalize(normal*2.f-1.f);
+        normalMapping(normal, normalMap, i.tangent);
+    }
+
+   // printf("Debug msg albedo: %f %f %f \n", albedo.x, albedo.y, albedo.z);
+
+    float random = u01(rng);
+        if (random <= m.hasReflective)
+        {
+            nextRayDir = glm::reflect(pathSegment.ray.direction, normal);
+            if (m.specular.exponent > 0 && random > 0.5)
+            {
+                pathSegment.color *= m.specular.color;
+            }
+            else
+            {
+                pathSegment.color *= m.color;
+            }
+        }
+        else if (random <= m.hasReflective + m.hasRefractive)
+        {
+            nextRayDir = dielectricEvaluation(pathSegment, intersect, normal, m, rng);
+        }
+        else
+        {
+            nextRayDir = calculateRandomDirectionInHemisphere(normal, rng);
+            pathSegment.color *= m.color ;
+        }
+
+
 
     pathSegment.ray.origin = intersect + 0.0001f * nextRayDir;
     pathSegment.ray.direction = nextRayDir;

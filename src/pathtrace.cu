@@ -186,8 +186,6 @@ void pathtraceInit(Scene* scene) {
 	mallocAndCopytoGPU<Geom>(dev_geoms, scene->geoms);
 	mallocAndCopytoGPU<Mesh>(dev_meshes, scene->meshes);
 
-	//cudaMalloc(&dev_triangles, scene->mesh_triangles.size() * sizeof(Triangle));
-	//cudaMemcpy(dev_triangles, scene->mesh_triangles.data(), sizeof(Triangle) * scene->mesh_triangles.size(), cudaMemcpyHostToDevice);
 
 	mallocAndCopytoGPU<Primitive>(dev_prim_data.primitives, scene->primitives);
 	mallocAndCopytoGPU<uint16_t>(dev_prim_data.indices, scene->mesh_indices);
@@ -422,6 +420,7 @@ __global__ void computeIntersections(
 			intersection.materialId = materialID;
 			intersection.surfaceNormal = normal;
 			intersection.tangent = tangent;
+			intersection.uv = uv;
 			//Add here
 			intersection.intersectionPoint = intersect_point;
 			//printf("get intersections \n");
@@ -508,9 +507,6 @@ __global__ void BSDFShading(
 
 			Material material = materials[intersection.materialId];
 			//glm::vec3 materialColor = glm::vec3(material.pbrVal.baseColor);
-	
-
-
 			//Ray ends when ray hit the light
 			if (material.emittance>0.0)
 			{
@@ -521,6 +517,7 @@ __global__ void BSDFShading(
 			{
 				//need intersection position
 				glm::vec3 inter = getPointOnRay(pathSegments[index].ray, intersection.t);
+				
 				scatterRay(pathSegments[index],intersection, inter, intersection.surfaceNormal, material,textures,rng);
 				//Debug
 				pathSegments[index].remainingBounces -= 1;

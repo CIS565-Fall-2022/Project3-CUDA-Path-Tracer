@@ -199,8 +199,8 @@ int Scene::loadMaterial(string materialid) {
             } else if (strcmp(tokens[0].c_str(), "REFL") == 0) {
                 float r = atof(tokens[1].c_str());
                 newMaterial.hasReflective = r;
-                newMaterial.pbrMetallicRoughness.metallicFactor = r;
-                newMaterial.pbrMetallicRoughness.roughnessFactor = 0;
+                newMaterial.pbrShadingAttribute.metallicFactor = r;
+                newMaterial.pbrShadingAttribute.roughnessFactor = 0;
             } else if (strcmp(tokens[0].c_str(), "REFR") == 0) {
                 newMaterial.hasRefractive = atof(tokens[1].c_str());
             } else if (strcmp(tokens[0].c_str(), "REFRIOR") == 0) {
@@ -223,6 +223,7 @@ int Scene::loadGLTFNodes(const std::vector<tinygltf::Node>& nodes, const tinyglt
         glm::vec3 translate = node.translation.empty() ? glm::vec3(0.f) : glm::make_vec3(node.translation.data());
         glm::quat rotation = node.rotation.empty() ? glm::quat(1,0,0,0) : glm::make_quat(node.rotation.data());
         glm::vec3 scale = node.scale.empty() ? glm::vec3(1.f) : glm::make_vec3(node.scale.data());
+        scale *=120;
         tempMatrix = utilityCore::buildTransformationMatrix(translate, rotation, scale);
     }
     else
@@ -248,6 +249,8 @@ int Scene::loadGLTFNodes(const std::vector<tinygltf::Node>& nodes, const tinyglt
         return 0;
     }
     //parse model data into personal structure
+    //std::vector<double>smallerScale = {3,3,3};
+    //glm::mat4 scaleMat = glm::make_mat4(smallerScale.data());
     Geom newGeom;
     newGeom.type = MESH;
     newGeom.mesh_id = meshes.size() + node.mesh;
@@ -335,16 +338,15 @@ int Scene::loadGLTF(const std::string filename)
     for (const tinygltf::Material& gltfMat : model.materials)
     {
         Material newMat;
-        newMat.gltf = true;
         newMat.color = glm::vec3(0.3f, 0.3f, 1.f);
         newMat.specular.color = glm::vec3(0.98f, 0.98f, 0.98f);
         newMat.hasReflective = 0.5f;
-
+        newMat.gltf = true;
         newMat.texOffset = textureOffset;
-        newMat.pbrMetallicRoughness.baseColorTexture = gltfMat.pbrMetallicRoughness.baseColorTexture;
-        newMat.pbrMetallicRoughness.metallicRoughnessTexture = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture;
-        newMat.pbrMetallicRoughness.metallicFactor = gltfMat.pbrMetallicRoughness.metallicFactor;
-        newMat.pbrMetallicRoughness.roughnessFactor = gltfMat.pbrMetallicRoughness.roughnessFactor;
+        newMat.pbrShadingAttribute.baseColorTexture = gltfMat.pbrMetallicRoughness.baseColorTexture;
+        newMat.pbrShadingAttribute.metallicRoughnessTexture = gltfMat.pbrMetallicRoughness.metallicRoughnessTexture;
+        newMat.pbrShadingAttribute.metallicFactor = gltfMat.pbrMetallicRoughness.metallicFactor;
+        newMat.pbrShadingAttribute.roughnessFactor = gltfMat.pbrMetallicRoughness.roughnessFactor;
         newMat.normalTexture = gltfMat.normalTexture;
         newMat.emissiveFactor = glm::make_vec3(gltfMat.emissiveFactor.data());
         newMat.emissiveTexture = gltfMat.emissiveTexture;
@@ -490,6 +492,7 @@ int Scene::loadGLTF(const std::string filename)
                         {
                             offset = 2;
                         }
+
                         mesh_uvs.resize(prim.uv_Offset+attributeAccessor.count);
                         //For each triangle
                         for (int i = 0; i < prim.count; i+=3)
@@ -509,6 +512,7 @@ int Scene::loadGLTF(const std::string filename)
                             t0.x = data[i0 + 0];
                             t0.y = data[i0 + 1];
                             t1.x = data[i1 + 0];
+
                             t1.y = data[i1 + 1];
                             t2.x = data[i2 + 0];
                             t2.y = data[i2 + 1];

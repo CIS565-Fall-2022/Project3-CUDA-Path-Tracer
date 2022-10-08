@@ -130,16 +130,17 @@ struct Mesh
 
 struct PBRShadingAttribute
 {
-    glm::vec4 baseColor = glm::vec4(1.0);
+    glm::vec3 baseColor = glm::vec3(1.0);
 
     TextureInfo baseColorTexture;
     double metallicFactor;   // default 1
     double roughnessFactor;  // default 1
     TextureInfo metallicRoughnessTexture;
+   
 
     __host__ __device__ PBRShadingAttribute()
     {
-        baseColor = glm::vec4(1.0);
+        baseColor = glm::vec3(1.0);
         metallicFactor = 1.0f;
         roughnessFactor = 1.0f;
     }
@@ -149,8 +150,8 @@ struct PBRShadingAttribute
 struct Material {
 
     int texOffset = 0;
-    bool gltf = false;
 
+    bool gltf = false;
 
     glm::vec3 color;
     struct {
@@ -164,7 +165,7 @@ struct Material {
 
     TextureInfo emissiveTexture;
     NormalTextureInfo normalTexture;
-    PBRShadingAttribute pbrMetallicRoughness;
+    PBRShadingAttribute pbrShadingAttribute;
 
     glm::vec3 emissiveFactor;
 
@@ -206,10 +207,11 @@ struct ShadeableIntersection {
   float t;
   glm::vec3 intersectionPoint;
   glm::vec3 surfaceNormal;
+  
   bool outSide;
   int materialId;
   glm::vec4 tangent;
-
+  glm::vec2 uv;
 };
 
 //Add for string compaction

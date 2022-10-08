@@ -217,7 +217,7 @@ __host__ __device__ float meshIntersectionTest(Geom& geom,Mesh mesh,PrimitiveDat
 
         const Primitive& m = primData.primitives[mesh.prim_offset + primId];
 
-        // Try intersecting with the bbox first
+        // Try intersecting with the boundingbox first
         if (!hitBoundingBox(rayOrigin, rayDirection, m.boundingBoxMin, m.boundingBoxMax))
         {
             continue;

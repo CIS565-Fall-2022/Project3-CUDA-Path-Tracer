@@ -182,4 +182,4 @@ TRANS       5 4 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
-GLTF ../gltf/Duck/Duck.gltf
+GLTF ../gltf/BoomBox/BoomBox.gltf
