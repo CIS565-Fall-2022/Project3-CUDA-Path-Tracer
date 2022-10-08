@@ -30,7 +30,7 @@
 #define FOCAL_DISTANCE 4.f
 #define PI 3.141592654f
 
-#define DIRECT_LIGHTING 0
+#define DIRECT_LIGHTING 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)

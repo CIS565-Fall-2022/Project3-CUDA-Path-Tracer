@@ -6,7 +6,7 @@ SPECRGB     0 0 0
 REFL        0
 REFR        0
 REFRIOR     0
-EMITTANCE   10
+EMITTANCE   2
 
 // Diffuse white
 MATERIAL 1
@@ -136,16 +136,8 @@ TRANS       -4 2.0 -1
 ROTAT       0 0 0
 SCALE       4 4 4
 
-// Sphere refractive glass
-OBJECT 7
-sphere
-material 5
-TRANS       0 1.5 3
-ROTAT       0 0 0
-SCALE       3 3 3
-
 // Sphere reflect glass
-OBJECT 8
+OBJECT 7
 sphere
 material 4
 TRANS       4 2.5 -2.5
