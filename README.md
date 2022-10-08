@@ -11,7 +11,7 @@ CUDA Path Tracer
 * GPU Compatibility: 5.0
 
 
-# Introduction
+## Introduction
 
 Ray-tracing is a computer graphics technique in which we calculate the exact path of reflection or refraction of each ray and trace them all the way back to one or more light sources. Path tracing is a specific form of ray tracing that simulates the way light scatters off surfaces and through media, by generating multiple rays for each pixel(sampling) and bouncing off those rays based on material properties.
 
@@ -19,7 +19,7 @@ Since this technique involves computing a large number of rays independently, it
 
 ![](img/demoSceneAnnotate.png)
 
-# Features
+## Features
 
 Some of the visual improvements implemented include:
 - [Specular refraction and reflection](#specular-refraction-and-reflection)
@@ -33,15 +33,15 @@ Some performance improvements implemented include:
 - Path continuation/termination using stream compaction
 - Sorting rays by material
 
-# Visual Improvements
+## Visual Improvements
 
-## Specular refraction and reflection
+### Specular refraction and reflection
 The following render has a cube placed inside spheres of varying refractive index. Note how the size distortion of the refracted sphere varies
 |Schlick's approximation for varying index of refraction|
 |---|
 |![](img/materialTypes2Annotate.png)|
 
-## Physically based depth of field
+### Physically based depth of field
 
 ![](img/dof_focaldist12.png)
 
@@ -53,19 +53,19 @@ The following render has a cube placed inside spheres of varying refractive inde
 |---|
 |![](img/dof_focalDist.png)|
 
-## Stochastic sampled antialiasing
+### Stochastic sampled antialiasing
 
 |Observe aliasing along the surface of the sphere in the left image|
 |---|
 |![](img/antialiasingAnnotate.png)|
 
-## Procedural shapes and textures
+### Procedural shapes and textures
 
 |Using SDF operations by [Inigo Quilez](https://iquilezles.org/articles/distfunctions/) and noise functions|
 |---|
 |![](img/proceduralAnnotate.png)|
 
-## Aritrary obj mesh loading
+### Aritrary obj mesh loading
 
 |OBJ mesh loading with bounding box intersection culling|
 |---|
