@@ -76,8 +76,16 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
-    glm::vec3 outRay = calculateRandomDirectionInHemisphere(normal, rng);
-
+    glm::vec3 outRay;
+    
+    thrust::uniform_real_distribution<float> u02(0, 1);
+    if (m.hasReflective > .95) {
+        outRay = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+    }
+    else {
+        outRay = calculateRandomDirectionInHemisphere(normal, rng);
+    }
     pathSegment.color *= m.color;
+    //pathSegment.color = normal;
     pathSegment.ray = { intersect + outRay * .1f, outRay };
 }

@@ -10,6 +10,8 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    PLANE,
+    BOUNDINGBOX,
 };
 
 struct Ray {
@@ -26,6 +28,17 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+
+    //For planes only
+    glm::vec3 p1;
+    glm::vec3 p2;
+    glm::vec3 p3;
+    bool hasNorm;
+    glm::vec3 norm;
+
+    //For bounding box only
+    int begindex;
+    int endex;
 };
 
 struct Material {
@@ -57,6 +70,7 @@ struct RenderState {
     int traceDepth;
     std::vector<glm::vec3> image;
     std::string imageName;
+    bool usingSavedState;
 };
 
 struct PathSegment {
@@ -64,6 +78,7 @@ struct PathSegment {
     glm::vec3 color;
     int pixelIndex;
     int remainingBounces;
+    int aliasIdx;
 };
 
 // Use with a corresponding PathSegment to do:
