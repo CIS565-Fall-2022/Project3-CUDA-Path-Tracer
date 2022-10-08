@@ -136,7 +136,8 @@
 - However, the naive octree **does not** always outperform brute force.
 	1. The depth limit of the octree is a crucial factor of performance. A poorly chosen depth limit will cause objects to be stored for multiple times in a lot of leaves. In the gif above, there are only 29,156 triangles in the scene, but an octree of depth 5 will contain 465,142 pieces of information in its leaf nodes!
 	2. The worst case scenario for the octree is a scene where there is a single low-poly mesh and nothing else, as shown here. It becomes essentially a uniform grid. A similar situation happens if we have a very large mesh that spans the entire scene.
-		![](./img/Octree/worst.png)
+
+![](./img/Octree/worst.png)
 
 ### Performance Comparison (Intersection Test)
 
