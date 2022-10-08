@@ -30,17 +30,14 @@ NodeRange determineRange(unsigned int* sortedMCodes, int triangleCount, int idx)
 int findSplit(unsigned int* sortedMCodes, int triangleCount, NodeRange range);
 void assignBoundingBoxes(Scene* scene);
 void buildLBVH(Scene* scene, int triangleCount);
+
+// Tree traversal
 void traverseLBVH(Scene* scene);
 
-bool bvhIsLeaf(const BVHNode* node);
-void test_bvhIntersectionTestRecursive(const BVHNode* nodes, const Triangle* tris, Ray r, int idx, Triangle& min_tri, glm::vec3& min_barycenter, float& min_t);
-float test_bvhIntersectionTest(const BVHNode* nodes, const Triangle* tris, Ray r, int triangleCount, glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside);
-
-// Construct entire LBVH
+// Construct LBVH and BVH
 void generateLBVH(Scene* scene);
 void generateBVH(Scene* scene, int triangleCount);
-void flattenBVH(Scene* scene, int triangleCount);
 
-// Small test for LBVH
+// Small unit tests for LBVH and BVH
 void unitTest(Scene* scene);
 void unitTestBVH(Scene* scene, int triangleCount);

@@ -388,7 +388,7 @@ __host__ __device__ void bvhIntersectTriangles(const Triangle* tris, Ray r, int 
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ float bvhIntersectionTestIterative(const BVHNode* nodes, const Triangle* tris, Ray r, int triangleCount,
+__host__ __device__ float bvhIntersectionTest(const BVHNode* nodes, const Triangle* tris, Ray r, int triangleCount,
     glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
 
     float stack[20];
@@ -448,42 +448,6 @@ __host__ __device__ float bvhIntersectionTestIterative(const BVHNode* nodes, con
     float w = 1.f - u - v;
     intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
     normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
-
-    return min_t;
-}
-
-__host__ __device__ void bvhIntersectionTestRecursive(const BVHNode* nodes, const Triangle* tris, Ray r, int idx,
-    Triangle& min_tri, glm::vec3& min_barycenter, float& min_t) {
-
-    const BVHNode* node = &nodes[idx];
-
-    if (aabbIntersectionTest(node->aabb, r)) {
-        if (devBvhIsLeaf(node)) {
-            bvhIntersectTriangles(tris, r, node->firstTri, node->numTris, min_tri, min_barycenter, min_t);
-        }
-        else {
-            bvhIntersectionTestRecursive(nodes, tris, r, node->left, min_tri, min_barycenter, min_t);
-            bvhIntersectionTestRecursive(nodes, tris, r, node->right, min_tri, min_barycenter, min_t);
-        }
-    }
-}
-
-__host__ __device__ float bvhIntersectionTest(const BVHNode* nodes, const Triangle* tris, Ray r, int triangleCount,
-    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
-
-    Triangle min_tri = tris[0];
-    glm::vec3 min_barycenter;
-    float min_t = INFINITY;
-
-    // Start traversing tree from root node
-    bvhIntersectionTestRecursive(nodes, tris, r, 0, min_tri, min_barycenter, min_t);
-
-    // Find intersection point and normal
-    //float u = min_barycenter.x;
-    //float v = min_barycenter.y;
-    //float w = 1.f - u - v;
-    //intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
-    //normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
 
     return min_t;
 }

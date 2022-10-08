@@ -84,7 +84,6 @@ void computeMortonCodes(Scene* scene, const AABB& sceneAABB) {
 
 void sortMortonCodes(Scene* scene) {
     std::vector<MortonCode> mcodes_copy = scene->mcodes;
-    //thrust::stable_sort(thrust::host, mcodes_copy.begin(), mcodes_copy.end(), morton_sort());
     std::sort(mcodes_copy.begin(), mcodes_copy.end(), morton_sort);
     scene->mcodes = mcodes_copy;
 }
@@ -129,71 +128,31 @@ NodeRange determineRange(MortonCode* sortedMCodes, int triangleCount, int i) {
     }
     int j = i + l * d;
 
-    return NodeRange{ min(i, j), max(i, j), l, d };
+    return NodeRange{ i, j, l, d };
 }
-
-//int findSplit(MortonCode* sortedMCodes, int triangleCount, NodeRange range) {
-//    int i = range.i;
-//    int j = range.j;
-//    int l = range.l;
-//    int d = range.d;
-//    
-//    // Find split position with binary search
-//    int deltaNode = delta(sortedMCodes, triangleCount, range.i, range.j);
-//    int s = 0;
-//    for (int t = l / 2; t >= 1; t /= 2) {
-//        if (delta(sortedMCodes, triangleCount, i, i + (s + t) * d) > deltaNode) {
-//            s = s + t;
-//        }
-//    }
-//    int gamma = i + s * d + min(d, 0);
-//    
-//    return gamma;
-//}
 
 int findSplit(MortonCode* sortedMCodes, int triangleCount, NodeRange range) {
-    int start = range.i;
-    int end = range.j;
+    int i = range.i;
+    int j = range.j;
     int l = range.l;
-    int d = range.d;
-
-    // Identical Morton codes => split the range in the middle.
-
-    unsigned int firstCode = sortedMCodes[start].code;
-    unsigned int lastCode = sortedMCodes[end].code;
-
-    if (firstCode == lastCode)
-        return (start + end) >> 1;
-
-    // Calculate the number of highest bits that are the same
-    // for all objects, using the count-leading-zeros intrinsic.
-
-    int commonPrefix = delta(sortedMCodes, triangleCount, start, end);
-
-    // Use binary search to find where the next bit differs.
-    // Specifically, we are looking for the highest object that
-    // shares more than commonPrefix bits with the first one.
-
-    int split = start; // initial guess
-    int step = end - start;
-
-    do
-    {
-        step = (step + 1) >> 1; // exponential decrease
-        int newSplit = split + step; // proposed new position
-
-        if (newSplit < end)
-        {
-            int splitPrefix = delta(sortedMCodes, triangleCount, start, newSplit);
-            if (splitPrefix > commonPrefix)
-                split = newSplit; // accept proposal
+    int d = range.d;    
+    
+    // Find split position with binary search
+    int deltaNode = delta(sortedMCodes, triangleCount, range.i, range.j);
+    int s = 0;
+    int t = l;
+    do {
+        t = ceil(t / 2.f);
+        if (delta(sortedMCodes, triangleCount, i, i + (s + t) * d) > deltaNode) {
+            s = s + t;
         }
-    } while (step > 1);
+    } while (t > 1);
 
-    return split;
+    int gamma = i + s * d + min(d, 0);
+    
+    return gamma;
 }
 
-// TODO: make sure leaf bounding boxes are assigned in buildLBVH function
 AABB assignBoundingBoxes(Scene* scene, LBVHNode* node) {
 
     if (!isLeaf(node)) {
@@ -515,57 +474,7 @@ void generateBVH(Scene* scene, int triangleCount)
     //}
 }
 
-bool bvhIsLeaf(const BVHNode* node) {
-    return (node->numTris > 0);
-}
-
-void test_bvhIntersectionTestRecursive(const BVHNode* nodes, const Triangle* tris, Ray r, int idx,
-    Triangle& min_tri, glm::vec3& min_barycenter, float& min_t) {
-
-    const BVHNode* node = &nodes[idx];
-
-    if (test_aabbIntersectionTest(node->aabb, r)) {
-        if (bvhIsLeaf(node)) {
-            //bvhIntersectTriangles(tris, r, node->firstTri, node->numTris, min_tri, min_barycenter, min_t);
-        }
-        else {
-            test_bvhIntersectionTestRecursive(nodes, tris, r, node->left, min_tri, min_barycenter, min_t);
-            test_bvhIntersectionTestRecursive(nodes, tris, r, node->right, min_tri, min_barycenter, min_t);
-        }
-    }
-}
-
-float test_bvhIntersectionTest(const BVHNode* nodes, const Triangle* tris, Ray r, int triangleCount,
-    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
-
-    Triangle min_tri;
-    glm::vec3 min_barycenter;
-    float min_t = INFINITY;
-
-    // Start traversing tree from root node
-    test_bvhIntersectionTestRecursive(nodes, tris, r, 0, min_tri, min_barycenter, min_t);
-
-    // Find intersection point and normal
-    float u = min_barycenter.x;
-    float v = min_barycenter.y;
-    float w = 1.f - u - v;
-    intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
-    normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
-
-    return min_t;
-}
-
 void unitTestBVH(Scene* scene, int triangleCount)
 {
     generateBVH(scene, triangleCount);
-
-    Ray ray;
-    ray.origin = glm::vec3(0.0, 0.0, 0.0);
-    ray.direction = glm::vec3(0.0, 0.0, 1.0);
-
-    glm::vec3 intersectionPoint;
-    glm::vec3 normal;
-    bool outside = true;
-
-    test_bvhIntersectionTest(scene->bvh.data(), scene->triangles.data(), ray, triangleCount, intersectionPoint, normal, outside);
 }
