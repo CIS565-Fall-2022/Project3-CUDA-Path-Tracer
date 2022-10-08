@@ -40,6 +40,8 @@ int main(int argc, char** argv) {
 	}
 
 	const char* sceneFile = argv[1];
+	//string sceneFilePath = "../scenes/customScene.txt";
+	//const char* sceneFile = sceneFilePath.c_str();
 
 	// Load scene file
 	scene = new Scene(sceneFile);

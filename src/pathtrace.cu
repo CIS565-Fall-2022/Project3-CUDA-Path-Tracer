@@ -17,8 +17,8 @@
 
 #define ERRORCHECK 1
 
-#define SORT_BY_MATERIAL 0
-#define CACHE_FIRST_INTERSECTION 0
+#define SORT_BY_MATERIAL 1
+#define CACHE_FIRST_INTERSECTION 1
 
 #define ANTIALIASING 0
 
@@ -26,8 +26,8 @@
 #define MOTION_VELOCITY glm::vec3(0.0f, 1.75f, 0.0f)
 
 #define DEPTH_OF_FIELD 0
-#define LENS_RADIUS 3.f
-#define FOCAL_DISTANCE 8.5f
+#define LENS_RADIUS 0.3f
+#define FOCAL_DISTANCE 5.3f
 #define PI 3.141592654f
 
 #define DIRECT_LIGHTING 1
@@ -275,10 +275,10 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		// random a sample point on the disk as a point on lens
 		// added it to the camera origin
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
-		//thrust::uniform_real_distribution<float> u01(0, 1);
-		//glm::vec3 pointOnLens = squareToDiskConcentric(glm::vec2(u01(rng), u01(rng))) * LENS_RADIUS;
-		thrust::uniform_real_distribution<float> u01(-1.4, 1.4);
-		glm::vec3 pointOnLens = squareToHeart(glm::vec2(u01(rng), u01(rng))) * LENS_RADIUS;
+		thrust::uniform_real_distribution<float> u01(0, 1);
+		glm::vec3 pointOnLens = squareToDiskConcentric(glm::vec2(u01(rng), u01(rng))) * LENS_RADIUS;
+		/*thrust::uniform_real_distribution<float> u01(-1.4, 1.4);
+		glm::vec3 pointOnLens = squareToHeart(glm::vec2(u01(rng), u01(rng))) * LENS_RADIUS;*/
 		glm::vec3 origin =  cam.position + glm::mat3(cam.right, cam.up, cam.view) * pointOnLens;
 		segment.ray.origin = origin;
 #else
