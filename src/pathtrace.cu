@@ -18,16 +18,16 @@
 #define ERRORCHECK 1
 
 #define SORT_BY_MATERIAL 1
-#define CACHE_FIRST_INTERSECTION 1
+#define CACHE_FIRST_INTERSECTION 0
 
 #define ANTIALIASING 0
 
-#define MOTION_BLUR 0
-#define MOTION_VELOCITY glm::vec3(0.0f, 1.75f, 0.0f)
+#define MOTION_BLUR 1
+#define MOTION_VELOCITY glm::vec3(0.0f, 0.75f, 0.0f)
 
 #define DEPTH_OF_FIELD 0
 #define LENS_RADIUS 0.3f
-#define FOCAL_DISTANCE 5.3f
+#define FOCAL_DISTANCE 3.f
 #define PI 3.141592654f
 
 #define DIRECT_LIGHTING 1
