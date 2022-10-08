@@ -6,15 +6,26 @@
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
+#define USE_BOUNDING_BOX 1
 
 enum GeomType {
     SPHERE,
     CUBE,
+    MESH,
 };
 
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
+};
+
+struct Triangle {
+    glm::vec3 p0;
+    glm::vec3 p1;
+    glm::vec3 p2;
+    glm::vec3 n0;
+    glm::vec3 n1;
+    glm::vec3 n2;
 };
 
 struct Geom {
@@ -26,6 +37,11 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+    // for mesh loading from obj
+    Triangle* triangles;
+    int numTris;
+    glm::vec3 AABBmax = glm::vec3(FLT_MIN);
+    glm::vec3 AABBmin = glm::vec3(FLT_MAX);
 };
 
 struct Material {

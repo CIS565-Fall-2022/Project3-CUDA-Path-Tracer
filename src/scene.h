@@ -22,5 +22,11 @@ public:
 
     std::vector<Geom> geoms;
     std::vector<Material> materials;
+    std::vector<Geom> lights;
     RenderState state;
+    // for mesh geom allocate buffer on GPU use
+    bool hasMesh = false;
+    int meshGeomId = -1;
 };
+
+int LoadMeshFromOBJ(const char* filePath, Geom& mesh);

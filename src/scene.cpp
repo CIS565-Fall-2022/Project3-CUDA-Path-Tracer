@@ -3,6 +3,7 @@
 #include <cstring>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include "tiny_obj_loader.h"
 
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
@@ -51,6 +52,9 @@ int Scene::loadGeom(string objectid) {
             } else if (strcmp(line.c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
+            } else if (strcmp(line.c_str(), "mesh") == 0) {
+                cout << "Creating new mesh..." << endl;
+                newGeom.type = MESH;
             }
         }
 
@@ -60,29 +64,75 @@ int Scene::loadGeom(string objectid) {
             vector<string> tokens = utilityCore::tokenizeString(line);
             newGeom.materialid = atoi(tokens[1].c_str());
             cout << "Connecting Geom " << objectid << " to Material " << newGeom.materialid << "..." << endl;
+
+            // if the geom is light push it back to scene lights vector
+            if (materials[newGeom.materialid].emittance > 0.f) {
+                lights.push_back(newGeom);
+            }
         }
 
         //load transformations
-        utilityCore::safeGetline(fp_in, line);
-        while (!line.empty() && fp_in.good()) {
-            vector<string> tokens = utilityCore::tokenizeString(line);
+        //utilityCore::safeGetline(fp_in, line);
+        //while (!line.empty() && fp_in.good()) {
+        //    vector<string> tokens = utilityCore::tokenizeString(line);
 
+        //    //load tranformations
+        //    if (strcmp(tokens[0].c_str(), "TRANS") == 0) {
+        //        newGeom.translation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        //    } else if (strcmp(tokens[0].c_str(), "ROTAT") == 0) {
+        //        newGeom.rotation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        //    } else if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
+        //        newGeom.scale = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+        //    }
+
+        //    utilityCore::safeGetline(fp_in, line);
+        //}
+        utilityCore::safeGetline(fp_in, line);
+        if (!line.empty() && fp_in.good()) {
+            vector<string> tokens = utilityCore::tokenizeString(line);
             //load tranformations
             if (strcmp(tokens[0].c_str(), "TRANS") == 0) {
                 newGeom.translation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-            } else if (strcmp(tokens[0].c_str(), "ROTAT") == 0) {
-                newGeom.rotation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-            } else if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
+            }
+        }
+
+        utilityCore::safeGetline(fp_in, line);
+        if (!line.empty() && fp_in.good()) {
+            vector<string> tokens = utilityCore::tokenizeString(line);
+            //load tranformations
+            if (strcmp(tokens[0].c_str(), "ROTAT") == 0) {
+            newGeom.rotation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+            }
+        }
+
+        utilityCore::safeGetline(fp_in, line);
+        if (!line.empty() && fp_in.good()) {
+            vector<string> tokens = utilityCore::tokenizeString(line);
+            //load tranformations
+            if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
                 newGeom.scale = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
             }
-
-            utilityCore::safeGetline(fp_in, line);
         }
 
         newGeom.transform = utilityCore::buildTransformationMatrix(
                 newGeom.translation, newGeom.rotation, newGeom.scale);
         newGeom.inverseTransform = glm::inverse(newGeom.transform);
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
+
+        // read filepath and load obj from file
+        // after createing transform matrix 
+        // because need transform matrix to transform postion to create AABB
+        if (newGeom.type == MESH) {
+            utilityCore::safeGetline(fp_in, line);
+            if (!line.empty() && fp_in.good()) {
+                vector<string> tokens = utilityCore::tokenizeString(line);
+                const char* filePath = tokens[1].c_str();
+                LoadMeshFromOBJ(filePath, newGeom);
+                std::cout << "creating mesh from file: " << filePath << "..." << std::endl;
+                hasMesh = true;
+                meshGeomId = id;
+            }
+        }
 
         geoms.push_back(newGeom);
         return 1;
@@ -185,4 +235,87 @@ int Scene::loadMaterial(string materialid) {
         materials.push_back(newMaterial);
         return 1;
     }
+}
+
+int LoadMeshFromOBJ(const char* filePath, Geom& mesh) {
+    std::vector<float> positions;
+    std::vector<float> normals;
+    std::vector<int> posIndex;
+    std::vector<int> normIndex;
+    string errors = tinyobj::SimpleLoadObj(positions, normals, posIndex, normIndex, filePath);
+    std::cout << errors << std::endl;
+    std::cout << positions[0] << std::endl;
+    std::cout << normals[0] << std::endl;
+    if (errors.size() == 0) {
+        mesh.numTris = (int)(posIndex.size() / 3.f);
+        mesh.triangles = new Triangle[mesh.numTris];
+        glm::vec3 p0;
+        glm::vec3 p1;
+        glm::vec3 p2;
+        glm::vec3 n0;
+        glm::vec3 n1;
+        glm::vec3 n2;
+        int triCount = 0;
+        for (int i = 0; i < posIndex.size(); i = i + 3)
+        {
+            Triangle triangle;
+            int idx0 = posIndex[i] * 3;
+            int idx1 = posIndex[i + 1] * 3;
+            int idx2 = posIndex[i + 2] * 3;
+
+            // every three float make a pos
+            p0 = glm::vec3(positions[idx0], positions[idx0 + 1], positions[idx0 + 2]);
+            p1 = glm::vec3(positions[idx1], positions[idx1 + 1], positions[idx1 + 2]);
+            p2 = glm::vec3(positions[idx2], positions[idx2 + 1], positions[idx2 + 2]);
+            
+            // use three pos to create a triangle
+            triangle.p0 = p0;
+            triangle.p1 = p1;
+            triangle.p2 = p2;
+
+#if USE_BOUNDING_BOX
+            glm::vec3 worldP0 = glm::vec3(mesh.transform *  glm::vec4(p0, 1.0f));
+            glm::vec3 worldP1 = glm::vec3(mesh.transform * glm::vec4(p1, 1.0f));
+            glm::vec3 worldP2 = glm::vec3(mesh.transform * glm::vec4(p2, 1.0f));
+            
+            mesh.AABBmax.x = max(mesh.AABBmax.x, worldP0.x);
+            mesh.AABBmax.x = max(mesh.AABBmax.x, worldP1.x);
+            mesh.AABBmax.x = max(mesh.AABBmax.x, worldP2.x);
+            mesh.AABBmin.x = min(mesh.AABBmin.x, worldP0.x);
+            mesh.AABBmin.x = min(mesh.AABBmin.x, worldP1.x);
+            mesh.AABBmin.x = min(mesh.AABBmin.x, worldP2.x);
+            
+            mesh.AABBmax.y = max(mesh.AABBmax.y, worldP0.y);
+            mesh.AABBmax.y = max(mesh.AABBmax.y, worldP1.y);
+            mesh.AABBmax.y = max(mesh.AABBmax.y, worldP2.y);
+            mesh.AABBmin.y = min(mesh.AABBmin.y, worldP0.y);
+            mesh.AABBmin.y = min(mesh.AABBmin.y, worldP1.y);
+            mesh.AABBmin.y = min(mesh.AABBmin.y, worldP2.y);
+            
+            mesh.AABBmax.z = max(mesh.AABBmax.z, worldP0.z);
+            mesh.AABBmax.z = max(mesh.AABBmax.z, worldP1.z);
+            mesh.AABBmax.z = max(mesh.AABBmax.z, worldP2.z);
+            mesh.AABBmin.z = min(mesh.AABBmin.z, worldP0.z);
+            mesh.AABBmin.z = min(mesh.AABBmin.z, worldP1.z);
+            mesh.AABBmin.z = min(mesh.AABBmin.z, worldP2.z);
+#endif
+            // normal
+            int nIdx0 = normIndex[i] * 3;
+            int nIdx1 = normIndex[i + 1] * 3;
+            int nIdx2 = normIndex[i + 2] * 3;
+
+            n0 = glm::vec3(normals[nIdx0], normals[nIdx0 + 1], normals[nIdx0 + 2]);
+            n1 = glm::vec3(normals[nIdx1], normals[nIdx1 + 1], normals[nIdx1 + 2]);
+            n2 = glm::vec3(normals[nIdx2], normals[nIdx2 + 1], normals[nIdx2 + 2]);
+
+            triangle.n0 = n0;
+            triangle.n1 = n1;
+            triangle.n2 = n2;
+
+            mesh.triangles[triCount] = triangle;
+
+            triCount++;
+        }
+    }
+    return 1;
 }
