@@ -80,7 +80,11 @@ EMITTANCE   0
 
 // Box texture
 TEXTURE 0
-PATH ../Project3-CUDA-Path-Tracer/objs/textures/linkFlippedVertical.png
+PATH ../Project3-CUDA-Path-Tracer/objs/textures/wahooFlippedVertical.png
+
+// Box texture
+TEXTURE 1
+PATH ../Project3-CUDA-Path-Tracer/objs/textures/boxOutline.png
 
 // Camera
 CAMERA
@@ -160,17 +164,18 @@ SCALE       .01 10 10
 
 // texture obj
 OBJECT 8
-../Project3-CUDA-Path-Tracer/objs/link.obj
+../Project3-CUDA-Path-Tracer/objs/wahoo.obj
 material 1
-TRANS		0 0 0
-ROTAT	      0 0 0
-SCALE		0.5 0.5 0.5
+TRANS		-3 2 0
+ROTAT	      -30 -30 0
+SCALE		0.75 0.75 0.75
 TEXTURE 0
 
-// front light
+// texture obj
 OBJECT 9
-cube
-material 0
-TRANS       0 5 12
-ROTAT       0 0 0
-SCALE       3 3 .3
+../Project3-CUDA-Path-Tracer/objs/box.obj
+material 1
+TRANS		3 2 0
+ROTAT	      -30 0 0
+SCALE		3 3 3
+TEXTURE 1
