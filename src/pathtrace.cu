@@ -20,8 +20,8 @@
 //option
 #define CACHE_FIRST_INTERSECTION 1
 #define MATERIAL_CONTIGUOUS 0
-#define ANTIALIASING 0
-#define DEPTH_OF_FIELD 1
+#define ANTIALIASING 1
+#define DEPTH_OF_FIELD 0
 
 #define ENABLE_CACHE_FIRST_INTERSECTION (CACHE_FIRST_INTERSECTION && !ANTIALIASING && !DEPTH_OF_FIELD)
 
@@ -171,7 +171,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		int index = x + (y * cam.resolution.x);
 		PathSegment& segment = pathSegments[index];
 
-		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, cam.resolution.y * cam.resolution.x - index, 0);
 		thrust::uniform_real_distribution<float> u01(0, 1);
 
 		segment.ray.origin = cam.position;
@@ -343,6 +343,9 @@ __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iteration
 	if (index < nPaths)
 	{
 		PathSegment iterationPath = iterationPaths[index];
+		for (int i = 0; i < 3; i++) {
+			iterationPath.color[i] = glm::max(iterationPath.color[i], 0.f);
+		}
 		image[iterationPath.pixelIndex] += iterationPath.color;
 	}
 }

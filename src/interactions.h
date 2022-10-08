@@ -126,27 +126,6 @@ glm::vec3 calculateRandomDirectionInSpecularLobe(
     pdf = (specex + 1) * powf(up, specex) * over / TWO_PI;
     return localToWorldWithNormal(glm::vec3(cos(around) * over, sin(around) * over, up), wiCenter);
 
-    //glm::vec3 directionNotNormal;
-    //if (abs(wiCenter.x) < SQRT_OF_ONE_THIRD) {
-    //    directionNotNormal = glm::vec3(1, 0, 0);
-    //}
-    //else if (abs(wiCenter.y) < SQRT_OF_ONE_THIRD) {
-    //    directionNotNormal = glm::vec3(0, 1, 0);
-    //}
-    //else {
-    //    directionNotNormal = glm::vec3(0, 0, 1);
-    //}
-
-    //// Use not-normal direction to generate two perpendicular directions
-    //glm::vec3 perpendicularDirection1 =
-    //    glm::normalize(glm::cross(wiCenter, directionNotNormal));
-    //glm::vec3 perpendicularDirection2 =
-    //    glm::normalize(glm::cross(wiCenter, perpendicularDirection1));
-
-    //pdf = (specex + 1) * powf(up, specex) * over / TWO_PI;
-    //return up * wiCenter
-    //    + cos(around) * over * perpendicularDirection1
-    //    + sin(around) * over * perpendicularDirection2;
 }
 
 __host__ __device__
@@ -302,8 +281,6 @@ void scatterRay(
                 float cosine = glm::dot(scatterDir, trueNormal);
                 float fresnel = (1 - FrDielectric(cosine, 1, eta));
                 color = fresnel * m.refractionColor;
-                float a = color.x, b = color.y, c = color.z;
-                color = glm::vec3(a, b, c);
             }
         }
     }
@@ -317,4 +294,6 @@ void scatterRay(
     pathSegment.ray.direction = scatterDir;
     pathSegment.ray.origin = intersect + scatterDir * 0.01f;
     pathSegment.remainingBounces--;
+
+
 }
