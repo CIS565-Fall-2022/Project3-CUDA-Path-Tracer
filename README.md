@@ -55,6 +55,8 @@ In this project, I implemented a CUDA path tracer for the GPU. Previously in Adv
 
 ![](img/completeMario2.png)
 
+![](img/myLink.png)
+
 ![](img/nobump.png)
 
 ![](img/yesBumpmap.png)
