@@ -39,7 +39,7 @@ Some performance improvements implemented include:
 
 Implemented diffused, specular reflective, specular refractive, glass
 
-![](img/materialTypes2.png)
+![](img/materialTypes2Annotate.png)
 
 ## Physically based depth of field
 
