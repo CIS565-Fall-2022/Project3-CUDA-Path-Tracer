@@ -57,15 +57,17 @@ To implement anti-aliasing, when generating ray from camera, I slightly noised t
 I implemented motion blur in a simple way. When calculating the intersection of ray, I randomly noised the ray origin along a vector, which I defined as MOTION_VELOCITY, so the rendering result looks like the object is moving. 
 
 ## Depth of Field
-<img src="/img/dof_2063samp.png"  width="400"> <img src="/img/dof_shape_5000samp.png"  width="400">
-
+<p align="center">
+  <img src="/img/dof_2063samp.png"  width="400"> <img src="/img/dof_shape_5000samp.png"  width="400">
+</p>
 Instead of casting rays from a single point on the camera, we considered the camera as a small lens. We cast rays from various points on the lens. When an object is further away or closer to the focal plane, the ray that cast coresponding to a single pixel hit the object in a large vairaty of locations, we then average all the colors into a single pixel. This will result in a blurry image. 
 
 Instead of setting the camera's lens as a circle, I change the camera's lens to a heart shape, so the blurry reresult will form a heart shape.
 
 ## Direct lighting
-<img src="/img/dl_2543samp.png"  width="400"> <img src="/img/ndl_3003samp.png"  width="400">
-
+<p align="center">
+  <img src="/img/dl_2543samp.png"  width="400"> <img src="/img/ndl_3003samp.png"  width="400">
+</p>
 When bounce the ray base on the material BSDF, some of the ray may not hit the light at the end and have no contribution to the final result. So, I take the final ray directly to a random point on an emissive object acting as a light source, to make sure every ray will hit the ligth source and contribute to the final result. The picture on the left is using direct lighting, the picture on the right is without using direct lighting. I don't know if I implement something wrong, it's hard to tell the direct lighting rendered scene is brighter than the other one.
 
 ## Mesh Loading
