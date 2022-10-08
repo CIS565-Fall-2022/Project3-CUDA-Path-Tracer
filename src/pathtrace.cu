@@ -27,7 +27,7 @@
 
 #define ANTIALIASING 1
 #define CACHEINTERSECTIONS 0
-#define DOF 0
+#define DOF 1
 #define SORTMATERIALS 1
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
@@ -224,11 +224,12 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 			glm::vec2 pLens = lensRadius / 2 * concentricDiskSampling(randomSample);
 
 			// Compute point on plane of focus
-			float ft = glm::length(cam.lookAt - cam.position);
+			float ft = cam.focalDist; // glm::length(cam.lookAt - cam.position);
 			glm::vec3 pFocus = getPointOnRay(segment.ray, ft);
 
 			// Update ray for effect of lens
 			segment.ray.origin += pLens.x * cam.right + pLens.y * cam.up;
+			//segment.ray.origin += glm::vec3(pLens.x, pLens.y, 0);
 			segment.ray.direction = glm::normalize(pFocus - segment.ray.origin);
 		}
 #endif
