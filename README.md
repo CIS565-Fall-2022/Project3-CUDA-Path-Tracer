@@ -15,7 +15,10 @@ CUDA Path Tracer
 
 
 ![](img/3balls.png)
-See the above image
+
+*cornell.txt*
+
+See the above image (I modified the scene file `cornell.txt`)
 * Ideal diffuse surfaces (the wall)
 * Perfectly specular-reflective surfaces (the left ball)
 * Imperfect specular-reflective surfaces (Phong shading) (the middle ball)
@@ -33,18 +36,22 @@ I made a toggleable option to cache the first bounce intersections when antialia
 
 ### Physically-based Depth-of-field [PBRT 6.2.3]
 ![](img/depth-of-field.png)
-*Enable depth-of-field*
+
+*depth_of_field.txt. Enable depth-of-field*
 
 ![](img/no-depth-of-field.png)
-*No depth-of-field*
+
+*depth_of_field.txt. No depth-of-field*
 
 See the above image
 
 ### Stochastic Sampled Antialiasing
 ![](img/antialiasing_detail.png)
+
 *Enable antialiasing*
 
 ![](img/no_antialiasing_detail.png)
+
 *Disable antialiasing*
 
 See the above comparison. There's obvious difference at the edge of the ball. 
@@ -59,7 +66,23 @@ However the rendered images are almost the same, so I don't put comparison here.
 ### Re-startable Path Tracing
 Press `Enter` to stop rendering temporarily, and press `Enter` again to start
 
-## Performance Analysis
-**To be done**
+## Analysis
 
+### Core questions
+* Stream compaction helps most after a few bounces. Print and plot the effects of stream compaction within a single iteration (i.e. the number of unterminated rays after each bounce) and evaluate the benefits you get from stream compaction.
+
+![](img/number_of_paths.png)
+
+![](img/stream_compaction.png)
+
+Stream compaction reduce approximately 2/3 paths in an iteration. However, the `thrust::partition` function also takes some time, so the overall benefit in my scene (which is not complex) is not so obvious.
+
+
+* Compare scenes which are open (like the given cornell box) and closed (i.e. no light can escape the scene). Again, compare the performance effects of stream compaction! Remember, stream compaction only affects rays which terminate, so what might you expect?
+
+![](img/number_of_paths_compare.png)
+
+![](img/render_time_compare.png)
+
+In closed scene there are also termintaed paths. They are paths hitting light source or the rgb is too small. From the above graphs we can know that more paths terminated in open scene, and the render time is smaller. In addition, notice that in close scene, no compaction is even faster than compaction, I think it's because stream compaction also takes some time, it's considerable when the scene is simple. 
 
