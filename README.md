@@ -23,6 +23,9 @@ In this project, I implemented a CUDA path tracer for the GPU. Previously in Adv
 
 ## Additional Features
 ### Refractive Material
+
+![](img/Refractive.png)
+
 ### Depth of Field
 ### Stochastic Sampled Anti-Aliasing
 ### Direct Lighting
