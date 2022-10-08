@@ -6,7 +6,7 @@ SPECRGB     0 0 0
 REFL        0
 REFR        0
 REFRIOR     0
-EMITTANCE   5
+EMITTANCE   2
 
 // Diffuse white
 MATERIAL 1
@@ -43,9 +43,59 @@ MATERIAL 4
 RGB         .98 .98 .98
 SPECEX      0
 SPECRGB     .98 .98 .98
-REFL        1
+REFL        0.8
 REFR        1
 REFRIOR     1.5
+EMITTANCE   0
+
+// Diffuse green
+MATERIAL 5
+RGB         .19 .878 .96
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse green
+MATERIAL 6
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     0 0 0
+REFL        1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse green
+MATERIAL 7
+RGB         .85 .35 .35
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0.8
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Emissive material (light)
+MATERIAL 8
+RGB         1 1 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   5
+
+// Diffuse white
+MATERIAL 9
+RGB         .45 .45 .45
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
 EMITTANCE   0
 
 // Camera
@@ -55,26 +105,49 @@ FOVY        45
 ITERATIONS  5000
 DEPTH       8
 FILE        cornell
-EYE         0.0 5 10.5
-LOOKAT      0 5 0
+EYE         0.0 5 7
+LOOKAT      -3.5 4.5 0
 UP          0 1 0
-
 
 // Ceiling light
 OBJECT 0
 cube
 material 0
-TRANS       0 10 0
+TRANS       -10 0 0
 ROTAT       0 0 0
-SCALE       3 .3 3
+SCALE       1 .3 20
+
+// Ceiling light
+OBJECT 0
+cube
+material 0
+TRANS       0 0 -10
+ROTAT       0 0 0
+SCALE       20 .3 1
+
+// Ceiling light
+OBJECT 15
+cube
+material 0
+TRANS       0 10 10
+ROTAT       0 0 0
+SCALE       20 5 1
+
+// Ceiling light
+OBJECT 16
+cube
+material 0
+TRANS       10 10 0
+ROTAT       0 0 0
+SCALE       1 5 20
 
 // Floor
 OBJECT 1
 cube
-material 1
+material 9
 TRANS       0 0 0
 ROTAT       0 0 0
-SCALE       10 .01 10
+SCALE       20 .01 20
 
 // Ceiling
 OBJECT 2
@@ -82,45 +155,68 @@ cube
 material 1
 TRANS       0 10 0
 ROTAT       0 0 90
-SCALE       .01 10 10
+SCALE       .01 20 20
 
 // Back wall
 OBJECT 3
 cube
-material 1
-TRANS       0 5 -5
+material 5
+TRANS       0 5 -10
 ROTAT       0 90 0
-SCALE       .01 10 10
+SCALE       .01 20 20
+
+// Back wall
+OBJECT 300
+cube
+material 1
+TRANS       0 5 10
+ROTAT       0 90 0
+SCALE       .01 20 20
 
 // Left wall
 OBJECT 4
 cube
 material 2
-TRANS       -5 5 0
+TRANS       -10 5 0
 ROTAT       0 0 0
-SCALE       .01 10 10
+SCALE       .01 20 20
 
 // Right wall
 OBJECT 5
 cube
-material 3
-TRANS       5 5 0
+material 1
+TRANS       10 5 0
 ROTAT       0 0 0
-SCALE       .01 10 10
-
+SCALE       .01 20 20
 
 OBJECT 6
 mesh
 GLTF ../scenes/models/bunny/bunny.gltf
 material 4
-TRANS       0 0 1
-ROTAT       0 0 0 
-SCALE       2 2 2
+TRANS       -3.5 0 -3.5
+ROTAT       0 30 0 
+SCALE       2.25 2.25 2.25
 
 OBJECT 7
 mesh
 GLTF ../scenes/models/bunny/bunny.gltf
-material 3
-TRANS       2 0 3
-ROTAT       0 0 0 
+material 6
+TRANS       -6 0 1.5
+ROTAT       0 75 0 
+SCALE       1 1 1
+
+OBJECT 8
+mesh
+GLTF ../scenes/models/bunny/bunny.gltf
+material 5
+TRANS       -2 0 1
+ROTAT       0 35 0 
 SCALE       0.75 0.75 0.75
+
+OBJECT 9
+mesh
+GLTF ../scenes/models/bunny/bunny.gltf
+material 7
+TRANS       1 0 -3
+ROTAT       0 15 0 
+SCALE       1.25 1.25 1.25

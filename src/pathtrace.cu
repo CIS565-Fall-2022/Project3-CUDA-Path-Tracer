@@ -20,9 +20,9 @@
 #define SORT_BY_MATERIAL 0
 #define FIRST_BOUNCE_CACHE 0
 #define ANTIALIASING 1
-#define DIRECT_LIGHTING 0
+#define DIRECT_LIGHTING 1
 
-#define DEPTH_OF_FIELD 1
+#define DEPTH_OF_FIELD 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)

@@ -50,7 +50,7 @@ EMITTANCE   0
 
 // Specular Blue
 MATERIAL 5
-RGB         .35 .35 .85
+RGB         .19 .878 .96
 SPECEX      0
 SPECRGB     .98 .98 .98
 REFL        0.75
@@ -98,7 +98,7 @@ FILE        cornell
 EYE         0.0 5 10.5
 LOOKAT      0 5 0
 UP          0 1 0
-FOCAL       7.5
+FOCAL       5.0
 APERTURE    0.5
 
 
@@ -187,5 +187,21 @@ OBJECT 10
 sphere
 material 5
 TRANS       -3 4 7
+ROTAT       0 0 0
+SCALE       2 2 2
+
+// Sphere
+OBJECT 11
+sphere
+material 5
+TRANS       2 4 -3
+ROTAT       0 0 0
+SCALE       2 2 2
+
+// Sphere
+OBJECT 12
+sphere
+material 5
+TRANS       3 4 -5
 ROTAT       0 0 0
 SCALE       2 2 2
