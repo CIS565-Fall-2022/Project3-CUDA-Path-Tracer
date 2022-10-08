@@ -209,9 +209,32 @@ void scatterRay(
 
     float randGen = u01(rng);
 
-    if (randGen <= m.hasReflective) {
-        // take a reflective ray
+    // if perfectly specular
+    if (m.hasReflective == 1) {
         glm::vec3 newDirection = glm::reflect(pathSegment.ray.direction, normal);
+        Ray newRay = {
+            intersect,
+            newDirection
+        };
+
+        PathSegment newPath = {
+            newRay,
+            m.specular.color * m.color * pathSegment.color * m.hasReflective,
+            pathSegment.pixelIndex,
+            pathSegment.remainingBounces
+        };
+
+        pathSegment = newPath;
+    }
+    else if (randGen <= m.hasReflective) {
+        // if not perfectly specular
+
+        thrust::uniform_real_distribution<float> u02(0.1, 0.2);
+        float jitterX = u02(rng);
+        float jitterY = u02(rng);
+
+        glm::vec3 perfectSpecularDir = glm::reflect(pathSegment.ray.direction, normal);
+        glm::vec3 newDirection = glm::normalize(glm::vec3(perfectSpecularDir[0] + jitterX, perfectSpecularDir[1] + jitterY, perfectSpecularDir[2])); // todo change this direction
         Ray newRay = {
             intersect,
             newDirection
