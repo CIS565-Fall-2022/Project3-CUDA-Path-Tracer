@@ -49,7 +49,7 @@ In this project, I implemented a CUDA path tracer for the GPU. Previously in Adv
 
 ![](img/refractiveKitty.png)
 
-### UV Texture and Bump Mapping
+### UV Texture, Procedural Texture and Bump Mapping
 
 ![](img/completeMario2.png)
 
@@ -57,6 +57,7 @@ In this project, I implemented a CUDA path tracer for the GPU. Previously in Adv
 
 ![](img/yesBumpmap.png)
 
+![](img/procedural.png)
 
 ## Performance Analysis
 
