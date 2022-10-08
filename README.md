@@ -61,7 +61,7 @@ We can set the focal length of our camera to focus on foreground, mid-ground or 
 
 Using sdf operations
 
-![](img/procedural2.png)
+![](img/proceduralAnnotate.png)
 
 ## Aritrary obj mesh loading
 
