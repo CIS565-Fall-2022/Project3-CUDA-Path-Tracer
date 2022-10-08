@@ -11,7 +11,7 @@ CUDA Path Tracer
 ![](img/title.png)
 
 - Scene file: title.txt
-- Resolution : 1024 x 1024
+- Resolution : 800 x 800
 - Iteration : 5000
 
 * GLTF mesh loading with [tinyGLTF](https://github.com/syoyo/tinygltf)
