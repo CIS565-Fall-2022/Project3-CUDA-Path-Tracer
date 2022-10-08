@@ -14,7 +14,7 @@ CUDA Path Tracer
 - Resolution : 1024 x 1024
 - Iteration : 5000
 
-* GLTF mesh loading
+* GLTF mesh loading with [tinyGLTF](https://github.com/syoyo/tinygltf)
 * Texture mapping
 * Physically based depth of field
 
