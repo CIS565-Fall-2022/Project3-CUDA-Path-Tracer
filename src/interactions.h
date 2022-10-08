@@ -43,6 +43,101 @@ glm::vec3 calculateRandomDirectionInHemisphere(
         + sin(around) * over * perpendicularDirection2;
 }
 
+#if USE_PROCEDURAL_TEXTURE
+__host__ __device__
+float fract(float x)
+{
+    return x - floorf(x);
+}
+
+__host__ __device__
+float mix(float x, float y, float a) {
+    return x * (1.f - a) + y * a;
+}
+
+__host__ __device__
+//FBM NOISE FIRST VARIANT
+float random3D(glm::vec3 p) {
+    return sin(glm::length(glm::vec3(fract(glm::dot(p, glm::vec3(161.1, 121.8, 160.2))),
+        fract(glm::dot(p, glm::vec3(120.5, 161.3, 160.4))),
+        fract(glm::dot(p, glm::vec3(161.4, 161.2, 122.5))))) * 435.90906);
+}
+
+__host__ __device__
+float interpolateNoise3D(float x, float y, float z)
+{
+    int intX = int(floor(x));
+    float fractX = fract(x);
+    int intY = int(floor(y));
+    float fractY = fract(y);
+    int intZ = int(floor(z));
+    float fractZ = fract(z);
+
+    float v1 = random3D(glm::vec3(intX, intY, intZ));
+    float v2 = random3D(glm::vec3(intX + 1, intY, intZ));
+    float v3 = random3D(glm::vec3(intX, intY + 1, intZ));
+    float v4 = random3D(glm::vec3(intX + 1, intY + 1, intZ));
+
+    float v5 = random3D(glm::vec3(intX, intY, intZ + 1));
+    float v6 = random3D(glm::vec3(intX + 1, intY, intZ + 1));
+    float v7 = random3D(glm::vec3(intX, intY + 1, intZ + 1));
+    float v8 = random3D(glm::vec3(intX + 1, intY + 1, intZ + 1));
+
+
+    float i1 = mix(v1, v2, fractX);
+    float i2 = mix(v3, v4, fractX);
+
+    //mix between i1 and i2
+    float i3 = mix(i1, i2, fractY);
+
+    float i4 = mix(v5, v6, fractX);
+    float i5 = mix(v7, v8, fractX);
+
+    //mix between i3 and i4
+    float i6 = mix(i4, i5, fractY);
+
+    //mix between i3 and i6
+    float i7 = mix(i3, i6, fractZ);
+
+    return i7;
+}
+
+__host__ __device__
+float fbmNoise(float x, float y, float z)
+{
+    float total = 0.0;
+    float persistence = 0.3;
+    float frequency = 2.0;
+    float amplitude = 6.0;
+    int octaves = 2;
+
+    for (int i = 1; i <= octaves; i++) {
+        total += amplitude * interpolateNoise3D(frequency * x, frequency * y, frequency * z);
+        frequency *= 2.0;
+        amplitude *= persistence;
+    }
+    return total;
+}
+
+__host__ __device__
+glm::vec3 proceduralTexture(glm::vec3 pos, const Material& m) {
+    float noise = fbmNoise(pos.x, pos.y, pos.z);
+    glm::vec3 pink = glm::vec3(217.f, 93.f, 184.f) / 255.f;
+    glm::vec3 blue = glm::vec3(81.f, 187.f, 245.f) / 255.f;
+
+    glm::vec3 surfaceColor = glm::vec3(0.f);
+    if (noise > 0.5) {
+        surfaceColor = blue;
+    }
+    else {
+        surfaceColor = pink;
+    }
+
+    return surfaceColor;
+}
+
+#endif
+
 /**
  * Scatter a ray with some probabilities according to the material properties.
  * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
@@ -99,7 +194,6 @@ void scatterRay(
     if (texid != -1) {
         float u = uv[0];
         float v = uv[1];
-
 
         float4 finalcol = tex2D<float4>(texObject, u, v);
         pointColor = glm::vec3(finalcol.x, finalcol.y, finalcol.z);
@@ -195,7 +289,11 @@ void scatterRay(
     glm::vec3 intersect,
     glm::vec3 normal,
     const Material& m,
-    thrust::default_random_engine& rng) {
+    thrust::default_random_engine& rng
+#if USE_PROCEDURAL_TEXTURE
+    , bool hasHitObj
+#endif
+) {
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
@@ -209,6 +307,15 @@ void scatterRay(
 
     float randGen = u01(rng);
 
+    glm::vec3 pointColor = m.color;
+
+#if USE_PROCEDURAL_TEXTURE && LOAD_OBJ
+    if (hasHitObj) {
+        // if this ray has hit an obj
+        pointColor = proceduralTexture(intersect, m);
+    }
+#endif
+
     // if perfectly specular
     if (m.hasReflective == 1) {
         glm::vec3 newDirection = glm::reflect(pathSegment.ray.direction, normal);
@@ -219,7 +326,7 @@ void scatterRay(
 
         PathSegment newPath = {
             newRay,
-            m.specular.color * m.color * pathSegment.color * m.hasReflective,
+            m.specular.color * pointColor * pathSegment.color * m.hasReflective,
             pathSegment.pixelIndex,
             pathSegment.remainingBounces
         };
@@ -242,7 +349,7 @@ void scatterRay(
 
         PathSegment newPath = {
             newRay,
-            m.specular.color * m.color * pathSegment.color * m.hasReflective,
+            m.specular.color * pointColor * pathSegment.color * m.hasReflective,
             pathSegment.pixelIndex,
             pathSegment.remainingBounces
         };
@@ -276,7 +383,7 @@ void scatterRay(
             newDirection = glm::normalize(glm::refract(pathSegment.ray.direction, normal, eta));
         }
 
-        glm::vec3 newColor = pathSegment.color * m.color * m.specular.color;
+        glm::vec3 newColor = pathSegment.color * pointColor * m.specular.color;
 
         Ray newRay = {
             intersect + 0.001f * pathSegment.ray.direction,
@@ -299,10 +406,6 @@ void scatterRay(
             intersect,
             newDirection
         };
-
-        glm::vec3 pointColor;
-
-        pointColor = m.color;
 
         PathSegment newPath = {
             newRay,

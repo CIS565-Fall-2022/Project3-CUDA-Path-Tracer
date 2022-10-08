@@ -93,7 +93,6 @@ static ShadeableIntersection* dev_intersections = NULL;
 static ShadeableIntersection* dev_cached_intersections = NULL;
 #endif
 
-// static Texture* dev_texData = NULL;
 static Texture* dev_textures = NULL;
 static std::vector<cudaArray_t> dev_texData;
 static std::vector<cudaTextureObject_t> host_textureObjs;
@@ -199,7 +198,6 @@ void pathtraceInit(Scene* scene) {
 		cudaMemcpy(&dev_textureChannels[i], &scene->textures[i].channels, sizeof(int), cudaMemcpyHostToDevice);
 		checkCUDAError("cudaMalloc dev_textureChannels failed");
 	}
-
 
 	cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
 	checkCUDAError("cudaMalloc dev_textures failed");
@@ -366,10 +364,12 @@ __global__ void computeIntersections(
 		int hit_geom_index = -1;
 		glm::vec2 uv = glm::vec2(-1, -1);
 		bool outside = true;
+		bool hitObj; // for use in procedural texturing
 
 		glm::vec3 tmp_intersect;
 		glm::vec3 tmp_normal;
 		glm::vec2 tmp_uv = glm::vec2(-1, -1);
+		bool tmpHitObj = false;
 
 		// naive parse through global geoms
 
@@ -382,10 +382,12 @@ __global__ void computeIntersections(
 			if (geom.type == CUBE)
 			{
 				t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				tmpHitObj = false;
 			}
 			else if (geom.type == SPHERE)
 			{
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				tmpHitObj = false;
 			}
 			else if (geom.type == OBJ) {
 				float boxT = boundBoxIntersectionTest(&geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
@@ -399,6 +401,8 @@ __global__ void computeIntersections(
 #else
 						t = triangleIntersectionTest(&geom, &geom.device_tris[j], pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
 #endif
+						tmpHitObj = true;
+
 						if (t > 0.0f && t_min > t)
 						{
 							t_min = t;
@@ -406,6 +410,7 @@ __global__ void computeIntersections(
 							intersect_point = tmp_intersect;
 							normal = tmp_normal;
 							uv = tmp_uv;
+							hitObj = tmpHitObj;
 						}
 					}
 				}
@@ -419,6 +424,7 @@ __global__ void computeIntersections(
 #else
 				t = triangleIntersectionTest(&geom, &geom.device_tris[0], pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
 #endif
+				tmpHitObj = true;
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
@@ -429,6 +435,7 @@ __global__ void computeIntersections(
 				intersect_point = tmp_intersect;
 				normal = tmp_normal;
 				uv = tmp_uv;
+				hitObj = tmpHitObj;
 			}
 		}
 
@@ -445,6 +452,7 @@ __global__ void computeIntersections(
 			intersections[path_index].surfaceNormal = normal;
 			intersections[path_index].uv = uv;
 			intersections[path_index].textureId = geoms[hit_geom_index].textureid;
+			intersections[path_index].hasHitObj = hitObj;
 
 			pathSegments[path_index].remainingBounces--;
 		}
@@ -587,6 +595,9 @@ __global__ void kernComputeShade(
 				cudaTextureObject_t texObj = textureObjs[intersection.textureId];
 				int channels = numChannels[intersection.textureId];
 				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, intersection.textureId, intersection.uv, material, /*texture,*/ texObj, channels, rng);
+
+#elif USE_PROCEDURAL_TEXTURE		
+				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, material, rng, intersection.hasHitObj);
 #else
 				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, material, rng);
 #endif

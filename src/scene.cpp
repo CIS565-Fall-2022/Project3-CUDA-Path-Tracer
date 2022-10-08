@@ -8,8 +8,6 @@
 
 #include "tiny_obj_loader.h"
 
-#define LOAD_OBJ 1
-
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;

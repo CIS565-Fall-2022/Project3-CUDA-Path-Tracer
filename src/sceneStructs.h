@@ -7,8 +7,11 @@
 #include "image.h"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
+
+#define LOAD_OBJ 1
 #define USE_BOUND_BOX 0
 #define USE_UV 0
+#define USE_PROCEDURAL_TEXTURE 1 // cannot be on at the same time as USE_UV
 #define BUMP_MAP 0
 
 enum GeomType {
@@ -116,4 +119,5 @@ struct ShadeableIntersection {
     int materialId;
     int textureId;
     glm::vec2 uv;
+    bool hasHitObj = false;
 };
