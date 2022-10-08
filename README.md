@@ -27,7 +27,17 @@ In this project, I implemented a CUDA path tracer for the GPU. Previously in Adv
 ![](img/Refractive.png)
 
 ### Depth of Field
+
+![](img/noDepthOfField.png)
+
+![](img/depthFieldFinal.png)
+
 ### Stochastic Sampled Anti-Aliasing
+
+![](img/noAntialiasing.png)
+
+![](img/antialiasing5000samp.png)
+
 ### Direct Lighting
 ### Arbitrary Mesh Loading with TinyObjLoader
 ### UV Texture and Bump Mapping
