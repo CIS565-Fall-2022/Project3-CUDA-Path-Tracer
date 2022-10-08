@@ -10,6 +10,11 @@
 #include <thrust/device_vector.h>
 #include <thrust/partition.h>
 
+#include <glm/gtx/intersect.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
+
+
 #include "sceneStructs.h"
 #include "scene.h"
 #include "glm/glm.hpp"
@@ -18,6 +23,7 @@
 #include "pathtrace.h"
 #include "intersections.h"
 #include "interactions.h"
+
 
 
 #define ERRORCHECK 1
@@ -29,6 +35,7 @@
 #define CACHING 0
 #define ANTIALIASING 1
 #define THINLENS 1
+#define MOTIONBLUR 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -223,6 +230,15 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 	}
 }
 
+__device__ glm::mat4 devBuildTransformationMatrix(glm::vec3 translation, glm::vec3 rotation, glm::vec3 scale) {
+	glm::mat4 translationMat = glm::translate(glm::mat4(), translation);
+	glm::mat4 rotationMat = glm::rotate(glm::mat4(), rotation.x * (float)PI / 180, glm::vec3(1, 0, 0));
+	rotationMat = rotationMat * glm::rotate(glm::mat4(), rotation.y * (float)PI / 180, glm::vec3(0, 1, 0));
+	rotationMat = rotationMat * glm::rotate(glm::mat4(), rotation.z * (float)PI / 180, glm::vec3(0, 0, 1));
+	glm::mat4 scaleMat = glm::scale(glm::mat4(), scale);
+	return translationMat * rotationMat * scaleMat;
+}
+
 // TODO:
 // computeIntersections handles generating ray intersections ONLY.
 // Generating new rays is handled in your shader(s).
@@ -234,6 +250,7 @@ __global__ void computeIntersections(
 	, Geom* geoms
 	, int geoms_size
 	, ShadeableIntersection* intersections
+	, int iter
 )
 {
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -252,12 +269,26 @@ __global__ void computeIntersections(
 		glm::vec3 tmp_intersect;
 		glm::vec3 tmp_normal;
 
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, path_index, 0);
+		thrust::uniform_real_distribution<float> u01(0, 1);
+
 		// naive parse through global geoms
 
 		for (int i = 0; i < geoms_size; i++)
 		{
-			Geom& geom = geoms[i];
+#ifdef MOTIONBLUR == 1
+			Geom geom = geoms[i];
 
+			geom.translation += glm::vec3(u01(rng)) * geom.velocity;
+
+
+			geom.transform = devBuildTransformationMatrix(
+				geom.translation, geom.rotation, geom.scale);
+			geom.inverseTransform = glm::inverse(geom.transform);
+			geom.invTranspose = glm::inverseTranspose(geom.transform);
+#else
+			Geom &geom = geoms[i];
+#endif
 			if (geom.type == CUBE)
 			{
 				t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
@@ -411,9 +442,7 @@ __global__ void shadeBSDF(
 		else {
 			pathSegments[idx].color = glm::vec3(0.0f);
 			pathSegments[idx].remainingBounces = 0;
-			//pathSegments[idx].remainingBounces--;
 		}
-		//pathSegments[idx].remainingBounces--;
 	}
 }
 
@@ -530,6 +559,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, dev_geoms
 			, hst_scene->geoms.size()
 			, dev_intersections
+			, iter
 			);
 #endif
 		checkCUDAError("trace one bounce");

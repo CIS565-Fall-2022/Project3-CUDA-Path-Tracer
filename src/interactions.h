@@ -2,6 +2,8 @@
 
 #include "intersections.h"
 
+#define DIRECTLIGHT 1
+
 // CHECKITOUT
 /**
  * Computes a cosine-weighted random direction in a hemisphere.
@@ -109,10 +111,10 @@ void scatterRay(
     pathSegment.color *= m.color;
     thrust::uniform_real_distribution<float> u01(0, 1);
     
-    if (m.hasReflective) {
-        pathSegment.ray.direction = (u01(rng) > 0.3) ? jitterRay(glm::reflect(pathSegment.ray.direction, normal), rng, 0.f) : calculateRandomDirectionInHemisphere(normal, rng);
+    if (m.hasReflective > 0.f) {
+        pathSegment.ray.direction = (u01(rng) < m.hasReflective) ? jitterRay(glm::reflect(pathSegment.ray.direction, normal), rng, 0.f) : calculateRandomDirectionInHemisphere(normal, rng);
     }
-    else if (m.hasRefractive) {
+    else if (m.hasRefractive > 0.f) {
         float costheta = glm::dot(normal, -pathSegment.ray.direction);
         bool entering = costheta > 0;
         float r_not = glm::pow((1.5 - 1) / (1.5 + 1), 2);
@@ -129,6 +131,7 @@ void scatterRay(
             pathSegment.ray.direction = glm::refract(pathSegment.ray.direction, normal, eta);
         }
     }
+#if DIRECTLIGHT == 1
     else if (pathSegment.remainingBounces == 1) {
         int light_idx = glm::floor(u01(rng) * num_lights);
         Geom light = lights[light_idx];
@@ -143,6 +146,7 @@ void scatterRay(
         }
         pathSegment.ray.direction = glm::normalize(sample - pathSegment.ray.origin);
     }
+#endif
     else {
         pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
     }
