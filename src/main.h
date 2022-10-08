@@ -2,7 +2,7 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-
+#include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 #include <fstream>
@@ -13,12 +13,19 @@
 #include <sstream>
 #include <stdlib.h>
 #include <string>
-
+#include <cstdio>
+#include <cstring>
+#include <cmath>
+#include <algorithm>
+#include <chrono>
+#include <stdexcept>
 #include "sceneStructs.h"
 #include "image.h"
 #include "pathtrace.h"
 #include "utilities.h"
 #include "scene.h"
+
+
 
 using namespace std;
 

@@ -1,0 +1,220 @@
+// Emissive material (light)
+MATERIAL 0
+RGB         1 1 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   6
+TEXTURE NONE
+BUMP NONE
+
+// Diffuse white
+MATERIAL 1
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+// Diffuse red
+MATERIAL 2
+RGB         .85 .35 .35
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+// Diffuse green
+MATERIAL 3
+RGB         .35 .85 .35
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+// Specular white(glass)
+MATERIAL 4
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        1
+REFRIOR     1.52
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+//International Klein Blue
+MATERIAL 5
+RGB         0.1 0.24 0.63
+SPECEX      0
+SPECRGB     0.1 0.24 0.63
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+//water 
+MATERIAL 6
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        1
+REFRIOR     1.333
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+//reflective
+MATERIAL 7
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+// Camera
+CAMERA
+RES         1200 1200
+FOVY        50
+ITERATIONS  5000
+DEPTH       8
+FILE        cornell
+EYE         0.0 5 10.5
+LOOKAT      0 5 0
+UP          0 1 0
+
+
+// Ceiling light
+OBJECT 0
+cube
+material 0
+TRANS       0 10 0
+ROTAT       0 0 0
+SCALE       4 .3 6
+
+// Ceiling light
+OBJECT 1
+cube
+material 0
+TRANS       -5 10 0
+ROTAT       0 0 0
+SCALE       4 .3 6
+
+// Ceiling light
+OBJECT 2
+cube
+material 0
+TRANS       5 10 0
+ROTAT       0 0 0
+SCALE       4 .3 6
+
+// Floor
+OBJECT 3
+cube
+material 4
+TRANS       0 0 0
+ROTAT       0 0 0
+SCALE       18 .01 12
+
+// Ceiling
+OBJECT 4
+cube
+material 1
+TRANS       0 10 0
+ROTAT       0 0 90
+SCALE       .01 18 12
+
+// Back wall
+OBJECT 5
+gltf
+../scenes/models/Box/Box.gltf
+material -1
+TRANS       0 5 -5
+ROTAT       0 0 0
+SCALE       18 10 0.01
+
+// Left wall
+OBJECT 6
+cube
+material 5
+TRANS       -9 5 0
+ROTAT       0 0 0
+SCALE       .01 10 12
+
+// Right wall
+OBJECT 7
+cube
+material 3
+TRANS       9 5 0
+ROTAT       0 0 0
+SCALE       .01 10 15
+
+// Standing 1
+OBJECT 8
+cube
+material 1
+TRANS       -4 2 2
+ROTAT       0 0 0
+SCALE       2.5 4 2.5
+
+//Standing 2
+OBJECT 9
+cube
+material 1
+TRANS       0 2 0
+ROTAT       0 0 0
+SCALE       2.5 4 2.5
+
+//Standing 3
+OBJECT 10
+cube
+material 1
+TRANS       4 2 -2
+ROTAT       0 0 0
+SCALE       2.5 4 2.5
+
+//Diffuse Ball
+OBJECT 11
+sphere
+material 5
+TRANS       -4 5 2
+ROTAT       0 0 0
+SCALE       2 2 2
+
+//Reflective Ball
+OBJECT 12
+sphere
+material 7
+TRANS       0 5 0
+ROTAT       0 0 0
+SCALE       2 2 2
+
+//Refraction
+OBJECT 13
+sphere
+material 4
+TRANS       4 5 -2
+ROTAT       0 0 0
+SCALE       2 2 2

@@ -1,0 +1,247 @@
+// Emissive material (light)
+MATERIAL 0
+RGB         1 1 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   10
+TEXTURE NONE
+BUMP NONE
+
+// Diffuse white
+MATERIAL 1
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+// Diffuse red
+MATERIAL 2
+RGB         .85 .35 .35
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+// Diffuse green
+MATERIAL 3
+RGB         .35 .85 .35
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+// Specular white
+MATERIAL 4
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        1
+REFRIOR     1.52
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+//International Klein Blue
+MATERIAL 5
+RGB         0.1 0.24 0.63
+SPECEX      0
+SPECRGB     0.1 0.24 0.63
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+//water 
+MATERIAL 6
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        1
+REFRIOR     1.333
+EMITTANCE   0
+TEXTURE NONE
+BUMP NONE
+
+//fish
+MATERIAL 7
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+TEXTURE ../scenes/models/Waterbottle/WaterBottle_baseColor.png
+BUMP ../scenes/models/Waterbottle/WaterBottle_normal.png
+
+// Camera
+CAMERA
+RES         800 800
+FOVY        40
+ITERATIONS  5000
+DEPTH       8
+FILE        cornell
+EYE         0.0 5 10.5
+LOOKAT      0 5 0
+UP          0 1 0
+
+
+// Ceiling light
+OBJECT 0
+cube
+material 0
+TRANS       0 10 0
+ROTAT       0 0 0
+SCALE       3 .3 3
+
+// Floor
+OBJECT 1
+cube
+material 1
+TRANS       0 0 0
+ROTAT       0 0 0
+SCALE       15 .01 10
+
+// Ceiling
+OBJECT 2
+cube
+material 1
+TRANS       0 10 0
+ROTAT       0 0 90
+SCALE       .01 15 10
+
+// Back wall
+OBJECT 3
+cube
+material 2
+TRANS       0 5 -5
+ROTAT       0 90 0
+SCALE       .01 10 15
+
+// Left wall
+OBJECT 4
+cube
+material 5
+TRANS       -7.5 5 0
+ROTAT       0 0 0
+SCALE       .01 10 10
+
+// Right wall
+OBJECT 5
+cube
+material 3
+TRANS       7.5 5 0
+ROTAT       0 0 0
+SCALE       .01 10 10
+
+//Front Wall(glass)
+OBJECT 6
+cube
+material 4
+TRANS       0 5 5
+ROTAT       0 90 0
+SCALE       .01 10 15
+
+//Water 
+OBJECT 7
+cube
+material 6
+TRANS       0 4 0
+ROTAT       0 0 0
+SCALE       15 7 5
+
+//fish1
+OBJECT 8
+gltf
+../scenes/models/Fish/BarramundiFish.gltf
+material -1
+TRANS       2 7 -1
+ROTAT       0 90 0
+SCALE       4 4 4
+
+//fish2
+OBJECT 9
+gltf
+../scenes/models/Fish/BarramundiFish.gltf
+material -1
+TRANS       3 1 -1
+ROTAT       0 80 0
+SCALE       8 8 8
+
+//fish3
+OBJECT 10
+gltf
+../scenes/models/Fish/BarramundiFish.gltf
+material -1
+TRANS       3 4 -1
+ROTAT       0 80 0
+SCALE       4 4 4
+
+//waterbottle
+OBJECT 11
+gltf
+../scenes/models/Waterbottle/WaterBottle.gltf
+material -1
+TRANS       -4 7.5 -1
+ROTAT       75 0 90
+SCALE       15 15 15
+
+//bubbles
+OBJECT 12
+sphere
+material 4
+TRANS       0.25 2.25 -1
+ROTAT       0 80 0
+SCALE       0.5 0.5 0.5
+
+//bubbles
+OBJECT 13
+sphere
+material 4
+TRANS       -0.5 3 -1
+ROTAT       0 80 0
+SCALE       1 1 1
+
+//box in the sand
+OBJECT 14
+cube
+material 4
+TRANS       -4 1 -1
+ROTAT       0 0 0
+SCALE       2 2 2
+
+//box on the box
+OBJECT 15
+cube
+material 5
+TRANS       -4 3 -1
+ROTAT       45 0 45
+SCALE       1 1 1
+
+//bubbles
+OBJECT 16
+sphere
+material 4
+TRANS       1.5 4.7 -1
+ROTAT       0 80 0
+SCALE       0.3 0.3 0.3

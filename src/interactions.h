@@ -209,7 +209,8 @@ void scatterRayGLTF(
     glm::vec4 tangent,
     const Material& m,
     thrust::default_random_engine& rng,
-    cudaTextureObject_t* textures) {//this function has help and is referenced from our TA Wayne Wu
+    cudaTextureObject_t* textures,
+    glm::vec3* texData) {//this function has help and is referenced from our TA Wayne Wu
 
     if (pathSegment.remainingBounces == 0) return;
     thrust::uniform_real_distribution<float> u01(0, 1);
@@ -253,6 +254,15 @@ void scatterRayGLTF(
         glm::mat3 tbn = glm::mat3(tan, bitan, normal);
         normal = glm::normalize(tbn * normal);
     }
+
+    //texture mapping
+    //if (m.tex.TexIndex >= 0) {
+    //    int w = m.tex.width;
+    //    int x = uv.x * (w - 1);
+    //    int y = uv.y * (m.tex.height - 1);
+    //    //pathSegment.color *= textures->image[m.tex.TexIndex + y * w + x];
+    //    pathSegment.color *= texData[m.tex.TexIndex + y * w + x];
+    //}
 
     if (u01(rng) < metal) {
         // Specular

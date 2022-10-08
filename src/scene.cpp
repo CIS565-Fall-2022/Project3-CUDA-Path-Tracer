@@ -82,6 +82,7 @@ int Scene::loadGeom(string objectid) {
         utilityCore::safeGetline(fp_in, line);
         while (!line.empty() && fp_in.good()) {
             vector<string> tokens = utilityCore::tokenizeString(line);
+
             //load tranformations
             if (strcmp(tokens[0].c_str(), "TRANS") == 0) {
                 newGeom.translation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
@@ -188,6 +189,7 @@ int Scene::loadMaterial(string materialid) {
             if (strcmp(tokens[0].c_str(), "RGB") == 0) {
                 glm::vec3 color( atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()) );
                 newMaterial.color = color;
+                newMaterial.pbrMetallicRoughness.baseColorFactor = color;
             } else if (strcmp(tokens[0].c_str(), "SPECEX") == 0) {
                 newMaterial.specular.exponent = atof(tokens[1].c_str());
             } else if (strcmp(tokens[0].c_str(), "SPECRGB") == 0) {
@@ -195,12 +197,16 @@ int Scene::loadMaterial(string materialid) {
                 newMaterial.specular.color = specColor;
             } else if (strcmp(tokens[0].c_str(), "REFL") == 0) {
                 newMaterial.hasReflective = atof(tokens[1].c_str());
+
+                newMaterial.pbrMetallicRoughness.metallicFactor = newMaterial.hasReflective;
+                newMaterial.pbrMetallicRoughness.roughnessFactor = 0.0;
             } else if (strcmp(tokens[0].c_str(), "REFR") == 0) {
                 newMaterial.hasRefractive = atof(tokens[1].c_str());
             } else if (strcmp(tokens[0].c_str(), "REFRIOR") == 0) {
                 newMaterial.indexOfRefraction = atof(tokens[1].c_str());
             } else if (strcmp(tokens[0].c_str(), "EMITTANCE") == 0) {
                 newMaterial.emittance = atof(tokens[1].c_str());
+                //newMaterial.emissiveFactor = newMaterial.emittance * newMaterial.color;
             }
             else if (strcmp(tokens[0].c_str(), "TEXTURE") == 0) {
                 tex = &newMaterial.tex;
@@ -389,10 +395,11 @@ int Scene::loadGLTF(string filename, Geom& geom) {
             }
         }
     }
+    
     geom.primEnd = primitives.size();
     
     /*std::cout << geom.aabb_min.x << " " << geom.aabb_min.y << " " << geom.aabb_min.z << endl;
     std::cout << geom.aabb_max.x << " " << geom.aabb_max.y << " " << geom.aabb_max.z << endl;*/
-    //std::cout << primitives.size() << " " << geom.primBegin << " " << geom.primEnd << std::endl;
+    std::cout << primitives.size() << " " << geom.primBegin << " " << geom.primEnd << std::endl;
     return 1;
 }
