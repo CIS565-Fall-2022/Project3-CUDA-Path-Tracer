@@ -17,9 +17,11 @@ Ray-tracing is a computer graphics technique in which we calculate the exact pat
 
 Since this technique involves computing a large number of rays independently, it can be highly parallelized. In this project, I have used CUDA to compute intersections and shading per iteration for multiple rays parallelly.
 
-![](img/demoSceneAnnotate.png)
-
 ## Features
+
+|Implemented features|
+|---|
+|![](img/demoSceneAnnotate.png)|
 
 Some of the visual improvements implemented include:
 - [Specular refraction and reflection](#specular-refraction-and-reflection)
@@ -45,11 +47,13 @@ The following render has a cube placed inside spheres of varying refractive inde
 
 ![](img/dof_focaldist12.png)
 
-|The following renders of a string of pearls show depth of field as cameras with different lens radius generate varying depth of field.|
+The following renders of a string of pearls show depth of field as cameras with different lens radius generate varying depth of field.
+|As lens radius increases, the blur/jitter on non-focused objects increases|
 |---|
 | ![](img/dof_lensRadius.png) |
 
-|We can set the focal length of our camera to focus on foreground, mid-ground or background. The render comparisons are as follows.|
+We can set the focal length of our camera to focus on foreground, mid-ground or background. The render comparisons are as follows.
+|Lesser focal length focuses on objects closer to camera and blurs the rest|
 |---|
 |![](img/dof_focalDist.png)|
 
