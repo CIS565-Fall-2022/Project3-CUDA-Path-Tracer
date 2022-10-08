@@ -67,5 +67,5 @@ Using sdf operations
 
 Implemented OBJ mesh loading tested within bounding box
 
-![](img/objLoading.png)
+![](img/objLoading2.png)
  
