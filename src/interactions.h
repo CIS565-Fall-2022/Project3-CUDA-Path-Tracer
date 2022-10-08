@@ -111,7 +111,10 @@ void scatterRay(    // similar to sample_f, calculate the new wi and f
     float random = u01(rng);
 
     if (m.proceduralTex == 1) {
-        color = getProceduralColor(pathSegment, intersect, normal);
+        color = getProceduralColor1(pathSegment, intersect, normal, m.color);
+    }
+    else if (m.proceduralTex == 2) {
+        color = getProceduralColor2(pathSegment, intersect, normal, m.color);
     }
     else {
         color = glm::vec3(1.f, 1.f, 1.f);

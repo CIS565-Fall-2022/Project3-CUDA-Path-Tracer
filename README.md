@@ -12,7 +12,6 @@ CUDA Path Tracer
 
 
 # Introduction
----
 
 Ray-tracing is a computer graphics technique in which we calculate the exact path of reflection or refraction of each ray and trace them all the way back to one or more light sources. Path tracing is a specific form of ray tracing that simulates the way light scatters off surfaces and through media, by generating multiple rays for each pixel(sampling) and bouncing off those rays based on material properties.
 
@@ -21,7 +20,6 @@ Since this technique involves computing a large number of rays independently, it
 ![](img/demoScene.png)
 
 # Features
----
 
 Some of the visual improvements implemented include:
 - [Specular refraction and reflection](specular-refraction-and-reflection)
@@ -36,13 +34,12 @@ Some performance improvements implemented include:
 - Sorting rays by material
 
 # Visual Improvements
----
 
 ## Specular refraction and reflection
 
 Implemented diffused, specular reflective, specular refractive, glass
 
-![](img/materialTypes.png)
+![](img/materialTypes2.png)
 
 ## Physically based depth of field
 
