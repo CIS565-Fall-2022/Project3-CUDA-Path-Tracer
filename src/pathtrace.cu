@@ -4,6 +4,8 @@
 #include <thrust/execution_policy.h>
 #include <thrust/device_ptr.h>
 #include <thrust/partition.h>
+#include <thrust/remove.h>
+
 #include <thrust/random.h>
 #include <thrust/sort.h>
 #include "sceneStructs.h"
@@ -550,7 +552,11 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 		cudaDeviceSynchronize();
 
 #ifdef COMPACTION
+#ifdef COMPACTION_USE_PARTITION
 		num_paths = thrust::partition(dev_thrust_paths, dev_thrust_paths + num_paths, PathSegment::PartitionRule()) - dev_thrust_paths;
+#else
+		num_paths = thrust::remove_if(dev_thrust_paths, dev_thrust_paths + num_paths, PathSegment::RemoveRule()) - dev_thrust_paths;
+#endif // COMPACTION_USE_PARTITION
 #endif // COMPACTION
 
 #ifdef MAX_DEPTH_OVERRIDE

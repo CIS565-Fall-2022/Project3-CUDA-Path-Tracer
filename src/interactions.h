@@ -321,9 +321,6 @@ struct BSDF {
             }
         }
 
-        wi = -wo;
-        pdf = 1;
-        return reflectance;
         wi = glm::vec3(0);
         pdf = 0;
         return glm::vec3(0);

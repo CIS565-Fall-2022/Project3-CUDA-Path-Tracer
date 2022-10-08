@@ -86,11 +86,40 @@
 ![](./img/Texture/spider2.png)
 
 ## Performance Improvements
+### Stream Compaction
+- An iteration takes as long as the longest traced path to complete
+- Each segment of a path is a ray and is handled by a kernel instance
+- A pool of rays is maintained, and at each iteration we check if there are any unfinished paths. It would be inefficient to loop through all rays and check if a ray has any remaining bounces. Stream Compaction is used to partition the rays so that those with remaining bounces are grouped together.
+
+### Material Sorting
+- Each material has a differnt BSDF, and some of them may be significantly more complex and take longer to compute than others.
+- If we process sampling points with no defined order, then there is a good chance the threads in a single warp will handle all kinds of materials. This causes considerable warp divergence and lowers the performance.
+- Sorting sampling points by material is a good way to reduce warp divergence.
+
+### First Bounce Cache
+- It is also possible to cache the intersection points of the first-bounce rays. These points will always stay the same regardless of the number of iterations. It is only true for the first bounce because the BSDFs often utilize random numbers to determine ray directions.
+- Note: this optimization does not play well with Anti-aliasing which causes the first-bounce intersections to be non-deterministic.
+
+### Performance Impact by the above optimizations
+![](./img/Visual/cover_small.png)
+- The sample scene is used for the test. It consists of all the materials (6 in total) supported by this path tracer. The scene only contains simple shapes to minimize the variation introduced by intersection tests.
+- One optimization technique will be applied at a time and its performance measured.
+- Tested on Windows 10, i7-8700 @ 3.20 GHz 16GB, RTX 2070
+- Average time spent to render a frame is used as the metric of performance.
+![](./img/chart0.png)
+- **You are not seeing this wrong.** The performance actually got worse when optimizations are applied.
+- I think it has something to do with the thrust library used for sorting & partition.
+- I did some profiling and found that thrust functions take a lot of compute cycles and have a low compute throughput. Maybe there is an unintended CPU-to-GPU copy every iteration?
+- I will do more research and hopefully provide an explanation.
+![](./img/issue.jpg)
+
+
 ### AABB Culling
 - Each object is assigned an AABB (Axis-Aligned Bounding Box)
 - During the intersection test, the object's AABB will always be tested against the ray first.
 - This is especially useful in scenes where there are lots of complex yet small meshes, because if a ray does not intersect with the AABB of a mesh (which happens a lot in such scenes), we can skip a great number of ray-triangle intersection tests.
-- TODO: performance data
+![](./img/Octree/aabb.png)
+
 
 ### Octree
 - An octree can be viewed as a 3D version of a binary tree; it recursively and evenly divides a cube into 8 smaller cubes.
@@ -98,16 +127,55 @@
 	- we have reached a pre-configured depth limit
 	- or there is nothing but vacuum in the current AABB
 - When we reach a leaf node, we store information about the objects it contains. Intermediate nodes do not contain object information.
-- The octree is first constructed on the CPU and uploaded to the GPU where it is read-only.
+- The octree is first constructed top-down on the CPU and uploaded to the GPU where it is read-only.
 	- any operations that modify its internal states are not supported on GPU.
 - I have implemented a tool based on Imgui that helps with debugging and visualizing the octree, as shown below.
+
 ![](./img/Octree/demo.gif)
-- However, an octree **does not** always outperform brute force.
-	1. The depth limit of the octree is a crucial factor of performance. A poorly chosen depth limit will cause objects to be stored for multiple times in a lot of leaves. In the gif above, there are only 29,156 triangles in the scene, but an octree of depth 5 will contain 465,142 pieces of information in its leaf nodes! 
-	2. The worst case scenario for the octree is a scene where there is a single small mesh and nothing else, as shown here. In this case, it may be faster to simply loop through all triangles.
+
+- However, the naive octree **does not** always outperform brute force.
+	1. The depth limit of the octree is a crucial factor of performance. A poorly chosen depth limit will cause objects to be stored for multiple times in a lot of leaves. In the gif above, there are only 29,156 triangles in the scene, but an octree of depth 5 will contain 465,142 pieces of information in its leaf nodes!
+	2. The worst case scenario for the octree is a scene where there is a single low-poly mesh and nothing else, as shown here. It becomes essentially a uniform grid. A similar situation happens if we have a very large mesh that spans the entire scene.
 		![](./img/Octree/worst.png)
 
-- TODO: performance data
+### Performance Comparison (Intersection Test)
+
+| 1 | 2 | 3 |
+|--|--|--|
+|![](./img/Octree/test.png)|![](./img/Octree/test2.png)|![](./img/Octree/test3.png)|
+
+- 3 Test Scenes
+	1. two meshes with medium poly count, taking roughly 50% of the space
+	2. single low-poly mesh
+	3. the cornell box, a fairly large empty space
+- Material Sort, Stream Compaction, and First-Bounce Cache optimizations are assumed.
+- Minimal Shading is used so that the result would better reflect the computational cost of ray-object intersection tests.
+- Tested on Windows 10, i7-8700 @ 3.20 GHz 16GB, RTX 2070
+- Average time spent to render a frame is used as the metric of performance.
+- 3 types of implementations are tested:
+	1. octree with depth limits of 2,3,5,6. For an octree of depth limit x, it will be labelled as "x-octree".
+	2. simple AABB culling
+	3. brute force
+
+![](./img/chart1.png)
+- The result conforms to my expectations.
+	1. For a scene with a large number of triangles (Scene 1), octree and AABB greatly outperform brute force. 
+	2. For a scene with a single low-poly mesh (Scene 2), all implementations have similar performance, because we're essentially checking most (if not all) of the triangles for each implementation.
+	3. For the cornell box scene (Scene 3), octrees actually tend to perform slightly worse than AABB and brute force. This is probably because the 4 large walls create a lot of subdivisions and hence duplicate information in the leaves.
+	4. The performance of a very shallow octree (2-octree) is nearly identical to AABB. Maybe it's because the things in the test scenes are more or less evenly/uniformly spaced.
+	5. As the depth of the octree increases, the cost of maintaining leaf information outweighs the benefits.
+- Considering the strengths of different implementations, I developed a hybrid approach:
+	- The octree is responsible for ray-triangle tests. It only partitions the scene based on meshes (triangles). (see `consts.h` for the toggles)
+	- Brute force with AABB handles large, low-poly meshes or primitives.
+
+### Room for Further Improvement
+- There are several potential problems with my current ray tracer. If time permits, I would continue to work on this project in the future.
+	- suboptimal octree construction and implementation
+		- octree construction can be parallized. CPU-side construction can only handle octree up to a depth limit of 6 within a reasonable amount of time.
+		- non-leaf nodes & leaf nods use the same structures
+		- the leaf information is not stored in the node and is scattered around in the GPU memory
+	- inaccurate AABB-triangle test
+		- currently I test the AABB agianst the triangle's AABB instead, which seems good enough but will probably result in duplicate information stored in the leaves
 
 ## Restartable Ray Tracing (Saving & Loading)
 - Being able to pause and save the rendering progress is always a nice thing to have, especially when the scene takes hours to converge.

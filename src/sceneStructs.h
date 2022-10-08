@@ -191,6 +191,12 @@ struct PathSegment {
             return seg.remainingBounces > 0;
         }
     };
+    struct RemoveRule {
+        __host__ __device__
+            bool operator()(PathSegment const& seg) const {
+            return seg.remainingBounces == 0;
+        }
+    };
 
     Ray ray;
     color_t color;
