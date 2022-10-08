@@ -25,6 +25,29 @@ __host__ __device__ float random2D(glm::vec2 x)
         glm::mix(hashN(n + 57.f), hashN(n + 58.f), f.x), f.y);
 }
 
+glm::vec2 random2(glm::vec2 p) {
+    return glm::fract(sin(glm::vec2(glm::dot(p, glm::vec2(127.1f, 311.7f)),
+        glm::dot(p, glm::vec2(269.5f, 183.3f))))
+        * 43758.5453f);
+}
+
+__host__ __device__ float WorleyNoise(glm::vec2 uv) {
+    uv *= 10.0; // Now the space is 10x10 instead of 1x1. Change this to any number you want.
+    glm::vec2 uvInt = floor(uv);
+    glm::vec2 uvFract = fract(uv);
+    float minDist = 1.0; // Minimum distance initialized to max.
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            glm::vec2 neighbor = glm::vec2(float(x), float(y)); // Direction in which neighbor cell lies
+            glm::vec2 point = random2(uvInt + neighbor); // Get the Voronoi centerpoint for the neighboring cell
+            glm::vec2 diff = neighbor + point - uvFract; // Distance between fragment coord and neighbor’s Voronoi point
+            float dist = glm::length(diff);
+            minDist = min(minDist, dist);
+        }
+    }
+    return minDist;
+}
+
 __host__ __device__ float interpNoise2D(glm::vec2 p) {
     int intX = int(floor(p.x));
     float fractX = glm::fract(p.x);
@@ -115,40 +138,79 @@ __host__ __device__ float fbm3D(glm::vec3 p, float freq, float persistence) {
      return t * t * (3.0 - (2.0 * t));
  }
 
-__host__ __device__ glm::vec3 getProceduralColor(PathSegment& pathSegment, glm::vec3 intersect, glm::vec3 normal) {
+__host__ __device__ glm::vec3 getProceduralColor1(PathSegment& pathSegment, glm::vec3 intersect, glm::vec3 normal, glm::vec3 color) {
 
     glm::vec3 isectCpy = glm::normalize(intersect) * 2.f - 1.f;
     glm::vec4 baseCol = glm::vec4(1.0, 1.0, 0.0, 1.0);
     float theta = glm::atan(intersect.x, intersect.y);
     float r = sqrt(pow(intersect.x, 2.0f) + pow(intersect.y, 2.0f));
-    glm::vec4 brown = glm::vec4(0.36, 0.29, 0.01, 1.0) * fbm3D(glm::vec3(isectCpy), 2.f, 0.5f);
     glm::vec4 green = glm::vec4(0.24, abs(sin(0.4 * r * 20.f)), cos(0.22 * r * 90.f), 1.0);
-    glm::vec4 blue = glm::vec4(0.0, 0.0, 1.0, 1.0);
+    glm::vec4 matColor = glm::vec4(color.x, color.y, color.z, 1.0);
 
     glm::vec4 out_color = glm::vec4(0.0, 0.0, 0.0, 1.0);
    
     float smoothVal = smoothstep(0.9, 0.99f, isectCpy.z);
    
      // blue with low persistence noise function
-    float f_blue = fbm3D(glm::vec3(intersect), 10.f, 0.2f);
-    blue *= f_blue;
+    float f_matCol = fbm3D(glm::vec3(intersect), 10.f, 0.2f);
+    matColor *= f_matCol;
 
     // increasing blue influence with radius and adjusting green ring position with appropriate multiple
     float f_green = fbm3D(glm::vec3(intersect), 20.f, 0.5f);
     green *= f_green;
 
-    // multiplying with cos(theta) makes cos wave look like rays around the center
-    // use sin function based on z to set a varying phase difference
-    //float f_brown = fbm3D(glm::vec3(intersect), 2.f, 0.5f);
-    //brown = glm::vec4(0.36, 0.29, 0.01, 1.0) * f_brown;
-    //brown *= abs(cos(theta * 20.f - sin(isectCpy.z * interpNoise3D(intersect) * 200.f)));// *3.14f / 8.f));
+    // In smoothstep function below, fs_Pos.z value changes from 0.98 to 0.99, value gradually decreases
+    // Subtracting it from 1.0 inverses the effect, so as fs_Pos.z moves towards 0.99, the value increases
+    smoothVal = smoothstep(0.98, 0.99f, isectCpy.z);
+
+    out_color = mix(green, matColor, 0.5f);// mix(mix(green, blue, 0.5f), brown, f_brown);
+    out_color *= (1.f - smoothVal);
+
+    return glm::vec3(out_color.x, out_color.y, out_color.z);
+}
+
+__host__ __device__ glm::vec3 getProceduralColor2(PathSegment& pathSegment, glm::vec3 intersect, glm::vec3 normal, glm::vec3 color) {
+
+    glm::vec3 p_copy = intersect;
+
+    glm::vec3 isectCpy = glm::normalize(intersect) * 2.f - 1.f;
+    /*glm::vec4 col1 = glm::vec4(color.x, color.y, color.z, 1.0f);
+    glm::vec4 col2 = glm::vec4(1.0, 1.0, 1.0, 1.0) * WorleyNoise(glm::vec2((uv.x * 1000), (uv.y * 1000)));
+    glm::vec4 col3 = mix(col1, col2, 0.5f);*/
+
+    
+    glm::vec4 baseCol = glm::vec4(1.0, 1.0, 0.0, 1.0);
+
+    float theta = glm::atan(intersect.x, intersect.y);
+    float phi = atan2(-p_copy.z, p_copy.x) + PI;
+
+    glm::vec2 uv = glm::vec2(phi / (2 * PI), theta / PI);
+    float r = sqrt(pow(uv.x, 2.0f) + pow(uv.y, 2.0f));
+    glm::vec4 green = glm::vec4(cos(theta * 20.f), (cos(theta * 20.f)), sin((0.22 * r) * 90.f + 1000.f), 1.0);
+    glm::vec4 matColor = glm::vec4(color.x * cos(r * 20.f), color.y, color.z, 1.0);
+
+    glm::vec4 out_color = glm::vec4(0.0, 0.0, 0.0, 1.0);
+
+    float smoothVal = smoothstep(0.9, 0.99f, isectCpy.z);
+
+    // blue with low persistence noise function
+    float f_matCol = fbm3D(glm::vec3(intersect * glm::clamp(cos(0.5f), 0.f, 1.f) * random3D(intersect)), 10.f, glm::clamp(sin(0.5f),0.f,1.f));
+    matColor *= f_matCol;
+
+    // increasing blue influence with radius and adjusting green ring position with appropriate multiple
+    float f_green = fbm3D(glm::vec3(intersect), 20.f, f_matCol);
+    green *= f_green;
 
     // In smoothstep function below, fs_Pos.z value changes from 0.98 to 0.99, value gradually decreases
     // Subtracting it from 1.0 inverses the effect, so as fs_Pos.z moves towards 0.99, the value increases
     smoothVal = smoothstep(0.98, 0.99f, isectCpy.z);
 
-    out_color = mix(green, blue, 0.5f);// mix(mix(green, blue, 0.5f), brown, f_brown);
+    out_color = mix(green, matColor, 0.7f);// mix(mix(green, blue, 0.5f), brown, f_brown);
     out_color *= (1.f - smoothVal);
 
+    float f_red = fbm3D(isectCpy, 1.f, 0.7);
+    //float f_red = mix(interpNoise3D(vec3(fs_Pos.xyz)), sin(perlinNoise(vec2(fs_Pos.xy)) * 10.f), 0.1);
+    //float f_red = interpNoise3D(vec3(fs_Pos.xyz));
+    out_color = mix(glm::vec4(1.0, abs(sin(r)), 0.0f, 1.0) * f_red * (0.4f * (-uv.y + 1.5f)), out_color, 0.5);
     return glm::vec3(out_color.x, out_color.y, out_color.z);
 }

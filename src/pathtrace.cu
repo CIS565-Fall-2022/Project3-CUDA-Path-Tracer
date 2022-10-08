@@ -25,10 +25,10 @@
 #define PIOVER2 1.57079632679
 #define PI 3.14159265359
 
-#define ANTIALIASING 0
-#define CACHEINTERSECTIONS 1
-#define DOF 1
-
+#define ANTIALIASING 1
+#define CACHEINTERSECTIONS 0
+#define DOF 0
+#define SORTMATERIALS 1
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #if ERRORCHECK
@@ -502,7 +502,6 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	checkCUDAError("generate camera ray");
 
 	int depth = 0;
-	// dev_paths - number of rays cast per pixel in this iteration
 	PathSegment* dev_path_end = dev_paths + pixelcount;
 	int num_paths = dev_path_end - dev_paths;	// initially number of rays cast is equal to pixel count and then it goes on decreasing after each round of stream compaction
 
@@ -568,9 +567,10 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		// TODO: compare between directly shading the path segments and shading
 		// path segments that have been reshuffled to be contiguous in memory.
 
+#if SORTMATERIALS
 		// 1. Sort ray by material
 		thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + new_num_paths, dev_paths, compareMaterialId());
-
+#endif
 		// 2. Ideal diffused shading and bounce and // 3. Perfect specular reflection
 		shadeWithMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
 			iter,
