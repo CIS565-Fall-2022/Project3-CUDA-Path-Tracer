@@ -12,6 +12,8 @@
 #include "scene.h"
 #include "glm/glm.hpp"
 #include "glm/gtx/norm.hpp"
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 #include "utilities.h"
 #include "pathtrace.h"
 #include "intersections.h"
@@ -22,7 +24,7 @@
 
 #define ERRORCHECK 1
 #define SORT_RAYS 0
-#define CACHE_FIRST_BOUNCE 1
+#define CACHE_FIRST_BOUNCE 0
 #define ANTI_ALIASING 0
 
 #define DEPTH_OF_FIELD 0
@@ -36,6 +38,8 @@
 #define SEPIA 0
 #define INVERTED 0
 #define CONTRAST 0
+
+#define MOTIONBLUR 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -242,7 +246,6 @@ __host__ __device__ bool checkMeshhBoundingBox(Geom& geom, Ray& ray) {
 	return false;
 }
 
-
 // TODO:
 // computeIntersections handles generating ray intersections ONLY.
 // Generating new rays is handled in your shader(s).
@@ -257,6 +260,7 @@ __global__ void computeIntersections(
 	// for mesh loading
 	,Triangle* triangles
 	,int triangles_size
+	,int iter
 )
 {
 	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -278,11 +282,9 @@ __global__ void computeIntersections(
 		glm::vec2 uv(0.f);
 
 		// naive parse through global geoms
-
 		for (int i = 0; i < geoms_size; i++)
 		{
 			Geom& geom = geoms[i];
-
 			if (geom.type == CUBE)
 			{
 				t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
@@ -538,6 +540,17 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	// --- PathSegment Tracing Stage ---
 	// Shoot ray into scene, bounce between objects, push shading chunks
 
+#if MOTIONBLUR
+	for (int i = 0; i < hst_scene->geoms.size(); i++) {
+		Geom& geom = hst_scene->geoms[i];
+		geom.translation = geom.translation + (geom.endpos - geom.translation) * (float)iter / (float)hst_scene->state.iterations;
+		geom.transform[3] = glm::vec4(geom.translation, geom.transform[3][3]);
+		geom.inverseTransform = glm::inverse(geom.transform);
+		geom.invTranspose = glm::inverseTranspose(geom.transform);
+	}
+	cudaMemcpy(dev_geoms, hst_scene->geoms.data(), hst_scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
+#endif
+
 	bool iterationComplete = false;
 	while (!iterationComplete) {
 
@@ -562,6 +575,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_intersections
 				, dev_triangles
 				, hst_scene->triangles.size()
+				,iter
 				);
 			checkCUDAError("trace one bounce");
 			cudaDeviceSynchronize();
@@ -582,6 +596,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_intersections
 				, dev_triangles
 				, hst_scene->triangles.size()
+				, iter
 				);
 			checkCUDAError("trace one bounce");
 			cudaDeviceSynchronize();
@@ -596,6 +611,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, dev_intersections
 			, dev_triangles
 			, hst_scene->triangles.size()
+			, iter
 			);
 		checkCUDAError("trace one bounce");
 		cudaDeviceSynchronize();

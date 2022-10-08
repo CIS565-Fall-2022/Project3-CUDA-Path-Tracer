@@ -143,6 +143,7 @@ material 4
 TRANS       2 7 1
 ROTAT       0 0 0
 SCALE       3 3 3
+ENDPOS      2 6 1
 
 OBJECT 8
 obj_mesh
