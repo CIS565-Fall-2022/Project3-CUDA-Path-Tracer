@@ -43,6 +43,8 @@ Implemented diffused, specular reflective, specular refractive, glass
 
 ## Physically based depth of field
 
+![](img/dof_F6_R1.png)
+
 The following renders of a string of pearls show depth of field as cameras with different lens radius generate varying depth of field effect.
 
 ![](img/dof_lensRadius.png)
