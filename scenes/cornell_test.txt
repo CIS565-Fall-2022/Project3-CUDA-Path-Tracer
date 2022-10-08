@@ -89,11 +89,11 @@ FOVY        45
 ITERATIONS  5000
 DEPTH       8
 FILE        cornell
-EYE         0.0 5 10.5
+EYE         0.0 5 4.8
 LOOKAT      0 5 0
 UP          0 1 0
 FOCAL 10
-APERTURE 0.1
+APERTURE 0
 
 
 // Ceiling light
@@ -153,19 +153,5 @@ TRANS       -1 4 -1
 ROTAT       0 0 0
 SCALE       1 1 1
 
-// monkey
-OBJECT 7
-gltf
-../scenes/Suzanne.gltf
-material 6
-TRANS       3 4 3
-ROTAT       0 0 0
-SCALE       2 2 2
 
-// front light
-OBJECT 8
-cube
-material 0
-TRANS       0 5 13
-ROTAT       90 0 0
-SCALE       4 .3 4
+

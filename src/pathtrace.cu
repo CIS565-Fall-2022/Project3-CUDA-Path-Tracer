@@ -15,13 +15,14 @@
 #include "pathtrace.h"
 #include "intersections.h"
 #include "interactions.h"
+
 #include <device_launch_parameters.h>
 
 #define ERRORCHECK 1
 #define STREAM_COMPACTION 1
 #define ANTIALIASING 0
 #define CACHE_FIRST_BOUNCE 0
-#define SORT_BY_MAT 1
+#define SORT_BY_MAT 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -542,15 +543,19 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_materials,
 			dev_maps
 			);
+		
 
 		//stream compaction for path segments
+		if (depth >= hst_scene->state.traceDepth)
+		{
+			break;
+		}
 		PathSegment* remaining_path_end = thrust::stable_partition(thrust::device, dev_paths, dev_path_end, is_bouncing());
 		num_paths = remaining_path_end - dev_paths;
 
 		if (num_paths == 0) {
 			iterationComplete = true;
 		} // TODO: should be based off stream compaction results.
-
 	}
 
 	// Assemble this iteration and apply it to the image

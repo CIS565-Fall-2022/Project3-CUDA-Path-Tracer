@@ -5,7 +5,7 @@ CUDA Path Tracer
 
 * Guanlin Huang
   * [LinkedIn](https://www.linkedin.com/in/guanlin-huang-4406668502/), [personal website](virulentkid.github.io/personal_web/index.html)
-* Tested on: Windows 11, i9-10900K @ 4.9GHz 32GB, RTX3080 10GB; Compute Capability: 8.6
+* Tested on: Windows 11, i7-8750H CPU @ 3.5GHz 16GB, RTX2070 8GB; Compute Capability: 7.5
 
 ## Representive Scene
 ![](img/title.png)
@@ -64,3 +64,20 @@ https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0
 with normal map        |  without normal nap
 :-------------------------:|:-------------------------:
 ![](img/with_normal_map.png)   |  ![](img/no_normal_map.png)
+
+## Performance Analysis
+### Stream Compaction
+- Inactive threads, which have ray paths with 0 remaining bounce, are terminated by stream compaction. The majority of rays are still bouncing around and active before depth 8, as in a closed box case, they can only become inactive by hitting a light or going beyond the maximum depth, which is 8 in the testing.  Because the rays leave the box and hit nothing in the open box scenario, many rays progressively become inactive with stream compaction, reducing the number of rays to test in the intersection test that follows. The following diagram supports this statement as well.
+![](img/open_close_perf.png)
+
+### Material Sorting
+- We may require multiple shading algorithms for various materials at this level. This might cause warp divergences and is not the GPU's preferred memory access pattern. Sorting the rays according to their material ids is one approach we could lessen the severity of this problem. Theoretically, this lowers divergence by allowing contiguous memory access to material information.
+- According to the performance analysis results for the cornell test.txt scene, sorting paths by materials takes longer than it does for the cornell scene without sorting. This is because there aren't as many materials and the cost of sorting itself outweighs any performance improvement from sorting by materials.
+![](img/mat_perf.png)
+- However, sorting ray pathways by material should improve efficiency when the scene is more complicated.
+
+## Bloopers
+- "Camera malfunctioning!"
+![](img/fov_blooper.png)
+- "A mirror, or a light?"
+![](img/blooper_refl.png)
