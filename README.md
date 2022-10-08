@@ -50,7 +50,7 @@ Nearest and farthest spheres are blurred, spheres in the middle are in focus
 
 ## Stochastic sampled antialiasing
 
-
+![](img/antialiasingAnnotate.png)
 
 ## Procedural shapes and textures
 
