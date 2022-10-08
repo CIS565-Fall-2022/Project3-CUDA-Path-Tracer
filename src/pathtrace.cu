@@ -20,12 +20,12 @@
 #define SORT_BY_MATERIAL 0
 #define CACHE_FIRST_INTERSECTION 0
 
-#define ANTIALIASING 0
+#define ANTIALIASING 1
 
 #define MOTION_BLUR 0
 #define MOTION_VELOCITY glm::vec3(0.0f, 0.75f, 0.0f)
 
-#define DEPTH_OF_FIELD 1
+#define DEPTH_OF_FIELD 0
 #define LENS_RADIUS 4.0f
 #define FOCAL_DISTANCE 4.f
 #define PI 3.141592654f
