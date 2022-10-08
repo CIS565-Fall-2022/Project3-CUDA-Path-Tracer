@@ -43,10 +43,13 @@ Implemented diffused, specular reflective, specular refractive, glass
 
 ## Physically based depth of field
 
-Following image shows depth of field with focal length 10 and lens radius 0.5. The scene is 20 units in length along z
-Nearest and farthest spheres are blurred, spheres in the middle are in focus
+The following renders of a string of pearls show depth of field as cameras with different lens radius generate varying depth of field effect.
 
-![](img/dof.png)
+![](img/dof_lensRadius.png)
+
+We can set the focal length of our camera to focus on foreground, mid-ground or background. The render comparisons are as follows.
+
+![](img/dof_focalDist.png)
 
 ## Stochastic sampled antialiasing
 
