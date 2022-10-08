@@ -8,6 +8,11 @@ CUDA Path Tracer
 * Tested on:  Windows 11, i7-11700 @ 2.50GHz, NVIDIA GeForce RTX 3060
 
 # Project Description
+
+<p align="center">
+  <img width="600" height="600" src="/img/customScene_3739samp.png">
+</p>
+
 In this project. I implemented a simple GPU path tracer with CUDA. For each iteration, instead of evaluating every ray all in one for loop on CPU, I paralleled it by rays. 
 
 Here's what will be done in one iteration:
@@ -24,6 +29,9 @@ Having implemented a path tracer on CPU before, it's nice to see how things go p
 
 # Features
 ## Diffuse, Reflection and Refraction Surfaces
+<p align="center">
+  <img width="600" height="600" src="/img/material_5000samp.png">
+</p>
 In my project, I implemented three types of materials, ideal diffuse, perfectly specular-reflective and refractive.
 
 For the ideal diffuse surface, when scattering rays, the direction is radomnly picked using the cosine-weighted scatter function.
@@ -43,6 +51,9 @@ To implement anti-aliasing, when generating ray from camera, I slightly noised t
 I implemented motion blur in a simple way. When calculating the intersection of ray, I randomly noised the ray origin along a vector, which I defined as MOTION_VELOCITY, so the rendering result looks like the object is moving. 
 
 ## Depth of Field
+<p align="center">
+  <img width="600" height="600" src="/img/dof_2063samp.png">
+</p>
 Instead of casting rays from a single point on the camera, we considered the camera as a small lens. We cast rays from various points on the lens. When an object is further away or closer to the focal plane, the ray that cast coresponding to a single pixel hit the object in a large vairaty of locations, we then average all the colors into a single pixel. This will result in a blurry image. 
 
 Instead of setting the camera lens as a circle, I change the camera's lens to a heart shape, so the blurry reresult will form a heart shape.
