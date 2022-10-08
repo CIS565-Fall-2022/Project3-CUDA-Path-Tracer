@@ -39,8 +39,23 @@ In this project, I implemented a CUDA path tracer for the GPU. Previously in Adv
 ![](img/antialiasing5000samp.png)
 
 ### Direct Lighting
+
+![](img/NoDirectLighting.png)
+
+![](img/DirectLighting.png)
+
 ### Arbitrary Mesh Loading with TinyObjLoader
+
+![](img/refractiveKitty.png)
+
 ### UV Texture and Bump Mapping
+
+![](img/completeMario2.png)
+
+![](img/nobump.png)
+
+![](img/yesBumpmap.png)
+
 
 ## Performance Analysis
 
