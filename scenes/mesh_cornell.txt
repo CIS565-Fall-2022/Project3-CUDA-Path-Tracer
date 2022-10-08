@@ -112,7 +112,7 @@ SCALE       .01 10 10
 
 // Mesh
 OBJECT 6
-mesh dragon.obj
+mesh bunny-full.obj
 material 4
 TRANS       0 0 0
 ROTAT       0 0 0

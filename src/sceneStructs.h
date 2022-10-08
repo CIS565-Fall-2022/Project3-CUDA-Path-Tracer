@@ -23,8 +23,9 @@ struct AABB {
     glm::vec3 min;
     glm::vec3 max;
 
-    float getArea() {
-        
+    float surfaceArea() {
+        glm::vec3 e = min - max;
+        return 2.f * (e.x * e.y + e.x * e.z + e.y * e.z);
     };
 };
 

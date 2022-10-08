@@ -1,7 +1,7 @@
 #include "lbvh.h"
 
-#define USE_MIDPOINT
-//#define USE_SAH
+//#define USE_MIDPOINT
+#define USE_SAH
 
 /// LBVH FUNCTIONS ///
 
@@ -43,26 +43,30 @@ float test_aabbIntersectionTest(AABB aabb, Ray r) {
     return tmin <= tmax;
 }
 
-// Helper functions to calculate a 30-bit Morton code for the
-// given 3D point located within the unit cube [0,1] (credit: Tero Karras)
-unsigned int expandBits(unsigned int v)
+// Expand 10-bit integer into 30-bit integer
+unsigned int expand(unsigned int n)
 {
-    v = (v * 0x00010001u) & 0xFF0000FFu;
-    v = (v * 0x00000101u) & 0x0F00F00Fu;
-    v = (v * 0x00000011u) & 0xC30C30C3u;
-    v = (v * 0x00000005u) & 0x49249249u;
-    return v;
+    n = (n | (n << 16)) & 0b00000011000000000000000011111111;
+    n = (n | (n << 8)) & 0b00000011000000001111000000001111;
+    n = (n | (n << 4)) & 0b00000011000011000011000011000011;
+    n = (n | (n << 2)) & 0b00001001001001001001001001001001;
+    return n;
 }
 
-unsigned int mortonCode3D(glm::vec3 centroid)
-{
+// Based on PBRT 4.3.3. and Tero Karras version at https://developer.nvidia.com/blog/thinking-parallel-part-iii-tree-construction-gpu/
+unsigned int mortonCode3D(const glm::vec3& centroid) {
+    // Convert centroid coordinates to value between 0 and 1024
     float x = min(max(centroid.x * 1024.0f, 0.0f), 1023.0f);
     float y = min(max(centroid.y * 1024.0f, 0.0f), 1023.0f);
     float z = min(max(centroid.z * 1024.0f, 0.0f), 1023.0f);
-    unsigned int xx = expandBits((unsigned int)x);
-    unsigned int yy = expandBits((unsigned int)y);
-    unsigned int zz = expandBits((unsigned int)z);
-    return xx * 4 + yy * 2 + zz;
+
+    // Expand each 10 bit value so that ith value is at 3 * ith position
+    unsigned int xx = expand((unsigned int)x);
+    unsigned int yy = expand((unsigned int)y);
+    unsigned int zz = expand((unsigned int)z);
+
+    // Interleave the bits
+    return (xx << 2) | (yy << 1) | zz;
 }
 
 void computeMortonCodes(Scene* scene, const AABB& sceneAABB) {
@@ -360,16 +364,17 @@ float evalSAH(Scene* scene, BVHNode* node, float queryPos, int axis)
         glm::vec3 centroid = scene->triangles[i].centroid;
         if (centroid[axis] < queryPos) {
             leftCount++;
-
+            leftChild = Union(leftChild, scene->triangles[i].aabb);
         }
         else {
             rightCount++;
+            rightChild = Union(rightChild, scene->triangles[i].aabb);
         }
     }
     // Calculate cost
-    //float cost = leftCount * leftAABB.area() + rightCount * rightAABB.area();
+    float cost = leftCount * leftChild.surfaceArea() + rightCount * rightChild.surfaceArea();
 
-    return 0.f;
+    return cost;
 }
 
 void calculateCost(Scene* scene, BVHNode* node, float& split, int& axis)
@@ -398,7 +403,7 @@ void chooseSplit(Scene* scene, BVHNode* node, float& split, int& axis)
 #endif
 
 #ifdef USE_SAH
-
+    calculateCost(scene, node, split, axis);
 #endif
 
 }

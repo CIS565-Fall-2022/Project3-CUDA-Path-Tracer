@@ -398,8 +398,6 @@ __host__ __device__ float bvhIntersectionTest(const BVHNode* nodes, const Triang
     glm::vec3 min_barycenter;
     float min_t = INFINITY;
 
-    int count = 0;
-
     // Push root node
     stack[++stackPtr] = 0;
     int currNodeIdx = stack[stackPtr];
@@ -414,8 +412,6 @@ __host__ __device__ float bvhIntersectionTest(const BVHNode* nodes, const Triang
         float t;
         bool intersectLeft = mesh_aabbIntersectionTest(left->aabb, r, t);
         bool intersectRight = mesh_aabbIntersectionTest(right->aabb, r, t);
-
-        if (intersectLeft || intersectRight) ++count;
 
         // If intersection found, and they are leaf nodes, check for triangle intersections
         if (intersectLeft && devBvhIsLeaf(left)) {

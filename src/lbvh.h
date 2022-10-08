@@ -15,9 +15,11 @@
 
 class Scene;
 
+/// LBVH FUNCTIONS /// 
+
 // Morton code generation and sorting
-unsigned int expandBits(unsigned int v);
-unsigned int mortonCode3D(glm::vec3 centroid);
+unsigned int expand(unsigned int n);
+unsigned int mortonCode3D(const glm::vec3& centroid);
 void computeMortonCodes(Scene* scene, const AABB& sceneAABB);
 void sortMortonCodes(Scene* scene);
 
@@ -36,8 +38,19 @@ void traverseLBVH(Scene* scene);
 
 // Construct LBVH and BVH
 void generateLBVH(Scene* scene);
-void generateBVH(Scene* scene, int triangleCount);
+
 
 // Small unit tests for LBVH and BVH
 void unitTest(Scene* scene);
+
+/// BVH FUNCTIONS /// 
+
+void updateBounds(Scene* scene, const int idx);
+int maxExtent(glm::vec3 extent);
+float evalSAH(Scene* scene, BVHNode* node, float queryPos, int axis);
+void calculateCost(Scene* scene, BVHNode* node, float& split, int& axis);
+void chooseSplit(Scene* scene, BVHNode* node, float& split, int& axis);
+void addChildren(Scene* scene, BVHNode* node);
+
+void generateBVH(Scene* scene, int triangleCount);
 void unitTestBVH(Scene* scene, int triangleCount);
