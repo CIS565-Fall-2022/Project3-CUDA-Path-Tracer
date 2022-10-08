@@ -61,4 +61,6 @@ In this project, I implemented a CUDA path tracer for the GPU. Previously in Adv
 
 ## Bloopers! :)
 
+Too much antialiasing: me without my contacts
 
+![](img/antialiasing1.png)
