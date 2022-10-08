@@ -22,11 +22,11 @@ Since this technique involves computing a large number of rays independently, it
 # Features
 
 Some of the visual improvements implemented include:
-- [Specular refraction and reflection](specular-refraction-and-reflection)
-- [Physically based depth of field](physically-based-depth-of-field)
-- [Stochastic sampled antialiasing](stochastic-sampled-antialiasing)
-- [Procedural shapes and textures](procedural-shapes-and-textures)
-- [Aritrary obj mesh loading](aritrary-obj-mesh-loading)
+- [Specular refraction and reflection](#specular-refraction-and-reflection)
+- [Physically based depth of field](#physically-based-depth-of-field)
+- [Stochastic sampled antialiasing](#stochastic-sampled-antialiasing)
+- [Procedural shapes and textures](#procedural-shapes-and-textures)
+- [Aritrary obj mesh loading](#aritrary-obj-mesh-loading)
 
 Some performance improvements implemented include:
 - First bounce cached intersections
