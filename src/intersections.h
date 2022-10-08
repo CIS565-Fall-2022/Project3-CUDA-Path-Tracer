@@ -145,54 +145,82 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 
 
 __host__ __device__ float triangleIntersectionTest(Geom custom_obj, Ray r,
-    glm::vec3& intersectionPoint, glm::vec3 vertex1, glm::vec3 vertex2, glm::vec3 vertex3,
-    glm::vec3 normal1, glm::vec3 normal2, glm::vec3 normal3, glm::vec3& normal, bool& outside) {
+    glm::vec3& intersectionPoint, Triangle* triangles, int triangles_size, glm::vec3& normal, bool& outside,
+    glm::vec2& uv) 
+{
 
     // get the Ray in local space
     Ray ray_inversed;
     ray_inversed.origin = multiplyMV(custom_obj.inverseTransform, glm::vec4(r.origin, 1.0f));
     ray_inversed.direction = glm::normalize(multiplyMV(custom_obj.inverseTransform, glm::vec4(r.direction, 0.0f)));
 
-    glm::vec3 baryPos;
+    float min_t = FLT_MAX;
 
-    // Not intersected
-    if (!glm::intersectRayTriangle(ray_inversed.origin, ray_inversed.direction, vertex1, vertex2, vertex3, baryPos)) 
+    for (int i = 0; i < triangles_size; i++)
     {
-        return -1;
+        Triangle& triangle = triangles[i];
+        glm::vec3 vertex1 = triangle.v1;
+        glm::vec3 vertex2 = triangle.v2;
+        glm::vec3 vertex3 = triangle.v3;
+        glm::vec3 normal1 = triangle.n1;
+        glm::vec3 normal2 = triangle.n2;
+        glm::vec3 normal3 = triangle.n3;
+        glm::vec2 t1 = triangle.t1;
+        glm::vec2 t2 = triangle.t2;
+        glm::vec2 t3 = triangle.t3;
+        glm::vec3 baryPos;
+
+
+        // Not intersected
+        if (glm::intersectRayTriangle(ray_inversed.origin, ray_inversed.direction, vertex1, vertex2, vertex3, baryPos))
+        {
+
+            // Smooth interpolate normals
+            glm::vec3 n0;
+            glm::vec3 n1;
+            glm::vec3 n2;
+
+            glm::vec3 isect_pos = (1.f - baryPos.x - baryPos.y) * vertex1 + baryPos.x * vertex2 + baryPos.y * vertex3;
+            intersectionPoint = multiplyMV(custom_obj.transform, glm::vec4(isect_pos, 1.f));
+            float t = glm::length(r.origin - intersectionPoint);
+            if (t > min_t)
+            {
+                continue;
+            }
+            min_t = t;
+
+            if ((glm::length(normal1) != 0) && (glm::length(normal2) != 0) && (glm::length(normal3) != 0))
+            {
+                n0 = normal1;
+                n1 = normal2;
+                n2 = normal3;
+            }
+            else
+            {
+                n0 = glm::normalize(glm::cross(vertex2 - vertex1, vertex3 - vertex1));
+                n1 = glm::normalize(glm::cross(vertex1 - vertex2, vertex3 - vertex2));
+                n2 = glm::normalize(glm::cross(vertex1 - vertex3, vertex2 - vertex3));
+            }
+
+            // Barycentric Interpolation
+            float S = 0.5f * glm::length(glm::cross(vertex1 - vertex2, vertex3 - vertex2));
+            float S0 = 0.5f * glm::length(glm::cross(vertex2 - isect_pos, vertex3 - isect_pos));
+            float S1 = 0.5f * glm::length(glm::cross(vertex1 - isect_pos, vertex3 - isect_pos));
+            float S2 = 0.5f * glm::length(glm::cross(vertex1 - isect_pos, vertex2 - isect_pos));
+            glm::vec3 newNormal = glm::normalize(n0 * S0 / S + n1 * S1 / S + n2 * S2 / S);
+            if ((glm::length(t1) != 0) && (glm::length(t2) != 0) && (glm::length(t3) != 0))
+            {
+                glm::vec2 newUV = glm::normalize(t1 * S0 / S + t2 * S1 / S + t3 * S2 / S);
+            }
+            normal = glm::normalize(multiplyMV(custom_obj.invTranspose, glm::vec4(newNormal, 0.f)));
+            outside = glm::dot(normal, ray_inversed.direction) < 0;
+            isect_pos = multiplyMV(custom_obj.transform, glm::vec4(isect_pos, 1.f));
+
+        }
     }
-
-    // Smooth interpolate normals
-    glm::vec3 n0;
-    glm::vec3 n1;
-    glm::vec3 n2;
-
-    glm::vec3 isect_pos = (1.f - baryPos.x - baryPos.y) * vertex1 + baryPos.x * vertex2 + baryPos.y * vertex3;
-    intersectionPoint = multiplyMV(custom_obj.transform, glm::vec4(isect_pos, 1.f));
-    if ((glm::length(normal1) != 0) && (glm::length(normal2) != 0) && (glm::length(normal3) != 0))
-    {
-        n0 = normal1;
-        n1 = normal2;
-        n2 = normal3;
-    }
-    else
-    {
-        n0 = glm::normalize(glm::cross(vertex2 - vertex1, vertex3 - vertex1));
-        n1 = glm::normalize(glm::cross(vertex1 - vertex2, vertex3 - vertex2));
-        n2 = glm::normalize(glm::cross(vertex1 - vertex3, vertex2 - vertex3));
-    }
-
-    float S = 0.5f * glm::length(glm::cross(vertex1 - vertex2, vertex3 - vertex2));
-    float S0 = 0.5f * glm::length(glm::cross(vertex2 - isect_pos, vertex3 - isect_pos));
-    float S1 = 0.5f * glm::length(glm::cross(vertex1 - isect_pos, vertex3 - isect_pos));
-    float S2 = 0.5f * glm::length(glm::cross(vertex1 - isect_pos, vertex2 - isect_pos));
-    glm::vec3 newNormal = glm::normalize(n0 * S0 / S + n1 * S1 / S + n2 * S2 / S);
-
-    normal = glm::normalize(multiplyMV(custom_obj.invTranspose, glm::vec4(newNormal, 0.f)));
-
-    if (glm::dot(normal, r.direction) > 0) {
-        normal = -normal;
-        outside = false;
-    }
-
-    return glm::length(r.origin - intersectionPoint);
+        if (!outside) 
+        {
+            normal = -normal;
+        }
+        return min_t;
 }

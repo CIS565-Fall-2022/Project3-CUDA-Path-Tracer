@@ -27,6 +27,8 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+    glm::vec3 boundingBoxMin;
+    glm::vec3 boundingBoxMax;
 };
 
 struct Triangle {
@@ -38,6 +40,10 @@ struct Triangle {
     glm::vec3 n1;
     glm::vec3 n2;
     glm::vec3 n3;
+    // Texcoords
+    glm::vec2 t1;
+    glm::vec2 t2;
+    glm::vec2 t3;
 };
 
 struct Material {
@@ -50,6 +56,9 @@ struct Material {
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+
+    int textureIdx = -1;
+    int normIdx = -1;
 };
 
 struct Camera {
@@ -85,6 +94,7 @@ struct ShadeableIntersection {
   float t;
   glm::vec3 surfaceNormal;
   int materialId;
+  glm::vec2 uv;
 };
 
 struct compareIntersections 

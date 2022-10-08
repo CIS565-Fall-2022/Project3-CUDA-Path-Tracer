@@ -22,12 +22,20 @@
 
 #define ERRORCHECK 1
 #define SORT_RAYS 0
-#define CACHE_FIRST_BOUNCE 0
-#define ANTI_ALIASING 1
+#define CACHE_FIRST_BOUNCE 1
+#define ANTI_ALIASING 0
 
 #define DEPTH_OF_FIELD 0
 #define FOCAL_LENGTH 15.0f
 #define APERTURE 0.5f
+
+#define MESH_BOUNDING_BOX 1
+
+#define POST_PROCESS 0
+#define GREYSCALE 1
+#define SEPIA 0
+#define INVERTED 0
+#define CONTRAST 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -198,6 +206,43 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 	}
 }
 
+
+__host__ __device__ bool checkMeshhBoundingBox(Geom& geom, Ray& ray) {
+	Ray q;
+	q.origin = multiplyMV(geom.inverseTransform, glm::vec4(ray.origin, 1.0f));
+	q.direction = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(ray.direction, 0.0f)));
+
+	float tmin = -1e38f;
+	float tmax = 1e38f;
+	glm::vec3 tmin_n;
+	glm::vec3 tmax_n;
+	for (int xyz = 0; xyz < 3; ++xyz) {
+		float qdxyz = q.direction[xyz];
+		if (glm::abs(qdxyz) > 0.00001f) {
+			float t1 = (geom.boundingBoxMin[xyz] - q.origin[xyz]) / qdxyz;
+			float t2 = (geom.boundingBoxMax[xyz] - q.origin[xyz]) / qdxyz;
+			float ta = glm::min(t1, t2);
+			float tb = glm::max(t1, t2);
+			glm::vec3 n;
+			n[xyz] = t2 < t1 ? +1 : -1;
+			if (ta > 0 && ta > tmin) {
+				tmin = ta;
+				tmin_n = n;
+			}
+			if (tb < tmax) {
+				tmax = tb;
+				tmax_n = n;
+			}
+		}
+	}
+
+	if (tmax >= tmin && tmax > 0) {
+		return true;
+	}
+	return false;
+}
+
+
 // TODO:
 // computeIntersections handles generating ray intersections ONLY.
 // Generating new rays is handled in your shader(s).
@@ -230,7 +275,7 @@ __global__ void computeIntersections(
 		glm::vec3 tmp_intersect;
 		glm::vec3 tmp_normal;
 
-
+		glm::vec2 uv(0.f);
 
 		// naive parse through global geoms
 
@@ -249,18 +294,16 @@ __global__ void computeIntersections(
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 			else if (geom.type == OBJ_MESH)
 			{
-				float closest_dist = FLT_MAX;
-				for (int j = 0; j < triangles_size; j++) {
-					Triangle& triangle = triangles[j];
-					float triangle_inter = triangleIntersectionTest(geom, pathSegment.ray,
-						tmp_intersect, triangle.v1, triangle.v2, triangle.v3,
-						triangle.n1, triangle.n2, triangle.n3, tmp_normal, outside);
-					if (triangle_inter != -1) {
-						closest_dist = glm::min(closest_dist, triangle_inter);
-					}
+#if MESH_BOUNDING_BOX
+				if (checkMeshhBoundingBox(geom, pathSegment.ray))
+				{
+					t = triangleIntersectionTest(geom, pathSegment.ray,
+						tmp_intersect, triangles, triangles_size, tmp_normal, outside, uv);
 				}
-				t = closest_dist;
-
+#else
+				t = triangleIntersectionTest(geom, pathSegment.ray,
+					tmp_intersect, triangles, tmp_normal, outside);
+#endif
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
@@ -384,6 +427,43 @@ __global__ void shadeMaterial(
 	}
 }
 
+__global__ void postShade(
+	int iter
+	, int num_paths
+	, ShadeableIntersection* shadeableIntersections
+	, PathSegment* pathSegments) 
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx < num_paths)
+	{
+		glm::vec3 postProcessColor = glm::vec3(0.f);
+
+		glm::vec3 currentColor = pathSegments[idx].color;
+
+		// Greyscale filter
+#if GREYSCALE
+		postProcessColor = glm::vec3(0.21 * currentColor.x + 0.72 * currentColor.y + 0.07 * currentColor.z);
+#elif SEPIA
+		// Sepia
+		float adjust = 0.4f;
+		postProcessColor.r = glm::min(1.0, (currentColor.r * (1.0 - (0.607 * adjust))) + (currentColor.g * (0.769 * adjust)) + (currentColor.b * (0.189 * adjust)));
+		postProcessColor.g = glm::min(1.0, (currentColor.r * (0.349 * adjust)) + (currentColor.g * (1.0 - (0.314 * adjust))) + (currentColor.b * (0.168 * adjust)));
+		postProcessColor.b = glm::min(1.0, (currentColor.r * (0.272 * adjust)) + (currentColor.g * (0.534 * adjust)) + (currentColor.b * (1.0 - (0.869 * adjust))));
+#elif INVERTED 
+		// Inverted
+		postProcessColor = glm::vec3(1.0) - currentColor;
+		// High Contrast
+#elif CONTRAST
+		postProcessColor =  (currentColor - glm::vec3(0.5f)) * 1.1f + glm::vec3(0.5f);
+
+#endif
+
+		ShadeableIntersection intersection = shadeableIntersections[idx];
+		if (intersection.t > 0.0f) {
+			pathSegments[idx].color = postProcessColor;
+		}
+	}
+}
 
 // Add the current iteration's output to the overall image
 __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iterationPaths)
@@ -553,6 +633,16 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_paths,
 			dev_materials
 			);
+
+#if POST_PROCESS
+
+			postShade << <numblocksPathSegmentTracing, blockSize1d >> > (
+				iter,
+				num_paths,
+				dev_intersections,
+				dev_paths
+				);
+#endif
 
 		//Stream compact
 		PathSegment* path_end = thrust::stable_partition(thrust::device, dev_paths, dev_paths + num_paths, rayTerminated());

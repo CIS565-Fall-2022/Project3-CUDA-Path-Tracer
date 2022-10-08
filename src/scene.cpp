@@ -6,7 +6,7 @@
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
-
+#include <stb_image.h>
 
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
@@ -61,7 +61,7 @@ int Scene::loadGeom(string objectid) {
             {
                 cout << "Creating new obj mesh..." << endl;
                 newGeom.type = OBJ_MESH;
-                loadObj();
+                loadObj(newGeom);
             }
         }
 
@@ -192,6 +192,14 @@ int Scene::loadMaterial(string materialid) {
             } else if (strcmp(tokens[0].c_str(), "EMITTANCE") == 0) {
                 newMaterial.emittance = atof(tokens[1].c_str());
             }
+            else if (strcmp(tokens[0].c_str(), "TEXTURE") == 0)
+            {
+                newMaterial.textureIdx = atof(tokens[1].c_str());
+            }
+            else if (strcmp(tokens[0].c_str(), "NORMMAP") == 0)
+            {
+                newMaterial.normIdx= atof(tokens[1].c_str());
+            }
         }
         materials.push_back(newMaterial);
         return 1;
@@ -199,13 +207,12 @@ int Scene::loadMaterial(string materialid) {
 }
 
 // Reference: https://github.com/tinyobjloader/tinyobjloader
-int Scene::loadObj()
+int Scene::loadObj(Geom& geo)
 {
     tinyobj::ObjReader reader;
     tinyobj::ObjReaderConfig reader_config;
 
-    const char* inputfile = "../scenes/cow.obj";
-
+    const char* inputfile = "../scenes/wahoo.obj";
 
     if (!reader.ParseFromFile(inputfile, reader_config)) {
         if (!reader.Error().empty()) {
@@ -213,7 +220,6 @@ int Scene::loadObj()
         }
         exit(1);
     }
-
     if (!reader.Warning().empty()) {
         std::cout << "TinyObjReader: " << reader.Warning();
     }
@@ -226,6 +232,8 @@ int Scene::loadObj()
         Triangle face;     // current face to be loaded
 
         size_t idx = 0;
+        float maxX = FLT_MAX, maxY = FLT_MAX, maxZ = FLT_MAX;
+        float minX = FLT_MIN, minY = FLT_MIN, minZ = FLT_MIN;
 
         // Loop over faces
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) 
@@ -234,6 +242,7 @@ int Scene::loadObj()
 
             glm::vec3 vert;
             glm::vec3 norm;
+            glm::vec2 texture;
 
             // Loop over vertices
             for (size_t v = 0; v < num_v; v++)
@@ -245,48 +254,74 @@ int Scene::loadObj()
                 tinyobj::real_t vz = attrib.vertices[3 * size_t(v_idx.vertex_index) + 2];
 
                 vert = glm::vec3(vx, vy, vz);
-
+                
+                // Compute the bounding box
+                if (vx > maxX)
+                {
+                    maxX = vx;
+                }
+                if (vy > maxY)
+                {
+                    maxY = vy;
+                }
+                if (vz > maxZ)
+                {
+                    maxZ = vz;
+                }
+                if (vx < minX)
+                {
+                    minX = vx;
+                }
+                if (vy < minY)
+                {
+                    minY = vy;
+                }
+                if (vz < minZ)
+                {
+                    minZ = vz;
+                }
 
                 if (v_idx.normal_index >= 0) {
                     tinyobj::real_t nx = attrib.normals[3 * size_t(v_idx.normal_index) + 0];
                     tinyobj::real_t ny = attrib.normals[3 * size_t(v_idx.normal_index) + 1];
                     tinyobj::real_t nz = attrib.normals[3 * size_t(v_idx.normal_index) + 2];
-
                     norm = glm::vec3(nx, ny, nz);
-
                 }
 
                 if (v_idx.texcoord_index >= 0) {
                     tinyobj::real_t tx = attrib.texcoords[2 * size_t(v_idx.texcoord_index) + 0];
                     tinyobj::real_t ty = attrib.texcoords[2 * size_t(v_idx.texcoord_index) + 1];
+                    texture = glm::vec2(tx, ty);
                 }
 
                 if (v == 0)
                 {
                     face.v1 = vert;
                     face.n1 = norm;
+                    face.t1 = texture;
                 }
                 else if (v == 1)
                 {
                     face.v2 = vert;
                     face.n2 = norm;
+                    face.t2 = texture;
                 }
                 else if (v == 2)
                 {
                     face.v3 = vert;
                     face.n3= norm;
+                    face.t3 = texture;
                 }
                 else
                 {
                     std::cout << "Quad face detected" << reader.Warning();
                 }
-
             }
-
             idx += num_v;
             triangles.push_back(face);
+            geo.boundingBoxMax = glm::vec3(maxX, maxY, maxZ);
+            geo.boundingBoxMin = glm::vec3(minX, minY, minZ);
         }
     }
     return 1;
 }
-
