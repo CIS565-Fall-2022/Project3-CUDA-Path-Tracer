@@ -227,6 +227,8 @@ The second level of optimization is done on GPU. BVH is a tree after all, so we 
 
 For the BVH in this project, I implemented stackless traversal. The idea is to preprocess tree structure to know in advance which node to visit if the ray intersects/does not intersect the node's bounding box. By doing so we actually create a automated machine, whose traversal only requires $O(1)$ runtime memory.
 
+![](./img/stackless.png)
+
 ##### How much BVH Enhances Performance
 
 I only tested relatively small scenes considering that it would take fairly long to render without BVH.
