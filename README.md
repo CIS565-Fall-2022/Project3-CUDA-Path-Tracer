@@ -30,8 +30,8 @@ In this project, I implemented GPU Path Tracer with multiple features and learne
 ### Shading Kernel With BSDF Evaluation for Diffuse/Specular/Refraction
 The first part I did was to implement the basic BSDF evaluation, where reflection/refraction/diffusion are distributed based on every object's material, and refraction is distributed based on Fresnel's computation and Schlick's approximation. Here is a picture with three different kind of material in it.
 ![BSDF](./img/bsdf.png)
-Left: Diffuse Material Colored with Klein Blue
-Middle: Perfect Specular
+Left: Diffuse Material Colored with Klein Blue<br />
+Middle: Perfect Specular<br />
 Right: Refractive with an index of refraction of 1.52(Glass)
 
 Another Refraction:
