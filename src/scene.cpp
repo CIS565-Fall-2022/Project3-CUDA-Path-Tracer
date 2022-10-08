@@ -265,8 +265,14 @@ int Scene::loadOBJ(string filename, int objectid)
                 tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
                 tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
                 tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+                tri.verts[i] = glm::vec3((float)vx, (float)vy, (float)vz);
 
-                tri.verts[i]= glm::vec3((float)vx, (float)vy, (float)vz);
+                if (idx.normal_index >= 0) {
+                    tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
+                    tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
+                    tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
+                    tri.norms[i] = glm::vec3((float)nx, (float)ny, (float)nz);
+                }
 
                 // Determine AABB min and max
                 min = glm::min(min, tri.verts[i]);

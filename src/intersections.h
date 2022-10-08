@@ -271,7 +271,8 @@ __host__ __device__ float meshIntersectionTest(Geom mesh, Ray r,
     float v = min_barycenter.y;
     float w = 1.f - u - v;
     intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
-    normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
+    //normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
+    normal = u * min_tri.norms[0] + v * min_tri.norms[1] + w * min_tri.norms[2];
 
     return min_t;
 }
@@ -356,7 +357,8 @@ __host__ __device__ float lbvhIntersectionTest(const LBVHNode* nodes, const Tria
     float v = min_barycenter.y;
     float w = 1.f - u - v;
     intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
-    normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
+    //normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
+    normal = u * min_tri.norms[0] + v * min_tri.norms[1] + w * min_tri.norms[2];
 
     return min_t;
 }
@@ -443,7 +445,8 @@ __host__ __device__ float bvhIntersectionTest(const BVHNode* nodes, const Triang
     float v = min_barycenter.y;
     float w = 1.f - u - v;
     intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
-    normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
+    //normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
+    normal = u * min_tri.norms[0] + v * min_tri.norms[1] + w * min_tri.norms[2];
 
     return min_t;
 }

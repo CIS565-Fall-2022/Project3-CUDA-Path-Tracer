@@ -1,7 +1,7 @@
 #include "lbvh.h"
 
-//#define USE_MIDPOINT
-#define USE_SAH
+#define USE_MIDPOINT
+//#define USE_SAH
 
 /// LBVH FUNCTIONS ///
 

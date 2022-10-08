@@ -38,6 +38,7 @@ struct Triangle {
     AABB aabb;
     glm::vec3 centroid;
     glm::vec3 verts[3];
+    glm::vec3 norms[3];
     unsigned int mcode; // for testing, remove later
     int objectId;
 
