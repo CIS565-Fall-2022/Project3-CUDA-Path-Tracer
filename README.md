@@ -18,7 +18,7 @@ Ray-tracing is a computer graphics technique in which we calculate the exact pat
 
 Since this technique involves computing a large number of rays independently, it can be highly parallelized. In this project, I have used CUDA to compute intersections and shading per iteration for multiple rays parallelly.
 
-![](img/demoScene.png)
+![](img/demoSceneAnnotate.png)
 
 # Features
 ---
