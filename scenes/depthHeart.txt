@@ -1,6 +1,6 @@
 // Emissive material (light)
 MATERIAL 0
-RGB         0.5 0.5 1
+RGB         .98 .71 .81
 SPECEX      0
 SPECRGB     0 0 0
 REFL        0
@@ -113,11 +113,12 @@ SCALE       .01 10 10
 
 // Sphere
 OBJECT 5
-sphere
+mesh
 material 0
-TRANS       0.0 5 7
-ROTAT       0 0 0
-SCALE       0.5 0.5 0.5
+TRANS       0.0 4 0
+ROTAT       -90 0 0
+SCALE       0.05 0.05 0.05
+filepath ../scenes/mesh/heart.obj
 
 // Back light
 //OBJECT 5

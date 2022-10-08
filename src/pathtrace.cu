@@ -17,7 +17,7 @@
 
 #define ERRORCHECK 1
 
-#define SORT_BY_MATERIAL 1
+#define SORT_BY_MATERIAL 0
 #define CACHE_FIRST_INTERSECTION 0
 
 #define ANTIALIASING 0
@@ -26,11 +26,11 @@
 #define MOTION_VELOCITY glm::vec3(0.0f, 0.75f, 0.0f)
 
 #define DEPTH_OF_FIELD 1
-#define LENS_RADIUS 0.3f
-#define FOCAL_DISTANCE 7.f
+#define LENS_RADIUS 4.0f
+#define FOCAL_DISTANCE 4.f
 #define PI 3.141592654f
 
-#define DIRECT_LIGHTING 1
+#define DIRECT_LIGHTING 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -140,7 +140,7 @@ glm::vec3 pointOnSquarePlane(thrust::default_random_engine& rng, Geom light)
 __host__ __device__
 float heartFunction(const glm::vec2& sample) {
 	float tmp = (sample.x * sample.x + sample.y * sample.y - 1.0f);
-	return (tmp * tmp * tmp + sample.x * sample.x * sample.y * sample.y * sample.y);
+	return (tmp * tmp * tmp - sample.x * sample.x * sample.y * sample.y * sample.y);
 }
 __host__ __device__
 glm::vec3 squareToHeart(const glm::vec2& sample)
@@ -275,10 +275,10 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		// random a sample point on the disk as a point on lens
 		// added it to the camera origin
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
-		thrust::uniform_real_distribution<float> u01(0, 1);
-		glm::vec3 pointOnLens = squareToDiskConcentric(glm::vec2(u01(rng), u01(rng))) * LENS_RADIUS;
-		/*thrust::uniform_real_distribution<float> u01(-1.4, 1.4);
-		glm::vec3 pointOnLens = squareToHeart(glm::vec2(u01(rng), u01(rng))) * LENS_RADIUS;*/
+		/*thrust::uniform_real_distribution<float> u01(0, 1);
+		glm::vec3 pointOnLens = squareToDiskConcentric(glm::vec2(u01(rng), u01(rng))) * LENS_RADIUS;*/
+		thrust::uniform_real_distribution<float> u01(-1.4, 1.4);
+		glm::vec3 pointOnLens = squareToHeart(glm::vec2(u01(rng), u01(rng))) * LENS_RADIUS;
 		glm::vec3 origin =  cam.position + glm::mat3(cam.right, cam.up, cam.view) * pointOnLens;
 		segment.ray.origin = origin;
 #else
