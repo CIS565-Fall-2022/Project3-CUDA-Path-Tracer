@@ -41,7 +41,7 @@ Some performance improvements implemented include:
 The following render has a cube placed inside spheres of varying refractive index. Note how the size distortion of the refracted sphere varies
 |Schlick's approximation for varying index of refraction|
 |---|
-|![](img/materialTypes2Annotate.png)|
+|![](img/renders/materialTypes2Annotate.png)|
 
 ### Physically based depth of field
 
@@ -81,13 +81,15 @@ We can set the focal length of our camera to focus on foreground, mid-ground or 
 
 |Tested on basic cornell box with 1 diffused sphere in the center|
 |---|
-|![](img/performanceAnalysis/cacheIntersections.png)|![](img/performanceAnalysis/cacheIntersectionsCol.png)|
+|![](img/performanceAnalysis/cacheIntersections.png)|
+|![](img/performanceAnalysis/cacheIntersectionsCol.png)|
 
 For the above observations, anti-aliasing was turned off. Anti-aliasing is an expensive operation. However, it becomes even more expensive if implemented along with intersection caching.
 
 |Anti-aliasing tested with intersection caching|
 |---|
-|![](img/performanceAnalysis/antialiasing.png)|![](img/performanceAnalysis/antialiasingCol.png)|
+|![](img/performanceAnalysis/antialiasing.png)|
+|![](img/performanceAnalysis/antialiasingCol.png)|
 
 ### Path continuation/termination using stream compaction
 
