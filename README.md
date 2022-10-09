@@ -31,9 +31,9 @@ Some of the visual improvements implemented include:
 - [Aritrary obj mesh loading](#aritrary-obj-mesh-loading)
 
 Some performance improvements implemented include:
-- First bounce cached intersections
-- Path continuation/termination using stream compaction
-- Sorting rays by material
+- [First bounce cached intersections](#first-bounce-cached-intersections)
+- [Path continuation/termination using stream compaction]()
+- [Sorting rays by material](#sorting-rays-by-material)
 
 ## Visual Improvements
 
@@ -75,3 +75,15 @@ We can set the focal length of our camera to focus on foreground, mid-ground or 
 |---|
 |![](img/renders/objLoading2.png)|
  
+## Performance Optimizations
+
+### First bounce cached intersections
+
+|Tested on basic cornell box with 1 diffused sohere in the center|
+|---|
+|![](img/performanceAnalysis/cacheintersections.png)|
+
+### Path continuation/termination using stream compaction
+
+
+### Sorting rays by material
