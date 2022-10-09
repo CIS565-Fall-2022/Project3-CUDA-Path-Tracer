@@ -68,11 +68,13 @@ My implementation for refractive materials comes from [Physically Based Renderin
 
 This is the result of my refraction implementation:
 
-_View 1_            |  _View 2_ 
+_View 1_            |  _View 2 without specular sphere_ 
 :-------------------------:|:-------------------------:
 ![](img/Refractive.png) |  ![](img/cornell.2022-09-28_22-10-45z.5000samp.png)
 
 ### Depth of Field
+
+In order to obtain a depth of field effect, I referenced this online article: [Depth of Field in Path Tracing](https://medium.com/@elope139/depth-of-field-in-path-tracing-e61180417027#:~:text=Implementing%20depth%20of%20field%20in,out%20of%20focus%20will%20appear)
 
 ![](img/noDepthOfField.png)
 
