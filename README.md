@@ -85,7 +85,7 @@ _No Depth of Field_            |  _Depth of Field_
 _No Antialiasing_            |  _Antialiasing_ 
 :-------------------------:|:-------------------------:
 ![](img/noAntialiasing.png) |  ![](img/antialiasing5000samp.png)
-
+:-------------------------:|:-------------------------:
 _No Antialiasing Closeup_            |  _Antialiasing Closeup_ 
 :-------------------------:|:-------------------------:
 ![](img/noAntialiasingCloseup.png) |  ![](img/antialiasingCloseup.png)
