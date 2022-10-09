@@ -12,7 +12,9 @@ CUDA Path Tracer
 
 In this project, I implemented a CUDA path tracer for the GPU. Previously in Advanced Rendering, I implemented a Monte Carlo Path Tracer for the CPU. In this project, the path tracer is
 
-![](img/myLink.png)
+![](img/main.png)
+
+![](img/mainAntialiasing.png)
 
 ## Core Features
 1. Shading kernel with BSDF Evaluation for Diffuse and Perfect/Imperfect Specular
