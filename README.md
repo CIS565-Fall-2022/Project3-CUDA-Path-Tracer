@@ -125,7 +125,7 @@ We can see that with Path Termination, the run time is high at the first bounce.
 
 | Run Time | Number of Rays Remaining | 
 | :--------------------------: | :-------------------: |
-| ![](./img/Trace%20Depth%20vs%20Run%20Time%20per%20Bounce%20(ms).png) | ![](./img/Trace%20Depth%20vs%20Number%20of%20Rays%20Remainng.png) |
+| ![](./img/Trace%20Depth%20vs%20Run%20Time%20per%20Bounce%20(ms).png) | ![](./img/td1.png) |
 
 ### Close & Open Scene Comparison 
 Since the stream compaction only affect to the rays which have no remaining bounce. Therefore, if all the ray have the same remaining bounce, stream compaction will have less impact. 
