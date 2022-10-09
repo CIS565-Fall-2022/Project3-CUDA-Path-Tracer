@@ -7,6 +7,7 @@ REFL        0
 REFR        0
 REFRIOR     0
 EMITTANCE   5
+ABSORPTION  0
 
 // Diffuse white
 MATERIAL 1
@@ -17,6 +18,7 @@ REFL        0
 REFR        0
 REFRIOR     0
 EMITTANCE   0
+ABSORPTION  0
 
 // Diffuse red
 MATERIAL 2
@@ -27,6 +29,7 @@ REFL        0
 REFR        0
 REFRIOR     0
 EMITTANCE   0
+ABSORPTION  0
 
 // Diffuse green
 MATERIAL 3
@@ -37,6 +40,7 @@ REFL        0
 REFR        0
 REFRIOR     0
 EMITTANCE   0
+ABSORPTION  0
 
 // Specular white
 MATERIAL 4
@@ -47,6 +51,29 @@ REFL        1
 REFR        0
 REFRIOR     0
 EMITTANCE   0
+ABSORPTION  0
+
+// Refractive
+MATERIAL 5
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        1
+REFRIOR     1.5
+EMITTANCE   0
+ABSORPTION  0
+
+// SSS
+MATERIAL 6
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     1.35
+EMITTANCE   0
+ABSORPTION  .03
 
 // Camera
 CAMERA
@@ -55,6 +82,8 @@ FOVY        45
 ITERATIONS  5000
 DEPTH       8
 FILE        cornell
+FOCAL       0
+LENS_LEN    0
 EYE         0.0 5 10.5
 LOOKAT      0 5 0
 UP          0 1 0
@@ -110,8 +139,8 @@ SCALE       .01 10 10
 
 // Cube but an obj
 OBJECT 6
-C:\Users\Edward\Desktop\CIS565 Directory\Project3-CUDA-Path-Tracer\scenes\cubeobj.obj
+C:\Users\Edward\Desktop\CIS565 Directory\Project3-CUDA-Path-Tracer\scenes\amogus.obj
 material 3
-TRANS       0 0 0
-ROTAT       0 0 0
+TRANS       0 3 0
+ROTAT       45 45 30
 SCALE       2 2 2
