@@ -46,12 +46,12 @@ Since the operations for this approximation are primitive arithmetic operations 
 The following image obtained from the path tracer shows a fully specular transmissive material, specular reflective material and a lambertian diffused material.
 |Left to Right - Transmissive (ROI=1.5), Mirror-like, Diffused|
 |---|
-| |
+| ![](img/renders/materialTypes3.png) |
 
 The following render has a cube placed inside spheres of varying refractive index. Note how the size distortion of the refracted sphere varies
 |Schlick's approximation for varying index of refraction|
 |---|
-|![](img/renders/materialTypes2Annotate.png)|
+|![](img/materialTypes2Annotate.png)|
 
 ### Physically based depth of field
 
