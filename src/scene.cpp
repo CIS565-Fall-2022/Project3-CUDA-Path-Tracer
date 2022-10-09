@@ -223,7 +223,7 @@ int Scene::loadGLTFNodes(const std::vector<tinygltf::Node>& nodes, const tinyglt
         glm::vec3 translate = node.translation.empty() ? glm::vec3(0.f) : glm::make_vec3(node.translation.data());
         glm::quat rotation = node.rotation.empty() ? glm::quat(1,0,0,0) : glm::make_quat(node.rotation.data());
         glm::vec3 scale = node.scale.empty() ? glm::vec3(1.f) : glm::make_vec3(node.scale.data());
-        scale *=120;
+        scale *=3;
         tempMatrix = utilityCore::buildTransformationMatrix(translate, rotation, scale);
     }
     else
@@ -338,9 +338,10 @@ int Scene::loadGLTF(const std::string filename)
     for (const tinygltf::Material& gltfMat : model.materials)
     {
         Material newMat;
-        newMat.color = glm::vec3(0.3f, 0.3f, 1.f);
+        newMat.color = glm::vec3(1.f,0.8f,0.f);
         newMat.specular.color = glm::vec3(0.98f, 0.98f, 0.98f);
-        newMat.hasReflective = 0.5f;
+        newMat.hasRefractive = 0.f;
+        newMat.hasReflective = 0.f;
         newMat.gltf = true;
         newMat.texOffset = textureOffset;
         newMat.pbrShadingAttribute.baseColorTexture = gltfMat.pbrMetallicRoughness.baseColorTexture;

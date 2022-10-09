@@ -276,7 +276,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
 
 	bool enableDepthField = false;
-	bool enableStochasticAA = true;
+	bool enableStochasticAA = false;
 
 	if (x < cam.resolution.x && y < cam.resolution.y) {
 		int index = x + (y * cam.resolution.x);
@@ -308,8 +308,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		//DepthField
 		if (enableDepthField)
 		{
-			float lensRadius = 0.3f; // 0.003f
-			float focalDistance = 5.f;
+			float lensRadius = 0.3f; 
+			float focalDistance = 6.f;
 			thrust::normal_distribution<float> n01(0, 1);
 			float theta = u01(rng) * TWO_PI;
 			glm::vec3 circlePerturb = lensRadius * n01(rng) * (cos(theta) * cam.right + sin(theta) * cam.up);
