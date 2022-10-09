@@ -8,8 +8,6 @@ CUDA Path Tracer
   * [personal website](https://www.dluisnothere.com/)
 * Tested on: Windows 11, i7-12700H @ 2.30GHz 32GB, NVIDIA GeForce RTX 3050 Ti
 
-![](img/main.png)
-
 ## Introduction
 
 In 3D rendering, Pathtracing is a technique that generates realistic looking scenes/images by simulating light ray bounces. For this project, I implemented a CUDA path tracer for the GPU. In order to get the least noisy final output, 5000 calls to pathtrace are made whenever the camera is moved. The result of each pathtrace call is then averaged to produce the final output.
@@ -20,6 +18,8 @@ Overall, this project is a continuation of learning how to write CUDA kernel fun
    a. Simple Diffuse, Specular, and Imperfect Specular BSDF shading
    b. 
 3. Additional Features
+
+![](img/main.png)
 
 ![](img/mainAntialiasing.png)
 
