@@ -81,15 +81,22 @@ We can set the focal length of our camera to focus on foreground, mid-ground or 
 
 |Tested on basic cornell box with 1 diffused sphere in the center|
 |---|
-|![](img/performanceAnalysis/cacheIntersections.png)|![](img/performanceAnalysis/cacheIntersectionsCol.png)|
+|![](img/performanceAnalysis/cacheIntersections.png)|
 
 For the above observations, anti-aliasing was turned off. Anti-aliasing is an expensive operation. However, it becomes even more expensive if implemented along with intersection caching.
 
 |Anti-aliasing tested with intersection caching|
 |---|
-|![](img/performanceAnalysis/antialiasing.png)|![](img/performanceAnalysis/antialiasingCol.png)|
+|![](img/performanceAnalysis/antialiasing.png)|
 
 ### Path continuation/termination using stream compaction
 
+| Time-taken by GPU versus depth (1 iteration cycle)|
+|---|
+|![](img/performanceAnalysis/streamcompaction_time.png)|
+
+| Number of paths remaining versus depth (1 iteration cycle)|
+|---|
+|![](img/performanceAnalysis/streamcompaction_path.png)|
 
 ### Sorting rays by material
