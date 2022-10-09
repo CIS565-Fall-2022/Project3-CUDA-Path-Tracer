@@ -3,7 +3,7 @@ CUDA Path Tracer
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 3**
 
-![](img/cover.png)
+![](img/cover.png)  
 An implementation of a path tracer including simulated diffuse, specular, and refractive materials, loading from checkpoints, Anti-Aliasing, and Depth of Field.
 * Tom Donnelly
   * [LinkedIn](https://www.linkedin.com/in/the-tom-donnelly/)
@@ -13,16 +13,16 @@ An implementation of a path tracer including simulated diffuse, specular, and re
 ## Materials
 Materials are able to be loaded from a scene including RGB color, specular color, diffuse, specular, and refraction interactions with light.
 
-Diffuse:  
+### Diffuse:  
 ![](img/diffuse.png)
 
-Perfectly Specular:  
+### Perfectly Specular:  
 ![](img/reflect.png)
 
-Imperfect Specular:  
+### Imperfect Specular:  
 ![](img/imperfect.png)
 
-Refraction with Fresnel Effects:  
+### Refraction with Fresnel Effects:  
 ![](img/refract.png)
  
 ---
@@ -98,15 +98,15 @@ DOF options are included in scene files under camera
 Save a checkpoint by pressing c when running the program  
 Load a checkpoint by passing the path to the checkpoint as the second argument of the program  
 ### Bloopers
-![](img/blooper_1.png)
+![](img/blooper_1.png)  
 Issues with ray bounces  
 
-![](img/blooper_2.png)
+![](img/blooper_2.png)  
 Not offsetting intersection causing noise  
 
-![](img/blooper_3.png)
+![](img/blooper_3.png)  
 Strange Refractions  
 
-![](img/blooper_4.png)
+![](img/blooper_4.png)  
 Super zoomed in spheres getting DOF to work  
 
