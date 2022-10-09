@@ -26,7 +26,7 @@ Overall, this project is a continuation of learning how to write CUDA kernel fun
 *  Continugous arrangement of materials based on materialId
 *  First-bounce-cache for a specific camera angle.
 
-3. [Additional Features](https://github.com/dluisnothere/Project3-CUDA-Path-Tracer#additional-features)
+2. [Additional Features](https://github.com/dluisnothere/Project3-CUDA-Path-Tracer#additional-features)
 *  Refractive materials using Schlick's approximation
 *  Depth of Field
 *  Direct Lighting
@@ -63,6 +63,10 @@ _All Materials Diffuse_            |  _Specular Sphere_ | _Imperfect Specular_
 
 ## Additional Features
 ### Refractive Material
+
+My implementation for refractive materials comes from [Physically Based Rendering](https://www.pbr-book.org/). If a ray decides it will refract, then I first get the material properties of material 1 and material 2 (in most cases, material 1 is air, which means it has an IOR of 1.003). Then, I obtain the incidence angle of my ray and the normal of the intersection point. Using this information, I can figure out if the angle is a critical angle or not. If it's a critical angle, then the light ray will simply bounce off the surface. Otherwise, it will refract. If the ray is inside the Object and a critical angle is hit, tjhen there will be total internal reflection.
+
+This is the result of my refraction implementation:
 
 ![](img/Refractive.png)
 
