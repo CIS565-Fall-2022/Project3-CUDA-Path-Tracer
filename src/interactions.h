@@ -218,6 +218,7 @@ void scatterRay(
     }
     pathSegment.throughput *= f;
     pathSegment.ray.direction = wi;
+    pathSegment.ray.invDirection = glm::vec3(1.0, 1.0, 1.0) / pathSegment.ray.direction;
     pathSegment.ray.origin = intersect + 0.01f * pathSegment.ray.direction;
     pathSegment.remainingBounces--;
 }

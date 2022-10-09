@@ -48,7 +48,7 @@ struct Triangle {
     }
 
     void computeCentroid() {
-        centroid = 0.5f * aabb.min + 0.5f * aabb.max;
+        centroid = (verts[0] + verts[1] + verts[2]) / glm::vec3(3.f, 3.f, 3.f);
     }
 };
 

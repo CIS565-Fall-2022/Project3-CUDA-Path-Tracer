@@ -25,8 +25,8 @@
 #define BB_CULLING        DISABLE
 #define USE_LBVH          ENABLE
 #define USE_BVH           DISABLE
-#define USE_BVH_MIDPOINT  DISABLE
-#define USE_BVH_SAH       ENABLE
+#define USE_BVH_MIDPOINT  ENABLE
+#define USE_BVH_SAH       DISABLE
 
 class GuiDataContainer
 {

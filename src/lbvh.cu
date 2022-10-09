@@ -16,6 +16,12 @@ AABB Union(AABB left, AABB right) {
     return AABB{ umin, umax }; 
 }
 
+AABB Union(AABB aabb, glm::vec3 p) {
+    glm::vec3 umin = glm::min(aabb.min, p);
+    glm::vec3 umax = glm::max(aabb.max, p);
+    return AABB{ umin, umax };
+}
+
 float test_aabbIntersectionTest(AABB aabb, Ray r) {
     glm::vec3 invR = glm::vec3(1.0, 1.0, 1.0) / r.direction;
 
@@ -393,10 +399,17 @@ void calculateSAHSplit(Scene* scene, BVHNode* node, float& split, int& axis)
 void chooseSplit(Scene* scene, BVHNode* node, float& split, int& axis)
 {
 
-#ifdef USE_BVH_MIDPOINT
-    glm::vec3 extent = node->aabb.max - node->aabb.min;
+#if USE_BVH_MIDPOINT
+    /*glm::vec3 extent = node->aabb.max - node->aabb.min;
     axis = maxExtent(extent);
-    split = node->aabb.min[axis] + extent[axis] * 0.5f;
+    split = node->aabb.min[axis] + extent[axis] * 0.5f;*/
+
+    AABB centroidAABB = { glm::vec3{INFINITY, INFINITY, INFINITY}, glm::vec3{-INFINITY, -INFINITY, -INFINITY} };
+    for (int i = node->firstTri; i < node->firstTri + node->numTris; ++i)
+        centroidAABB = Union(centroidAABB, scene->triangles[i].centroid);
+    axis = maxExtent(centroidAABB.max - centroidAABB.min);
+    split = (centroidAABB.min[axis] + centroidAABB.max[axis]) * 0.5f;
+
 #elif USE_BVH_SAH
     calculateSAHSplit(scene, node, split, axis);
 #endif
@@ -432,6 +445,13 @@ void addChildren(Scene* scene, BVHNode* node)
     // Make sure there is no empty side on partition
     int count = start - node->firstTri;
     if (count == 0 || count == node->numTris) return;
+
+    //int start = node->firstTri;
+    //int end = node->firstTri + node->numTris;
+    //auto mid = std::partition(&scene->triangles[start], &scene->triangles[end-1]+1, [axis, split](const Triangle& tri) { return tri.centroid[axis] < split; });
+
+    //int middle = mid - &scene->triangles[node->firstTri];
+    //if (middle == start || middle == node->numTris) return;
 
     // Set children nodes
     node->left = idx++;

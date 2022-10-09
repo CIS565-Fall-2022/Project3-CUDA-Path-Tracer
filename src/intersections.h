@@ -114,7 +114,8 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
 //}
 
 __host__ __device__ bool aabbIntersectionTest(AABB aabb, Ray r, float& t) {
-    glm::vec3 invR = glm::vec3(1.0, 1.0, 1.0) / r.direction;
+    //glm::vec3 invR = glm::vec3(1.0, 1.0, 1.0) / r.direction;
+    glm::vec3 invR = r.invDirection;
 
     float x1 = (aabb.min.x - r.origin.x) * invR.x;
     float x2 = (aabb.max.x - r.origin.x) * invR.x;
