@@ -409,20 +409,6 @@ __global__ void shadeFakeMaterial(
 	}
 }
 
-
-__host__ __device__ int getTextureElementIndex(const Texture& tex, glm::vec2 uv)
-{
-	// UV to pixel space
-	int w = tex.width * uv[0] - 0.5;
-	int h = tex.height * (1 - uv[1]) - 0.5;
-
-	// 2D pixel space to 1D
-	int pixelIndex = h * tex.width + w;
-
-	return pixelIndex;
-}
-
-
 __global__ void shadeMaterial(
 	int iter
 	, int num_paths
@@ -449,14 +435,12 @@ __global__ void shadeMaterial(
 		Material material = materials[intersection.materialId];
 		glm::vec3 materialColor = material.color;
 
-		glm::vec3 textureColor = glm::vec3(0.f);
 		if (intersection.textureId != -1)
 		{
 			Texture tex = textures[intersection.textureId];
 			int w = tex.width * intersection.uv[0] - 0.5;
 			int h = tex.height * (1 - intersection.uv[1]) - 0.5;
-			int colIdx = h * tex.width + w;
-			textureColor = texColors[colIdx];
+			int colIdx = h * tex.width + w + tex.idx;
 			material.color = texColors[colIdx];
 		}
 

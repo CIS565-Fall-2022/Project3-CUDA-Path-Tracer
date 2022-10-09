@@ -346,10 +346,11 @@ int Scene::loadObj(Geom& geo, const char* inputfile)
 int Scene::loadTexture(string textureID)
 {
     int id = atoi(textureID.c_str());
-    std::cout << "Loading texture file: " << id <<endl;
+    std::cout << "Loading texture file: " << id <<" starting index: "<< textureColors.size() <<endl;
 
     Texture texture;
     texture.id = id;
+    texture.idx = textureColors.size();
     int width, height, channels;
 
     string line;

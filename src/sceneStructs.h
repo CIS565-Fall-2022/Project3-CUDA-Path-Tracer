@@ -55,6 +55,7 @@ struct Texture {
     int channel;
     int width;
     int height;
+    int idx;
 };
 
 struct Material {
