@@ -27,7 +27,7 @@ Overall, this project is a continuation of learning how to write CUDA kernel fun
 *  First-bounce-cache for a specific camera angle.
 
 3. [Additional Features](https://github.com/dluisnothere/Project3-CUDA-Path-Tracer#additional-features)
-*  Refractive materials
+*  Refractive materials using Schlick's approximation
 *  Depth of Field
 *  Direct Lighting
 *  Stochastic-sampled antialiasing
