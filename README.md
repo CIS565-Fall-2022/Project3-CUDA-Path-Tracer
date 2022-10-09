@@ -8,11 +8,11 @@ CUDA Path Tracer
   * [personal website](https://www.dluisnothere.com/)
 * Tested on: Windows 11, i7-12700H @ 2.30GHz 32GB, NVIDIA GeForce RTX 3050 Ti
 
+![](img/main.png)
+
 ## Introduction
 
 In this project, I implemented a CUDA path tracer for the GPU. Previously in Advanced Rendering, I implemented a Monte Carlo Path Tracer for the CPU. In this project, the path tracer is
-
-![](img/main.png)
 
 ![](img/mainAntialiasing.png)
 
