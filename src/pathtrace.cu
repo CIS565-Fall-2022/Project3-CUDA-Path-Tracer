@@ -15,11 +15,12 @@
 #include "intersections.h"
 #include "interactions.h"
 
+#define TIMING 0
 
 #define ERRORCHECK 1
 #define SORT_BY_MATERIAL 0
-#define FIRST_BOUNCE_CACHE 0
-#define ANTIALIASING 1
+#define FIRST_BOUNCE_CACHE 1
+#define ANTIALIASING 0
 #define DIRECT_LIGHTING 1
 
 #define DEPTH_OF_FIELD 0
@@ -84,6 +85,12 @@ static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
+
+#if TIMING
+// Timing
+static cudaEvent_t event_start = nullptr;
+static cudaEvent_t event_end = nullptr;
+#endif
 
 static int* dev_stencil = NULL;
 static ShadeableIntersection* dev_first_intersections = NULL;
@@ -177,6 +184,10 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_octree, scene->octree.size() * sizeof(OctreeNode));
 	cudaMemcpy(dev_octree, scene->octree.data(), scene->octree.size() * sizeof(OctreeNode), cudaMemcpyHostToDevice);
 
+#if TIMING
+	cudaEventCreate(&event_start);
+	cudaEventCreate(&event_end);
+#endif
 	checkCUDAError("pathtraceInit");
 }
 
@@ -207,6 +218,13 @@ void pathtraceFree() {
 
 	cudaFree(dev_octree);
 	cudaFree(dev_triangleIndice);
+
+#if TIMING
+	if (event_start != NULL)
+		cudaEventDestroy(event_start);
+	if (event_end != NULL)
+		cudaEventDestroy(event_end);
+#endif
 
 	checkCUDAError("pathtraceFree");
 }
@@ -594,9 +612,12 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	// --- PathSegment Tracing Stage ---
 	// Shoot ray into scene, bounce between objects, push shading chunks
-
+#if TIMING
+	cudaEventRecord(event_start);
+#endif
 	bool iterationComplete = false;
 	while (!iterationComplete) {
+
 		ShadeableIntersection* intersections = dev_intersections;
 
 		// clean shading chunks
@@ -707,6 +728,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 		iterationComplete = (num_paths <= 0) || (depth > traceDepth); // TODO: should be based off stream compaction results.
 
+
 		//std::cout << "Iter: " << iter << "  Number of Paths: " << num_paths << std::endl;
 
 		if (guiData != NULL)
@@ -714,7 +736,13 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			guiData->TracedDepth = depth;
 		}
 	}
-
+#if TIMING
+	cudaEventRecord(event_end);
+	cudaEventSynchronize(event_end);
+	float ms;
+	cudaEventElapsedTime(&ms, event_start, event_end);
+	std::cout << "Iter: " << iter << " Depth: " << depth << " " << ms << " ms Number of path: " << num_paths << endl;
+#endif
 	// Assemble this iteration and apply it to the image
 	dim3 numBlocksPixels = (pixelcount + blockSize1d - 1) / blockSize1d;
 	finalGather << <numBlocksPixels, blockSize1d >> > (pixelcount, dev_image, dev_paths);

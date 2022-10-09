@@ -11,9 +11,11 @@ CUDA Path Tracer
 This project is a CUDA-based path tracer used to generate high-quality images. The concept is to generate rays from camera and maintain the rays using parallel computing. This enables the Physically-based Rendering work in a very fast speed. 
 
 ![](./img/Laterns.png)
+* Latern Model Credit (https://github.com/KhronosGroup/glTF-Sample-Models)
 
 # Visual Effect
 ![](./img/title1-3.png)
+* Stanford Bunny Model Credit (http://graphics.stanford.edu/data/3Dscanrep/)
 
 ## Reflective, Refraction and Diffuse Surfaces
 
@@ -65,40 +67,81 @@ To enable Physically-Based Depth-of-Field, a random point on the aperture is fir
 ![](./img/DFO.png)
 
 ## Stochastic Sampled Antialiasing
+Antialiasing is the process that attempts to eliminate or reduce the impact of aliasing objects in teh scene. The idea is to divide one pixel into several sampled points, and calculate the colors of these points in this pixel. Then, assign the average of the sampled points to that pixel. Here, a Stochastic Sampling method is used to determine the sampled points. Then, we can jittering the rays' direction when generating them.
 
 | Without Antialiasing | With Antialiasing | 
 :---------------:|:-------------------: |
 | ![](./img/antiWO.png) | ![](./img/antiW.png) |
 | ![](./img/antiW-A-2.jpg) | ![](./img/antiW-A-1.jpg) |
 
-# TODO
-Type Something Here
+We can see the antialiasing has a better result for the edges of the object. Also, the faces of the cube becomes smoother than before. This is because antialiasing take the average of the sampled points.
 
 ## Direct lighting
+The concept of Direct Lighting is to make the final ray bounce directly to a random point on an emissive object, such as light source. Therefore, the image will become lighter. Also, the image will converge faster for open scene, since there will be less useless ray that bounce to nowhere.
+
+To take a random point on light source, the sampling process is necessary. Therefore, for every bounce, the intersections will be recorded when there is a ray hit the light source. Then, when one ray has only one remaining bounce, it will randomly choose one point on light source from the perviously sampled points.
+
+| Without Direct lighting | With Direct lighting | 
+:---------------:|:-------------------: |
+| ![](./img/dl2.png) | ![](./img/dl1.png) |
+| ![](./img/dl3.png) | ![](./img/dl4.png)
 
 # Mesh Loading
 
-## GLTF Loading
+![](./img/title10.png)
+
+## GLTF Loading 
+In order to render more complex objects, GLTF files loading is used to generate mesh objects. GLTF was chosen as the scene description format since it is much powerful than OBJ. Here, [tinygltf](https://github.com/syoyo/tinygltf/) is implemented to support GLTF loading. 
+
+GLTF data is parsed into custom ```struct``` when loading into the program. To avoid passing nested struct into GPU kernels, a giant data buffer is created to store all the vertex data, such as position, normal, and uvs, in the scene. Then, for each mesh object, it only needs to store the indice of those vertex data.
 
 ## Texture and Normal Mapping
 
+| Textue Mapping | Normal Mapping | Normal Mapping with Reflection
+| :--------------------------: | :-------------------: | :-------------------: |
+| ![](./img/textureMapping2.png) | ![](./img/normalMapping.png) | ![](./img/n2.png)
+
 ## Emissive Mapping
+Emissive map shows where the light source is in the mesh object. Just likes texture mapping, it uses ```uv``` to do mapping. Also, only light source has value greater than 0, and thus it is a good condition to check if the ray hit the light source.
+
+| Without Emissive Mapping | Emissive Map | With Emissive Mapping
+| :--------------------------: | :-------------------: | :-------------------: |
+| ![](./img/r0.png) | ![](./img/Lantern_emissive.png) | ![](./img/title10.png)
+
+## Procedural Texture
+
+| Procedural Texture | Procedural Texture | Procedural Texture
+| :--------------------------: | :-------------------: | :-------------------: |
+| ![](./img/p1.png) | ![](./img/p2.png) | ![](./img/p3.png)
+
+![](./img/proText.png)
 
 # Performance Improvements
 
 ## Path Termination using Stream Compaction
 This optimization is to terminate the paths which have not remaining bounces. In this implementation, a stream compaction function ```thrust::partition``` is used to separate the existing paths and terminated paths. This have a great performance improvement when the trace depth increase due to less paths have to be processed after each bounce.
 
-We can see that with Path Termination, the run time is high at the first bounce. This is because we add a partition function. However, when the Trace Depth increase, the run time decrease significantly.
+We can see that with Path Termination, the run time is high at the first bounce. This is because we add a partition function. However, when the Trace Depth increase, the run time decrease significantly. Also, the right image shows the decreasing of the number of rays. This means that there will be less rays needed to be computed when the trace depth increases.
 
-![](./img/Trace%20Depth%20vs%20Run%20Time%20per%20Bounce%20(ms).png)
+| Run Time | Number of Rays Remaining | 
+| :--------------------------: | :-------------------: |
+| ![](./img/Trace%20Depth%20vs%20Run%20Time%20per%20Bounce%20(ms).png) | ![](./img/Trace%20Depth%20vs%20Number%20of%20Rays%20Remainng.png) |
 
+### Close & Open Scene Comparison 
+Since the stream compaction only affect to the rays which have no remaining bounce. Therefore, if all the ray have the same remaining bounce, stream compaction will have less impact. 
 
-![](./img/Trace%20Depth%20vs%20Number%20of%20Rays%20Remainng.png)
+The following shows the difference between closed and open scene. Since there will be no ray escape, the closed scene will have most ray remaining during the iteration. Hence, stream compaction will have less effect.
+| Run Time | Number of Rays Remaining | 
+| :--------------------------: | :-------------------: |
+| ![](./img/occ1.png) | ![](./img/occ2.png) |
 
-## Path Sorting
+## Path Sorting by Materials
+This improvement is to sort the path by the intersection's materials for memory coalescing. Also, since the same materials will always do the same thing in one kernel, the will be less warp divergence. Therefore, it will be a performance increase. The function ```thrust::sort_by_key``` is used to do key-value sorting.
+
+However, this implementaion does not seem to impact the performance for above kernels. In addition, the run time increase due to the cost of sorting. Perhaps introducing very distinctively different materials would make a bigger difference.
 
 ## First Bounce Cache
+This implementation is to store the intersection of the first bounce at iteration 1 and skip the first bounce after. This can be done because each ray starts at the same spot for each pixel, and thus the first bounce will always be the same for all iterations. 
 
 ## Hierarchical Spatial Data Structures - Octree
 Hierarchical spatial data structure is used to avoid checking a ray against every primitive int the scene of every triangle in a mesh. Here, *Octree* is being used to quickly find the triangle(s) intersected by a particular ray
@@ -116,3 +159,21 @@ The following is the comparison between different maximum depth of the Octree. H
 The reason is that the more depth we have, the more nodes needed to be checked. Also, when the bounding boxes become smaller, one triangle may overlap multiple bounding boxes. Therefore, there will be duplicate intersection check for the same triangle since this triangle is existed in multiple leaf nodes. Thus, this will increase the run time. 
 
 ![](./img/Run%20Time%20vs%20Maximum%20Depth%20of%20Octree.png)
+
+# Blooper
+An Abnormal Duck
+![](./img/b1.png)
+
+Got confused for Normal Mapping
+![](./img/b2.png)
+
+Something missing for Octree
+![](./img/b3.png)
+
+It's a really big aperture
+![](./img/b4.png)
+
+# Reference
+* Latern Model Credit (https://github.com/KhronosGroup/glTF-Sample-Models)
+* Stanford Bunny Model Credit (http://graphics.stanford.edu/data/3Dscanrep/)
+* GLTF loading tinygltf (https://github.com/syoyo/tinygltf/)

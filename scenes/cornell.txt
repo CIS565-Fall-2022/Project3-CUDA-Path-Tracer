@@ -77,7 +77,7 @@ SPECEX      0
 SPECRGB     .98 .98 .98
 REFL        0.8
 REFR        1
-REFRIOR     20
+REFRIOR     1.5
 EMITTANCE   0
 
 // Camera
@@ -87,7 +87,7 @@ FOVY        45
 ITERATIONS  5000
 DEPTH       8
 FILE        cornell
-EYE         0.0 5 10.5
+EYE         0.0 5 4
 LOOKAT      0 5 0
 UP          0 1 0
 
@@ -131,6 +131,7 @@ material 1
 TRANS       0 5 -5
 ROTAT       0 90 0
 SCALE       .01 10 10
+
 
 // Left wall
 OBJECT 4
