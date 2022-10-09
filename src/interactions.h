@@ -2,6 +2,8 @@
 
 #include "intersections.h"
 
+#define IMPERFECT_SPECULAR 1
+
 // CHECKITOUT
 /**
  * Computes a cosine-weighted random direction in a hemisphere.
@@ -72,7 +74,8 @@ void scatterRay(
         glm::vec3 intersect,
         glm::vec3 normal,
         const Material &m,
-        thrust::default_random_engine &rng) {
+        thrust::default_random_engine &rng
+) {
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
@@ -119,10 +122,9 @@ void scatterRay(
     // Even split between specular and diffuse
     else if (m.hasReflective)
     {
-        // perfect specular
-        //pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
-        //pathSegment.color *= m.specular.color * m.color; 
 
+
+#if IMPERFECT_SPECULAR
         // imperfect specular
         if (rand > 0.5f)
         {
@@ -135,6 +137,11 @@ void scatterRay(
             pathSegment.color *= m.specular.color;
         }
         pathSegment.color *= 2.f * m.color;
+#else
+        // perfect specular
+        pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+        pathSegment.color *= m.specular.color * m.color; 
+#endif
 
     }
     else if (m.hasRefractive)

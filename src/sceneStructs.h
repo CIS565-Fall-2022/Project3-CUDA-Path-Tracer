@@ -32,6 +32,7 @@ struct Geom {
     glm::vec3 boundingBoxMax;
     int triangleStart;
     int triangleEnd;
+    int textureId = -1;
 };
 
 struct Triangle {
@@ -49,6 +50,13 @@ struct Triangle {
     glm::vec2 t3;
 };
 
+struct Texture {
+    int id;
+    int channel;
+    int width;
+    int height;
+};
+
 struct Material {
     glm::vec3 color;
     struct {
@@ -59,9 +67,6 @@ struct Material {
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
-
-    int textureIdx = -1;
-    int normIdx = -1;
 };
 
 struct Camera {
@@ -98,6 +103,7 @@ struct ShadeableIntersection {
   glm::vec3 surfaceNormal;
   int materialId;
   glm::vec2 uv;
+  int textureId;
 };
 
 struct compareIntersections 

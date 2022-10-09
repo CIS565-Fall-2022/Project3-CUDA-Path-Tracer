@@ -208,14 +208,15 @@ __host__ __device__ float triangleIntersectionTest(Geom custom_obj, Ray r,
             float S1 = 0.5f * glm::length(glm::cross(vertex1 - isect_pos, vertex3 - isect_pos));
             float S2 = 0.5f * glm::length(glm::cross(vertex1 - isect_pos, vertex2 - isect_pos));
             glm::vec3 newNormal = glm::normalize(n0 * S0 / S + n1 * S1 / S + n2 * S2 / S);
+            
             if ((glm::length(t1) != 0) && (glm::length(t2) != 0) && (glm::length(t3) != 0))
             {
-                glm::vec2 newUV = glm::normalize(t1 * S0 / S + t2 * S1 / S + t3 * S2 / S);
+                uv = t1 * S0 / S + t2 * S1 / S + t3 * S2 / S;
             }
+
             normal = glm::normalize(multiplyMV(custom_obj.invTranspose, glm::vec4(newNormal, 0.f)));
             outside = glm::dot(normal, ray_inversed.direction) < 0;
             isect_pos = multiplyMV(custom_obj.transform, glm::vec4(isect_pos, 1.f));
-
         }
     }
         if (!outside) 

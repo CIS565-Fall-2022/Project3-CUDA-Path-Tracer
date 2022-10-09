@@ -105,8 +105,11 @@ static ShadeableIntersection* dev_intersections = NULL;
 // ...
 static ShadeableIntersection* dev_intersection_cache = NULL;
 static Triangle* dev_triangles = NULL;
+static Texture* dev_textures = NULL;
+static glm::vec3* dev_texColors = NULL;
 
 static Geom* dev_lights = NULL;
+
 
 
 void InitDataContainer(GuiDataContainer* imGuiData)
@@ -141,6 +144,12 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_triangles, scene->triangles.size() * sizeof(Triangle));
 	cudaMemcpy(dev_triangles, scene->triangles.data(), scene->triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice);
 
+	cudaMalloc(&dev_textures, scene->textures.size() * sizeof(Texture));
+	cudaMemcpy(dev_textures, scene->textures.data(), scene->textures.size() * sizeof(Texture), cudaMemcpyHostToDevice);
+
+	cudaMalloc(&dev_texColors, scene->textureColors.size() * sizeof(glm::vec3));
+	cudaMemcpy(dev_texColors, scene->textureColors.data(), scene->textureColors.size() * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+
 	cudaMalloc(&dev_lights, scene->lights.size() * sizeof(Geom));
 	cudaMemcpy(dev_lights, scene->lights.data(), scene->lights.size() * sizeof(Geom), cudaMemcpyHostToDevice);
 
@@ -156,6 +165,8 @@ void pathtraceFree() {
 	// TODO: clean up any extra device memory you created
 	cudaFree(dev_intersection_cache);
 	cudaFree(dev_triangles);
+	cudaFree(dev_textures);
+	cudaFree(dev_texColors);
 	cudaFree(dev_lights);
 
 	checkCUDAError("pathtraceFree");
@@ -338,6 +349,8 @@ __global__ void computeIntersections(
 			intersections[path_index].t = t_min;
 			intersections[path_index].materialId = geoms[hit_geom_index].materialid;
 			intersections[path_index].surfaceNormal = normal;
+			intersections[path_index].uv = uv;
+			intersections[path_index].textureId = geoms[hit_geom_index].textureId;
 		}
 	}
 }
@@ -396,12 +409,28 @@ __global__ void shadeFakeMaterial(
 	}
 }
 
+
+__host__ __device__ int getTextureElementIndex(const Texture& tex, glm::vec2 uv)
+{
+	// UV to pixel space
+	int w = tex.width * uv[0] - 0.5;
+	int h = tex.height * (1 - uv[1]) - 0.5;
+
+	// 2D pixel space to 1D
+	int pixelIndex = h * tex.width + w;
+
+	return pixelIndex;
+}
+
+
 __global__ void shadeMaterial(
 	int iter
 	, int num_paths
 	, ShadeableIntersection* shadeableIntersections
 	, PathSegment* pathSegments
 	, Material* materials
+	, Texture* textures
+	, glm::vec3* texColors
 )
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -420,6 +449,17 @@ __global__ void shadeMaterial(
 		Material material = materials[intersection.materialId];
 		glm::vec3 materialColor = material.color;
 
+		glm::vec3 textureColor = glm::vec3(0.f);
+		if (intersection.textureId != -1)
+		{
+			Texture tex = textures[intersection.textureId];
+			int w = tex.width * intersection.uv[0] - 0.5;
+			int h = tex.height * (1 - intersection.uv[1]) - 0.5;
+			int colIdx = h * tex.width + w;
+			textureColor = texColors[colIdx];
+			material.color = texColors[colIdx];
+		}
+
 		// Light source then return light color 
 		if (material.emittance > 0.0f)
 		{
@@ -431,6 +471,8 @@ __global__ void shadeMaterial(
 		else
 		{
 			glm::vec3 i = getPointOnRay(pathSegments[idx].ray, intersection.t);
+
+
 			scatterRay(pathSegments[idx], i, intersection.surfaceNormal, material, rng);
 			return;
 		}
@@ -445,6 +487,8 @@ __global__ void shadeMaterialWithDirectLighting(
 	, Material* materials
 	, Geom* lights
 	, int lightCount
+	,Texture* textures
+    ,glm::vec3* texColors
 )
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -463,6 +507,17 @@ __global__ void shadeMaterialWithDirectLighting(
 		Material material = materials[intersection.materialId];
 		glm::vec3 materialColor = material.color;
 
+		glm::vec3 textureColor = glm::vec3(0.f);
+		if (intersection.textureId != -1)
+		{
+			Texture tex = textures[intersection.textureId];
+			int w = tex.width * intersection.uv[0] - 0.5;
+			int h = tex.height * (1 - intersection.uv[1]) - 0.5;
+			int colIdx = h * tex.width + w;
+			material.color = texColors[colIdx];
+		}
+
+
 		// Light source then return light color 
 		if (material.emittance > 0.0f)
 		{
@@ -474,7 +529,9 @@ __global__ void shadeMaterialWithDirectLighting(
 		else
 		{
 			glm::vec3 i = getPointOnRay(pathSegments[idx].ray, intersection.t);
+
 			scatterRay(pathSegments[idx], i, intersection.surfaceNormal, material, rng);
+			
 			if (pathSegments[idx].remainingBounces == 1)
 			{
 				thrust::uniform_real_distribution<float> u01(0, 1);
@@ -705,7 +762,9 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				dev_paths,
 				dev_materials,
 				dev_lights,
-				hst_scene->lightCount
+				hst_scene->lightCount,
+				dev_textures,
+				dev_texColors
 					);
 #else
 		shadeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
@@ -713,7 +772,9 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			num_paths,
 			dev_intersections,
 			dev_paths,
-			dev_materials
+			dev_materials,
+			dev_textures,
+			dev_texColors
 			);
 #endif
 

@@ -32,6 +32,11 @@ Scene::Scene(string filename) {
                 loadCamera();
                 cout << " " << endl;
             }
+            else if (strcmp(tokens[0].c_str(), "TEXTURE") == 0)
+            {
+                loadTexture(tokens[1]);
+                cout << " " << endl;
+            }
         }
     }
 }
@@ -92,7 +97,10 @@ int Scene::loadGeom(string objectid) {
                 newGeom.scale = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
             } else if (strcmp(tokens[0].c_str(), "ENDPOS") == 0) {
                 newGeom.endpos = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-        }
+            }
+            else if (strcmp(tokens[0].c_str(), "TEXTURE") == 0) {
+                newGeom.textureId = atoi(tokens[1].c_str());
+            }
 
             utilityCore::safeGetline(fp_in, line);
         }
@@ -205,14 +213,6 @@ int Scene::loadMaterial(string materialid) {
                 newMaterial.indexOfRefraction = atof(tokens[1].c_str());
             } else if (strcmp(tokens[0].c_str(), "EMITTANCE") == 0) {
                 newMaterial.emittance = atof(tokens[1].c_str());
-            }
-            else if (strcmp(tokens[0].c_str(), "TEXTURE") == 0)
-            {
-                newMaterial.textureIdx = atof(tokens[1].c_str());
-            }
-            else if (strcmp(tokens[0].c_str(), "NORMMAP") == 0)
-            {
-                newMaterial.normIdx= atof(tokens[1].c_str());
             }
         }
         materials.push_back(newMaterial);
@@ -341,4 +341,41 @@ int Scene::loadObj(Geom& geo, const char* inputfile)
     geo.triangleEnd = triangles.size();
 
     return 1;
+}
+
+int Scene::loadTexture(string textureID)
+{
+    int id = atoi(textureID.c_str());
+    std::cout << "Loading texture file: " << id <<endl;
+
+    Texture texture;
+    texture.id = id;
+    int width, height, channels;
+
+    string line;
+    utilityCore::safeGetline(fp_in, line);
+    vector<string> tokens = utilityCore::tokenizeString(line);
+
+    if (strcmp(tokens[0].c_str(), "PATH") == 0) {
+        const char* filepath = tokens[1].c_str();
+        unsigned char* img = stbi_load(filepath, &width, &height, &channels, 0);
+        if (img != nullptr && width > 0 && height > 0)
+        {
+                texture.width = width;
+                texture.height = height;
+                texture.channel = channels;
+
+                for (int i = 0; i < width * height; ++i)
+                {
+                    glm::vec3 col = glm::vec3(img[3 * i + 0], img[3 * i + 1] , img[3 * i + 2]) / 255.f;
+                    textureColors.emplace_back(col);
+                }
+        }
+        stbi_image_free(img);
+        textures.push_back(texture);
+        return 1;
+    }
+    std::cout << "Texture path does not exist" << endl;
+    return -1;
+
 }
