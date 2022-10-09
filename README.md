@@ -47,23 +47,23 @@ Specular Exponent: 100 (As the exponent increases, the surface gets closer and c
 
 Imperfectly specular materials are just shiny since reflection angles are, while more focused than diffuse materials, nondeterministic.
 ## Stream Compaction
-\[](img/RayTerminationChart.png)
+![](img/RayTerminationChart.png)
 Remove all rays that hit nothing in the scene.
 ## Material Sorting in Memory
-\[](img/MaterialSortChart.png)
+![](img/MaterialSortChart.png)
 
 Sort all ray intersections by the materials they hit with the intent of enabling memory coalescence for bsdf interactions based on different materials.
 ## Ray Caching
-\[](img/RayCacheChart.png)
+![](img/RayCacheChart.png)
 
 The first rays cast into the scene are deterministic based on the camera's position; thus there is no need to recalculate their interactions and intersections for each iteration that the Pathtracer renders.
 ## OBJ Loading
-\[](img/basicObjTest.png) 
+![](img/basicObjTest.png) 
 Tested this implementation against importing a basic cube that was stored as an OBJ.
 
 Implemented functionaltiy loads in an arbitrary, but untextured mesh. Implemented bounding box acceleration data structure as well.
 
-\[](img/ObjPerformance.png)
+![](img/ObjPerformance.png)
 Performance is significantly improved when loading the Low Poly Among Us Crewmate obj into the scene as shown in chart above
 
 ## Refractive
@@ -91,16 +91,15 @@ The difference is subtle but the curved surface is a little less jagged with ant
 
 ## Stratified Sampling
 Improve random hemisphere sampling by using a grid to stratify the portions of the hemisphere upon which we sample ray directions.
-\[](img/StratSampling.png)
+![](img/StratSampling.png)
 
 Random ray bounces employing stratified random hemisphere sampling.
 
-\[](img/RandomSampling.png)
+![](img/RandomSampling.png)
 
 Standard random ray bounces used for random hemisphere sampling.
 
 The shadows are slightly different in terms of noise levels, though they converge to very similar results.
-
 
 ## References
 
