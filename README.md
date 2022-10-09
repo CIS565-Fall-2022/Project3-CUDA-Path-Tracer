@@ -24,13 +24,13 @@ _OBJ credit goes to SketchFab:_
 * _Quartz: [Vergil190202](https://sketchfab.com/3d-models/crystalpack-25ff46fd33624c91b36307575b000891)_
 * _Bottle: modified from [Steva_](https://sketchfab.com/3d-models/simple-low-poly-potion-bottles-a13c6858e8174bebbd58babc52f769c0)_
 
-1. [Core Features](https://github.com/dluisnothere/Project3-CUDA-Path-Tracer#core-features): 
+[Core Features](https://github.com/dluisnothere/Project3-CUDA-Path-Tracer#core-features): 
 *  Simple Diffuse, Specular, and Imperfect Specular BSDF shading
 *  Path continuation/termination using stream compaction
 *  Continugous arrangement of materials based on materialId
 *  First-bounce-cache for a specific camera angle.
 
-2. [Additional Features](https://github.com/dluisnothere/Project3-CUDA-Path-Tracer#additional-features)
+[Additional Features](https://github.com/dluisnothere/Project3-CUDA-Path-Tracer#additional-features)
 *  Refractive materials using Schlick's approximation
 *  Depth of Field
 *  Direct Lighting
