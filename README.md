@@ -39,11 +39,17 @@ The scene files used in this project are laid out as blocks of text in this orde
 ## Core Features
 1. Shading kernel with BSDF Evaluation for Diffuse and Perfect/Imperfect Specular.
 
-Each Object in the scene has a reference to its material. Each material has attributes representing Reflection, Refraction, Specular, Index of Refraction, Color, and Emittance. For each ray, once it has gotten information about the object it has hit, I use a random number generate to generate a float between 0 and 1. Using this number, each ray will behave in a probabilistic manner and will either reflect, refract, or completely diffuse randomly in a cosine-weighted hemisphere (for lambertian reflection). 
+Each Object in the scene has a reference to its material. Each material has attributes representing Reflection, Refraction, Specular, Index of Refraction, Color, and Emittance. For each ray, once it has gotten information about the object it has hit, I use a random number generate to generate a float between 0 and 1. Using this number, each ray will behave in a probabilistic manner and will either reflect, refract, or completely diffuse randomly in a cosine-weighted hemisphere (for lambertian reflection) based on the Reflection and Refraction material values in the scene file. 
 
 3. Path continuation/termination using Stream Compaction
-4. Contiguous arrangement of materials based on materialId
-5. First bounce caching
+
+In order to avoid processing any unnecessary information, all paths which do not hit any of the Objects in the scene are removed from the list of active paths. This is done through the thrust library's built in stream-compaction function. Stream Compaction takes an array, runs a predicate on each element, and returns another list containing all the elements for which the predicate is true. 
+
+5. Contiguous arrangement of materials based on materialId
+
+For scenes which have a lot of different materials, sorting materials based on materialId makes sense to make reading from global memory faster.
+
+7. First bounce caching
 
 ![](img/part1Final.png)
 ![](img/part1FinalSpecular.png)
