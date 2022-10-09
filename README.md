@@ -104,15 +104,21 @@ _No Direct Lighting_            |  _Direct Lighting_
 
 ### UV Texture, Procedural Texture and Bump Mapping
 
+In order to parse through an obj file, I used [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader). After parsing, I created triangles and stored points within these triangles, alongside the normal and any other useful information like uv. If the bounding box is turned on, then the Obj geom would contain an array of triangles (host and device). This way, if there is only one obj, we only loop over triangles if the bounding box is hit. If the bounding box is turned off, then each triangle becomes its own geom, meaning we will iterate over all of them check for intersections, potentially wasting loops. 
+
+In order to initialize the device pointers for triangles, I cudaMalloc'd each geom's list of device triangles. To cudaFree them, I performed a cudaMemcpy for the outer pointers (geom pointers) and used those host-accessible pointers to cudaFree the member device vectors.
+
 ![](img/completeMario2.png)
 
 ![](img/myLink.png)
 
+![](img/procedural.png)
+
+I also implemented bump mapping for uv textures. I followed these slides for instructions on bump map calculations: https://www.ics.uci.edu/~majumder/VC/classes/BEmap.pdf 
+
 ![](img/nobump.png)
 
 ![](img/yesBumpmap.png)
-
-![](img/procedural.png)
 
 ## Performance Analysis
 
