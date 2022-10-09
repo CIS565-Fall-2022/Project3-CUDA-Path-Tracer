@@ -108,7 +108,7 @@ Here is the result:
 
 ![](img/refractiveKitty.png)
 
-_OBJ credit goes to [volkanongun](https://sketchfab.com/3d-models/low-poly-cat-1e7143dfafd04ff4891efcb06949a0b4) on SketchFab!
+_OBJ credit goes to [volkanongun](https://sketchfab.com/3d-models/low-poly-cat-1e7143dfafd04ff4891efcb06949a0b4) on SketchFab!_
 
 ### UV Texture, Procedural Texture and Bump Mapping
 
