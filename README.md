@@ -83,6 +83,12 @@ We can set the focal length of our camera to focus on foreground, mid-ground or 
 |---|
 |![](img/performanceAnalysis/cacheIntersections.png)|
 
+For the above observations, anti-aliasing was turned off. If anti-aliasing is implemented along with caching first bounce intersections, it can be highly inefficient.
+
+|Anti-aliasing tested with intersection caching|
+|---|
+|![](img/performanceAnalysis/antialiasing.png)|
+
 ### Path continuation/termination using stream compaction
 
 
