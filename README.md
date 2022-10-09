@@ -132,7 +132,7 @@ Since the stream compaction only affect to the rays which have no remaining boun
 
 The following shows the difference between closed and open scene. Since there will be no ray escape, the closed scene will have most ray remaining during the iteration. Hence, stream compaction will have less effect.
 | Run Time | Number of Rays Remaining | 
-| :--------------------------: | :-------------------: |
+| :--------------------------: | :-------------------: | 
 | ![](./img/td4.png) | ![](./img/td3.png) |
 
 ## Path Sorting by Materials
