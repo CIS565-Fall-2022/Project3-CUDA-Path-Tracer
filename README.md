@@ -36,7 +36,7 @@ In path tracing, specular materials are simulated using a probability distributi
 
 A parameter *shininess* is used to determine the surface's *perfection*. For the images from left to right, the surfaces become more imperfect. 
 
-| Perfect Specular     | Imperfect Specular    | Imperfect Specular    |  
+| Perfect Specular     | Less Imperfect Specular    | Imperfect Specular    |  
 :---------------:|:-------------------: |:-------------------: 
 ![](./img/reflection-ndl.png) | ![](./img/imperfect08-ndl.png) | ![](./img/imperfect06-ndl.png) 
 
@@ -59,8 +59,8 @@ With the Depth-of-Field, one can focus on specific object on arbitrary distance.
 
 | | Low Focal Length | Medium Focal Length | High Focal Length |  
 :---------------:|:-------------------: |:-------------------: |:-------------------: 
-| Small Aperture | ![](./img/DOF5005.png) | ![](./img/DOF7505.png) | ![](./img/DOF1005.png)|
-| Large Aperture | ![](./img/DOF5010.png) | ![](./img/DOF7510.png) | ![](./img/DOF1010.png)|
+| **Small Aperture** | ![](./img/DOF5005.png) | ![](./img/DOF7505.png) | ![](./img/DOF1005.png)|
+| **Large Aperture** | ![](./img/DOF5010.png) | ![](./img/DOF7510.png) | ![](./img/DOF1010.png)|
 
 To enable Physically-Based Depth-of-Field, a random point on the aperture is first sampled. Also, a point on the focus plane is calculated using the original ray. Then, the new origin of the ray is the connection of the sampled point and the focus point.
 
@@ -81,7 +81,7 @@ The concept of Direct Lighting is to make the final ray bounce directly to a ran
 
 To take a random point on light source, the sampling process is necessary. Therefore, for every bounce, the intersections will be recorded when there is a ray hit the light source. Then, when one ray has only one remaining bounce, it will randomly choose one point on light source from the perviously sampled points.
 
-| Without Direct lighting | With Direct lighting | 
+| Without Direct Lighting | With Direct Lighting | 
 :---------------:|:-------------------: |
 | ![](./img/dl2.png) | ![](./img/dl1.png) |
 | ![](./img/dl3.png) | ![](./img/dl4.png)
@@ -125,7 +125,7 @@ We can see that with Path Termination, the run time is high at the first bounce.
 
 | Run Time | Number of Rays Remaining | 
 | :--------------------------: | :-------------------: |
-| ![](./img/Trace%20Depth%20vs%20Run%20Time%20per%20Bounce%20(ms).png) | ![](./img/td1.png) |
+| ![](./img/td2.png) | ![](./img/td1.png) |
 
 ### Close & Open Scene Comparison 
 Since the stream compaction only affect to the rays which have no remaining bounce. Therefore, if all the ray have the same remaining bounce, stream compaction will have less impact. 
@@ -133,7 +133,7 @@ Since the stream compaction only affect to the rays which have no remaining boun
 The following shows the difference between closed and open scene. Since there will be no ray escape, the closed scene will have most ray remaining during the iteration. Hence, stream compaction will have less effect.
 | Run Time | Number of Rays Remaining | 
 | :--------------------------: | :-------------------: |
-| ![](./img/occ1.png) | ![](./img/occ2.png) |
+| ![](./img/td4.png) | ![](./img/td3.png) |
 
 ## Path Sorting by Materials
 This improvement is to sort the path by the intersection's materials for memory coalescing. Also, since the same materials will always do the same thing in one kernel, the will be less warp divergence. Therefore, it will be a performance increase. The function ```thrust::sort_by_key``` is used to do key-value sorting.
