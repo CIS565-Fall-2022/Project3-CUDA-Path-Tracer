@@ -623,28 +623,29 @@ __global__ void shadeFakeMaterial(
                     TextureInfo norMap = textureNormals[material.normalMapIndex];
                     int index = getTextureElementIndex(norMap, intersection.uv);
 
-                    normal = normals[index];    // Normal map normal in tangnet space
+                    //normal = ;    // Normal map normal in tangnet space
 
                     // Tangent space to model space
                     if (intersection.triangleId >= 0)
                     {
                         Triangle t = triangles[intersection.triangleId];
 
-                        //glm::vec3 deltaPos1 = t.v1 - t.v0;  // In model space
-                        //glm::vec3 deltaPos2 = t.v2 - t.v0;
-                        //glm::vec2 deltaUV1 = t.tex1 - t.tex0;
-                        //glm::vec2 deltaUV2 = t.tex2 - t.tex0;
-                        //
-                        //float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
-                        //glm::vec3 tagent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r;
-                        //glm::vec3 bitangent = (deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * r;
+                        glm::vec3 deltaPos1 = t.v1 - t.v0;  // In model space
+                        glm::vec3 deltaPos2 = t.v2 - t.v0;
+                        glm::vec2 deltaUV1 = t.tex1 - t.tex0;
+                        glm::vec2 deltaUV2 = t.tex2 - t.tex0;
+                        
+                        float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+                        glm::vec3 tagent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r;
+                        glm::vec3 bitangent = (deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * r;
                         //glm::vec3 nor = glm::normalize(glm::cross(tagent, bitangent));
-                        ////glm::vec3 nor = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(normal, 0.0f)));
-                        ////glm::cross(tagent, bitangent);
+                        glm::vec3 nor = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(intersection.surfaceNormal, 0.0f)));
+                        //glm::cross(tagent, bitangent);
 
                         //glm::mat3 TBN = glm::transpose(glm::mat3(tagent, bitangent, nor));
+                        glm::mat3 TBN = glm::mat3(tagent, bitangent, nor);
 
-                        normal = glm::normalize(t.TBN * normal);
+                        normal = glm::normalize(TBN * normals[index]);
                     }
 
                     // Model space to world space
@@ -661,12 +662,13 @@ __global__ void shadeFakeMaterial(
 
             if (pathSegments[idx].isRefrectiveRay || depth == 0)
             {
+                //printf("ok ");
                 glm::vec2 uv = DirectionToSpereUV(pathSegments[idx].ray.direction);
                 int index = getTextureElementIndex(*skyboxInfo, uv);
                 pathSegments[idx].color *= skyboxPixels[index] * (pathSegments[idx].remainingBounces * 1.f) / (traceDepth * 1.f);
             }
 #else
-            pathSegments[idx].color = glm::vec3(DEFAULT_SKY_COLOR);
+            pathSegments[idx].color *= glm::vec3(DEFAULT_SKY_COLOR);
 #endif
             pathSegments[idx].remainingBounces = -1;
         }

@@ -174,7 +174,7 @@ __host__ __device__ float objIntersectionTest(Geom geom, Ray r, Triangle *triang
 {
     float minT = BIG_FLOAT;
 
-    // Ray to local space
+    // Ray to model space
     Ray localRay;
     localRay.origin = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
     localRay.direction = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -269,7 +269,7 @@ __host__ __device__ float objIntersectionTest(Geom geom, Ray r, Triangle *triang
                         // Get value in world space
                         outside = glm::dot(localNormal, localRay.direction) < 0;
                         normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(localNormal, 0.f)));
-                        intersectionPoint = multiplyMV(geom.transform, glm::vec4(localIntersectionPoint, 1.f));
+                        intersectionPoint = multiplyMV(geom.transform, glm::vec4(localIntersectionPoint, 1.f)) + 0.0001f * normal;
                         triangleId = geom.triangleStartIndex + node.firstPrimOffset + i;
                     }
                 }
@@ -358,6 +358,6 @@ __host__ __device__ float objIntersectionTest(Geom geom, Ray r, Triangle *triang
             normal = -normal;
         }
 
-        return minT;
+        return glm::length(r.origin - intersectionPoint);
     }  
 }
