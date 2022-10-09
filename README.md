@@ -30,59 +30,78 @@ The Cuda Path Tracer Project - The Big Boi
 - Stratified Random Hemisphere Sampling (3)
 
 ## Ideal Diffuse
-![](img/depthOfField.png)
+
 
 An ideal diffuse material shows the characteristics of being a perfectly smooth matte surface; approximated by lambertian shading in rasterization but it only judged by multiplicative color accumilation in this path tracer.
 ## Specular
 Specular materials showcase the characteristics of being polished or shiny. Reflective in nature, meaning that rays that interact with this surface are reflected away from the surface in a more focused manner.
 
 ### Perfect
-![](img/BasicDiffuseCornell.png)
+![](img/depthOfField.png)
 
 Perfectly specular materials are like mirrors since reflection angles are deterministic.
 ### Imperfect
-![](img/imperfspec100ex[.png)
+![](img/imperfSpec100ex[.png)
 
 Specular Exponent: 100 (As the exponent increases, the surface gets closer and closer to being perfectly specular.
 
 Imperfectly specular materials are just shiny since reflection angles are, while more focused than diffuse materials, nondeterministic.
 ## Stream Compaction
-\[img/RayTerminationChart.png] 
-
+\[](img/RayTerminationChart.png)
 Remove all rays that hit nothing in the scene.
 ## Material Sorting in Memory
-\[img/MaterialSortChart.png]
+\[](img/MaterialSortChart.png)
 
 Sort all ray intersections by the materials they hit with the intent of enabling memory coalescence for bsdf interactions based on different materials.
 ## Ray Caching
-\[img/RayCacheChart.png]
+\[](img/RayCacheChart.png)
 
 The first rays cast into the scene are deterministic based on the camera's position; thus there is no need to recalculate their interactions and intersections for each iteration that the Pathtracer renders.
 ## OBJ Loading
-\[img/Custom Scenes.png] 
+\[](img/basicObjTest.png) 
+Tested this implementation against importing a basic cube that was stored as an OBJ.
 
-Loads in an arbitrary, but untextured mesh. Implemented bounding box acceleration data structure as well.
+Implemented functionaltiy loads in an arbitrary, but untextured mesh. Implemented bounding box acceleration data structure as well.
+
+\[](img/ObjPerformance.png)
+Performance is significantly improved when loading the Low Poly Among Us Crewmate obj into the scene as shown in chart above
+
 ## Refractive
 ![](img/Transmissive.png)
 
-
 Refractive materials like glass both refract and reflect light. Using schlick approximation, we nondeterministically have some rays get refracted into the object while other rays are reflected away.
+
 ## Depth of Field
 ![](img/Screenshot 2022-10-08 202552.png)
 Focal Dist of 12
 Lens Radius of 1
 
 Lenses in real life have radii and focal distances (based on their concavity) which bend light rays in a way that only certain objects a certain distance away are actually in focus. This is approximated using random disk sampling to artificially bend cameras cast into screen space.
+
 ## Antialiasing
-![](img/AAClose.png)
-![](img/withoutAAClose.png)
 
 Sending out multiple rays approximated by small scale directional jitter per camera ray per pixel to get sub-pixel values.
+
+![](img/AAClose.png)
+Close up of a sphere with Anti Aliasing applied.
+![](img/withoutAAClose.png)
+Close up of a sphere without Anti Aliasing applied.
+
+The difference is subtle but the curved surface is a little less jagged with anti-aliasing applied.
+
 ## Stratified Sampling
+Improve random hemisphere sampling by using a grid to stratify the portions of the hemisphere upon which we sample ray directions.
 \[](img/StratSampling.png)
+
+Random ray bounces employing stratified random hemisphere sampling.
+
 \[](img/RandomSampling.png)
 
-Improve random hemisphere sampling by using a grid to stratify the portions of the hemisphere upon which we sample ray directions.
+Standard random ray bounces used for random hemisphere sampling.
+
+The shadows are slightly different in terms of noise levels, though they converge to very similar results.
+
+
 ## References
 
 * [PBRT] Physically Based Rendering, Second Edition: From Theory To Implementation. Pharr, Matt and Humphreys, Greg. 2010.
