@@ -20,8 +20,8 @@
 
 #define ERRORCHECK 1
 #define SORTBYMATERIAL 1
-#define CACHEFIRSTBOUNCE 1
-#define ANTIALIASING 0
+#define CACHEFIRSTBOUNCE 0
+#define ANTIALIASING 1
 #define DEPTHOFFIELD 0
 #define USEBOUNDINGBOX 0
 
@@ -273,8 +273,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		thrust::default_random_engine rngX = makeSeededRandomEngine(iter, index, 11);
 		thrust::default_random_engine rngY = makeSeededRandomEngine(iter, index, 10);
 		
-		float lensRadius = 1;
-		float focalDistance = 15.0;
+		float lensRadius = 3;
+		float focalDistance = 10;
 		if (lensRadius > 0) {
 			glm::vec2 pLens = lensRadius * ConcentricSampleDisk(glm::vec2(u01(rngX), u01(rngY)));
 
@@ -656,9 +656,10 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	#endif
         depth++;
 
-		#if SORTBYMATERIAL 
+		
         thrust::device_ptr<PathSegment> dev_thrust_path(dev_paths);
         thrust::device_ptr<ShadeableIntersection> dev_thrust_intersections(dev_intersections);
+#if SORTBYMATERIAL 
 		thrust::sort_by_key(dev_thrust_intersections, dev_thrust_intersections + num_paths
 			               , dev_thrust_path, matSort());
 		#endif
