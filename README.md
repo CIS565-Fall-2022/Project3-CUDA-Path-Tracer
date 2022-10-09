@@ -13,14 +13,18 @@ An implementation of a path tracer including simulated diffuse, specular, and re
 ## Materials
 Materials are able to be loaded from a scene including RGB color, specular color, diffuse, specular, and refraction interactions with light.
 
-Diffuse:
+Diffuse:  
 ![](img/diffuse.png)
-Perfectly Specular:
+
+Perfectly Specular:  
 ![](img/reflect.png)
-Imperfect Specular:
+
+Imperfect Specular:  
 ![](img/imperfect.png)
-Refraction with Fresnel Effects:
+
+Refraction with Fresnel Effects:  
 ![](img/refract.png)
+ 
 ---
 
 ## Stream Compaction
@@ -95,10 +99,14 @@ Save a checkpoint by pressing c when running the program
 Load a checkpoint by passing the path to the checkpoint as the second argument of the program  
 ### Bloopers
 ![](img/blooper_1.png)
-Issues with ray bounces
+Issues with ray bounces  
+
 ![](img/blooper_2.png)
-Not offsetting intersection causing noise
+Not offsetting intersection causing noise  
+
 ![](img/blooper_3.png)
-Strange Refractions
+Strange Refractions  
+
 ![](img/blooper_4.png)
-Super zoomed in spheres getting DOF to work
+Super zoomed in spheres getting DOF to work  
+
