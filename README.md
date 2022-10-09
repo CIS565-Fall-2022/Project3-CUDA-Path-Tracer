@@ -21,7 +21,7 @@ This scene is rendered with around 1000 samples.
 
 ### "Embarassingly Parallel"
 
-Perhaps the one saving grace about all those rays is that much of this process can be parallelized. The color accumulated by one ray does not depend on the color of another. The CPU can only parallelize a small quantity of processes, capped by number of cores on the CPU. The GPU on the other hand was designed for this kind of work. Thousands of processes can be run on the GPU at once, making that 3.2 billion figure a lot less daunting.
+Perhaps the one saving grace about all those rays is that much of the work in path tracing can be parallelized. The color accumulated by one ray does not depend on the color of another. The CPU can only parallelize a small quantity of processes, capped by number of cores on the CPU. The GPU on the other hand was designed for this kind of work. Thousands of processes can be run on the GPU at once, making that 3.2 billion figure a lot less daunting.
 
 ### Stream Compaction
 
@@ -36,7 +36,7 @@ As the depth increases, we have to do less and less work because stream compacti
 As is likely expected: the closed system benefits much less from stream compaction. One of ray termination condtions, not hitting anything, will never be satisfied under the closed system. 
 
 ### Other performance "improvements"
-Another "improvement" that was introduced was sorting by material type. In other words, when the rays intersect an object that object has a material type which encompasses objects color, emittance and how rays should bounce off it. If we sort by material type, then we leverage the architecture of the GPU to be more efficient. This is because processes or threads are executed in groups of 32: called a warp. If just one thread in a warp is running, then the other 31 threads just sit idle. By sorting by material, we minimize the chance of this sort of thing happening with the idea that rays with the same material type will do a similar amount of work and terminate at around the same time. Unfortunately, this did not really work out, on running a test scene the frame per second on the render dropped ever so slightly when sorting by material which is bad. This is likely because the work of sorting by materials takes longer than the amount of time saved by the sorting. 
+Another "improvement" that was introduced was sorting by material type. In other words, when the rays intersect an object that object has a material type which encompasses objects color, emittance and how rays should bounce off it. If we sort by material type, then we leverage the architecture of the GPU to be more efficient. This is because processes or threads are executed in groups of 32: called a warp. If just one thread in a warp is running, then the other 31 threads just sit idle. By sorting by material, we minimize the chance of this sort of thing happening with the idea that rays with the same material type will do a similar amount of work and terminate at around the same time. Unfortunately, this did not really work out, on running a test scene the frames per second on the render dropped ever so slightly from a little over 4.0 to around 3.9. this is bad and is likely because the work of sorting by materials takes longer than the amount of time saved by the sorting. Another performance improvement that actually increased performance was caching the fist bounce. For every sample we take, the first ray intersection is almost always the same 
 
 
 
