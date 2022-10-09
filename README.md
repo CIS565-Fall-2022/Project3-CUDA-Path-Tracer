@@ -17,7 +17,7 @@ It allows loading GLTF files for meshes.
 
 ## Basic Features
 
-* Basic Shading
+### Basic Shading
 
 First we need to convert the naive path tracing shading technique from CPU version to GPU version.This allows for global illumination
 effect to be achieved. (But very slow)
@@ -28,16 +28,17 @@ Diffuse | Specular
 :--------------------------:|:------------------------:
 ![Render Img](img/Diffuse.JPG) | ![Render Img](img/specular.JPG)
 
-* Refraction
+### Refraction
 
-To implement refraction, we need to use snell's law and fresnel law to compute material's eta, then use fresnel formula to 
-compute final ray color.
+To implement refraction, we need to use snell's law and fresnel law to compute material's eta, then use fresnel formula to compute final ray color.
 
 Pure Specular | Specular with Refraction
 :--------------------------:|:-------------------------:
 ![Render Img](img/specular.JPG) | ![Render Img](img/refraction.JPG)
 
-* SSAA & Depth of Field
+### SSAA & Depth of Field
+
+These methods is used to increase visualize experience. Depth of Field seems a little bit buggy,but SSAA works pretty well and it looks good.
 
 SSAA not Enabled | SSAA Enabled
 :-------------------------:|:-------------------------:
@@ -47,20 +48,30 @@ DoF not Enabled | Dof Enabled
 :-------------------------:|:-------------------------:
 ![Render Img](img/NOSSAA.JPG) | ![Render Img](img/DoF.JPG)
 
-* String Compaction
+### String Compaction
 
 Since we are using naive path tracing method, many rays may reflect out of the scene and become useless computation.
-To optimize it, we have 
+To optimize it, we need to remove these useless ray from path tracer.
 
-* Material Sorting
+In this project I use the `thrust::stable_partition` kernal to partition these paths based on completion.
 
-* First bounce Caching
-
-## GLTF Mesh Loading
+This method is really useful for unclosed scene and bring performance improvement to the MCPT since the GPU will compute less rays after each bounce.
 
 
 
-# Performance Analysis
+But for closed scene, since no ray will bounce outside the scene, this method will not bring performance improvement in this case.
+
+### Material Sorting
+
+
+
+### First bounce Caching
+
+
+
+### GLTF Mesh Loading
+
+
 
 
 ## Reference
