@@ -86,7 +86,15 @@ Type Something Here
 
 # Performance Improvements
 
-## Stream Compaction
+## Path Termination using Stream Compaction
+This optimization is to terminate the paths which have not remaining bounces. In this implementation, a stream compaction function ```thrust::partition``` is used to separate the existing paths and terminated paths. This have a great performance improvement when the trace depth increase due to less paths have to be processed after each bounce.
+
+We can see that with Path Termination, the run time is high at the first bounce. This is because we add a partition function. However, when the Trace Depth increase, the run time decrease significantly.
+
+![](./img/Trace%20Depth%20vs%20Run%20Time%20per%20Bounce%20(ms).png)
+
+
+![](./img/Trace%20Depth%20vs%20Number%20of%20Rays%20Remainng.png)
 
 ## Path Sorting
 
