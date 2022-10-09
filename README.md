@@ -68,7 +68,9 @@ My implementation for refractive materials comes from [Physically Based Renderin
 
 This is the result of my refraction implementation:
 
-![](img/Refractive.png)
+_View 1_            |  _View 2_ 
+:-------------------------:|:-------------------------:
+![](img/Refractive.png) |  ![](img/cornell.2022-09-28_22-10-45z.5000samp.png)
 
 ### Depth of Field
 
