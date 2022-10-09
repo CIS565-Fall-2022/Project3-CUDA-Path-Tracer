@@ -6,7 +6,7 @@
 #include "sceneStructs.h"
 #include "utilities.h"
 
-#define BOUNDINGVOLUME 1
+#define BOUNDINGVOLUME 0
 #define BVH 1
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
@@ -96,16 +96,22 @@ __host__ __device__ float BoundingBoxIntersectionTest(const Ray& r, const BBox& 
 #else
 __host__ __device__ bool meshBoundingBoxIntersectionTest(Geom geom, Ray r) {
 #endif
-   /* Ray q;
-    q.origin = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
-    q.direction = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));*/
 
+#if !BVH
+    Ray q;
+    q.origin = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
+    q.direction = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));
+#endif
     float tmin = -1e38f;
     float tmax = 1e38f;
     glm::vec3 tmin_n;
     glm::vec3 tmax_n;
     for (int xyz = 0; xyz < 3; ++xyz) {
+#if BVH
         float qdxyz = r.direction[xyz];
+#else
+        float qdxyz = q.direction[xyz];
+#endif
         if (glm::abs(qdxyz) > 0.00001f) {
 #if BVH
             float t1 = (box.minCorner[xyz] - r.origin[xyz]) / qdxyz;
@@ -269,6 +275,7 @@ __host__ __device__ float meshIntersectionTest(Geom geom, Triangle* tri, Ray r,
         glm::vec3 objspaceIntersection = getPointOnRay(rt, closest_t);
         intersectionPoint = multiplyMV(geom.transform, glm::vec4(objspaceIntersection, 1.f));
         normal = getNormal(closestTri, bary);
+        
         normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(normal, 0.f)));
     
         if (glm::dot(normal, r.direction) > 0) {

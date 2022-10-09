@@ -277,10 +277,14 @@ __global__ void computeIntersections(
 			if (t > 0.0f && t_min > t)
 			{
 				t_min = t;
-				
+#if BVH
 				hit_geom_index = geom.type == MODEL ? geomID : i;
+#else 
+				hit_geom_index = i;
+#endif
 				intersect_point = tmp_intersect;
 				normal = tmp_normal;
+				
 			}
 		}
 
@@ -525,6 +529,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			cudaMemcpy(dev_intersections_cache, dev_intersections, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
 		}
 #endif
+
+		
 		//// tracing
 		////dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
 		//computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
