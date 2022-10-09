@@ -123,3 +123,7 @@ My hypothesis is that since the scene is closed, all rays will hit something on 
 Too much antialiasing: me without my contacts
 
 ![](img/antialiasing1.png)
+
+Cursed Black Hole Wahoo
+
+![](img/wtfWahoo.png)
