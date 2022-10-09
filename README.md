@@ -32,8 +32,15 @@ Overall, this project is a continuation of learning how to write CUDA kernel fun
 
 ![](img/mainAntialiasing.png)
 
+## Scene File Description
+
+The scene files used in this project are laid out as blocks of text in this order: Materials, Textures (if any), and Objects in the scene. Each Object has a description of its translation, scale, and rotation, as well as which material it's using, and if it's a basic shape (such as sphere or cube), then that is also specified. If not a basic shape, then it specifies a path to its obj. If the Object also has a texture, then it will refer to the Id of the texture. Using Ids to keep track of scene attributes prevent over-copying of shared data between Objects.
+
 ## Core Features
 1. Shading kernel with BSDF Evaluation for Diffuse and Perfect/Imperfect Specular.
+
+Each Object in the scene has a reference to its material. Each material has attributes representing Reflection, Refraction, Specular, Index of Refraction, Color, and Emittance. For each ray, once it has gotten information about the object it has hit, I use a random number generate to generate a float between 0 and 1. Using this number, each ray will behave in a probabilistic manner and will either reflect, refract, or completely diffuse randomly in a cosine-weighted hemisphere (for lambertian reflection). 
+
 3. Path continuation/termination using Stream Compaction
 4. Contiguous arrangement of materials based on materialId
 5. First bounce caching
