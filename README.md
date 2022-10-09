@@ -32,7 +32,7 @@ Some of the visual improvements implemented include:
 
 Some performance improvements implemented include:
 - [First bounce cached intersections](#first-bounce-cached-intersections)
-- [Path continuation/termination using stream compaction]()
+- [Path continuation/termination using stream compaction](#path-continuationtermination-using-stream-compaction)
 - [Sorting rays by material](#sorting-rays-by-material)
 
 ## Visual Improvements
