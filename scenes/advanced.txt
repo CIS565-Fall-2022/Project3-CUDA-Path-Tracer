@@ -158,6 +158,16 @@ REFR        0.7
 REFRIOR     1.6
 EMITTANCE   0
 
+// Imperfect specular refractive white
+MATERIAL 16
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0.5
+REFR        0.3
+REFRIOR     0
+EMITTANCE   0
+
 // Box texture
 TEXTURE 0
 PATH ../Project3-CUDA-Path-Tracer/objs/textures/linkFlippedVertical.png
@@ -168,7 +178,7 @@ PATH ../Project3-CUDA-Path-Tracer/objs/textures/boxOutline.png
 
 // Camera
 CAMERA
-RES         800 800
+RES         1400 1400
 FOVY        45
 ITERATIONS  5000
 DEPTH       8
@@ -194,21 +204,21 @@ TRANS       7 1 -1
 ROTAT       0 0 0
 SCALE       1 .3 1
 
-// Ceiling light
+// ceil light
 OBJECT 2
 cube
 material 0
-TRANS       0 5 10
-ROTAT       90 0 0
-SCALE       3 .3 3
+TRANS       0 15 0
+ROTAT       0 0 0
+SCALE       10 .3 10
 
-// larte ceiling light
+// low ceiling light
 OBJECT 3
 cube
 material 0
-TRANS       0 15 0
-ROTAT       0 0 90
-SCALE       .3 10 10
+TRANS       -3 5 13
+ROTAT       -45 0 0
+SCALE       10 .3 5
 
 // Floor
 OBJECT 4
@@ -329,13 +339,13 @@ TRANS		-1.5 0.5 4
 ROTAT	      0 0 0
 SCALE		1 1 1
 
-// fairy
+// fairy in bottle
 OBJECT 18
 sphere
 material 14
-TRANS		-1.5 2 4
+TRANS		-1.5 1 4
 ROTAT	      0 0 0
-SCALE		0.25 0.25 0.25 
+SCALE		0.3 0.3 0.3 
 
 // fairy
 OBJECT 19
@@ -434,3 +444,11 @@ material 14
 TRANS		-3 7 5
 ROTAT	      0 0 0
 SCALE		0.25 0.25 0.25 
+
+// fairy
+OBJECT 31
+sphere
+material 14
+TRANS		4 2 4
+ROTAT	      0 0 0
+SCALE		0.2 0.2 0.2 

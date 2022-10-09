@@ -25,7 +25,7 @@
 #define ERRORCHECK 1
 #define SORT_MATERIALS 0
 #define CACHE_FIRST_BOUNCE 0 // note that Cache first bounce and antialiasing cannot be on at the same time.
-#define ANTIALIASING 1
+#define ANTIALIASING 0
 #define DEPTH_OF_FIELD 0 // depth of field focus defined later
 #define DIRECT_LIGHTING 1
 
