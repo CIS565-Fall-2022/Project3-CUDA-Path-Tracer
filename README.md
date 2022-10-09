@@ -13,6 +13,7 @@ CUDA Path Tracer
 The Cuda Path Tracer Project - The Big Boi
 
 ## Representative Render
+![](img/Custom_Scenes.png)
 
 ### Requirements Fulfilled
 #### Core Features
@@ -29,64 +30,57 @@ The Cuda Path Tracer Project - The Big Boi
 - Stratified Random Hemisphere Sampling (3)
 
 ## Ideal Diffuse
-\[insert image\] 
-![](img/diffuse.png)
+![](img/depthOfField.png)
 
 An ideal diffuse material shows the characteristics of being a perfectly smooth matte surface; approximated by lambertian shading in rasterization but it only judged by multiplicative color accumilation in this path tracer.
 ## Specular
 Specular materials showcase the characteristics of being polished or shiny. Reflective in nature, meaning that rays that interact with this surface are reflected away from the surface in a more focused manner.
 
 ### Perfect
-\[insert image\] 
-![](img/perfspec.png)
+![](img/BasicDiffuseCornell.png)
 
 Perfectly specular materials are like mirrors since reflection angles are deterministic.
 ### Imperfect
-\[insert image\] 
-![](img/imperfspec.png)
+![](img/imperfspec100ex[.png)
 
+Specular Exponent: 100 (As the exponent increases, the surface gets closer and closer to being perfectly specular.
 
 Imperfectly specular materials are just shiny since reflection angles are, while more focused than diffuse materials, nondeterministic.
 ## Stream Compaction
-\[insert chart\] 
+\[img/RayTerminationChart.png] 
 
 Remove all rays that hit nothing in the scene.
 ## Material Sorting in Memory
-\[insert chart\]
+\[img/MaterialSortChart.png]
 
 Sort all ray intersections by the materials they hit with the intent of enabling memory coalescence for bsdf interactions based on different materials.
 ## Ray Caching
-\[insert chart\]
+\[img/RayCacheChart.png]
 
 The first rays cast into the scene are deterministic based on the camera's position; thus there is no need to recalculate their interactions and intersections for each iteration that the Pathtracer renders.
 ## OBJ Loading
-\[insert image\] 
+\[img/Custom Scenes.png] 
 
 Loads in an arbitrary, but untextured mesh. Implemented bounding box acceleration data structure as well.
 ## Refractive
-\[insert image\] 
-![](img/refractive.png)
+![](img/Transmissive.png)
 
 
 Refractive materials like glass both refract and reflect light. Using schlick approximation, we nondeterministically have some rays get refracted into the object while other rays are reflected away.
 ## Depth of Field
-\[insert image\] 
-![](img/DOF.png)
-Focal Dist of 10
+![](img/Screenshot 2022-10-08 202552.png)
+Focal Dist of 12
 Lens Radius of 1
-
-![](img/DOF5.png)
-Focal Dist of 5
-Lens Radius of 1
-
 
 Lenses in real life have radii and focal distances (based on their concavity) which bend light rays in a way that only certain objects a certain distance away are actually in focus. This is approximated using random disk sampling to artificially bend cameras cast into screen space.
 ## Antialiasing
-\[insert image\] 
+![](img/AAClose.png)
+![](img/withoutAAClose.png)
 
 Sending out multiple rays approximated by small scale directional jitter per camera ray per pixel to get sub-pixel values.
 ## Stratified Sampling
-\[insert image\] 
+\[](img/StratSampling.png)
+\[](img/RandomSampling.png)
 
 Improve random hemisphere sampling by using a grid to stratify the portions of the hemisphere upon which we sample ray directions.
 ## References
