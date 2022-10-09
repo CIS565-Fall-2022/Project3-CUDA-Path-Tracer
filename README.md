@@ -74,11 +74,11 @@ _View 1_            |  _View 2 without specular sphere_
 
 ### Depth of Field
 
-In order to obtain a depth of field effect, I referenced this online article: [Depth of Field in Path Tracing](https://medium.com/@elope139/depth-of-field-in-path-tracing-e61180417027#:~:text=Implementing%20depth%20of%20field%20in,out%20of%20focus%20will%20appear)
+In order to obtain a depth of field effect, I referenced this online article: [Depth of Field in Path Tracing](https://medium.com/@elope139/depth-of-field-in-path-tracing-e61180417027#:~:text=Implementing%20depth%20of%20field%20in,out%20of%20focus%20will%20appear). Essentially, we determine two variables: FOCAL_LENGTH and APERTURE. FOCAL_LENGTH specifies how far away your focus point is (where the object becomes sharp). APERTURE is a proxy for how blurry everything out of focus should be. Once we know where the focal point P is in the scene, we can blur the rest of the scene by shifting our ray's origin and then recalculate direction such that it starts at the new origin and goes towards the focal point. These are my results:
 
-![](img/noDepthOfField.png)
-
-![](img/depthFieldFinal.png)
+_No Depth of Field_            |  _Depth of Field_ 
+:-------------------------:|:-------------------------:
+![](img/noDepthOfField.png) |  ![](img/depthFieldFinal.png)
 
 ### Stochastic Sampled Anti-Aliasing
 
