@@ -72,7 +72,7 @@ TEXTURE 0
 PATH ../scenes/textures/wahoo.bmp
 
 TEXTURE 1
-PATH ../scenes/textures/winxp.jpg
+PROCEDURAL
 
 // Camera
 CAMERA
@@ -140,7 +140,7 @@ obj_mesh
 material 2
 TRANS       2 4 0
 ROTAT       0 0 0
-SCALE       0.8 0.8 0.8
+SCALE       0.4 0.4 0.4
 TEXTURE	0
 
 OBJECT 7

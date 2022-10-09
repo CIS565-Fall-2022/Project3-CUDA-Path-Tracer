@@ -32,3 +32,4 @@ public:
     std::vector<Geom> lights;
     int lightCount = 0;
 };
+

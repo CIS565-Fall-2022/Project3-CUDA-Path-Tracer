@@ -343,6 +343,12 @@ int Scene::loadObj(Geom& geo, const char* inputfile)
     return 1;
 }
 
+float noise(float x)
+{
+    float r = (sin(x * 127.1) * 43758.5453);
+    return r - (long)r;
+}
+
 int Scene::loadTexture(string textureID)
 {
     int id = atoi(textureID.c_str());
@@ -373,6 +379,19 @@ int Scene::loadTexture(string textureID)
                 }
         }
         stbi_image_free(img);
+        textures.push_back(texture);
+        return 1;
+    }
+    else if (strcmp(tokens[0].c_str(), "PROCEDURAL") == 0)
+    {
+        texture.width = 1000;
+        texture.height = 1;
+        texture.channel = 3;
+        for (float i = 0.f; i < 1000.f; ++i)
+        {
+            glm::vec3 col = glm::vec3(noise(i), noise(i * 2.f), noise(i * 3.f));
+            textureColors.emplace_back(col);
+        }
         textures.push_back(texture);
         return 1;
     }
