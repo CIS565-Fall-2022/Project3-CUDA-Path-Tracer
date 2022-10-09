@@ -80,7 +80,7 @@ Performance is significantly improved when loading the Low Poly Among Us Crewmat
 Refractive materials like glass both refract and reflect light. Using schlick approximation, we nondeterministically have some rays get refracted into the object while other rays are reflected away.
 
 ## Depth of Field
-![](img/Screenshot 2022-10-08 202552.png)
+![](img/realDOF.png)
 Focal Dist of 12
 Lens Radius of 1
 
