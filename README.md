@@ -16,8 +16,17 @@ Overall, this project is a continuation of learning how to write CUDA kernel fun
 
 1. Core Features: 
 *  Simple Diffuse, Specular, and Imperfect Specular BSDF shading
-* 
+*  Path continuation/termination using stream compaction
+*  Continugous arrangement of materials based on materialId
+*  First-bounce-cache for a specific camera angle.
+
 3. Additional Features
+*  Refractive materials
+*  Depth of Field
+*  Direct Lighting
+*  Stochastic-sampled antialiasing
+*  Arbitrary Mesh Loader with TinyObjLoader
+*  UV Texturing, Procedural Texturing, and Bump Mapping
 
 ![](img/main.png)
 
