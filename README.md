@@ -111,7 +111,11 @@ _Imperfect specular floors reflecting three objects_
 ## Performance Analysis
 
 - Stream compaction helps most after a few bounces. Print and plot the effects of stream compaction within a single iteration (i.e. the number of unterminated rays after each bounce) and evaluate the benefits you get from stream compaction.
+
 - Compare scenes which are open (like the given cornell box) and closed (i.e. no light can escape the scene). Again, compare the performance effects of stream compaction! Remember, stream compaction only affects rays which terminate, so what might you expect?
+
+My hypothesis is that since the scene is closed, all rays will hit something on each bounce. This means stream compaction won't remove any rays unless the ray ran out of bounces or it hit a light source.
+
 - For optimizations that target specific kernels, we recommend using stacked bar graphs to convey total execution time and improvements in individual kernels. For example:
 
 ## Bloopers! :)
