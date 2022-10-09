@@ -58,14 +58,15 @@ Since we restart rendering the scene whenever the camera moves, we know that the
 **Results of Core Features**
 
 ![](img/part1Final.png)
+![](img/part1FinalSpecular.png)
+![](img/imperfectSpecular.png)
 
 _All Materials Diffuse_
 
-![](img/part1FinalSpecular.png)
 
 _Specular Sphere_
 
-![](img/imperfectSpecular.png)
+
 
 _Imperfect specular floors reflecting three objects_
 
