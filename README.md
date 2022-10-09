@@ -45,7 +45,7 @@ The following render has a cube placed inside spheres of varying refractive inde
 
 ### Physically based depth of field
 
-![](img/dof_focaldist12.png)
+![](img/renders/dof_focaldist12.png)
 
 The following renders of a string of pearls show depth of field as cameras with different lens radius generate varying depth of field.
 |As lens radius increases, the blur/jitter on non-focused objects increases|
@@ -73,5 +73,5 @@ We can set the focal length of our camera to focus on foreground, mid-ground or 
 
 |OBJ mesh loading with bounding box intersection culling|
 |---|
-|![](img/objLoading2.png)|
+|![](img/renders/objLoading2.png)|
  

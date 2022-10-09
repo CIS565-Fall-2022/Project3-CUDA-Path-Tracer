@@ -77,6 +77,8 @@ set(headers
     src/ImGui/imconfig.h
     src/tiny_obj_loader.h
 	src/noise.h
+	src/common.h
+	src/testing_helpers.hpp
 	
 	src/ImGui/imgui.h
     src/ImGui/imconfig.h
