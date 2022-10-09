@@ -18,7 +18,11 @@ Overall, this project is a continuation of learning how to write CUDA kernel fun
 
 ![](img/main2.png)
 
-_OBJ credit goes to [ThatOneGuyWhoDoesThings](https://sketchfab.com/3d-models/ssbb-toon-link-c4737326bee4445ab2a565952ad32eab) on SketchFab! I painted over the model in Blender_
+_OBJ credit goes to SketchFab:_
+_Toon Link: [ThatOneGuyWhoDoesThings](https://sketchfab.com/3d-models/ssbb-toon-link-c4737326bee4445ab2a565952ad32eab) I painted over the model in Blender_
+_Stones: [Michael Hooper](https://sketchfab.com/3d-models/low-poly-rocks-9823ec262054408dbe26f6ddb9c0406e)_
+_Quartz: [Vergil190202](https://sketchfab.com/3d-models/crystalpack-25ff46fd33624c91b36307575b000891)_
+_Bottle: modified from [Steva_](https://sketchfab.com/3d-models/simple-low-poly-potion-bottles-a13c6858e8174bebbd58babc52f769c0)_
 
 1. [Core Features](https://github.com/dluisnothere/Project3-CUDA-Path-Tracer#core-features): 
 *  Simple Diffuse, Specular, and Imperfect Specular BSDF shading
