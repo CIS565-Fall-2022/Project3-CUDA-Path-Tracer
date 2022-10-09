@@ -6,7 +6,7 @@ SPECRGB     0 0 0
 REFL        0
 REFR        0
 REFRIOR     0
-EMITTANCE   5
+EMITTANCE   20
 ABSORPTION  0
 
 // Diffuse white
@@ -45,7 +45,7 @@ ABSORPTION  0
 // Specular white
 MATERIAL 4
 RGB         .98 .98 .98
-SPECEX      5
+SPECEX      0
 SPECRGB     .98 .98 .98
 REFL        1
 REFR        0
@@ -93,54 +93,71 @@ UP          0 1 0
 OBJECT 0
 cube
 material 0
-TRANS       0 10 0
-ROTAT       0 0 0
-SCALE       3 .3 3
+TRANS       0 12 6
+ROTAT       70 0 0
+SCALE       2 .3 2
+
+// Ceiling light
+OBJECT 1
+cube
+material 0
+TRANS       -4 12 6
+ROTAT       70 0 0
+SCALE       2 .3 2
+
+// Ceiling light
+OBJECT 2
+cube
+material 0
+TRANS       4 12 6
+ROTAT       70 0 0
+SCALE       2 .3 2
 
 // Floor
-OBJECT 1
+OBJECT 3
 cube
 material 1
 TRANS       0 0 0
 ROTAT       0 0 0
-SCALE       10 .01 10
+SCALE       30 .01 10
 
 // Ceiling
-OBJECT 2
-cube
-material 1
-TRANS       0 10 0
-ROTAT       0 0 90
-SCALE       .01 10 10
-
-// Back wall
-OBJECT 3
+OBJECT 4
 cube
 material 1
 TRANS       0 5 -5
-ROTAT       0 90 0
-SCALE       .01 10 10
+ROTAT       0 0 0
+SCALE       30 20 .1
 
 // Left wall
-OBJECT 4
+OBJECT 5
 cube
 material 2
 TRANS       -5 5 0
-ROTAT       0 0 0
-SCALE       .01 10 10
+ROTAT       0 -30 0
+SCALE       .01 30 30
 
 // Right wall
-OBJECT 5
+OBJECT 6
 cube
 material 3
 TRANS       5 5 0
-ROTAT       0 0 0
-SCALE       .01 10 10
+ROTAT       0 30 0
+SCALE       .01 30 30
 
-// Sphere
-OBJECT 6
+
+// Cube but an obj
+OBJECT 7
+C:\Users\Edward\Desktop\CIS565 Directory\Project3-CUDA-Path-Tracer\scenes\amogus.obj
+material 2
+TRANS       0 3 0
+ROTAT       0 20 0
+SCALE       3 3 3
+
+// Right wall
+OBJECT 8
 sphere
-material 1
-TRANS       0 4 0
-ROTAT       0 0 0
-SCALE       4 4 4
+material 4
+TRANS       .4 3.5 .8
+ROTAT       0 30 0
+SCALE       2 1.5 1.5

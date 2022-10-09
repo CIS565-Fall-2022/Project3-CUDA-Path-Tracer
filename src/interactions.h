@@ -2,7 +2,7 @@
 
 #include "intersections.h"
 
-#define STRAT_SAMP 1
+#define STRAT_SAMP 0
 
 
 // CHECKITOUT

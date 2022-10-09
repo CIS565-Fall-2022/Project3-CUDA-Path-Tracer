@@ -20,7 +20,8 @@
 #define ERRORCHECK 1
 #define RAYCACHE 0
 #define MEMSORT 0
-#define AA 1
+#define AA 0
+#define STREAM_COMP 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -489,9 +490,6 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	// --- PathSegment Tracing Stage ---
 	// Shoot ray into scene, bounce between objects, push shading chunks
-
-	//thrust::device_ptr<PathSegment*> dev_thrust_paths = thrust::device_ptr<PathSegment*>(dev_paths);
-	//thrust::device_ptr<PathSegment*> dev_thrust_path_end = thrust::device_ptr<PathSegment*>(dev_path_end);
 	dim3 numblocksPathSegmentTracing;
 
 	bool iterationComplete = false;
@@ -590,11 +588,15 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		thrust::sort_by_key(thrust::device, dev_intersections, dev_intersections + num_paths, dev_paths, compare_materials());
 
 #endif
+#if STREAM_COMP
 		dev_paths = thrust::stable_partition(thrust::device, dev_paths, dev_paths + num_paths, is_terminated());
 		num_paths = dev_path_end - dev_paths;
 		if (num_paths == 0){
 			iterationComplete = true;
 		}
+#else
+		iterationComplete = depth == traceDepth;
+#endif
 		
 
 		 // TODO: should be based off stream compaction results.
