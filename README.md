@@ -53,11 +53,21 @@ For scenes which have a lot of different materials, sorting materials based on m
 
 **First bounce caching**
 
-Since we restart rendering the scene whenever the camera moves, we know that the first bounce for each call to pathtrace for one particular camera angle will always be constant. We know exactly which object our first rays will hit and where. This way, we can avoid re-computing the first ray for each of the 5000 calls to pathtrace. 
+Since we restart rendering the scene whenever the camera moves, we know that the first bounce for each call to pathtrace for one particular camera angle will always be constant. We know exactly which object our first rays will hit and where. This way, we can avoid re-computing the first intersections for each of the 5000 calls to pathtrace. 
+
+**Results of Core Features**
 
 ![](img/part1Final.png)
+
+_All Materials Diffuse_
+
 ![](img/part1FinalSpecular.png)
+
+_Specular Sphere_
+
 ![](img/imperfectSpecular.png)
+
+_Imperfect specular floors reflecting three objects_
 
 ## Additional Features
 ### Refractive Material
