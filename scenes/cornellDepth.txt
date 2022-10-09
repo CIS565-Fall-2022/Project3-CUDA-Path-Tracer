@@ -123,3 +123,11 @@ material 2
 TRANS       1 4 2.5
 ROTAT       0 0 0
 SCALE       2 2 2
+
+// Sphere
+OBJECT 8
+sphere
+material 3
+TRANS       1 4 -4.5
+ROTAT       0 0 0
+SCALE       2 2 2

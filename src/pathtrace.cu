@@ -21,8 +21,8 @@
 #define ERRORCHECK 1
 #define SORTBYMATERIAL 1
 #define CACHEFIRSTBOUNCE 1
-#define ANTIALIASING 1
-#define DEPTHOFFIELD 1
+#define ANTIALIASING 0
+#define DEPTHOFFIELD 0
 #define USEBOUNDINGBOX 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
@@ -274,7 +274,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		thrust::default_random_engine rngY = makeSeededRandomEngine(iter, index, 10);
 		
 		float lensRadius = 1;
-		float focalDistance = 10.0;
+		float focalDistance = 15.0;
 		if (lensRadius > 0) {
 			glm::vec2 pLens = lensRadius * ConcentricSampleDisk(glm::vec2(u01(rngX), u01(rngY)));
 
