@@ -46,6 +46,7 @@ int main(int argc, char** argv) {
 
 	//Create Instance for ImGUIData
 	guiData = new GuiDataContainer();
+	guiData->TracedDepth = scene->state.traceDepth;
 
 	// Set up camera stuff from loaded path tracer settings
 	iteration = 0;
@@ -102,7 +103,7 @@ void saveImage() {
 	filename = ss.str();
 
 	// CHECKITOUT
-	img.savePNG(filename);
+	img.savePNG(filename, "../img/");
 	//img.saveHDR(filename);  // Save a Radiance HDR file
 }
 

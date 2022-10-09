@@ -1,0 +1,318 @@
+// Emissive material (light)
+MATERIAL 0
+RGB         0.992 0.933 0.863
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   5
+
+// Diffuse orange (couch color)
+MATERIAL 1
+RGB         1 .533 .294
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse light purple (wall color)
+MATERIAL 2
+RGB         .8 .8 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse black (tv color)
+MATERIAL 3
+RGB         .1 .1 .1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Specular white (mirror color)
+MATERIAL 4
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// diffuse white (floor color)
+MATERIAL 5
+RGB         .98 .98 0.98
+SPECEX      0
+SPECRGB     .98 .98 0.98
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// refraction pink (bunny)
+MATERIAL 6
+RGB         1 .412 .706
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        1
+REFRIOR     1.5
+EMITTANCE   0
+
+// diffuse wood color
+MATERIAL 7
+RGB         .73 .55 .39
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// refraction white (vase)
+MATERIAL 8
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        1
+REFRIOR     1.03
+EMITTANCE   0
+
+// diffuse coffee (table)
+MATERIAL 9
+RGB         .447 .286 .208
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// diffuse Platinum (chair)
+MATERIAL 10
+RGB         .91 .89 .867
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// diffuse Platinum (character)
+MATERIAL 11
+RGB         .91 .89 .867
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Emissive material (light on the right)
+MATERIAL 12
+RGB         0.882 0.302 0.165
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   5
+
+// Emissive material (light on the left)
+MATERIAL 13
+RGB         0.992 0.518 0.122
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   5
+
+
+
+// Camera
+CAMERA
+RES         1980 1080
+FOVY        45
+ITERATIONS  5000
+DEPTH       8
+FILE        cornell
+EYE         0.0 5 10.5
+LOOKAT      0 5 0
+UP          0 1 0
+
+
+// Ceiling light 1
+OBJECT 0
+cube
+material 0
+TRANS       -4 12 0
+ROTAT       0 0 0
+SCALE       3 .3 3
+
+// Floor
+OBJECT 1
+cube
+material 5
+TRANS       0 0 0
+ROTAT       0 0 0
+SCALE       20 .01 10
+
+// Ceiling
+OBJECT 2
+cube
+material 5
+TRANS       0 12 0
+ROTAT       0 0 90
+SCALE       .01 20 10
+
+// Back wall
+OBJECT 3
+cube
+material 2
+TRANS       0 6 -5
+ROTAT       0 90 0
+SCALE       .01 12 20
+
+// Left wall
+OBJECT 4
+cube
+material 2
+TRANS       -10 6 0
+ROTAT       0 0 0
+SCALE       .01 12 10
+
+// Right wall
+OBJECT 5
+cube
+material 2
+TRANS       10 6 0
+ROTAT       0 0 0
+SCALE       .01 12 10
+
+OBJECT 6
+../scenes/objFiles/room/cabinet2.obj
+material 7
+TRANS       0 -0.2 -5
+ROTAT       0 0 0
+SCALE       7 7 7
+
+OBJECT 7
+../scenes/objFiles/room/table.obj
+material 9
+TRANS       6 0 2
+ROTAT       -90 0 0
+SCALE       0.05 0.05 0.05
+
+OBJECT 8
+../scenes/objFiles/room/chair.obj
+material 10
+TRANS       6 0 1
+ROTAT       -90 0 0
+SCALE       0.035 0.035 0.035
+
+OBJECT 9
+../scenes/objFiles/room/tv.obj
+material 3
+TRANS       -3 3.25 -4.5
+ROTAT       90 -90 90
+SCALE       0.1 0.1 0.1
+
+OBJECT 10
+../scenes/objFiles/room/couchPillows.obj
+material 1
+TRANS       -4 0 3.5
+ROTAT       0 180 0
+SCALE       3 2.5 2.5
+
+OBJECT 11
+../scenes/objFiles/room/stairs.obj
+material 7
+TRANS       -9.5 0 -2
+ROTAT       0 90 0
+SCALE       0.075 0.1 0.075
+
+OBJECT 12
+../scenes/objFiles/room/vaseCeramic.obj
+material 8
+TRANS       8 2.01 2
+ROTAT       0 0 0
+SCALE       0.025 0.03 0.025
+
+OBJECT 13
+../scenes/objFiles/room/vaseCeramic.obj
+material 8
+TRANS       7.8 2.01 1.8
+ROTAT       0 0 0
+SCALE       0.025 0.03 0.025
+
+OBJECT 14
+../scenes/objFiles/melina.obj
+material 11
+TRANS       3 0 -1
+ROTAT       0 0 0
+SCALE       4 4 4
+
+OBJECT 15
+../scenes/objFiles/bunny.obj
+material 6
+TRANS       5 2.41 2
+ROTAT       0 0 0
+SCALE       0.5 0.5 0.5
+
+OBJECT 16
+../scenes/objFiles/cube.obj
+material 4
+TRANS       10 6 0
+ROTAT       0 90 0
+SCALE       4 3 0.01
+
+// Ceiling light 2
+OBJECT 17
+cube
+material 0
+TRANS       4 12 0
+ROTAT       0 0 0
+SCALE       3 .3 3
+
+// Wall light 1
+OBJECT 18
+cube
+material 12
+TRANS       10 10 -1
+ROTAT       0 90 0
+SCALE       3 0.5 .3
+
+// Wall light 2
+OBJECT 19
+cube
+material 12
+TRANS       10 10 3
+ROTAT       0 90 0
+SCALE       3 0.5 .3
+
+// Wall light 3
+OBJECT 20
+cube
+material 13
+TRANS       -10 10 -1
+ROTAT       0 -90 0
+SCALE       3 0.5 .3
+
+// Wall light 4
+OBJECT 21
+cube
+material 13
+TRANS       -10 10 3
+ROTAT       0 -90 0
+SCALE       3 0.5 .3

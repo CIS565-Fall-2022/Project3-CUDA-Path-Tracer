@@ -76,4 +76,69 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    glm::vec3 reflectDir;
+    glm::vec3 refractDir;
+    float etaI = 0.f;
+    float etaT = 0.f;
+    float cosTheta = 0.f;
+    if (m.hasRefractive)
+    {
+        cosTheta = glm::dot(pathSegment.ray.direction, normal);
+
+        bool entering = cosTheta < 0.f;
+        etaI = entering ? 1.f : m.indexOfRefraction;
+        etaT = entering ? m.indexOfRefraction : 1.f;
+        if (!entering) normal = -normal;
+
+        refractDir = glm::refract(pathSegment.ray.direction, normal, etaI / etaT);
+    }
+    if (m.hasReflective)
+    {
+        // specular reflection
+        reflectDir = glm::reflect(pathSegment.ray.direction, normal);
+    }
+
+    if (m.hasRefractive && m.hasReflective)
+    {
+        float r0 = (etaT - etaI) / (etaT + etaI);
+        r0 *= r0;
+        float cosThetaPlus1 = 1.f + cosTheta;
+        float pReflect = r0 + (1 - r0) * cosThetaPlus1 * cosThetaPlus1 * cosThetaPlus1 * cosThetaPlus1 * cosThetaPlus1;
+
+        thrust::uniform_real_distribution<float> u01(0, 1);
+        float probability = u01(rng);
+        if (probability < pReflect)
+        {
+            pathSegment.ray.direction = reflectDir;
+            pathSegment.ray.origin = intersect;
+        }
+        else
+        {
+            pathSegment.ray.origin = intersect + 0.001f * pathSegment.ray.direction;
+            pathSegment.ray.direction = refractDir;
+        }
+        pathSegment.color *= m.specular.color;
+
+    }
+    else if (m.hasRefractive)
+    {
+        pathSegment.ray.origin = intersect + 0.001f * pathSegment.ray.direction;
+        pathSegment.ray.direction = refractDir;
+        //pathSegment.ray.origin = intersect + 0.001f * pathSegment.ray.direction;
+        pathSegment.color *= m.specular.color;
+    }
+    else if (m.hasReflective)
+    {
+        pathSegment.ray.direction = reflectDir;
+        pathSegment.color *= m.specular.color;
+        pathSegment.ray.origin = intersect;
+    }
+    else
+    {
+        // pure diffuse reflection
+        pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
+        pathSegment.color *= m.color;
+        pathSegment.ray.origin = intersect;
+    }
+
 }
