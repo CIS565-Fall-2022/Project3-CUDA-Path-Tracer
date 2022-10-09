@@ -79,9 +79,9 @@ We can set the focal length of our camera to focus on foreground, mid-ground or 
 
 ### First bounce cached intersections
 
-|Tested on basic cornell box with 1 diffused sohere in the center|
+|Tested on basic cornell box with 1 diffused sphere in the center|
 |---|
-|![](img/performanceAnalysis/cacheintersections.png)|
+|![](img/performanceAnalysis/cacheIntersections.png)|
 
 ### Path continuation/termination using stream compaction
 
