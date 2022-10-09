@@ -23,7 +23,7 @@
 #define FIRSTBOUNCE 1
 #define AA 0
 #define DOF 0
-#define DIRECTLIGHTING 1
+#define DIRECTLIGHTING 0
 
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)

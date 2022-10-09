@@ -111,7 +111,7 @@ void scatterRay(
         float diffuseSpecularThresh = 1.f - m.hasReflective;
         float diffuseSpecularRand = u01(rng);
         if (diffuseSpecularRand > diffuseSpecularThresh) { // Specular case
-            pathSegment.color *= m.specular.color / diffuseSpecularThresh;
+            pathSegment.color *= m.specular.color;
             pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
             pathSegment.ray.origin = intersect;
             //float exp = m.specular.exponent;
