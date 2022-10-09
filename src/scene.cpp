@@ -4,6 +4,23 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
 
+Scene::Scene(tinygltf::Model model) {
+    int id = 0;
+    for (auto m : model.materials)
+    {
+        loadMaterial(m, id);
+        id++;
+    }
+    id = 0;
+    for (auto g : model.meshes)
+    {
+        loadGeom(g, id);
+    }
+}
+
+
+
+
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;
@@ -30,6 +47,17 @@ Scene::Scene(string filename) {
             }
         }
     }
+}
+
+int Scene::loadGeom(tinygltf::Mesh mesh, int id)
+{
+    Geom newGeom;
+    cout << "Creating new mesh..." << endl;
+    newGeom.type = MESH;
+    newGeom.materialid = mesh.primitives[0].material;
+
+    return 1;
+
 }
 
 int Scene::loadGeom(string objectid) {
@@ -125,7 +153,15 @@ int Scene::loadCamera() {
         } else if (strcmp(tokens[0].c_str(), "UP") == 0) {
             camera.up = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
         }
-
+        else if (strcmp(tokens[0].c_str(), "DOF") == 0) {
+            camera.dof = atof(tokens[1].c_str());
+        }
+        else if (strcmp(tokens[0].c_str(), "LENSR") == 0) {
+            camera.lens_radius = atof(tokens[1].c_str());
+        }
+        else if (strcmp(tokens[0].c_str(), "FOCAL") == 0) {
+            camera.focal_length = atof(tokens[1].c_str());
+        }
         utilityCore::safeGetline(fp_in, line);
     }
 
@@ -182,6 +218,31 @@ int Scene::loadMaterial(string materialid) {
                 newMaterial.emittance = atof(tokens[1].c_str());
             }
         }
+        materials.push_back(newMaterial);
+        return 1;
+    }
+}
+
+int Scene::loadMaterial(tinygltf::Material gltf_mat, int id) {
+    if (id != materials.size()) {
+        cout << "ERROR: MATERIAL ID does not match expected number of materials" << endl;
+        return -1;
+    }
+    else {
+        cout << "Loading Material " << id << "..." << endl;
+        Material newMaterial;
+
+        //load static properties
+        newMaterial.color.r = gltf_mat.pbrMetallicRoughness.baseColorFactor[0];
+        newMaterial.color.g = gltf_mat.pbrMetallicRoughness.baseColorFactor[1];
+        newMaterial.color.b = gltf_mat.pbrMetallicRoughness.baseColorFactor[2];
+        newMaterial.specular.exponent = 0;
+        newMaterial.specular.color = newMaterial.color;
+        newMaterial.hasReflective = 0;
+        newMaterial.hasRefractive = 0;
+        newMaterial.indexOfRefraction = 0;
+        newMaterial.emittance = gltf_mat.emissiveFactor[0];
+
         materials.push_back(newMaterial);
         return 1;
     }

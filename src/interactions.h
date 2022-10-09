@@ -72,8 +72,58 @@ void scatterRay(
         glm::vec3 intersect,
         glm::vec3 normal,
         const Material &m,
-        thrust::default_random_engine &rng) {
+        thrust::default_random_engine &rng, bool outside) {
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    auto rand = u01(rng);
+    if (m.hasReflective > rand)
+    {
+        pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+        pathSegment.ray.origin = intersect;
+        pathSegment.color *= (m.specular.color); //* glm::dot(normal, pathSegment.ray.direction);
+
+    }
+    //Adopted from PBRT and How to raytrace in a weekend
+    else if (m.hasRefractive)
+    {
+        //FRESNEL
+        float cosTheta = (glm::dot(-pathSegment.ray.direction, normal));
+        float r_zero = ((1.0f - m.indexOfRefraction) / (1.0f + m.indexOfRefraction)) * ((1.0f - m.indexOfRefraction) / (1.0f + m.indexOfRefraction));
+        float r_theta = r_zero + (1.0f - r_zero) * glm::pow((1.0f - cosTheta), 5.0f);
+        float sinTheta = sqrt(1 - cosTheta * cosTheta);
+        bool interal_reflection = false;
+        float rior = (outside ? 1.0f / m.indexOfRefraction : m.indexOfRefraction);
+        if (sinTheta * rior > 1.0f)
+        {
+            interal_reflection = true;
+        }
+        if (rand > r_theta && !interal_reflection)
+        {
+            //refract
+            pathSegment.color *= (m.color);
+            pathSegment.ray.origin = intersect + (0.001f * pathSegment.ray.direction);
+            pathSegment.ray.direction = glm::refract(pathSegment.ray.direction, normal, rior);
+        }
+        else
+        {
+            //reflect
+            pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+            pathSegment.ray.origin = intersect;
+            pathSegment.color *= (m.specular.color); 
+
+        }
+        
+    }
+    else
+    { 
+        auto random = calculateRandomDirectionInHemisphere(normal, rng);
+
+        pathSegment.ray.direction = random;
+        pathSegment.ray.origin = intersect;
+        pathSegment.color *= (m.color);
+
+    }
+    pathSegment.remainingBounces--;
 }

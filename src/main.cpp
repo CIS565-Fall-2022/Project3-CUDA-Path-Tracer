@@ -1,13 +1,21 @@
 #include "main.h"
 #include "preview.h"
 #include <cstring>
-
+#include "glm/gtx/string_cast.hpp"
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+//#define TINYGLTF_NO_INCLUDE_STB_IMAGE
+//#define TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
+#include "tiny_gltf.h"
 static std::string startTimeString;
 
 // For camera controls
 static bool leftMousePressed = false;
 static bool rightMousePressed = false;
 static bool middleMousePressed = false;
+static bool hasCheckpoint = false;
+static bool saveCheckpoint = false;
 static double lastX;
 static double lastY;
 
@@ -40,15 +48,40 @@ int main(int argc, char** argv) {
 	}
 
 	const char* sceneFile = argv[1];
+	char* checkpoint_folder = "";
+	if (argc == 3)
+	{
+		checkpoint_folder = argv[2];
+		hasCheckpoint = true;
+	}
+
+	tinygltf::Model model;
+	tinygltf::TinyGLTF loader;
+	std::string err;
+	std::string warn;
+
+	bool gltf = loader.LoadASCIIFromFile(&model, &err, &warn, argv[1]);
+	//bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, argv[1]); // for binary glTF(.glb)
 
 	// Load scene file
-	scene = new Scene(sceneFile);
+	if (gltf)
+	{
+		scene = new Scene(model);
+	}
+	else {
+		scene = new Scene(sceneFile);
+	}
 
 	//Create Instance for ImGUIData
 	guiData = new GuiDataContainer();
 
 	// Set up camera stuff from loaded path tracer settings
 	iteration = 0;
+	Camera old = scene->state.camera;
+	if (hasCheckpoint)
+	{
+		loadState(checkpoint_folder);
+	}
 	renderState = &scene->state;
 	Camera& cam = renderState->camera;
 	width = cam.resolution.x;
@@ -107,8 +140,11 @@ void saveImage() {
 }
 
 void runCuda() {
-	if (camchanged) {
-		iteration = 0;
+	if (camchanged && !hasCheckpoint) {
+		if (!hasCheckpoint)
+		{
+			iteration = 0;
+		}
 		Camera& cam = renderState->camera;
 		cameraPosition.x = zoom * sin(phi) * sin(theta);
 		cameraPosition.y = zoom * cos(theta);
@@ -134,6 +170,18 @@ void runCuda() {
 		pathtraceFree();
 		pathtraceInit(scene);
 	}
+	if (hasCheckpoint) {
+		pathtraceFree();
+		pathtraceInit(scene);
+		pathtraceInitCheckpoint(scene);
+		hasCheckpoint = false;
+		camchanged = false;
+	}
+	if (saveCheckpoint)
+	{
+		saveState();
+		saveCheckpoint = false;
+	}
 
 	if (iteration < renderState->iterations) {
 		uchar4* pbo_dptr = NULL;
@@ -155,6 +203,74 @@ void runCuda() {
 	}
 }
 
+
+void saveState()
+{
+	glm::io::precision(9);
+	std::cout << "Begining Checkpoint" << std::endl;
+	auto state = scene->state;
+	auto camera = state.camera;
+	std::ofstream image_output_file("./checkpoint/image.data");
+	image_output_file<< std::fixed << std::setprecision(6) << glm::io::precision(6);
+	std::ostream_iterator<glm::vec3> output_iterator(image_output_file, ",");
+	std::copy(state.image.begin(), state.image.end(), output_iterator);
+	std::ofstream iterations_output_file("./checkpoint/iterations.data");
+	iterations_output_file << iteration;
+	std::ofstream camera_output_file("./checkpoint/camera.data");
+	camera_output_file << std::fixed << std::setprecision(6) << glm::io::precision(9);
+	camera_output_file << camera.resolution << camera.position << camera.lookAt << camera.view << camera.up << camera.right << camera.fov << camera.pixelLength;
+	//glm::ivec2 resolution;
+	//glm::vec3 position;
+	//glm::vec3 lookAt;
+	//glm::vec3 view;
+	//glm::vec3 up;
+	//glm::vec3 right;
+	//glm::vec2 fov;
+	//glm::vec2 pixelLength;
+	camera_output_file << " " << camera.dof << " " << camera.lens_radius << " " << camera.focal_length;
+	std::cout << "Checkpoint Complete" << std::endl;
+	
+}
+
+void loadState(string checkpoint_folder)
+{
+	//GLM doesn't have an input stream operator
+	std::cout << "Loading Checkpoint" << std::endl;
+	std::ifstream image_file(checkpoint_folder + "/image.data");
+	char first_bracket;
+	double x_value;
+	double y_value;
+	double z_value;
+	char second_bracket;
+	char comma;
+	std::vector<glm::vec3> image;
+	while (image_file >> first_bracket)
+	{
+		
+		image_file >> x_value >> comma >> y_value >> comma >> z_value >> second_bracket >> comma;
+		glm::vec3 temp(x_value, y_value, z_value);
+		image.push_back(temp);
+	}
+	scene->state.image = image;
+	std::ifstream iterations_file(checkpoint_folder + "/iterations.data");
+	iterations_file >> iteration;
+	std::ifstream camera_file(checkpoint_folder + "/camera.data");
+	glm::ivec2 resolution = utilityCore::readIVec2(camera_file);
+	glm::vec3 position = utilityCore::readVec3(camera_file);
+	glm::vec3 lookAt = utilityCore::readVec3(camera_file);
+	glm::vec3 view = utilityCore::readVec3(camera_file);
+	glm::vec3 up = utilityCore::readVec3(camera_file);
+	glm::vec3 right = utilityCore::readVec3(camera_file);
+	glm::vec2 fov = utilityCore::readVec2(camera_file);
+	glm::vec2 pixelLength = utilityCore::readVec2(camera_file);
+	bool dof;
+	float lens_radius;
+	float focal_length;
+	camera_file >> dof >> lens_radius >> focal_length;
+	scene->state.camera = { resolution, position, lookAt, view, up, right, fov, pixelLength, dof, lens_radius, focal_length};
+	std::cout << "Loading Checkpoint Complete" << std::endl;
+}
+
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if (action == GLFW_PRESS) {
 		switch (key) {
@@ -164,6 +280,9 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 			break;
 		case GLFW_KEY_S:
 			saveImage();
+			break;
+		case GLFW_KEY_C:
+			saveCheckpoint = true;
 			break;
 		case GLFW_KEY_SPACE:
 			camchanged = true;
