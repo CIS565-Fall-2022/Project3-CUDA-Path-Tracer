@@ -177,3 +177,5 @@ It's a really big aperture
 * Latern Model Credit (https://github.com/KhronosGroup/glTF-Sample-Models)
 * Stanford Bunny Model Credit (http://graphics.stanford.edu/data/3Dscanrep/)
 * GLTF loading tinygltf (https://github.com/syoyo/tinygltf/)
+* Imperfect Specular Surface (https://developer.nvidia.com/gpugems/gpugems3/part-iii-rendering/chapter-20-gpu-based-importance-sampling)
+* Paul Bourke's notes for Antialiasing (http://paulbourke.net/miscellaneous/raytracing/)
