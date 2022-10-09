@@ -18,6 +18,8 @@ Overall, this project is a continuation of learning how to write CUDA kernel fun
 
 ![](img/main2.png)
 
+_OBJ credit goes to [ThatOneGuyWhoDoesThings](https://sketchfab.com/3d-models/ssbb-toon-link-c4737326bee4445ab2a565952ad32eab) on SketchFab! I painted over the model in Blender_
+
 1. [Core Features](https://github.com/dluisnothere/Project3-CUDA-Path-Tracer#core-features): 
 *  Simple Diffuse, Specular, and Imperfect Specular BSDF shading
 *  Path continuation/termination using stream compaction
