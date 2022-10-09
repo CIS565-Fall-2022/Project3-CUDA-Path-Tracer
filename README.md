@@ -82,6 +82,17 @@ Saving and reloading of the current path tracing iteration and camera angle can 
 ![](img/checkpoint_graph2.png)
 Checkpoint filesize and time to load are based on the initial resolution of your path traced image. The image buffer as well as metadata is written to a text file and must be reloaded in order to load state. This can lead to a significant load time and file size for high resolution images. This could be optimized in the future by using a serialization library like boost or converting to a more compressed file format. 
 
+### Install Instruction
+git clone this repo
+Add ![tinygltf](https://github.com/syoyo/tinygltf) to external/include/tinygltf  
+mkdir build
+cd build
+cmake ..
+
+Flags can be found in pathtracer.cu
+DOF options are included in scene files under camera
+Save a checkpoint by pressing c when running the program
+Load a checkpoint by passing the path to the checkpoint as the second argument of the program
 ### Bloopers
 ![](img/blooper_1.png)
 Issues with ray bounces
