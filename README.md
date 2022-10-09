@@ -13,7 +13,7 @@ CUDA Path Tracer
 The Cuda Path Tracer Project - The Big Boi
 
 ## Representative Render
-![](img/Custom_Scenes.png)
+![](img/amogus.png)
 
 ### Requirements Fulfilled
 #### Core Features
