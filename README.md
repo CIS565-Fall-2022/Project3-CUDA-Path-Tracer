@@ -88,7 +88,7 @@ _No Antialiasing_            |  _Antialiasing_
 
 _No Antialiasing Closeup_            |  _Antialiasing Closeup_ 
 :-------------------------:|:-------------------------:
-![](img/noAntialiasing.png) |  ![](img/antialiasing5000samp.png)
+![](img/noAntialiasingCloseup.png) |  ![](img/antialiasingCloseup.png)
 
 ### Direct Lighting
 
