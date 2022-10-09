@@ -112,6 +112,8 @@ _OBJ credit goes to [volkanongun](https://sketchfab.com/3d-models/low-poly-cat-1
 
 ### UV Texture, Procedural Texture and Bump Mapping
 
+In order to read UV values and map them to a texture file (png, bmp, etc), I used CudaTextureObject (Documentation). First, I used stbi_loader to parse pixel information from a given png file. Then, I sent pixel information to an array of cudaArray objects, where each cudaArray object contains all pixels associated with a specific texture. I also have an array of cudaTextureObjects, where each cudaTextureObject acts as a "wrapper" for the pixel information so that sampling functions can be called on the pixel information. (However, as a result of using this, I have had to flip my textures vertically to work properly).
+
 ![](img/completeMario2.png)
 
 ![](img/myLink.png)
