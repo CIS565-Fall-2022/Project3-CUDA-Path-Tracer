@@ -2,6 +2,9 @@
 
 #include "intersections.h"
 
+#define STRAT_SAMP 0
+
+
 // CHECKITOUT
 /**
  * Computes a cosine-weighted random direction in a hemisphere.
@@ -12,9 +15,23 @@ glm::vec3 calculateRandomDirectionInHemisphere(
         glm::vec3 normal, thrust::default_random_engine &rng) {
     thrust::uniform_real_distribution<float> u01(0, 1);
 
+#if STRAT_SAMP
+    const float sampleSize = 32;
+    int squareIdx = u01(rng) * sampleSize * sampleSize;
+    float gridLen = (1 / sampleSize);
+    
+    float stratX = ((squareIdx / sampleSize) + u01(rng)) * gridLen;
+    float stratY = ((squareIdx % (int)sampleSize) + u01(rng)) * gridLen;
+    
+    // CosineWarp
+    float up = sqrt(stratX); // cos(theta)
+    float over = sqrt(1 - up * up); // sin(theta)
+    float around = stratY * TWO_PI;
+#else
     float up = sqrt(u01(rng)); // cos(theta)
     float over = sqrt(1 - up * up); // sin(theta)
     float around = u01(rng) * TWO_PI;
+#endif
 
     // Find a direction that is not the normal based off of whether or not the
     // normal's components are all equal to sqrt(1/3) or whether or not at
@@ -40,6 +57,40 @@ glm::vec3 calculateRandomDirectionInHemisphere(
         + cos(around) * over * perpendicularDirection1
         + sin(around) * over * perpendicularDirection2;
 }
+
+__host__ __device__
+float FresnelMoment(float eta) {
+    float eta2 = eta * eta, eta3 = eta2 * eta, eta4 = eta3 * eta,
+        eta5 = eta4 * eta;
+    return (eta < 1) ?
+        0.45966f - 1.73965f * eta + 3.37668f * eta2 - 3.904945 * eta3 +
+        2.49277f * eta4 - 0.68441f * eta5 :
+        -4.61686f + 11.1136f * eta - 10.4646f * eta2 + 5.11455f * eta3 -
+        1.27198f * eta4 + 0.12746f * eta5;
+}
+
+__host__ __device__
+glm::vec3 imperfectSpecularScatter(
+    glm::vec3& normal,
+    thrust::default_random_engine& rng,
+    thrust::uniform_real_distribution<float>& u01,
+    float exp) {
+    float theta = acos(powf(u01(rng), 1.0 / (exp + 1)));
+    float phi = 2.f * PI * u01(rng);
+    glm::vec3 untransformedRef(
+        cos(phi) * sin(theta),
+        sin(phi) * sin(theta),
+        cos(theta));
+
+    glm::vec3 tangent = (normal.z == 0 && normal.y == 0) ?
+        glm::vec3(-normal.z, 0.f, normal.x) :
+        glm::vec3(0.f, normal.z, -normal.y);
+
+    glm::mat3 transform(tangent, glm::cross(normal, tangent), normal);
+
+    return transform * untransformedRef;
+}
+
 
 /**
  * Scatter a ray with some probabilities according to the material properties.
@@ -76,4 +127,104 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    
+    thrust::uniform_real_distribution<float> uniform(0, 1);
+
+    if (m.absorption > 0) {
+        float sceneIOR = 1.0f;
+        float matIOR = m.indexOfRefraction;
+
+        bool entering = glm::dot(normal, pathSegment.ray.direction) < 0;
+
+        if (!entering) {
+            float dist = glm::length(intersect - pathSegment.ray.origin);
+            float rand = uniform(rng);
+            if (rand == 0 || m.absorption == 0 || (-log(rand)) / m.absorption > dist) {
+                pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
+            }
+            else {
+                intersect = getPointOnRay(pathSegment.ray, rand);
+                glm::vec3 newNorm = -pathSegment.ray.direction;
+                pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(newNorm, rng));
+            }
+            pathSegment.color *= dist / (1.f + dist) * m.color;
+        }
+        else {
+            float cosTheta = glm::dot(normal, -pathSegment.ray.direction);
+            float c = 1 - 2 * FresnelMoment(sceneIOR / m.indexOfRefraction);
+
+            float n1 = m.indexOfRefraction;
+            float n2 = sceneIOR;
+
+            float refAtNorm = powf((n1 - n2) / (n1 + n2), 2.f);
+            refAtNorm += (1.f - refAtNorm) * powf(1.f - cosTheta, 5.f);
+
+            if (uniform(rng) < refAtNorm) {
+                if (m.specular.exponent < 30 || uniform(rng)) {
+                    pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
+                }
+                else {
+                    pathSegment.ray.direction = glm::normalize(imperfectSpecularScatter(normal, rng, uniform, m.specular.exponent));
+                }
+            }
+            else {
+                pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(-normal, rng));
+            }
+
+        }
+
+
+        //pathSegment.remainingBounces = 1;
+        //pathSegment.color = glm::vec3(0, 1, 1);
+
+        pathSegment.color *= m.color;
+        
+    }
+    else if (m.hasReflective && m.hasRefractive) {
+        float sceneIOR = 1.0f;
+        float matIOR = m.indexOfRefraction;
+
+        bool entering = glm::dot(normal, pathSegment.ray.direction) < 0;
+
+        float eta = entering ? matIOR / sceneIOR : sceneIOR / matIOR;
+        normal = entering ? normal : -normal;
+        float n1 = entering ? matIOR : sceneIOR;
+        float n2 = entering ? matIOR : sceneIOR;
+
+        float cosTheta = glm::dot(normal, -pathSegment.ray.direction);
+
+        float refAtNorm = powf((n1 - n2) / (n1 + n2), 2.f);
+        refAtNorm += (1.f - refAtNorm) * powf(1.f - cosTheta, 5.f);
+        //float index = n1 / n2;
+        if (uniform(rng) >= refAtNorm) {//refraction
+
+            pathSegment.ray.direction = glm::normalize(glm::refract(glm::normalize(pathSegment.ray.direction), glm::normalize(normal), 1 / eta));
+            pathSegment.ray.origin = intersect + 0.001f * pathSegment.ray.direction;
+            pathSegment.color *= m.specular.color;
+        }
+        else {
+            pathSegment.color *= m.specular.color;
+            pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+            (glm::normalize(pathSegment.ray.direction) * .0001f);
+        }
+        
+    }
+    else if (m.hasReflective) {
+        if (m.specular.exponent != 0){
+            pathSegment.ray.direction = glm::normalize(imperfectSpecularScatter(normal, rng, uniform, m.specular.exponent));
+        }
+        else {
+            pathSegment.ray.direction = glm::reflect(pathSegment.ray.direction, normal);
+        }
+        
+        pathSegment.color *= m.specular.color;
+        pathSegment.ray.origin = intersect + (glm::normalize(pathSegment.ray.direction) * .0001f);
+    }
+    else {
+        pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
+        pathSegment.color *= m.color;
+        pathSegment.ray.origin = intersect + (glm::normalize(pathSegment.ray.direction) * .0001f);
+    }
+    pathSegment.remainingBounces--;
+    
 }

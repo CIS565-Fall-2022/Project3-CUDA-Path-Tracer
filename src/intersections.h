@@ -142,3 +142,82 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 
     return glm::length(r.origin - intersectionPoint);
 }
+
+__host__ __device__ float triangleIntersectionTest(Geom* geom, Triangle* triangle, Ray r,
+    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+
+    glm::vec3 screenPA = glm::vec3(geom->transform * triangle->a.pos);
+    glm::vec3 screenPB = glm::vec3(geom->transform * triangle->b.pos);
+    glm::vec3 screenPC = glm::vec3(geom->transform * triangle->c.pos);
+
+    glm::vec3 baryPosition;
+
+    bool doesIntersect = glm::intersectRayTriangle(r.origin, r.direction, screenPA, screenPB, screenPC, baryPosition);
+
+    float u = baryPosition.r;
+    float v = baryPosition.g;
+    float t = baryPosition.b;
+
+    if (!doesIntersect) {
+        return -1.0f;
+    }
+
+    intersectionPoint = getPointOnRay(r, t);
+
+    normal = glm::vec3(u * triangle->a.norm + v * triangle->b.norm + (1 - u - v) * triangle->c.norm);
+
+    if (!outside) {
+        normal *= -1.f;
+    }
+
+    return t;
+
+}
+
+__host__ __device__ float bbIntersectionTest(Geom* geom, Ray r, glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
+    Ray q;
+    q.origin = multiplyMV(geom->inverseTransform, glm::vec4(r.origin, 1.0f));
+    q.direction = glm::normalize(multiplyMV(geom->inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+    glm::vec3 bbmin = geom->bb.min;
+    glm::vec3 bbmax = geom->bb.max;
+
+    float tmin = FLT_MIN;
+    float tmax = FLT_MAX;
+    glm::vec3 tmin_n;
+    glm::vec3 tmax_n;
+    for (int xyz = 0; xyz < 3; ++xyz) {
+        float qdxyz = q.direction[xyz];
+        /*if (glm::abs(qdxyz) > 0.00001f)*/ {
+            // divide by 2 if everything goes wrong
+            float t1 = (bbmin[xyz] - q.origin[xyz]) / qdxyz;
+            float t2 = (bbmax[xyz] - q.origin[xyz]) / qdxyz;
+            float ta = glm::min(t1, t2);
+            float tb = glm::max(t1, t2);
+            glm::vec3 n;
+            n[xyz] = t2 < t1 ? +1 : -1;
+            if (ta > 0 && ta > tmin) {
+                tmin = ta;
+                tmin_n = n;
+            }
+            if (tb < tmax) {
+                tmax = tb;
+                tmax_n = n;
+            }
+        }
+    }
+
+    if (tmax >= tmin && tmax > 0) {
+        outside = true;
+        if (tmin <= 0) {
+            tmin = tmax;
+            tmin_n = tmax_n;
+            outside = false;
+        }
+        intersectionPoint = multiplyMV(geom->transform, glm::vec4(getPointOnRay(q, tmin), 1.0f));
+        normal = glm::normalize(multiplyMV(geom->invTranspose, glm::vec4(tmin_n, 0.0f)));
+        return glm::length(r.origin - intersectionPoint);
+    }
+    return -1;
+
+}

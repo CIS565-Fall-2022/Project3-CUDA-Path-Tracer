@@ -45,7 +45,7 @@ ABSORPTION  0
 // Specular white
 MATERIAL 4
 RGB         .98 .98 .98
-SPECEX      5
+SPECEX      0
 SPECRGB     .98 .98 .98
 REFL        1
 REFR        0
@@ -137,10 +137,10 @@ TRANS       5 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
-// Sphere
+// Cube but an obj
 OBJECT 6
-sphere
-material 1
-TRANS       0 4 0
-ROTAT       0 0 0
-SCALE       4 4 4
+C:\Users\Edward\Desktop\CIS565 Directory\Project3-CUDA-Path-Tracer\scenes\amogus.obj
+material 3
+TRANS       0 3 0
+ROTAT       45 45 30
+SCALE       2 2 2

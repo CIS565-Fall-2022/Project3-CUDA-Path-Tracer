@@ -10,6 +10,24 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    TRIANGLE,
+    OBJ_BB
+};
+
+struct BoundingBox {
+    glm::vec3 min;
+    glm::vec3 max;
+};
+
+struct Vertex {
+    glm::vec4 pos;
+    glm::vec4 norm;
+};
+
+struct Triangle {
+    Vertex a;
+    Vertex b;
+    Vertex c;
 };
 
 struct Ray {
@@ -26,6 +44,10 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+    Triangle* host_triangles;
+    Triangle* device_triangles;
+    BoundingBox bb;
+    int triangleNum;
 };
 
 struct Material {
@@ -38,6 +60,7 @@ struct Material {
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+    float absorption;
 };
 
 struct Camera {
@@ -49,6 +72,8 @@ struct Camera {
     glm::vec3 right;
     glm::vec2 fov;
     glm::vec2 pixelLength;
+    float focalLength;
+    float lensRadius;
 };
 
 struct RenderState {
