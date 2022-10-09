@@ -41,15 +41,16 @@ Pure Specular | Specular with Refraction
 
 SSAA not Enabled | SSAA Enabled
 :-------------------------:|:-------------------------:
-![Render Img](img/NOSSAA.JPG) | ![Render Img](img/enableSSAA.JPG)
+![Render Img](img/enableSSAA.JPG) | ![Render Img](img/NOSSAA.JPG)
 
 DoF not Enabled | Dof Enabled
 :-------------------------:|:-------------------------:
-![Render Img](img/NoSSAA.JPG) | ![Render Img](img/DoF.JPG)
+![Render Img](img/NOSSAA.JPG) | ![Render Img](img/DoF.JPG)
 
 * String Compaction
 
-Since we are using naive path tracing method, 
+Since we are using naive path tracing method, many rays may reflect out of the scene and become useless computation.
+To optimize it, we have 
 
 * Material Sorting
 
