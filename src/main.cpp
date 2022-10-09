@@ -1,6 +1,10 @@
 #include "main.h"
 #include "preview.h"
 #include <cstring>
+#include <iostream>
+#include <Windows.h>
+#include <string>
+#include <shobjidl.h> 
 
 static std::string startTimeString;
 
@@ -30,7 +34,6 @@ int height;
 //-------------------------------
 //-------------MAIN--------------
 //-------------------------------
-
 int main(int argc, char** argv) {
 	startTimeString = currentTimeString();
 
@@ -158,19 +161,21 @@ void runCuda() {
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if (action == GLFW_PRESS) {
 		switch (key) {
-		case GLFW_KEY_ESCAPE:
-			saveImage();
-			glfwSetWindowShouldClose(window, GL_TRUE);
-			break;
-		case GLFW_KEY_S:
-			saveImage();
-			break;
-		case GLFW_KEY_SPACE:
-			camchanged = true;
-			renderState = &scene->state;
-			Camera& cam = renderState->camera;
-			cam.lookAt = ogLookAt;
-			break;
+			case GLFW_KEY_ESCAPE:
+				saveImage();
+				glfwSetWindowShouldClose(window, GL_TRUE);
+				break;
+			case GLFW_KEY_S:
+				saveImage();
+				break;
+			case GLFW_KEY_SPACE:
+				camchanged = true;
+				renderState = &scene->state;
+				Camera& cam = renderState->camera;
+				cam.lookAt = ogLookAt;
+				break;
+			
+			
 		}
 	}
 }

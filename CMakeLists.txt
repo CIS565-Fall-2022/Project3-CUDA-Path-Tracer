@@ -73,6 +73,9 @@ set(headers
     src/sceneStructs.h
     src/preview.h
     src/utilities.h
+    src/tinyobj/tiny_obj_loader.h
+    src/bvh.h
+
     src/ImGui/imconfig.h
 	
 	src/ImGui/imgui.h
@@ -95,7 +98,8 @@ set(sources
     src/scene.cpp
     src/preview.cpp
     src/utilities.cpp
-	
+	src/tinyobj/tiny_obj_loader.cc
+    src/bvh.cpp
     src/ImGui/imgui.cpp 
       src/ImGui/imgui_demo.cpp 
       src/ImGui/imgui_draw.cpp 

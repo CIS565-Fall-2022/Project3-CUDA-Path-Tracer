@@ -41,6 +41,10 @@ glm::vec3 calculateRandomDirectionInHemisphere(
         + sin(around) * over * perpendicularDirection2;
 }
 
+__host__ __device__ float schlickApproximation(float R0, float cosTheta){
+
+    return R0 + (1 - R0)*pow((1-cosTheta), 5);
+}
 /**
  * Scatter a ray with some probabilities according to the material properties.
  * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
@@ -76,4 +80,53 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    float r = u01(rng);
+
+    glm::vec3 rayDir = pathSegment.ray.direction;
+    glm::vec3 reflectiveBounce = glm::reflect(rayDir, normal);
+    glm::vec3 diffuseBounce = calculateRandomDirectionInHemisphere(normal, rng);
+    
+    //refraction
+    if (m.hasReflective && m.hasRefractive) {
+          
+        float cosTheta = glm::dot(-rayDir, normal);
+          
+        bool entering = cosTheta > 0;
+        float etaA = m.indexOfRefraction;
+        float etaB = 1.f; //air refraction rate = 1
+        float etaI = entering ? etaA : etaB;
+        float etaT = entering ? etaB : etaA;
+        normal = entering ? normal : -normal;
+        float R0 = pow((etaA - etaB) / (etaA + etaB), 2);
+        //Fresnel reflection coefficient
+        float R = schlickApproximation(R0, cosTheta);
+
+        //when reflection probablity is bigger
+        if (r < R) {
+            pathSegment.ray.direction = reflectiveBounce;
+            pathSegment.color *= m.specular.color;
+            pathSegment.ray.origin = intersect + EPSILON * normal;
+        }
+        else {
+            glm::vec3 refractiveDir = glm::refract(rayDir, normal, etaT / etaI);
+            pathSegment.ray.direction = refractiveDir;
+            pathSegment.ray.origin = intersect + EPSILON * pathSegment.ray.direction;
+            pathSegment.color *= m.color;
+        }
+             
+    }//only reflective
+    else if (m.hasReflective) {
+        pathSegment.ray.direction = reflectiveBounce;
+        pathSegment.color *= m.specular.color;
+        pathSegment.ray.origin = intersect + EPSILON * normal;
+    }else {
+        //pure diffuse
+        pathSegment.ray.direction = diffuseBounce;
+        pathSegment.color *= m.color;
+        pathSegment.ray.origin = intersect + EPSILON * normal;
+        
+    }
+    
+    pathSegment.remainingBounces--;
 }
