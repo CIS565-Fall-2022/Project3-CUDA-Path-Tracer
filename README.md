@@ -12,7 +12,14 @@ CUDA Path Tracer
 
 ## Introduction
 
-In this project, I implemented a CUDA path tracer for the GPU. Previously in Advanced Rendering, I implemented a Monte Carlo Path Tracer for the CPU. In this project, the path tracer is
+In 3D rendering, Pathtracing is a technique that generates realistic looking scenes/images by simulating light ray bounces. For this project, I implemented a CUDA path tracer for the GPU. In order to get the least noisy final output, 5000 calls to pathtrace are made whenever the camera is moved. The result of each pathtrace call is then averaged to produce the final output.
+
+Overall, this project is a continuation of learning how to write CUDA kernel functions, optimize performance by adding memory coalescence, and very simple acceleration structures. The second part of the project introduced me to using TinyObjLoader, CudaTextureObjects, and various rendering techniques to get specific types of images:
+
+1. Core Features: 
+   a. Simple Diffuse, Specular, and Imperfect Specular BSDF shading
+   b. 
+3. Additional Features
 
 ![](img/mainAntialiasing.png)
 
