@@ -82,15 +82,19 @@ _No Depth of Field_            |  _Depth of Field_
 
 ### Stochastic Sampled Anti-Aliasing
 
-![](img/noAntialiasing.png)
+_No Antialiasing_            |  _Antialiasing_ 
+:-------------------------:|:-------------------------:
+![](img/noAntialiasing.png) |  ![](img/antialiasing5000samp.png)
 
-![](img/antialiasing5000samp.png)
+_No Antialiasing Closeup_            |  _Antialiasing Closeup_ 
+:-------------------------:|:-------------------------:
+![](img/noAntialiasing.png) |  ![](img/antialiasing5000samp.png)
 
 ### Direct Lighting
 
-![](img/NoDirectLighting.png)
-
-![](img/DirectLighting.png)
+_No Direct Lighting_            |  _Direct Lighting_ 
+:-------------------------:|:-------------------------:
+![](img/NoDirectLighting.png) |  ![](img/DirectLighting.png)
 
 ### Arbitrary Mesh Loading with TinyObjLoader
 
