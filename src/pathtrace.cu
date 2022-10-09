@@ -27,7 +27,7 @@
 #define CACHE_FIRST_BOUNCE 0 // note that Cache first bounce and antialiasing cannot be on at the same time.
 #define ANTIALIASING 0
 #define DEPTH_OF_FIELD 0 // depth of field focus defined later
-#define DIRECT_LIGHTING 1
+#define DIRECT_LIGHTING 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
