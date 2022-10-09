@@ -10,7 +10,7 @@ CUDA Path Tracer
 
 ## Introduction
 
-In 3D rendering, Pathtracing is a technique that generates realistic looking scenes/images by simulating light ray bounces. For this project, I implemented a CUDA path tracer for the GPU. In order to get the least noisy final output, 5000 calls to pathtrace are made whenever the camera is moved. The result of each pathtrace call is then averaged to produce the final output.
+In 3D rendering, Pathtracing is a technique that generates realistic looking scenes/images by simulating light ray bounces. For this project, I implemented a CUDA path tracer for the GPU. In order to get the least noisy final output, 5000 calls to pathtrace are made whenever the camera is moved. The result of all pathtrace calls are then averaged to produce the final output. For this pathtracer, we parallelize operations by Rays (AKA Path Segments)
 
 Overall, this project is a continuation of learning how to write CUDA kernel functions, optimize performance by adding memory coalescence, and very simple acceleration structures. The second part of the project introduced me to using TinyObjLoader, CudaTextureObjects, and various rendering techniques to get specific types of images:
 
@@ -33,10 +33,10 @@ Overall, this project is a continuation of learning how to write CUDA kernel fun
 ![](img/mainAntialiasing.png)
 
 ## Core Features
-1. Shading kernel with BSDF Evaluation for Diffuse and Perfect/Imperfect Specular
-2. Path continuation/termination using Stream Compaction
-3. Contiguous arrangement of materials based on materialId
-4. First bounce caching
+1. Shading kernel with BSDF Evaluation for Diffuse and Perfect/Imperfect Specular.
+3. Path continuation/termination using Stream Compaction
+4. Contiguous arrangement of materials based on materialId
+5. First bounce caching
 
 ![](img/part1Final.png)
 ![](img/part1FinalSpecular.png)
