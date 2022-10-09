@@ -16,6 +16,18 @@
 #define SQRT_OF_ONE_THIRD 0.5773502691896257645091487805019574556476f
 #define EPSILON           0.00001f
 
+#define ENABLE            1
+#define DISABLE           0
+
+#define RUSSIAN_ROULETTE  ENABLE
+#define CONVERT_TO_SRGB   ENABLE
+
+#define BB_CULLING        DISABLE
+#define USE_LBVH          ENABLE
+#define USE_BVH           DISABLE
+#define USE_BVH_MIDPOINT  DISABLE
+#define USE_BVH_SAH       ENABLE
+
 class GuiDataContainer
 {
 public:

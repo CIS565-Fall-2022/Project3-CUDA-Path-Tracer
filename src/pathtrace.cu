@@ -77,6 +77,15 @@ thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int de
 	return thrust::default_random_engine(h);
 }
 
+__host__ __device__ glm::vec3 reinhardOp(glm::vec3 c) {
+	return c / (glm::vec3(1.f, 1.f, 1.f) + c);
+}
+
+__host__ __device__ glm::vec3 gammaCorrect(glm::vec3 c) {
+	glm::vec3 gamma = glm::vec3(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2);
+	return pow(c, gamma);
+}
+
 //Kernel that writes the image to the OpenGL PBO directly.
 __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
 	int iter, glm::vec3* image) {
@@ -87,10 +96,22 @@ __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
 		int index = x + (y * resolution.x);
 		glm::vec3 pix = image[index];
 
+		// Average samples
+		glm::vec3 mod_color = pix / glm::vec3(iter, iter, iter);
+
+#if CONVERT_TO_SRGB
+		// Apply Reinhard operator 
+		mod_color = reinhardOp(mod_color);
+
+		// Apply gamma correction
+		mod_color = gammaCorrect(mod_color);
+#endif
+
+		// Convert to 0-255 scale
 		glm::ivec3 color;
-		color.x = glm::clamp((int)(pix.x / iter * 255.0), 0, 255);
-		color.y = glm::clamp((int)(pix.y / iter * 255.0), 0, 255);
-		color.z = glm::clamp((int)(pix.z / iter * 255.0), 0, 255);
+		color.x = glm::clamp((int)(mod_color.x * 255.0), 0, 255);
+		color.y = glm::clamp((int)(mod_color.y * 255.0), 0, 255);
+		color.z = glm::clamp((int)(mod_color.z * 255.0), 0, 255);
 
 		// Each thread writes one pixel location in the texture (textel)
 		pbo[index].w = 0;
@@ -306,9 +327,13 @@ __global__ void computeIntersections(
 			// TODO: add more intersection tests here... triangle? metaball? CSG?
 			else if (geom.type == MESH)
 			{
-				//t = meshIntersectionTest(geom, pathSegment.ray, dev_tris, tmp_intersect, tmp_normal, outside);
+#if USE_LBVH
 				t = lbvhIntersectionTest(dev_lbvh, dev_tris, pathSegment.ray, geom.triangleCount, tmp_intersect, tmp_normal, outside);
-				//t = bvhIntersectionTest(dev_bvh, dev_tris, pathSegment.ray, geom.triangleCount, tmp_intersect, tmp_normal, outside);
+#elif USE_BVH
+				t = bvhIntersectionTest(dev_bvh, dev_tris, pathSegment.ray, geom.triangleCount, tmp_intersect, tmp_normal, outside);
+#else
+				t = meshIntersectionTest(geom, pathSegment.ray, dev_tris, tmp_intersect, tmp_normal, outside);
+#endif
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
@@ -431,6 +456,19 @@ __global__ void shadeAllMaterials(
 			// Lots of renderers use 4 channel color, RGBA, where A = alpha, often
 			// used for opacity, in which case they can indicate "no opacity".
 			// This can be useful for post-processing and image compositing.
+
+#if RUSSIAN_ROULETTE
+			if (iter > 3) {
+				float maxColorChannel = glm::max(pathSegments[idx].throughput.r, glm::max(pathSegments[idx].throughput.g, pathSegments[idx].throughput.b));
+				float xi = u01(rng);
+				if (xi < (1.f - maxColorChannel)) {
+					pathSegments[idx].remainingBounces = 0;
+				}
+				else {
+					pathSegments[idx].throughput /= maxColorChannel;
+				}
+			}
+#endif
 		}
 		else {
 			//pathSegments[idx].color = glm::vec3(0.0f);

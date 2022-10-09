@@ -1,8 +1,5 @@
 #include "lbvh.h"
 
-#define USE_MIDPOINT
-//#define USE_SAH
-
 /// LBVH FUNCTIONS ///
 
 bool morton_sort(const MortonCode& a, const MortonCode& b) {
@@ -377,7 +374,7 @@ float evalSAH(Scene* scene, BVHNode* node, float queryPos, int axis)
     return cost;
 }
 
-void calculateCost(Scene* scene, BVHNode* node, float& split, int& axis)
+void calculateSAHSplit(Scene* scene, BVHNode* node, float& split, int& axis)
 {
     float optimalCost = INFINITY;
     for (int i = 0; i < 3; ++i) {
@@ -396,14 +393,12 @@ void calculateCost(Scene* scene, BVHNode* node, float& split, int& axis)
 void chooseSplit(Scene* scene, BVHNode* node, float& split, int& axis)
 {
 
-#ifdef USE_MIDPOINT
+#ifdef USE_BVH_MIDPOINT
     glm::vec3 extent = node->aabb.max - node->aabb.min;
     axis = maxExtent(extent);
     split = node->aabb.min[axis] + extent[axis] * 0.5f;
-#endif
-
-#ifdef USE_SAH
-    calculateCost(scene, node, split, axis);
+#elif USE_BVH_SAH
+    calculateSAHSplit(scene, node, split, axis);
 #endif
 
 }

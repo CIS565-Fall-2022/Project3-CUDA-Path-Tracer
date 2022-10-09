@@ -6,8 +6,6 @@
 #include "sceneStructs.h"
 #include "utilities.h"
 
-#define BB_CULLING
-
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
  */
@@ -91,31 +89,31 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
     return -1;
 }
 
-__host__ __device__ bool aabbIntersectionTest(AABB aabb, Ray r) {
-    glm::vec3 invR = glm::vec3(1.0, 1.0, 1.0) / r.direction;
+//__host__ __device__ bool aabbIntersectionTest(AABB aabb, Ray r) {
+//    glm::vec3 invR = glm::vec3(1.0, 1.0, 1.0) / r.direction;
+//
+//    float x1 = (aabb.min.x - r.origin.x) * invR.x;
+//    float x2 = (aabb.max.x - r.origin.x) * invR.x;
+//
+//    float tmin = glm::min(x1, x2);
+//    float tmax = glm::max(x1, x2);
+//
+//    float y1 = (aabb.min.y - r.origin.y) * invR.y;
+//    float y2 = (aabb.max.y - r.origin.y) * invR.y;
+//
+//    tmin = glm::min(tmin, glm::min(y1, y2));
+//    tmax = glm::max(tmax, glm::max(y1, y2));
+//
+//    float z1 = (aabb.min.z - r.origin.z) * invR.z;
+//    float z2 = (aabb.max.z - r.origin.z) * invR.z;
+//
+//    tmin = glm::min(tmin, glm::min(z1, z2));
+//    tmax = glm::max(tmax, glm::max(z1, z2));
+//
+//    return tmin <= tmax && tmax >= 0.0;
+//}
 
-    float x1 = (aabb.min.x - r.origin.x) * invR.x;
-    float x2 = (aabb.max.x - r.origin.x) * invR.x;
-
-    float tmin = glm::min(x1, x2);
-    float tmax = glm::max(x1, x2);
-
-    float y1 = (aabb.min.y - r.origin.y) * invR.y;
-    float y2 = (aabb.max.y - r.origin.y) * invR.y;
-
-    tmin = glm::min(tmin, glm::min(y1, y2));
-    tmax = glm::max(tmax, glm::max(y1, y2));
-
-    float z1 = (aabb.min.z - r.origin.z) * invR.z;
-    float z2 = (aabb.max.z - r.origin.z) * invR.z;
-
-    tmin = glm::min(tmin, glm::min(z1, z2));
-    tmax = glm::max(tmax, glm::max(z1, z2));
-
-    return tmin <= tmax && tmax >= 0.0;
-}
-
-__host__ __device__ bool mesh_aabbIntersectionTest(AABB aabb, Ray r, float& t) {
+__host__ __device__ bool aabbIntersectionTest(AABB aabb, Ray r, float& t) {
     glm::vec3 invR = glm::vec3(1.0, 1.0, 1.0) / r.direction;
 
     float x1 = (aabb.min.x - r.origin.x) * invR.x;
@@ -198,7 +196,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     intersectionPoint = multiplyMV(sphere.transform, glm::vec4(objspaceIntersection, 1.f));
     normal = glm::normalize(multiplyMV(sphere.invTranspose, glm::vec4(objspaceIntersection, 0.f)));
     if (!outside) {
-        normal = -normal;
+        //normal = -normal;
     }
 
     return glm::length(r.origin - intersectionPoint);
@@ -235,10 +233,10 @@ __host__ __device__ float meshIntersectionTest(Geom mesh, Ray r,
     const Triangle* tris, glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
 
     //float min_t = INFINITY;
-#ifdef BB_CULLING
+#if BB_CULLING
     // Test ray against mesh AABB
     float t = -1.0;
-    bool intersectAABB = mesh_aabbIntersectionTest(mesh.aabb, r, t);
+    bool intersectAABB = aabbIntersectionTest(mesh.aabb, r, t);
     if (!intersectAABB) return -1.f;
 
     //float t = mesh_aabbIntersectionTest(mesh.aabb, r, t);
@@ -271,7 +269,6 @@ __host__ __device__ float meshIntersectionTest(Geom mesh, Ray r,
     float v = min_barycenter.y;
     float w = 1.f - u - v;
     intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
-    //normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
     normal = u * min_tri.norms[0] + v * min_tri.norms[1] + w * min_tri.norms[2];
 
     return min_t;
@@ -324,8 +321,8 @@ __host__ __device__ float lbvhIntersectionTest(const LBVHNode* nodes, const Tria
         const LBVHNode* right = &nodes[rightChild];
 
         float t;
-        bool intersectLeft = mesh_aabbIntersectionTest(left->aabb, r, t);
-        bool intersectRight = mesh_aabbIntersectionTest(right->aabb, r, t);
+        bool intersectLeft = aabbIntersectionTest(left->aabb, r, t);
+        bool intersectRight = aabbIntersectionTest(right->aabb, r, t);
 
         // If intersection found, and they are leaf nodes, check for triangle intersections
         if (intersectLeft && devIsLeaf(left)) {
@@ -357,7 +354,6 @@ __host__ __device__ float lbvhIntersectionTest(const LBVHNode* nodes, const Tria
     float v = min_barycenter.y;
     float w = 1.f - u - v;
     intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
-    //normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
     normal = u * min_tri.norms[0] + v * min_tri.norms[1] + w * min_tri.norms[2];
 
     return min_t;
@@ -412,8 +408,8 @@ __host__ __device__ float bvhIntersectionTest(const BVHNode* nodes, const Triang
         const BVHNode* right = &nodes[rightChild];
 
         float t;
-        bool intersectLeft = mesh_aabbIntersectionTest(left->aabb, r, t);
-        bool intersectRight = mesh_aabbIntersectionTest(right->aabb, r, t);
+        bool intersectLeft = aabbIntersectionTest(left->aabb, r, t);
+        bool intersectRight = aabbIntersectionTest(right->aabb, r, t);
 
         // If intersection found, and they are leaf nodes, check for triangle intersections
         if (intersectLeft && devBvhIsLeaf(left)) {
@@ -445,7 +441,6 @@ __host__ __device__ float bvhIntersectionTest(const BVHNode* nodes, const Triang
     float v = min_barycenter.y;
     float w = 1.f - u - v;
     intersectionPoint = u * min_tri.verts[0] + v * min_tri.verts[1] + w * min_tri.verts[2];
-    //normal = glm::cross(min_tri.verts[1] - min_tri.verts[0], min_tri.verts[2] - min_tri.verts[0]);
     normal = u * min_tri.norms[0] + v * min_tri.norms[1] + w * min_tri.norms[2];
 
     return min_t;

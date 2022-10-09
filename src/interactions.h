@@ -42,6 +42,37 @@ glm::vec3 calculateRandomDirectionInHemisphere(
 }
 
 __host__ __device__
+glm::vec3 calculateFresnel(const Material &m, float cosTheta) {
+    float etaI = 1.0;
+    float etaT = m.indexOfRefraction;
+    float cosThetaI = glm::clamp(cosThetaI, -1.f, 1.f);
+    
+    bool entering = (cosThetaI > 0.f);
+    if (!entering) {
+        float tmp = etaI;
+        etaI = etaT;
+        etaT = tmp;
+        cosThetaI = glm::abs(cosThetaI);
+    }
+    float eta = etaI / etaT;
+
+    // Snell's Law
+    float sinThetaI = glm::sqrt(max(0.0, 1.0 - cosThetaI * cosThetaI));
+    float sinThetaT = eta * sinThetaI;
+
+    // Total internal reflection
+    if (sinThetaT >= 1.0) return glm::vec3(1.0, 1.0, 1.0);
+
+    float cosThetaT = glm::sqrt(glm::max(0.0, 1.0 - sinThetaT * sinThetaT));
+    float Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
+        ((etaT * cosThetaI) + (etaI * cosThetaT));
+    float Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
+        ((etaI * cosThetaI) + (etaT * cosThetaT));
+
+    return glm::vec3((Rparl * Rparl + Rperp * Rperp) / 2.0);
+}
+
+__host__ __device__
 glm::vec3 sample_diffuse(
     glm::vec3 &normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 wo, glm::vec3& wi) 
 {
@@ -63,12 +94,12 @@ glm::vec3 sample_specular_trans(
 {
     float entering = (glm::dot(wo, normal) < 0);
     float eta = (entering) ? 1.f / m.indexOfRefraction : m.indexOfRefraction;
-    wi = glm::refract(wo, normal, eta);
 
     // Flip normal to be in same hemisphere as wo
-    bool flip = (glm::dot(wo, normal) < 0.f);
+    bool flip = (glm::dot(wo, normal) > 0.f);
     normal = (flip) ? -normal : normal;
-
+    wi = glm::refract(wo, normal, eta);
+  
     // Total internal reflection
     if (glm::length(wi) < 0) {
         wi = glm::reflect(wo, normal);
@@ -84,7 +115,8 @@ glm::vec3 sample_glass(
     thrust::uniform_real_distribution<float> u01(0, 1);
     bool reflect = u01(rng) < 0.5;
 
-    /*glm::vec3 Fr = Fresnel();
+    float cosTheta = glm::dot(wo, normal);
+    glm::vec3 Fr = calculateFresnel(m, cosTheta);
     glm::vec3 f = glm::vec3(0.0, 0.0, 0.0);
     if (reflect) {
         f = sample_specular_refl(normal, m, rng, wo, wi);
@@ -93,9 +125,29 @@ glm::vec3 sample_glass(
     else {
         f = sample_specular_trans(normal, m, rng, wo, wi);
         return 2.f * (glm::vec3(1.f, 1.f, 1.f) - Fr) * f;
-    }*/
-    return m.specular.color;
+    }
 }
+
+__host__ __device__
+glm::vec3 sample_plastic(
+    glm::vec3& normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 wo, glm::vec3& wi)
+{
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    bool reflect = u01(rng) < 0.5;
+
+    float cosTheta = glm::dot(wo, normal);
+    glm::vec3 Fr = calculateFresnel(m, cosTheta);
+    glm::vec3 f = glm::vec3(0.0, 0.0, 0.0);
+    if (reflect) {
+        f = sample_specular_refl(normal, m, rng, wo, wi);
+        return 2.f * Fr * f;
+    }
+    else {
+        f = sample_diffuse(normal, m, rng, wo, wi);
+        return 2.f * (glm::vec3(1.f, 1.f, 1.f) - Fr) * f;
+    }
+}
+
 /**
  * Scatter a ray with some probabilities according to the material properties.
  * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
@@ -152,7 +204,10 @@ void scatterRay(
     if (m.hasReflective && m.hasRefractive) {
         f = sample_glass(normal, m, rng, pathSegment.ray.direction, wi);
     }
-    if (m.hasReflective) {
+    else if (m.hasReflective && glm::length(m.color) > 0) {
+        f = sample_plastic(normal, m, rng, pathSegment.ray.direction, wi);
+    }
+    else if (m.hasReflective) {
         f = sample_specular_refl(normal, m, rng, pathSegment.ray.direction, wi);
     }
     else if (m.hasRefractive) {

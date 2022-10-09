@@ -45,8 +45,14 @@ int main(int argc, char** argv) {
 	scene = new Scene(sceneFile);
 
 	// Generate BVH
-	generateLBVH(scene);
-	//generateBVH(scene, scene->triangles.size());
+	if (scene->triangles.size() > 0)
+	{
+#if USE_LBVH
+		generateLBVH(scene);
+#elif USE_BVH
+		generateBVH(scene, scene->triangles.size());
+#endif
+	}
 
 	//Create Instance for ImGUIData
 	guiData = new GuiDataContainer();
