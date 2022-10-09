@@ -92,6 +92,8 @@ _No Antialiasing Closeup_            |  _Antialiasing Closeup_
 
 ### Direct Lighting
 
+Direct Lighting was implemented by sending every ray with only 1 bounce left directly to a randomly selected lightsource in the scene. Here are the implementation results:
+
 _No Direct Lighting_            |  _Direct Lighting_ 
 :-------------------------:|:-------------------------:
 ![](img/NoDirectLighting.png) |  ![](img/DirectLighting.png)
