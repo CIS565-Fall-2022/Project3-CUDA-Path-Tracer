@@ -16,13 +16,13 @@ For this pathtracer, we parallelize operations by Rays (AKA Path Segments), and 
 
 Overall, this project is a continuation of learning how to write CUDA kernel functions, optimize performance by adding memory coalescence, and very simple acceleration structures. The second part of the project introduced me to using TinyObjLoader, CudaTextureObjects, and various rendering techniques to get specific types of images:
 
-1. Core Features: 
+1. [Core Features](https://github.com/dluisnothere/Project3-CUDA-Path-Tracer#core-features): 
 *  Simple Diffuse, Specular, and Imperfect Specular BSDF shading
 *  Path continuation/termination using stream compaction
 *  Continugous arrangement of materials based on materialId
 *  First-bounce-cache for a specific camera angle.
 
-3. Additional Features
+3. [Additional Features](https://github.com/dluisnothere/Project3-CUDA-Path-Tracer#additional-features)
 *  Refractive materials
 *  Depth of Field
 *  Direct Lighting
