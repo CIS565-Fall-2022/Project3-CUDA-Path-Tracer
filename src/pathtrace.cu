@@ -222,7 +222,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 			distance = glm::clamp(1 - distance, 0.f, 1.f);
 
 			segment.aliasIdx = i;
-			segment.ray.origin = cam.position +glm::vec3(offset.x * cam.pixelLength.x, offset.y * cam.pixelLength.y, 0);
+			segment.ray.origin = cam.position +glm::vec3(offset.x * 4 * cam.pixelLength.x, offset.y * 4 * cam.pixelLength.y, 0);
 			segment.color = glm::vec3(1.0f, 1.0f, 1.0f);// * distance;
 
 			// TODO: implement antialiasing by jittering the ray
