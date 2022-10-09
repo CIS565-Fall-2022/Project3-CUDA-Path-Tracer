@@ -268,7 +268,6 @@ __global__ void computeIntersections(
 	, ShadeableIntersection* intersections
 	// for mesh loading
 	,Triangle* triangles
-	,int triangles_size
 	,int iter
 )
 {
@@ -309,11 +308,11 @@ __global__ void computeIntersections(
 				if (checkMeshhBoundingBox(geom, pathSegment.ray))
 				{
 					t = triangleIntersectionTest(geom, pathSegment.ray,
-						tmp_intersect, triangles, triangles_size, tmp_normal, outside, uv);
+						tmp_intersect, triangles, geom.triangleStart, geom.triangleEnd, tmp_normal, outside, uv);
 				}
 #else
 				t = triangleIntersectionTest(geom, pathSegment.ray,
-					tmp_intersect, triangles, tmp_normal, outside);
+					tmp_intersect, triangles + geom.triangleIndex, triangles_size, tmp_normal, outside, uv);
 #endif
 			}
 			// Compute the minimum t from the intersection tests to determine what
@@ -633,7 +632,6 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, hst_scene->geoms.size()
 				, dev_intersections
 				, dev_triangles
-				, hst_scene->triangles.size()
 				,iter
 				);
 			checkCUDAError("trace one bounce");
@@ -654,7 +652,6 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, hst_scene->geoms.size()
 				, dev_intersections
 				, dev_triangles
-				, hst_scene->triangles.size()
 				, iter
 				);
 			checkCUDAError("trace one bounce");
@@ -669,7 +666,6 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, hst_scene->geoms.size()
 			, dev_intersections
 			, dev_triangles
-			, hst_scene->triangles.size()
 			, iter
 			);
 		checkCUDAError("trace one bounce");

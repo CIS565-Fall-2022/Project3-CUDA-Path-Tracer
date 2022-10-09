@@ -145,7 +145,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 
 
 __host__ __device__ float triangleIntersectionTest(Geom custom_obj, Ray r,
-    glm::vec3& intersectionPoint, Triangle* triangles, int triangles_size, glm::vec3& normal, bool& outside,
+    glm::vec3& intersectionPoint, Triangle* triangles, int triangles_start, int triangles_end, glm::vec3& normal, bool& outside,
     glm::vec2& uv) 
 {
 
@@ -156,7 +156,7 @@ __host__ __device__ float triangleIntersectionTest(Geom custom_obj, Ray r,
 
     float min_t = FLT_MAX;
 
-    for (int i = 0; i < triangles_size; i++)
+    for (int i = triangles_start; i < triangles_end; i++)
     {
         Triangle& triangle = triangles[i];
         glm::vec3 vertex1 = triangle.v1;

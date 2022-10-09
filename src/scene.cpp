@@ -61,7 +61,11 @@ int Scene::loadGeom(string objectid) {
             {
                 cout << "Creating new obj mesh..." << endl;
                 newGeom.type = OBJ_MESH;
-                loadObj(newGeom);
+                utilityCore::safeGetline(fp_in, line);
+                if (!line.empty() && fp_in.good()) {
+                    const char* filename = line.c_str();
+                    loadObj(newGeom, filename);
+                }
             }
         }
 
@@ -217,12 +221,11 @@ int Scene::loadMaterial(string materialid) {
 }
 
 // Reference: https://github.com/tinyobjloader/tinyobjloader
-int Scene::loadObj(Geom& geo)
+int Scene::loadObj(Geom& geo, const char* inputfile)
 {
     tinyobj::ObjReader reader;
     tinyobj::ObjReaderConfig reader_config;
 
-    const char* inputfile = "../scenes/wahoo.obj";
 
     if (!reader.ParseFromFile(inputfile, reader_config)) {
         if (!reader.Error().empty()) {
@@ -236,6 +239,8 @@ int Scene::loadObj(Geom& geo)
 
     tinyobj::attrib_t attrib = reader.GetAttrib();
     std::vector<tinyobj::shape_t> shapes = reader.GetShapes();
+
+    geo.triangleStart = triangles.size();
 
     // Loop over shapes and attributes
     for (size_t s = 0; s < shapes.size(); s++) {
@@ -333,5 +338,7 @@ int Scene::loadObj(Geom& geo)
             geo.boundingBoxMin = glm::vec3(minX, minY, minZ);
         }
     }
+    geo.triangleEnd = triangles.size();
+
     return 1;
 }

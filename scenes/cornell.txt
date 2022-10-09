@@ -147,7 +147,16 @@ ENDPOS      2 6 1
 
 OBJECT 8
 obj_mesh
+../scenes/objs/wahoo.obj
 material 6
 TRANS       -2 7 2
+ROTAT       0 0 0
+SCALE       0.5 0.5 0.5
+
+OBJECT 9
+obj_mesh
+../scenes/objs/cow.obj
+material 2
+TRANS       0 4 4
 ROTAT       0 0 0
 SCALE       0.5 0.5 0.5

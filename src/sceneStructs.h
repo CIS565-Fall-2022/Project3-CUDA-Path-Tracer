@@ -30,6 +30,8 @@ struct Geom {
     glm::mat4 invTranspose;
     glm::vec3 boundingBoxMin;
     glm::vec3 boundingBoxMax;
+    int triangleStart;
+    int triangleEnd;
 };
 
 struct Triangle {
