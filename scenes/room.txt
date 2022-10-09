@@ -67,7 +67,7 @@ DEPTH       8
 FILE        cornell
 LENSRADIUS    .5
 FOCALDISTANCE   10
-EYE         0.0 5 10
+EYE         0.0 5 10.5
 LOOKAT      0 5 0
 UP          0 1 0
 
