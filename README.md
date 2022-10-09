@@ -48,15 +48,23 @@ Specular Exponent: 100 (As the exponent increases, the surface gets closer and c
 Imperfectly specular materials are just shiny since reflection angles are, while more focused than diffuse materials, nondeterministic.
 ## Stream Compaction
 ![](img/RayTerminationChart.png)
-Remove all rays that hit nothing in the scene.
+
+Remove all rays that hit nothing in the scene; this significantly improved performance as maximum iteration depth was increased; this is likely because there were less rays to process the deeper into the iteration we had to go when we had stream compaction active. 
+
+Numbers taken with material sort inactive, but with ray cache active.
+
 ## Material Sorting in Memory
 ![](img/MaterialSortChart.png)
 
-Sort all ray intersections by the materials they hit with the intent of enabling memory coalescence for bsdf interactions based on different materials.
+Sort all ray intersections by the materials they hit with the intent of enabling memory coalescence for bsdf interactions based on different materials. This did not pan out to be an optimization; the sort employed by thrust sort seems to only have added a constant lump sum runtime for the actual runtime of the employed sorting algorithm.
+
+Numbers taken with with ray cache and ray terminiation active.
+
 ## Ray Caching
 ![](img/RayCacheChart.png)
 
-The first rays cast into the scene are deterministic based on the camera's position; thus there is no need to recalculate their interactions and intersections for each iteration that the Pathtracer renders.
+The first rays cast into the scene are deterministic based on the camera's position; thus there is no need to recalculate their interactions and intersections for each iteration that the Pathtracer renders. This offered a marginal improvement in runtime that gradually widened as max iteration depth was increased; this is likely because the increased depths allowed for more work saved by ray caching. 
+
 ## OBJ Loading
 ![](img/basicObjTest.png) 
 Tested this implementation against importing a basic cube that was stored as an OBJ.
@@ -64,7 +72,7 @@ Tested this implementation against importing a basic cube that was stored as an 
 Implemented functionaltiy loads in an arbitrary, but untextured mesh. Implemented bounding box acceleration data structure as well.
 
 ![](img/ObjPerformance.png)
-Performance is significantly improved when loading the Low Poly Among Us Crewmate obj into the scene as shown in chart above
+Performance is significantly improved when loading the Low Poly Among Us Crewmate obj into the scene as shown in chart above. This is because the triangles inside of the bounding box did not need to be individually tested for intersection unless the ray was actually inside of that bounding box of the object itself.
 
 ## Refractive
 ![](img/Transmissive.png)
@@ -83,11 +91,22 @@ Lenses in real life have radii and focal distances (based on their concavity) wh
 Sending out multiple rays approximated by small scale directional jitter per camera ray per pixel to get sub-pixel values.
 
 ![](img/AAClose.png)
+
 Close up of a sphere with Anti Aliasing applied.
+
 ![](img/withoutAAClose.png)
+
 Close up of a sphere without Anti Aliasing applied.
 
-The difference is subtle but the curved surface is a little less jagged with anti-aliasing applied.
+A closer look:
+
+![](img/noAA.png)
+
+Less iterations but smoother.
+
+![](img/yesAA.png)
+
+More iterations but more jagged edges.
 
 ## Stratified Sampling
 Improve random hemisphere sampling by using a grid to stratify the portions of the hemisphere upon which we sample ray directions.
@@ -108,5 +127,8 @@ The shadows are slightly different in terms of noise levels, though they converg
 * [Sampling notes](http://graphics.ucsd.edu/courses/cse168_s14/) from Steve Rotenberg and Matteo Mannino, University of California, San Diego, CSE168: Rendering Algorithms
 
 ## Bloopers
+![](img/blooper.png)
 ![](img/GlassBlooper.png)
 ![](img/GlassBlooper1.png)
+
+These are my most visually interesting bloopers; I got lots of black and white screens. Most of my obj loading bloopers were just the object not showing up in the scene.
