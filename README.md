@@ -60,14 +60,6 @@ Since we restart rendering the scene whenever the camera moves, we know that the
 _All Materials Diffuse_            |  _Specular Sphere_ | _Imperfect Specular_
 :-------------------------:|:-------------------------:|:--------------------:
 ![](img/part1Final.png) |  ![](img/part1FinalSpecular.png) | ![](img/imperfectSpecular.png)
-![](img/part1Final.png)
-![](img/part1FinalSpecular.png)
-![](img/imperfectSpecular.png)
-
-
-
-
-_Imperfect specular floors reflecting three objects_
 
 ## Additional Features
 ### Refractive Material
