@@ -25,9 +25,9 @@
 #define ERRORCHECK 1
 #define SORT_MATERIALS 0
 #define CACHE_FIRST_BOUNCE 0 // note that Cache first bounce and antialiasing cannot be on at the same time.
-#define ANTIALIASING 0
+#define ANTIALIASING 1
 #define DEPTH_OF_FIELD 0 // depth of field focus defined later
-#define DIRECT_LIGHTING 0
+#define DIRECT_LIGHTING 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -302,8 +302,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 #endif
 
 #if DEPTH_OF_FIELD
-#define FOCUS 10.f // focus distance from the camera
-#define APERTURE 2.0f // how blurry will out of focus objects be? 
+#define FOCUS 5.f // focus distance from the camera
+#define APERTURE 1.3f // how blurry will out of focus objects be? 
 
 		// if depth of field is turned on, we jitter the ray origin.
 		// Calculate the converge point C using ray.origin, ray.direction, and focal length f C = O + f(D)
@@ -314,12 +314,12 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		glm::vec3 focalPoint = segment.ray.origin + FOCUS * segment.ray.direction;
 
 		// add blur effect
-		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
-		thrust::uniform_real_distribution<float> u01(-0.5, 0.5f);
+		thrust::default_random_engine rng2 = makeSeededRandomEngine(iter, index, 0);
+		thrust::uniform_real_distribution<float> u02(-0.5, 0.5f);
 
-		float randX = u01(rng);
-		float randY = u01(rng);
-		float randZ = u01(rng);
+		float randX = u02(rng2);
+		float randY = u02(rng2);
+		float randZ = u02(rng2);
 
 		glm::vec3 offset = glm::vec3(randX, randY, randZ);
 
@@ -623,7 +623,8 @@ __global__ void kernComputeShadeDirectLighting(
 	, Geom* lights
 	, int numLights
 #if USE_UV
-	, Texture* textures
+	, cudaTextureObject_t* textureObjs
+	, int* numChannels
 #endif
 )
 {
@@ -655,8 +656,13 @@ __global__ void kernComputeShadeDirectLighting(
 				// generate new ray and load it into pathSegments by calling scatterRay
 				glm::vec3 intersectionPoint = getPointOnRay(pathSegments[idx].ray, intersection.t);
 #if USE_UV
-				Texture texture = textures[intersection.textureId];
-				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, intersection.textureId, intersection.uv, material, texture, rng);
+				// cudaArray_t texture = textures[intersection.textureId];
+				cudaTextureObject_t texObj = textureObjs[intersection.textureId];
+				int channels = numChannels[intersection.textureId];
+				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, intersection.textureId, intersection.uv, material, /*texture,*/ texObj, channels, rng);
+
+#elif USE_PROCEDURAL_TEXTURE		
+				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, material, rng, intersection.hasHitObj);
 #else
 				scatterRay(pathSegments[idx], intersectionPoint, intersection.surfaceNormal, material, rng);
 #endif
@@ -978,7 +984,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_lights,
 			hst_scene->numLights
 #if USE_UV
-			, dev_texData
+			, dev_textureObjs
+			, dev_textureChannels
 #endif
 			);
 #else 
@@ -989,7 +996,6 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_paths,
 			dev_materials
 #if USE_UV
-// 			, dev_texData
 			, dev_textureObjs
 			, dev_textureChannels
 #endif
