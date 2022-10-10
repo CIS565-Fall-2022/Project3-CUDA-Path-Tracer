@@ -96,7 +96,7 @@ Frankly, I cannot see a difference. I suspect that it has to do with the random 
 </br >
 This happens when the buffer sizes are not properly adjusted to accomodate for all the extra rays.
 
-###OBJ Loading
+### OBJ Loading
 OBJ files basically encode 3d objects. [TinyObjLoader](https://github.com/tinyobjloader/tinyobjloader) was used to load the files into the path tracer. The objects in these files basically consist of a lot of planes bound by control points, normally called faces. When checking to see if a ray intersects an object, we have to iterate through every single thing in the scene. For simple scenes this is fine, but once we load in an obj the number of things in the scene can blow up. Each face in the loaded object is a new thing to check intersections against. Considering objects can have tens of thousands of faces, one can imagine that this can slow down the path tracer quite a bit. One simple performance improvement is to introduce a bounding box which encapsulates the entire object. Before we check against all the faces in an object, we first check against the bounding box. If we don't intersect with it, then we don't have to check any of the faces. Potentially saving a lot of useless work. 
 
 </br >
@@ -113,11 +113,13 @@ The objects of middle and most complexity both experienced around a 10% reductio
 </br >
 For reference: This is the object when scaled by twice it's size (last column)
 ![](img/teapotbig.png)
+</br >
 and this is the object when scaled by .25 it's size (first column)
 ![](img/teapotsmall.png)
+</br >
 When the object is small, we are saving significantly more time than if the same object was big. Much fewer rays would intersect the small object, so keeping the majority or rays from checking against it is quite significant. On the other hand, the majority of rays would intersect the big object anyway, so using the bounding box doesn't save as much time. 
 
-###Restartable Path-tracer
+### Restartable Path-tracer
 Despite all the performance improvements, the path tracer could still take hours to render an image. It is thus beneficial to be able to stop the execution, and pick up from where was left off upon running the pather tracer again, rather than need to restart the whole process. One may also want to adjust paramaters or make small adjustments to the scene while not fully restarting. While running the path tracer, one can press 'x' on their keyboard to save the current state of the execution. When launching the path tracer, one has the option to load the most recently saved state and pick up from there. This isn't really a performance or aesthetic improvement, but a quality of life one. Here is the feature in action
 ![](img/restart.gif)
 </br >
@@ -128,18 +130,31 @@ One pretty interesting unintentional consequence of this feature is the ability 
 </br >
 This was actually a bug caused by an indexing error, but the thought still stands.
 
-###References
+### References
 </br >
+
 [Angel Obj](https://www.cgtrader.com/free-3d-models/character/fantasy-character/lucy-a-christian-angel-statue-bb54169c38f87b1130bf72bfa18b3d9c)
+
 </br >
+
 [Discus Thrower Obj](https://www.turbosquid.com/3d-models/free-obj-mode-sculpture-discobolus-discus-thrower/1093054)
+
 </br >
+
 [Teapot Obj](https://graphics.stanford.edu/courses/cs148-10-summer/as3/code/as3/teapot.obj)
+
 </br >
+
 [Cube Obj](https://gist.github.com/MaikKlein/0b6d6bb58772c13593d0a0add6004c1c)
+
 </br >
+
 [Paul Bourke Anti-Aliasing](http://paulbourke.net/miscellaneous/raytracing/)
+
 </br >
+
 [TinyObjLoader](https://github.com/tinyobjloader/tinyobjloader)
+
 </br >
+
 [PBRT](https://pbr-book.org/3ed-2018/contents)
