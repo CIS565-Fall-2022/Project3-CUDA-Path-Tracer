@@ -276,7 +276,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
 
 	bool enableDepthField = false;
-	bool enableStochasticAA = false;
+	bool enableStochasticAA = true;
 
 	if (x < cam.resolution.x && y < cam.resolution.y) {
 		int index = x + (y * cam.resolution.x);
@@ -291,13 +291,10 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		//SSAA anti-aliasing
 		if (enableStochasticAA)
 		{
-			float dx = u01(rng) * cam.pixelLength.x - cam.pixelLength.x / 2;
-			float dy = u01(rng) * cam.pixelLength.y - cam.pixelLength.y / 2;
-			segment.ray.origin = cam.position;
+			thrust::random::uniform_real_distribution<float> u0(-1.f, 1.f);
 			segment.ray.direction = glm::normalize(cam.view
-				- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-				- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
-				- cam.right * dx - cam.up * dy);
+				- cam.right * cam.pixelLength.x * ((float)x + u0(rng) - (float)cam.resolution.x * 0.5f)
+				- cam.up * cam.pixelLength.y * ((float)y + u0(rng) - (float)cam.resolution.y * 0.5f));
 		}
 		else
 	    {
@@ -308,18 +305,18 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		//DepthField
 		if (enableDepthField)
 		{
-			float lensRadius = 0.3f; 
-			float focalDistance = 6.f;
+			float lensRadius = 0.1f; 
+			float focalDistance = 4.f;
 			thrust::normal_distribution<float> n01(0, 1);
 			float theta = u01(rng) * TWO_PI;
 			glm::vec3 circlePerturb = lensRadius * n01(rng) * (cos(theta) * cam.right + sin(theta) * cam.up);
 			glm::vec3 originalDir = segment.ray.direction;
 			float ft = focalDistance / glm::dot(originalDir, cam.view);
-			segment.ray.origin = cam.position + circlePerturb;
+			segment.ray.origin = segment.ray.origin + circlePerturb;
 			segment.ray.direction = glm::normalize(ft * originalDir - circlePerturb);
 		}
 		
-		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
+		//segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 		// TODO: implement antialiasing by jittering the ray
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;

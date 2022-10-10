@@ -38,11 +38,13 @@ Pure Specular | Specular with Refraction
 
 ### SSAA & Depth of Field
 
-These methods is used to increase visualize experience. Depth of Field seems a little bit buggy,but SSAA works pretty well and it looks good.
+Aliasing is the problem of artifacts on images as a result of discretization of pixels. This can be mitigated by taking more than one sample per pixel from regions around the center of the pixel. By performing stochastic sampled anti-aliasing, we are using a higher number of iterations to produce a sharper image. Stochastic sampled anti-aliasing definitely benefits from being implemented on the GPU because the rays generated for each pixel are always independent. This might be further optimized by launching more threads to per pixel. The exact effect cannot be known unless it is tried out. This depends on whether launching extra threads will help mask memory latency by doing more computations. Below is the comparison for 2000 iterations.
 
 SSAA not Enabled | SSAA Enabled
 :-------------------------:|:-------------------------:
 ![Render Img](img/enableSSAA.JPG) | ![Render Img](img/NOSSAA.JPG)
+
+Depth of field creates the thin lens effect of a real life camera as opposed to a pinhole camera. Objects in focus will be sharp while objects out of focus will be blurry. Depth of field significantly increases the number of iterations required to render an image since we need to shoot rays from not just a pinhole but rather the whole area of the circular lens. Depth of field definitely benefits from being implemented on the GPU because the rays generated are always independent. 
 
 DoF not Enabled | Dof Enabled
 :-------------------------:|:-------------------------:
@@ -59,7 +61,7 @@ This method is really useful for unclosed scene and bring performance improvemen
 
 
 
-But for closed scene, since no ray will bounce outside the scene, this method will not bring performance improvement in this case.
+But for closed scene, since no ray will bounce outside the scene, this method may not bring performance improvement in this case.
 
 ### Material Sorting
 
@@ -67,11 +69,18 @@ But for closed scene, since no ray will bounce outside the scene, this method wi
 
 ### First bounce Caching
 
-
+Another optimization that's made is caching the intersection data for the first bounce (i.e. depth = 1). Since each ray starts at the same spot for each pixel, the first bounce result will always be the same for all iterations. Although not significant, first bounce caching does make things slightly faster on average.
 
 ### GLTF Mesh Loading
 
+In order to render more complex scenes, we needs to support loading arbitrary mesh robustly. As long as the system is sufficiently robust (e.g. able to handle multiple hierarchies), the complexity can be defined by the file format itself thus making the scene more visually interesting. GLTF was chosen as the scene description format as it is much more powerful than OBJ and is a more modern 3D model file. I have never worked with GLTF before so I thought it would be a good opportunity to understand the specification through this project.
 
+GLTF is different because the gltf file was constructed by nodes and only give you bufferView and bufferOffset, to fetch the vertex and texture information we have to check the bin and read them from buffer.
 
+To support GLTF mesh loading, I used tinygltf to load in the GLTF file and parsed the data into custom struct data I defined in sceneStruct.cpp. This step is necessary because the tinygltf classes are not GPU-compatible. Additionally, in order to not have to deal with passing nested Struct Arrays to the GPU, each mesh vertex data is flattened into its own giant buffer containing the data for all meshes. The actual Mesh struct would only store the index offset for each data. This is similar to how GLTF/OpenGL defines VBOs.
+
+I have tried my best to implement GLTF texture binding but I must say GLTF texture loading is far more difficult than Obj file, I know gltf file contain texture, but my implements still have some bugs but I have no time to fix them.
+
+![Render Img]();
 
 ## Reference
