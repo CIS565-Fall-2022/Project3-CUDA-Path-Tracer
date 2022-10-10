@@ -422,25 +422,36 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	// TODO: perform one iteration of path tracing
 
+	int depth = 0;
+	PathSegment* dev_path_end = dev_paths + pixelcount;
+	int num_paths = dev_path_end - dev_paths;
+
 #if CACHE
 	if (first) {
 		generateRayFromCamera <<<blocksPerGrid2d, blockSize2d>>> (cam, iter, traceDepth, dev_paths);
 		checkCUDAError("generate camera ray");
 		cudaMemcpy(dev_first_paths, dev_paths, pixelcount * sizeof(PathSegment), cudaMemcpyDeviceToDevice);
+		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
+		computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+			depth
+			, num_paths
+			, dev_paths
+			, dev_geoms
+			, hst_scene->geoms.size()
+			, dev_intersections
+			);
+		cudaMemcpy(dev_first_intersections, dev_intersections, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
 		first = false;
 	}
 	else {
 		cudaMemcpy(dev_paths, dev_first_paths, pixelcount * sizeof(PathSegment), cudaMemcpyDeviceToDevice);
+		cudaMemcpy(dev_intersections,dev_first_intersections, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
 	}
 
 #else
 	generateRayFromCamera << <blocksPerGrid2d, blockSize2d >> > (cam, iter, traceDepth, dev_paths);
 	checkCUDAError("generate camera ray");
 #endif
-
-	int depth = 0;
-	PathSegment* dev_path_end = dev_paths + pixelcount;
-	int num_paths = dev_path_end - dev_paths;
 
 	// --- PathSegment Tracing Stage ---
 	// Shoot ray into scene, bounce between objects, push shading chunks
@@ -457,13 +468,34 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	cudaMemcpy(dev_geoms, hst_scene->geoms.data(), hst_scene->geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
 
 	bool iterationComplete = false;
+	bool iterationStart = true;
 	while (!iterationComplete) {
+		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
 
 		// clean shading chunks
+#if CACHE
+		if (iterationStart) {
+			cudaMemcpy(dev_intersections, dev_first_intersections, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
+			iterationStart = false;
+		}
+		else {
+			cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
+
+			computeIntersections <<<numblocksPathSegmentTracing, blockSize1d >>> (
+				depth
+				, num_paths
+				, dev_paths
+				, dev_geoms
+				, hst_scene->geoms.size()
+				, dev_intersections
+				);
+			checkCUDAError("trace one bounce");
+			cudaDeviceSynchronize();
+		}
+#else
 		cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
 		// tracing
-		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
 		computeIntersections <<<numblocksPathSegmentTracing, blockSize1d >> > (
 			depth
 			, num_paths
@@ -474,6 +506,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			);
 		checkCUDAError("trace one bounce");
 		cudaDeviceSynchronize();
+#endif
 		depth++;
 
 		// TODO:
@@ -499,6 +532,9 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 
 		dev_path_end = thrust::partition(thrust::device, dev_paths, dev_path_end, is_terminated());
+
+		//printf("%i,%i\n", num_paths, dev_path_end - dev_paths);
+
 		num_paths = dev_path_end - dev_paths;
 
 

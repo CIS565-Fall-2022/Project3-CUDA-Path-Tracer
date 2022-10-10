@@ -123,6 +123,9 @@ void scatterRay(
                     pathSegment.ray.direction = glm::normalize(out);
                     pathSegment.remainingBounces--;
                     pathSegment.ray.origin = intersect + 0.0001f * pathSegment.ray.direction;
+                    if (pathSegment.remainingBounces == 0) {
+                        pathSegment.color *= 0.f;
+                    }
                     return;
                 }
             }
@@ -130,8 +133,8 @@ void scatterRay(
 
         if (m.hasReflective || m.hasRefractive) {
             pathSegment.color *= m.specular.color;
-           // pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
-            pathSegment.ray.direction = glm::normalize(imperfectReflection(glm::normalize(glm::reflect(pathSegment.ray.direction, normal)), rng, m.shininess));
+           pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+            //pathSegment.ray.direction = glm::normalize(imperfectReflection(glm::normalize(glm::reflect(pathSegment.ray.direction, normal)), rng, m.shininess));
             pathSegment.remainingBounces--;
             pathSegment.ray.origin = intersect + 0.0001f * pathSegment.ray.direction;
         }
@@ -140,7 +143,10 @@ void scatterRay(
             pathSegment.color *= m.color;
             pathSegment.ray.direction = glm::normalize(calculateRandomDirectionInHemisphere(normal, rng));
             pathSegment.remainingBounces--;
-            pathSegment.ray.origin = intersect + 0.0001f * pathSegment.ray.direction;
+            pathSegment.ray.origin = intersect+ 0.0001f * pathSegment.ray.direction;
+        }
+        if (pathSegment.remainingBounces == 0) {
+            pathSegment.color *= 0.f;
         }
 
     }
