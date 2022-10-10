@@ -6,15 +6,39 @@
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
+#define FLOAT_MIN -1e38f
+#define FLOAT_MAX 1e38f;
 
 enum GeomType {
     SPHERE,
     CUBE,
+    OBJ,
+    IMPLICIT
+};
+
+enum ImplicitObj {
+    IMP_SPHERE,
+    IMP_BOOKCOVER,
+    IMP_BOOKPAGES,
+    IMP_MUG,
+    IMP_COFFEE,
+    IMP_LIGHT
 };
 
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
+};
+
+struct Triangle {
+    glm::vec3 pos[3];
+    glm::vec3 nor[3];
+    glm::vec2 uv[3];
+};
+
+struct BoundingBox {
+    glm::vec3 min;
+    glm::vec3 max;
 };
 
 struct Geom {
@@ -26,6 +50,11 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+    int triCount;
+    Triangle* triangles;
+    Triangle* dev_triangles;
+    BoundingBox boundingBox;
+    ImplicitObj implicitobj;
 };
 
 struct Material {
@@ -38,6 +67,7 @@ struct Material {
     float hasRefractive;
     float indexOfRefraction;
     float emittance;
+    int proceduralTex;
 };
 
 struct Camera {
@@ -49,6 +79,8 @@ struct Camera {
     glm::vec3 right;
     glm::vec2 fov;
     glm::vec2 pixelLength;
+    float lensRadius;
+    float focalDist;
 };
 
 struct RenderState {

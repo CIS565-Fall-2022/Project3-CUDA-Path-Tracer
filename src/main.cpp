@@ -1,6 +1,8 @@
+#define TINYOBJLOADER_IMPLEMENTATION
 #include "main.h"
 #include "preview.h"
 #include <cstring>
+#include "tiny_obj_loader.h"
 
 static std::string startTimeString;
 
@@ -131,7 +133,7 @@ void runCuda() {
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
 	if (iteration == 0) {
-		pathtraceFree();
+		pathtraceFree(scene);
 		pathtraceInit(scene);
 	}
 
@@ -149,7 +151,7 @@ void runCuda() {
 	}
 	else {
 		saveImage();
-		pathtraceFree();
+		pathtraceFree(scene);
 		cudaDeviceReset();
 		exit(EXIT_SUCCESS);
 	}

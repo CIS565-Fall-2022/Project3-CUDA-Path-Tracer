@@ -15,6 +15,10 @@ private:
     ifstream fp_in;
     int loadMaterial(string materialid);
     int loadGeom(string objectid);
+    int loadObjFile(string objectPath, Geom * newGeom);
+    int getImplicitType(Geom* newGeom);
+    int Scene::linkMaterial(Geom* newGeom);
+    int Scene::loadTransformations(Geom* newGeom);
     int loadCamera();
 public:
     Scene(string filename);

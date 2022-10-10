@@ -79,21 +79,21 @@ PROTEX		0
 MATERIAL 7
 RGB         .98 .98 .98
 SPECEX      0
-SPECRGB     .98 .98 .98
+SPECRGB     .68 .88 .88
 REFL        0
 REFR        1
 REFRIOR     1.5
 EMITTANCE   0
 PROTEX		0
 
-// Procedural Texture 1
+// Glass specular white
 MATERIAL 8
 RGB         .98 .98 .98
 SPECEX      0
-SPECRGB     .98 .98 .98
-REFL        0
-REFR        0
-REFRIOR     0
+SPECRGB     .68 .88 .88
+REFL        0.5
+REFR        0.5
+REFRIOR     1.5
 EMITTANCE   0
 PROTEX		0
 
@@ -102,15 +102,26 @@ MATERIAL 9
 RGB         .98 .98 .98
 SPECEX      0
 SPECRGB     .98 .98 .98
-REFL        1
+REFL        0
 REFR        0
 REFRIOR     0
 EMITTANCE   0
-PROTEX		0
+PROTEX		1
 
 // Procedural Texture 1
 MATERIAL 10
 RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+PROTEX		1
+
+// Procedural Texture 1
+MATERIAL 11
+RGB         0 0 .98
 SPECEX      0
 SPECRGB     .98 .98 .98
 REFL        0
@@ -125,7 +136,7 @@ RES         800 800
 FOVY        45
 ITERATIONS  5000
 DEPTH       8
-LENSRADIUS  3
+LENSRADIUS  0.5
 FOCALDIST   10
 FILE        cornell
 EYE         0.0 5 10.5
@@ -209,25 +220,54 @@ SCALE       .01 10 20
 OBJECT 9
 implicit
 IMP_SPHERE
-material 8
-TRANS       4 5 0
+material 5
+TRANS       -4.5 5 5
 ROTAT       0 0 0
-SCALE       1.5 1.5 1.5
+SCALE       1 1 1
 
 // Obj
 OBJECT 10
 implicit
 IMP_SPHERE
-material 9
-TRANS       0 5 0
+material 6
+TRANS       -1.5 5 2
 ROTAT       0 0 0
-SCALE       1.5 1.5 1.5
+SCALE       1 1 1
 
 // Obj
 OBJECT 11
 implicit
 IMP_SPHERE
-material 10
-TRANS       -4 5 0
+material 7
+TRANS       1.5 5 -1
 ROTAT       0 0 0
-SCALE       1.5 1.5 1.5
+SCALE       1 1 1
+
+// Obj
+OBJECT 12
+implicit
+IMP_SPHERE
+material 8
+TRANS       4.5 5 -4
+ROTAT       0 0 0
+SCALE       1 1 1
+
+
+// Obj
+OBJECT 13
+implicit
+IMP_SPHERE
+material 5
+TRANS       7.5 5 -7
+ROTAT       0 0 0
+SCALE       1 1 1
+
+
+// Obj
+OBJECT 14
+implicit
+IMP_SPHERE
+material 5
+TRANS       10.5 5 -9
+ROTAT       0 0 0
+SCALE       1 1 1

@@ -79,7 +79,7 @@ PROTEX		0
 MATERIAL 7
 RGB         .98 .98 .98
 SPECEX      0
-SPECRGB     .98 .98 .98
+SPECRGB     .68 .88 .88
 REFL        0
 REFR        1
 REFRIOR     1.5
@@ -95,7 +95,7 @@ REFL        0
 REFR        0
 REFRIOR     0
 EMITTANCE   0
-PROTEX		0
+PROTEX		1
 
 // Procedural Texture 1
 MATERIAL 9
@@ -106,11 +106,11 @@ REFL        1
 REFR        0
 REFRIOR     0
 EMITTANCE   0
-PROTEX		0
+PROTEX		1
 
 // Procedural Texture 1
 MATERIAL 10
-RGB         .98 .98 .98
+RGB         0 0 .98
 SPECEX      0
 SPECRGB     .98 .98 .98
 REFL        0
@@ -208,26 +208,25 @@ SCALE       .01 10 20
 // Obj
 OBJECT 9
 implicit
-IMP_SPHERE
-material 8
-TRANS       4 5 0
+IMP_LIGHT
+material 4
+TRANS       -1 0 0
 ROTAT       0 0 0
-SCALE       1.5 1.5 1.5
+SCALE       1 1 1
 
 // Obj
 OBJECT 10
-implicit
-IMP_SPHERE
-material 9
-TRANS       0 5 0
+sphere
+material 0
+TRANS       0.9 2.75 0
 ROTAT       0 0 0
-SCALE       1.5 1.5 1.5
+SCALE       1 1 1
 
 // Obj
 OBJECT 11
 implicit
-IMP_SPHERE
-material 10
-TRANS       -4 5 0
+IMP_MUG
+material 4
+TRANS       0 0 0
 ROTAT       0 0 0
-SCALE       1.5 1.5 1.5
+SCALE       0.5 0.5 0.5
