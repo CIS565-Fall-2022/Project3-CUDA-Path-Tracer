@@ -6,7 +6,7 @@ SPECRGB     0 0 0
 REFL        0
 REFR        0
 REFRIOR     0
-EMITTANCE   10
+EMITTANCE   4
 
 // Diffuse white
 MATERIAL 1
@@ -48,43 +48,62 @@ REFR        0
 REFRIOR     0
 EMITTANCE   0
 
-// Refract white
+// Warm Light 
 MATERIAL 5
-RGB         .98 .98 .98
+RGB         1 0.96 0.713
 SPECEX      0
-SPECRGB     .98 .98 .98
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   3
+
+// Refraction blue
+MATERIAL 6
+RGB         .6705 .8588 .8901
+SPECEX      0
+SPECRGB     .6705 .8588 .8901
 REFL        1
 REFR        1
-REFRIOR     1.4
+REFRIOR     2.3
 EMITTANCE   0
 
-// Wario
-MATERIAL 6
-RGB         .98 .98 .98
+// Blue floor
+MATERIAL 7
+RGB         .0392 .4705 .9686
 SPECEX      0
-SPECRGB     .98 .98 .98
+SPECRGB     .0392 .4705 .9686
 REFL        1
 REFR        1
-REFRIOR     1.4
+REFRIOR     1.5
+EMITTANCE   0
+
+// Dark blue wall
+MATERIAL 8
+RGB         .098 .1725 .3882
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
 EMITTANCE   0
 
 TEXTURE 0
-PATH ../scenes/textures/wahoo.bmp
+PATH ../scenes/textures/titanic.jpg
 
 TEXTURE 1
-PROCEDURAL
+PATH ../scenes/textures/Mineways2Skfb-RGBA.png
 
 // Camera
 CAMERA
-RES         800 800
+RES         1600 1600
 FOVY        45
-ITERATIONS  5000
-DEPTH       8
+ITERATIONS  10000
+DEPTH       10
 FILE        cornell
-EYE         0.0 5 10.5
-LOOKAT      0 5 0
+EYE         0.0 3 10.5
+LOOKAT      0 3 0
 UP          0 1 0
-
 
 // Ceiling light
 OBJECT 0
@@ -97,10 +116,10 @@ SCALE       5 .3 5
 // Floor
 OBJECT 1
 cube
-material 1
-TRANS       0 0 0
+material 7
+TRANS       0 -4 0
 ROTAT       0 0 0
-SCALE       10 .01 10
+SCALE       30 .01 30
 
 // Ceiling
 OBJECT 2
@@ -108,46 +127,68 @@ cube
 material 1
 TRANS       0 10 0
 ROTAT       0 0 90
-SCALE       .01 10 10
+SCALE       .01 20 20
 
 // Back wall
 OBJECT 3
 cube
-material 1
+material 8
 TRANS       0 5 -5
 ROTAT       0 90 0
-SCALE       .01 10 10
+SCALE       .01 20 20
 
 // Left wall
 OBJECT 4
 cube
-material 2
-TRANS       -5 5 0
-ROTAT       0 0 0
-SCALE       .01 10 10
+material 8
+TRANS       -15 5 0
+ROTAT       0 -45 0
+SCALE       .01 20 20
 
 // Right wall
 OBJECT 5
 cube
-material 3
-TRANS       5 5 0
-ROTAT       0 0 0
-SCALE       .01 10 10
+material 8
+TRANS       15 5 0
+ROTAT       0 45 0
+SCALE       .01 20 20
 
+// Sphere
 OBJECT 6
-obj_mesh
-../scenes/objs/wahoo.obj
-material 2
-TRANS       2 4 0
+sphere
+material 6
+TRANS       -0.5 6 0
 ROTAT       0 0 0
-SCALE       0.4 0.4 0.4
-TEXTURE	0
+SCALE       3 3 3
 
+// More Light
 OBJECT 7
-obj_mesh
-../scenes/objs/cow.obj
-material 2
-TRANS       -2 4 0
+cube
+material 5
+TRANS       14.9 4 0
+ROTAT       0 45 0
+SCALE       .01 2 20
+
+// Mirror
+OBJECT 8
+cube
+material 4
+TRANS       -10 5 -5
+ROTAT       0 30 0
+SCALE       4 20 4
+
+OBJECT 9
+sphere
+material 0
+TRANS       0 0 18
 ROTAT       0 0 0
-SCALE       0.5 0.5 0.5
-TEXTURE	1
+SCALE      6 6 0.1
+
+OBJECT 10
+obj_mesh
+../scenes/objs/titanic.obj
+material 2
+TRANS       -1 -0.3 0
+ROTAT       0 -45 0
+SCALE      5 5 5
+TEXTURE 0
