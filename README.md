@@ -155,3 +155,5 @@ Each material in the scene has a unique ID that scene intersections reference wh
 ![](img/bloopers/blooper2.png)
 
 ![](img/bloopers/blooper3.png)
+
+![](img/bloopers/blooper4.png)
