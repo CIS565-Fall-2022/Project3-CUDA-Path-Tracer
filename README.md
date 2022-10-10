@@ -136,17 +136,21 @@ I also implemented bump mapping for uv textures. I followed these slides for ins
 
 **Stream compaction helps most after a few bounces. Print and plot the effects of stream compaction within a single iteration (i.e. the number of unterminated rays after each bounce) and evaluate the benefits you get from stream compaction.**
 
-_No Direct Lighting_            |  _Direct Lighting_ 
-:-------------------------:|:-------------------------:
-![](img/streamCompactionBasic.png) |  ![](img/depthVsTime.png)
+![](img/streamCompactionBasic.png)
+
+![](img/depthVsTime.png)
+
+From the above, I printed out the number of remaining paths after each iteration of the while loop inside pathtrace(). It shows Stream Compaction filtering out paths that don't hit anything. Similarly, the second graph shows that since the number of paths decrease on each loop, the runtime also decreases.
 
 **Compare scenes which are open (like the given cornell box) and closed (i.e. no light can escape the scene). Again, compare the performance effects of stream compaction! Remember, stream compaction only affects rays which terminate, so what might you expect?**
+
+My hypothesis is that since the scene is closed, all rays will hit something on each bounce. If the user starts within the cornell box, this means stream compaction won't remove any rays unless the light is hit or the path has run through its entire depth, since rays shot out of the camera cannot escape the box and "not hit" anything. 
 
 ![](img/pathsNoCompaction.png)
 
 ![](img/runtimeClosedScene.png)
 
-My hypothesis is that since the scene is closed, all rays will hit something on each bounce. This means stream compaction won't remove any rays unless the ray ran out of bounces or it hit a light source.
+The results fit my origial hypothesis. 
 
 **Material Sorting Performance**
 
