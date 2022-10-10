@@ -443,8 +443,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		// TODO: implement antialiasing by jittering the ray
 #if ENABLE_ANTI_ALIASING
 
-        thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, pathSegments->remainingBounces);
-        thrust::uniform_real_distribution<float> r(-0.5f, 0.5f);
+        thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, 0);
+        thrust::uniform_real_distribution<float> r(-1.f, 1.f);
         float xRandom = r(rng);
         float yRandom = r(rng);
 
@@ -665,7 +665,7 @@ __global__ void shadeFakeMaterial(
                 //printf("ok ");
                 glm::vec2 uv = DirectionToSpereUV(pathSegments[idx].ray.direction);
                 int index = getTextureElementIndex(*skyboxInfo, uv);
-                pathSegments[idx].color *= skyboxPixels[index] * (pathSegments[idx].remainingBounces * 1.f) / (traceDepth * 1.f);
+                pathSegments[idx].color *= skyboxPixels[index]; // *(pathSegments[idx].remainingBounces * 1.f) / (traceDepth * 1.f);
             }
 #else
             pathSegments[idx].color *= glm::vec3(DEFAULT_SKY_COLOR);

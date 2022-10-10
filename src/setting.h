@@ -1,6 +1,6 @@
 #pragma once
 
-#define DEFAULT_SKY_COLOR 0
+#define DEFAULT_SKY_COLOR 0.1
 
 // Skybox setting
 #define ENABLE_SKYBOX 1
@@ -13,10 +13,10 @@
 #define ENABLE_ANTI_ALIASING 0
 
 // BVH setting
-#define ENABLE_BVH  1
+#define ENABLE_BVH  0
 #define SAH_BUCKET_SIZE 12
 #define MAX_PRIM_IN_BVH_NODE 100
-#define BVH_INTERSECT_STACK_SIZE 64
+#define BVH_INTERSECT_STACK_SIZE 128
 
 // Texture setting
 #define ENABLE_TEXTURE 1

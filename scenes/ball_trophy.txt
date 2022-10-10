@@ -1,0 +1,113 @@
+SKYBOX ../scenes/skybox.jpg
+
+// Emissive material (light)
+MATERIAL 0
+RGB         1 1 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   10
+
+
+// Wall mat
+MATERIAL 1
+RGB         .3 .3 .3
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+
+// Trophy Mat
+MATERIAL 2
+RGB         0.99 0.84 .0
+SPECEX      0
+SPECRGB     .98 .98 .98
+METALLIC	0.8
+REFL        0.8
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+
+// Basketball Mat
+MATERIAL 3
+RGB 		1 1 1
+TEXTURE		../scenes/objs/Basketball2/texture/BaseColor.png
+NORMALMAP	../scenes/objs/Basketball2/texture/Normal.png
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Table Mat
+MATERIAL 4
+RGB 		1 1 1
+TEXTURE		../scenes/objs/Table2/BaseColor.tga
+NORMALMAP	../scenes/objs/Table2/Normal.tga
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+
+
+// Camera
+CAMERA
+RES         800 800
+FOVY        30	//45
+ITERATIONS  10000
+DEPTH      	5
+FILE        cornell
+EYE         0 15 25
+LOOKAT      0 15 0
+UP          0 1 0
+
+
+
+
+// Ceiling light
+OBJECT 0
+cube
+material 0
+TRANS       0 50 0
+ROTAT       0 0 0
+SCALE       40 0.3 40
+
+
+// Table
+//OBJECT 1
+object
+../scenes/objs/Table2/table.obj
+material 4
+TRANS       0 -32 -8
+ROTAT       0 0 0
+SCALE       0.35 0.35 0.35
+
+// Object Basketball
+//OBJECT 2
+object
+../scenes/objs/Basketball2/model.obj
+material 3
+TRANS       -5 0 0
+ROTAT       -10 10 -15
+SCALE       8 8 8
+
+
+// Object Trophy
+//OBJECT 3
+object
+../scenes/objs/trophy2.obj
+material 2
+TRANS       10 1 -10
+ROTAT       0 0 0
+SCALE       55 55 55
+

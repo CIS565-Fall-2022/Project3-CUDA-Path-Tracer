@@ -1,3 +1,5 @@
+SKYBOX ../scenes/skybox.jpg
+
 // Emissive material (light)
 MATERIAL 0
 RGB         1 1 1
@@ -6,7 +8,7 @@ SPECRGB     0 0 0
 REFL        0
 REFR        0
 REFRIOR     0
-EMITTANCE   5
+EMITTANCE   25
 
 
 
@@ -48,11 +50,12 @@ EMITTANCE   0
 
 
 
-// Specular white
+// Metallic white
 MATERIAL 4
-RGB         .98 .98 .98
+RGB         0.98 0.98 .98
 SPECEX      0
 SPECRGB     .98 .98 .98
+METALLIC	0
 REFL        1
 REFR        1
 REFRIOR     1.3
@@ -85,13 +88,12 @@ REFRIOR     0
 EMITTANCE   0
 
 
-
-
-// Basketball Mat
+/////
+// Wooden Crate Mat
 MATERIAL 7
+TEXTURE		../scenes/objs/WoodenCrate/Textures/1024/WoodenCrate_Crate_BaseColor.png
+NORMALMAP	../scenes/objs/WoodenCrate/Textures/1024/WoodenCrate_Crate_Normal.png
 RGB 		1 1 1
-TEXTURE		../scenes/objs/Basketball/Textures/Basketball_BaseColor.png
-NORMALMAP	../scenes/objs/Basketball/Textures/Basketball_Normal.png
 SPECEX      0
 SPECRGB     0 0 0
 REFL        0
@@ -99,12 +101,19 @@ REFR        0
 REFRIOR     0
 EMITTANCE   0
 
-
-
-// Wooden Crate Mat
+// Brick Wall Mat
 MATERIAL 8
 RGB 		1 1 1
-TEXTURE		../scenes/objs/WoodenCrate/Textures/1024/WoodenCrate_Crate_BaseColor.png
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse white
+MATERIAL 9
+RGB         .75 .75 .75
 SPECEX      0
 SPECRGB     0 0 0
 REFL        0
@@ -113,7 +122,6 @@ REFRIOR     0
 EMITTANCE   0
 
 
-NORMALMAP	../scenes/objs/WoodenCrate/Textures/1024/WoodenCrate_Crate_Normal.png
 
 
 
@@ -121,11 +129,11 @@ NORMALMAP	../scenes/objs/WoodenCrate/Textures/1024/WoodenCrate_Crate_Normal.png
 CAMERA
 RES         800 800
 FOVY        30	//45
-ITERATIONS  2000
-DEPTH       8
+ITERATIONS  3000
+DEPTH      	10
 FILE        cornell
-EYE         0 10 25
-LOOKAT      0 10 0
+EYE         0 15 35
+LOOKAT      0 12 0
 UP          0 1 0
 
 
@@ -137,12 +145,12 @@ cube
 material 0
 TRANS       0 30 0
 ROTAT       0 0 0
-SCALE       20 0.3 20
+SCALE       12 0.3 12
 
 // Floor
 OBJECT 1
 cube
-material 1
+material 9
 TRANS       0 0 0
 ROTAT       0 0 0
 SCALE       40 0.1 40
@@ -150,7 +158,7 @@ SCALE       40 0.1 40
 // Ceiling
 OBJECT 2
 cube
-material 1
+material 9
 TRANS       0 30 0
 ROTAT       0 0 90
 SCALE       .01 40 40
@@ -158,7 +166,7 @@ SCALE       .01 40 40
 // Back wall
 OBJECT 3
 cube
-material 1
+material 9
 TRANS       0 10 -20
 ROTAT       0 90 0
 SCALE       .01 40 40
@@ -166,7 +174,7 @@ SCALE       .01 40 40
 // Left wall
 OBJECT 4
 cube
-material 1
+material 2
 TRANS       -20 10 0
 ROTAT       0 0 0
 SCALE       .01 40 40
@@ -174,27 +182,36 @@ SCALE       .01 40 40
 // Right wall
 OBJECT 5
 cube
-material 1
+material 3
 TRANS       20 10 0
 ROTAT       0 0 0
 SCALE       .01 40 40
 
 // Sphere
 //OBJECT 6
-//sphere
-//material 4
-//TRANS       0 5 0
-//ROTAT       0 0 0
-//SCALE       5 5 5
+sphere
+material 1
+TRANS       0 10 0
+ROTAT       0 0 0
+SCALE       10 10 10
+
+// Cube
+//OBJECT 7
+cube
+material 5
+TRANS       0 12 -8
+ROTAT       0 0 -30
+SCALE       30 3 1
+
 
 // Custom object
-//OBJECT 6
-//object
-//../scenes/objs/cube.obj
-//material 6
-//TRANS       0 3 -2
-//ROTAT       30 45 0
-//SCALE       3 3 3
+OBJECT 6
+object
+../scenes/objs/Basketball2/model.obj
+material 1
+TRANS       0 6 0
+ROTAT       0 0 0
+SCALE       8 8 8
 
 // Object Table
 //OBJECT 6
@@ -203,23 +220,35 @@ object
 material 6
 TRANS       0 5 0
 ROTAT       0 30 0
-SCALE       6 6 6
+SCALE       10 10 10
 
 // Object Basketball
 //OBJECT 6
-//object
-//../scenes/objs/Basketball/Basketball.obj
-//material 7
-//TRANS       0 12 -5
-//ROTAT       0 0 0
-//SCALE       0.5 0.5 0.5
+object
+../scenes/objs/Basketball2/model.obj
+material 7
+TRANS       0 0 -5
+ROTAT       0 0 0
+SCALE       8 8 8
 
 
 // Object Wooden Crate
-OBJECT 6
+//OBJECT 6
 object
 ../scenes/objs/WoodenCrate/WoodenCrate.obj
 material 8
-TRANS 0 2 0
-ROTAT 0 0 0
+TRANS 0 5 0
+ROTAT -20 30 0
 SCALE 1.5 1.5 1.5
+
+// Scoccer
+//OBJECT 6
+object
+../scenes/objs/Scoccer/Scoccer.obj
+material 1
+TRANS 0 8 0
+ROTAT 0 0 0
+SCALE 5 5 5
+
+
+

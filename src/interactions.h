@@ -149,9 +149,9 @@ void scatterRay(
         col *= m.color;
     }
 
-    if (reflectChance && m.hasMetallic > 0.001f)
+    if (reflectChance && m.hasMetallic > 0.0001f + u01(rng))
     {
-        col *= m.color * m.hasMetallic;
+        col *= m.color;
     }
 
     pathSegment.color *= col;
