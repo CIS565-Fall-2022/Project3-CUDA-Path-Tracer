@@ -31,17 +31,10 @@ int sign(unsigned int* sortedMCodes, int N, int i);
 NodeRange determineRange(unsigned int* sortedMCodes, int triangleCount, int idx);
 int findSplit(unsigned int* sortedMCodes, int triangleCount, NodeRange range);
 void assignBoundingBoxes(Scene* scene);
-void buildLBVH(Scene* scene, int triangleCount);
+void buildLBVH(Scene* scene, int leafStart, int triangleCount);
 
-// Tree traversal
-void traverseLBVH(Scene* scene);
-
-// Construct LBVH and BVH
+// Construct LBVH
 void generateLBVH(Scene* scene);
-
-
-// Small unit tests for LBVH and BVH
-void unitTest(Scene* scene);
 
 /// BVH FUNCTIONS /// 
 
@@ -52,5 +45,4 @@ void calculateCost(Scene* scene, BVHNode* node, float& split, int& axis);
 void chooseSplit(Scene* scene, BVHNode* node, float& split, int& axis);
 void addChildren(Scene* scene, BVHNode* node);
 
-void generateBVH(Scene* scene, int triangleCount);
-void unitTestBVH(Scene* scene, int triangleCount);
+void generateBVH(Scene* scene);

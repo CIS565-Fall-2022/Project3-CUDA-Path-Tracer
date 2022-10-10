@@ -191,16 +191,6 @@ void scatterRay(
     thrust::uniform_real_distribution<float> u01(0, 1);
     float xi = u01(rng);
 
-    /*float diffuseIntensity = glm::length(m.color);
-    float specularIntensity = glm::length(m.specular.color);
-    float totalIntensity = diffuseIntensity + specularIntensity;
-    float diffuseProbability = diffuseIntensity / totalIntensity;
-    float specularProbability = specularIntensity / totalIntensity;*/
-
-    /*float refl = m.hasReflective;
-    float refr = (1.0 - m.hasReflective) * m.hasRefractive;
-    float diff = (1.0 - m.hasReflective) * (1.0 - m.hasRefractive);*/
-
     glm::vec3 wi = glm::vec3(0.0, 0.0, 0.0);
     glm::vec3 f = glm::vec3(0.0, 0.0, 0.0);
     if (m.hasReflective && m.hasRefractive) {

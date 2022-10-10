@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
 #if USE_LBVH
 		generateLBVH(scene);
 #elif USE_BVH
-		generateBVH(scene, scene->triangles.size());
+		generateBVH(scene);
 #endif
 	}
 

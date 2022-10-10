@@ -6,7 +6,7 @@ SPECRGB     0 0 0
 REFL        0
 REFR        0
 REFRIOR     0
-EMITTANCE   10
+EMITTANCE   40
 
 // Diffuse white
 MATERIAL 1
@@ -40,10 +40,10 @@ EMITTANCE   0
 
 // Specular white
 MATERIAL 4
-RGB         0 0.13 0.84
+RGB         0.13 0.13 0.13
 SPECEX      0
 SPECRGB     0.98 0.98 0.98
-REFL        0
+REFL        1
 REFR        0
 REFRIOR     0
 EMITTANCE   0
@@ -51,7 +51,7 @@ EMITTANCE   0
 // Camera
 CAMERA
 RES         800 800
-FOVY        45
+FOVY        35
 ITERATIONS  5000
 DEPTH       5
 FILE        mesh_cornell
@@ -76,15 +76,15 @@ cube
 material 1
 TRANS       0 0 0
 ROTAT       0 0 0
-SCALE       10 .01 10
+SCALE       20 .01 10
 
 // Ceiling
 OBJECT 2
 cube
-material 1
+material 2
 TRANS       0 10 0
 ROTAT       0 0 90
-SCALE       .01 10 10
+SCALE       .01 20 10
 
 // Back wall
 OBJECT 3
@@ -92,13 +92,13 @@ cube
 material 1
 TRANS       0 5 -5
 ROTAT       0 90 0
-SCALE       .01 10 10
+SCALE       .01 10 20
 
 // Left wall
 OBJECT 4
 cube
-material 2
-TRANS       -5 5 0
+material 3
+TRANS       -10 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
@@ -106,7 +106,7 @@ SCALE       .01 10 10
 OBJECT 5
 cube
 material 3
-TRANS       5 5 0
+TRANS       10 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 

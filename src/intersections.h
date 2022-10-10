@@ -113,39 +113,32 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
 //    return tmin <= tmax && tmax >= 0.0;
 //}
 
+// Based off of "Fast, Branchless Ray/Bounding Box Intersections" by Tavian Barnes
 __host__ __device__ bool aabbIntersectionTest(AABB aabb, Ray &r, float& t) {
-    //glm::vec3 invR = glm::vec3(1.0, 1.0, 1.0) / r.direction;
     glm::vec3 invR = r.invDirection;
 
     float x1 = (aabb.min.x - r.origin.x) * invR.x;
     float x2 = (aabb.max.x - r.origin.x) * invR.x;
+
+    float tmin = glm::min(x1, x2);
+    float tmax = glm::max(x1, x2);
+
     float y1 = (aabb.min.y - r.origin.y) * invR.y;
     float y2 = (aabb.max.y - r.origin.y) * invR.y;
+
+    tmin = glm::max(tmin, glm::min(y1, y2));
+    tmax = glm::min(tmax, glm::max(y1, y2)); 
+
     float z1 = (aabb.min.z - r.origin.z) * invR.z;
     float z2 = (aabb.max.z - r.origin.z) * invR.z;
 
-    float tmin = glm::max(glm::max(glm::min(x1, x2), glm::min(y1, y2)), glm::min(z1, z2));
-    float tmax = glm::min(glm::min(glm::max(x1, x2), glm::max(y1, y2)), glm::max(z1, z2));
+    tmin = glm::max(tmin, glm::min(z1, z2));
+    tmax = glm::min(tmax, glm::max(z1, z2));
 
     bool intersect = tmin <= tmax && tmax >= 0;
     t = (intersect) ? tmin : -1.0;
     if (t < 0.f) t = tmax;
     
-    /*if (tmax < 0)
-    {
-        return -1.0;
-    }
-
-    if (tmin > tmax)
-    {
-        return -1.0;
-    }
-
-    if (tmin < 0.f)
-    {
-        return tmax;
-    }
-    return tmin <= tmax && tmax >= 0;*/
     r.intersectionCount++;
     return intersect;
 }
@@ -198,7 +191,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     intersectionPoint = multiplyMV(sphere.transform, glm::vec4(objspaceIntersection, 1.f));
     normal = glm::normalize(multiplyMV(sphere.invTranspose, glm::vec4(objspaceIntersection, 0.f)));
     if (!outside) {
-        //normal = -normal;
+        //normal = -normal; --> commented out because this impacts refraction
     }
     return glm::length(r.origin - intersectionPoint);
 }
@@ -234,21 +227,11 @@ __host__ __device__ float triangleIntersectionTest(Triangle tri, Ray &r,
 __host__ __device__ float meshIntersectionTest(Geom mesh, Ray &r,
     const Triangle* tris, glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
 
-    //float min_t = INFINITY;
 #if BB_CULLING
     // Test ray against mesh AABB
     float t = -1.0;
     bool intersectAABB = aabbIntersectionTest(mesh.aabb, r, t);
     if (!intersectAABB) return -1.f;
-
-    //float t = mesh_aabbIntersectionTest(mesh.aabb, r, t);
-    //if (t < min_t && t > 0.0f)
-    //{
-    //    min_t = t;
-    //    intersectionPoint = getPointOnRay(r, t);
-    //    normal = glm::vec3(0.0, 0.0, 1.0);
-    //    outside = true;
-    //}
 #endif
 
     // If bounding box is intersected, then check for intersection with all triangles

@@ -202,6 +202,7 @@ int Scene::loadMaterial(string materialid) {
     }
 }
 
+// Load obj using tinyobjloader (based off of example give by tinyobj library)
 int Scene::loadOBJ(string filename, int objectid)
 {
     int materialid = -1;
@@ -243,12 +244,15 @@ int Scene::loadOBJ(string filename, int objectid)
     auto& shapes = reader.GetShapes();
     auto& materials = reader.GetMaterials();
 
-    // Track aabb
-    //AABB sceneAABB;
-    glm::vec3 min = glm::vec3(INFINITY, INFINITY, INFINITY);
-    glm::vec3 max = glm::vec3(-INFINITY, -INFINITY, -INFINITY);
-
+    meshCount = 0;
     for (size_t s = 0; s < shapes.size(); s++) {
+        std::vector<Triangle> mesh_triangles;
+
+        // Track aabb
+        mesh_aabbs.resize(shapes.size());
+        glm::vec3 min = glm::vec3(INFINITY, INFINITY, INFINITY);
+        glm::vec3 max = glm::vec3(-INFINITY, -INFINITY, -INFINITY);
+
         // Loop over faces(polygon)
         size_t index_offset = 0;
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
@@ -283,33 +287,32 @@ int Scene::loadOBJ(string filename, int objectid)
             tri.computeAABB();
             tri.computeCentroid();
             tri.objectId = f;
-            triangles.push_back(tri);
+            mesh_triangles.push_back(tri);
 
             index_offset += fv;
         }
+
+        // Set AABB
+        mesh_aabbs[s].min = min;
+        mesh_aabbs[s].max = max;
+
+        // Initialize new mesh
+        Geom newGeom;
+        newGeom.type = MESH;
+        newGeom.aabb = mesh_aabbs[s];
+        newGeom.startIdx = triangles.size();
+        newGeom.triangleCount = mesh_triangles.size();
+        newGeom.materialid = materialid;
+        newGeom.translation = translation;
+        newGeom.rotation = rotation;
+        newGeom.scale = scale;
+        newGeom.transform = transform;
+        newGeom.inverseTransform = inverseTransform;
+        newGeom.invTranspose = invTranspose;
+        triangles.insert(triangles.end(), mesh_triangles.begin(), mesh_triangles.end());
+        geoms.push_back(newGeom);
+        meshCount++;
     }
-
-    // Set AABB
-    sceneAABB.min = min;
-    sceneAABB.max = max;
-
-    // Compute Morton Codes for triangles
-    // computeMortonCodes(this, sceneAABB);
-
-    // Initialize new mesh
-    Geom newGeom;
-    newGeom.type = MESH;
-    newGeom.aabb = sceneAABB;
-    newGeom.startIdx = 0;
-    newGeom.triangleCount = triangles.size();
-    newGeom.materialid = materialid;
-    newGeom.translation = translation;
-    newGeom.rotation = rotation;
-    newGeom.scale = scale;
-    newGeom.transform = transform;
-    newGeom.inverseTransform = inverseTransform;
-    newGeom.invTranspose = invTranspose;
-    geoms.push_back(newGeom);
 
     return 1;
 }

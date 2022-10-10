@@ -22,6 +22,9 @@
 // Turn on to sort by material (keeps same materials contiguous in memory)
 //#define MATERIAL_SORT
 
+// Turn on to stream compact
+#define STREAM_COMPACTION
+
 // Turn off cache first bouncing when anti-aliasing is enabled
 #ifndef ANTIALIASING
 	#define CACHE_FIRST_BOUNCE
@@ -77,6 +80,7 @@ thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int de
 	return thrust::default_random_engine(h);
 }
 
+// Color correction helper functions (to convert to sRGB)
 __host__ __device__ glm::vec3 reinhardOp(glm::vec3 c) {
 	return c / (glm::vec3(1.f, 1.f, 1.f) + c);
 }
@@ -180,7 +184,6 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_intersections, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
-	// TODO: initialize any extra device memeory you need
 	cudaMalloc(&dev_first_bounce_intersections, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_first_bounce_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
@@ -196,7 +199,6 @@ void pathtraceFree() {
 	cudaFree(dev_tris);
 	cudaFree(dev_materials);
 	cudaFree(dev_intersections);
-	// TODO: clean up any extra device memory you created
 	cudaFree(dev_first_bounce_intersections);
 
 	checkCUDAError("pathtraceFree");
@@ -262,12 +264,13 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.color = glm::vec3(0.0f, 0.0f, 0.0f);
 		segment.throughput = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		// TODO: implement antialiasing by jittering the ray
+		// Jitter the ray for anti-aliasing
 		segment.ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)(x + jitterX) - (float)cam.resolution.x * 0.5f)
 			- cam.up * cam.pixelLength.y * ((float)(y + jitterY) - (float)cam.resolution.y * 0.5f)
 		);
 
+		// Depth-of-field (if specified in scene file)
 		if (cam.lens_radius > 0.0f) {
 			// Get sample on lens
 			glm::vec3 samplePoint = cam.lens_radius * concentricSampleDisk(glm::vec2(u01(rng), u01(rng)));
@@ -307,10 +310,6 @@ __global__ void computeIntersections(
 
 	if (path_index < num_paths)
 	{
-		//if (pathSegments[path_index].remainingBounces <= 0)
-		//{
-		//	return;
-		//}
 		PathSegment &pathSegment = pathSegments[path_index];
 
 		float t;
@@ -483,7 +482,6 @@ __global__ void shadeAllMaterials(
 #endif
 		}
 		else {
-			//pathSegments[idx].color = glm::vec3(0.0f);
 			pathSegments[idx].remainingBounces = 0;
 		}
 	}
@@ -657,9 +655,11 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			);
 
 		// Stream compact
+#ifdef STREAM_COMPACTION
 		thrust::device_ptr<PathSegment> dev_thrust_path_end = thrust::stable_partition(dev_thrust_paths, dev_thrust_paths + compact_num_paths, not_zero());
 		dev_path_end = dev_thrust_path_end.get();
 		compact_num_paths = dev_path_end - dev_paths;
+#endif
 
 		// TODO: should be based off stream compaction results
 		if (depth == traceDepth || dev_paths == dev_path_end) { iterationComplete = true; }
