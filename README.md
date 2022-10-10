@@ -4,7 +4,7 @@ CUDA Path Tracer
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 3**
 
 * Hanlin Sun
-* Tested on: Windows 10, i7-8750H @ 2.22GHz 1024GB, NVIDIA Quadro P3200
+* Tested on: Windows 10, i7-8750H @ 2.96GHz 1024GB, NVIDIA Quadro P3200
 
 ## Background
 
@@ -38,17 +38,19 @@ Pure Specular | Specular with Refraction
 
 ### SSAA & Depth of Field
 
-Aliasing is the problem of artifacts on images as a result of discretization of pixels. This can be mitigated by taking more than one sample per pixel from regions around the center of the pixel. By performing stochastic sampled anti-aliasing, we are using a higher number of iterations to produce a sharper image. Stochastic sampled anti-aliasing definitely benefits from being implemented on the GPU because the rays generated for each pixel are always independent. This might be further optimized by launching more threads to per pixel. The exact effect cannot be known unless it is tried out. This depends on whether launching extra threads will help mask memory latency by doing more computations. Below is the comparison for 2000 iterations.
+Aliasing is the problem of artifacts on images as a result of discretization of pixels. This can be mitigated by taking more than one sample per pixel from regions around the center of the pixel. By performing stochastic sampled anti-aliasing, we are using a higher number of iterations to produce a sharper image. Stochastic sampled anti-aliasing definitely benefits from being implemented on the GPU because the rays generated for each pixel are always independent. This might be further optimized by launching more threads to per pixel. The exact effect cannot be known unless it is tried out. 
+
+Below is the comparison.
 
 SSAA not Enabled | SSAA Enabled
 :-------------------------:|:-------------------------:
-![Render Img](img/enableSSAA.JPG) | ![Render Img](img/NOSSAA.JPG)
+![Render Img](img/gltfAA1.JPG) | ![Render Img](img/gltfAA2.JPG)
 
 Depth of field creates the thin lens effect of a real life camera as opposed to a pinhole camera. Objects in focus will be sharp while objects out of focus will be blurry. Depth of field significantly increases the number of iterations required to render an image since we need to shoot rays from not just a pinhole but rather the whole area of the circular lens. Depth of field definitely benefits from being implemented on the GPU because the rays generated are always independent. 
 
-DoF not Enabled | Dof Enabled
+DoF not Enabled | DoF Enabled
 :-------------------------:|:-------------------------:
-![Render Img](img/NOSSAA.JPG) | ![Render Img](img/DoF.JPG)
+![Render Img](img/gltf.JPG) | ![Render Img](img/gltfDoF.JPG)
 
 ### String Compaction
 
@@ -63,13 +65,16 @@ This method is really useful for unclosed scene and bring performance improvemen
 
 But for closed scene, since no ray will bounce outside the scene, this method may not bring performance improvement in this case.
 
-### Material Sorting
+### Ray Sorting
 
+An attempt was made to optimize by sorting the intersection and ray paths based on materials for memory coalescing. For this, the kernel thrust::sort_by_key is used to do key-value sorting. 
 
 
 ### First bounce Caching
 
 Another optimization that's made is caching the intersection data for the first bounce (i.e. depth = 1). Since each ray starts at the same spot for each pixel, the first bounce result will always be the same for all iterations. Although not significant, first bounce caching does make things slightly faster on average.
+
+
 
 ### GLTF Mesh Loading
 
@@ -81,6 +86,10 @@ To support GLTF mesh loading, I used tinygltf to load in the GLTF file and parse
 
 I have tried my best to implement GLTF texture binding but I must say GLTF texture loading is far more difficult than Obj file, I know gltf file contain texture, but my implements still have some bugs but I have no time to fix them.
 
-![Render Img]();
+![Render Img](img/gltf.JPG)
 
 ## Reference
+
+PBRT: https://pbr-book.org/3ed-2018/contents
+
+NVIDIA CUDA Document: https://docs.nvidia.com/cuda/cuda-c-programming-guide/

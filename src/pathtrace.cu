@@ -186,7 +186,6 @@ void pathtraceInit(Scene* scene) {
 	mallocAndCopytoGPU<Geom>(dev_geoms, scene->geoms);
 	mallocAndCopytoGPU<Mesh>(dev_meshes, scene->meshes);
 
-
 	mallocAndCopytoGPU<Primitive>(dev_prim_data.primitives, scene->primitives);
 	mallocAndCopytoGPU<uint16_t>(dev_prim_data.indices, scene->mesh_indices);
 	mallocAndCopytoGPU<glm::vec3>(dev_prim_data.normals, scene->mesh_normals);
@@ -275,8 +274,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
 
-	bool enableDepthField = false;
-	bool enableStochasticAA = true;
+	bool enableDepthField = true;
+	bool enableStochasticAA = false;
 
 	if (x < cam.resolution.x && y < cam.resolution.y) {
 		int index = x + (y * cam.resolution.x);
@@ -305,8 +304,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		//DepthField
 		if (enableDepthField)
 		{
-			float lensRadius = 0.1f; 
-			float focalDistance = 4.f;
+			float lensRadius = 0.2f; 
+			float focalDistance = 5.25f;
 			thrust::normal_distribution<float> n01(0, 1);
 			float theta = u01(rng) * TWO_PI;
 			glm::vec3 circlePerturb = lensRadius * n01(rng) * (cos(theta) * cam.right + sin(theta) * cam.up);
