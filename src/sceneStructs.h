@@ -8,7 +8,7 @@
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 
-#define LOAD_OBJ 0
+#define LOAD_OBJ 1
 #define USE_BOUND_BOX 0
 #define USE_UV 0
 #define USE_PROCEDURAL_TEXTURE 0 // cannot be on at the same time as USE_UV

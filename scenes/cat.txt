@@ -50,7 +50,7 @@ EMITTANCE   0
 
 // Refractive glass
 MATERIAL 5
-RGB         .98 .50 .70
+RGB         .98 .98 .98
 SPECEX      0
 SPECRGB     .98 .98 .98
 REFL        0.3
@@ -100,7 +100,7 @@ cube
 material 0
 TRANS       0 10 0
 ROTAT       0 0 0
-SCALE       3 .3 3
+SCALE       5 .3 5
 
 // Floor
 OBJECT 1
