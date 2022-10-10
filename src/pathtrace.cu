@@ -28,9 +28,17 @@
 #define ANTIALIASING 0
 #define DEPTH_OF_FIELD 0 // depth of field focus defined later
 #define DIRECT_LIGHTING 0
+#define PERF_ANALYSIS 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
+
+PerformanceTimer& timer()
+{
+	static PerformanceTimer timer;
+	return timer;
+}
+
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #if ERRORCHECK
 	cudaDeviceSynchronize();
@@ -103,6 +111,11 @@ static int numTextures;
 static int numGeoms; //cursed variables to cudaFree nested pointers;
 
 static Geom* dev_lights = NULL;
+
+#if PERF_ANALYSIS
+static cudaEvent_t beginEvent = NULL;
+static cudaEvent_t endEvent = NULL;
+#endif
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -226,6 +239,12 @@ void pathtraceInit(Scene* scene) {
 	cudaMemcpy(dev_lights, scene->lights.data(), scene->lights.size() * sizeof(Geom), cudaMemcpyHostToDevice);
 	checkCUDAError("cudaMalloc dev_lights failed");
 #endif
+
+#if PERF_ANALYSIS
+	cudaEventCreate(&beginEvent);
+	cudaEventCreate(&endEvent);
+#endif
+
 	checkCUDAError("pathtraceInit");
 }
 
@@ -257,6 +276,15 @@ void pathtraceFree() {
 
 #if DIRECT_LIGHTING
 	cudaFree(dev_lights);
+#endif
+
+#if PERF_ANALYSIS
+	if (beginEvent != NULL) {
+		cudaEventDestroy(beginEvent);
+	} 
+	if (endEvent != NULL) {
+		cudaEventDestroy(endEvent);
+	}
 #endif
 
 	delete[] tmp_geom_pointer;
@@ -774,6 +802,19 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		}
 		else {
 			// otherwise, continue as usual with dev_intersections
+#if BUMP_MAP
+			computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+				depth
+				, currNumPaths
+				, dev_paths
+				, dev_geoms
+				, hst_scene->geoms.size()
+				, dev_intersections
+				, dev_textureObjs
+				, dev_textures
+				);
+			checkCUDAError("trace one bounce");
+#else
 			computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
 				depth
 				, currNumPaths
@@ -783,6 +824,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_intersections
 				);
 			checkCUDAError("trace one bounce");
+#endif
 		}
 
 		cudaDeviceSynchronize();
@@ -805,14 +847,33 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 #endif	
 		// 2. shade the ray and spawn new path segments using BSDF
 		// this function generates a new ray to replace the old one using BSDF
-		kernComputeShade << <numblocksPathSegmentTracing, blockSize1d >> > (
+#if DIRECT_LIGHTING
+		kernComputeShadeDirectLighting << <numblocksPathSegmentTracing, blockSize1d >> > (
 			iter,
 			currNumPaths,
 			dev_intersections,
 			dev_paths,
 			dev_materials,
-			dev_texData
+			dev_lights,
+			hst_scene->numLights
+#if USE_UV
+			, dev_textureObjs
+			, dev_textureChannels
+#endif
 			);
+#else 
+		kernComputeShade << <numblocksPathSegmentTracing, blockSize1d >> > (
+			iter,
+			currNumPaths,
+			dev_intersections,
+			dev_paths,
+			dev_materials
+#if USE_UV
+			, dev_textureObjs
+			, dev_textureChannels
+#endif
+			);
+#endif
 
 		cudaDeviceSynchronize();
 
@@ -925,6 +986,10 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	int currNumPaths = num_paths;
 
+#if PERF_ANALYSIS
+	cudaEventRecord(beginEvent);
+#endif
+
 	while (!iterationComplete) {
 		// clean shading chunks
 		cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
@@ -1010,6 +1075,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 		// nothing shows up if i set it out side of the if/else statement.
 		currNumPaths = dev_path_end - dev_paths;
+		// printf("curNum Paths: %i \n", currNumPaths);
 
 		// don't need to remove intersections because new intersections will be computed based on sorted dev_paths
 		// thrust uses exclusive start and end pointers, so if end pointer is the same as start pointer, we have no rays left.
@@ -1023,6 +1089,16 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			guiData->TracedDepth = depth;
 		}
 	}
+
+#if PERF_ANALYSIS
+	cudaEventRecord(endEvent);
+	cudaEventSynchronize(endEvent);
+
+	float time; // in ms
+
+	cudaEventElapsedTime(&time, beginEvent, endEvent);
+	printf("time: %f, iter: %i \n", time, iter);
+#endif
 
 	// Assemble this iteration and apply it to the image
 	dim3 numBlocksPixels = (pixelcount + blockSize1d - 1) / blockSize1d;
