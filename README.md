@@ -16,7 +16,7 @@ This path tracer is implemented for the GPU, meaning that it parallelizes severa
 This includes computing ray intersections for each pixel, shading, and writing to the output image.
 
 <p align="center">
-  <img src="img/dragon_5000_lbvh.PNG" />
+  <img src="img/dragon_5000_lbvh.png" />
 </p>
 <p align="center"><em>Stanford Dragon, 5000 iterations</em></p>
 
@@ -86,7 +86,7 @@ Refractive Stanford Bunny, 5000 iterations
 #### Performance Analysis
 
 <p align="center">
-  <img src="img/mesh.2022-10-10_00-39-44z.5000samp.PNG" />
+  <img src="img/mesh.2022-10-10_00-39-44z.5000samp.png" />
 </p>
 <p align="center"><em>Stanford Dragon Traversal Heatmap (Yellow = More)</em></p>
 
