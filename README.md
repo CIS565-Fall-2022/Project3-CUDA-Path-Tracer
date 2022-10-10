@@ -86,6 +86,8 @@ _No Depth of Field_            |  _Depth of Field_
 
 ### Stochastic Sampled Anti-Aliasing
 
+Stochastic Sampled Anti-Aliasing can be implemented by applying a slight amount of random noise to the camera ray so that the direction of the ray gets information from its neighbors and can average out the color between neighbors, providing a softer transition. However, this means the first intersection will not always be determinant between pathtrace calls, which renders cache first bounce useless.
+
 _No Antialiasing_            |  _Antialiasing_ 
 :-------------------------:|:-------------------------:
 ![](img/NoDirectLighting.png) |  ![](img/antialiasing5000samp.png)
