@@ -78,12 +78,27 @@ This pile of mess occured because I was not properly changing my random numbers.
 This happens because I was till caching the first bounce. Meaning the ray was shooting into the exact same spot for every sample. 
 
 ### Anti-Aliasing
-[Paul Bourke](http://paulbourke.net/miscellaneous/raytracing/) provides a great explaination of this. Basically, the goal is to create smoother transistions between pixels. We do this by shooting more than one ray per pixel, randomly offseting their origins, and averaging their colors at the end. 
+[Paul Bourke](http://paulbourke.net/miscellaneous/raytracing/) provides a great explaination of this. Basically, the goal is to create smoother transistions between pixels. We do this by shooting more than one ray per pixel, randomly offseting their origins, and averaging their colors at the end. Using anti-aliasing takes quite a bit longer as the pathtracer has four times as many rays to work with as before.
 </br >
 </br >
 Here is a render without anti-aliasing.
-![](img/dof1.PNG)
+![](img/aano.png)
 </br >
 </br >
 Here is a render with anti-aliasing
-![](img/dof1.PNG)
+![](img/aayes.png)
+</br >
+</br >
+Frankly, I cannot see a difference. I suspect that it has to do with the random offset being too small. That being said, it certainly looks better than this.
+![](img/tvstoppedworking.PNG)
+</br >
+</br >
+This happens when the buffer sizes are not properly adjusted to accomodate for all the extra rays.
+
+###OBJ Loading
+OBJ files basically encode 3d objects. [TinyObjLoader](https://github.com/tinyobjloader/tinyobjloader) was used to load the files into the path tracer. The objects in these files basically consist of a lot of planes bound by control points, normally called faces. When checking to see if a ray intersects an object, we have to iterate through every single thing in the scene. For simple scenes this is fine, but once we load in an obj the number of things in the scene can blow up. Each face in the loaded object is a new thing to check intersections against. Considering objects can have tens of thousands of faces, one can imagine that this can slow down the path tracer quite a bit. One simple performance improvement is to introduce a bounding box which encapsulates the entire object. Before we check against all the faces in an object, we first check against the bounding box. If we don't intersect with it, then we don't have to check any of the faces. Potentially saving a lot of useless work. 
+
+</br >
+</br >
+Here is a comparison between objects of differing complexities. Each object was rendered in a scene with and without a bounding box and timed to 100 samples.
+![](img/chart3.png)
