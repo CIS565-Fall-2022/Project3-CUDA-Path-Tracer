@@ -16,15 +16,15 @@
 #include "pathtrace.h"
 #include "intersections.h"
 #include "interactions.h"
+#include "../stream_compaction/efficient.h"
 
 #define ERRORCHECK 1
 
-#define MATERIALSORT 1
-#define FIRSTBOUNCE 1
+#define MATERIALSORT 0
+#define FIRSTBOUNCE 0
 #define AA 0
 #define DOF 0
 #define DIRECTLIGHTING 0
-
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -89,8 +89,8 @@ static ShadeableIntersection* dev_intersections = NULL;
 thrust::device_ptr<ShadeableIntersection> dev_thrust_intersections;
 static PathSegment* dev_paths_cache = NULL;
 static ShadeableIntersection* dev_intersections_cache = NULL;
-static PathSegment* temp_paths_cache = NULL;
-static ShadeableIntersection* temp_intersections_cache = NULL;
+static PathSegment* dev_paths_pingpong = NULL;
+static PathSegment* temp_paths = NULL;
 // Direct Lighting storage of light objects index
 static int* dev_lights = NULL;
 
@@ -125,11 +125,13 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_intersections_cache, pixelcount * sizeof(ShadeableIntersection));
 	cudaMemset(dev_intersections_cache, 0, pixelcount * sizeof(ShadeableIntersection));
 
-	temp_intersections_cache = (ShadeableIntersection*) malloc(pixelcount * sizeof(ShadeableIntersection));
-	temp_paths_cache = (PathSegment*) malloc(pixelcount * sizeof(PathSegment));
+	//Ping pong buffer for dev paths after stream compaction
+	cudaMalloc(&dev_paths_pingpong, pixelcount * sizeof(PathSegment));
 
 	cudaMalloc(&dev_lights, scene->lights.size() * sizeof(int));
 	cudaMemcpy(dev_lights, scene->lights.data(), scene->lights.size() * sizeof(int), cudaMemcpyHostToDevice);
+
+	temp_paths = (PathSegment*) malloc(pixelcount * sizeof(PathSegment));
 
 	checkCUDAError("pathtraceInit");
 }
@@ -144,9 +146,9 @@ void pathtraceFree() {
 
 	cudaFree(dev_intersections_cache);
 	cudaFree(dev_paths_cache);
+	cudaFree(dev_paths_pingpong);
 
-	free(temp_intersections_cache);
-	free(temp_paths_cache);
+	free(temp_paths);
 	checkCUDAError("pathtraceFree");
 
 	cudaFree(dev_lights);
@@ -164,7 +166,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 {
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
-	float focalLength = 9.f;
+	float focalLength = 13.f; // close ball = 9, far ball = 13ish?
 	float apertureSize = .5;
 
 	if (x < cam.resolution.x && y < cam.resolution.y) {
@@ -542,12 +544,19 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		// materials you have in the scenefile.
 		// TODO: compare between directly shading the path segments and shading
 		// path segments that have been reshuffled to be contiguous in memory.
-
+		
 		dev_path_end = thrust::partition(thrust::device, dev_paths, dev_paths + num_paths, isNonZero());
+		//cout << num_paths << ", " << dev_path_end - dev_paths << endl;
 		num_paths = dev_path_end - dev_paths;
 
-		//iterationComplete = true; // TODO: should be based off stream compaction results.
-		if (depth > 8 || dev_path_end == dev_paths) {
+		// My stream compact
+		//num_paths = StreamCompaction::Efficient::compact(num_paths, dev_paths_pingpong, dev_paths);
+		//dev_path_end = dev_paths + num_paths;
+		//PathSegment* temp = dev_paths;
+		//dev_paths = dev_paths_pingpong;
+		//dev_paths_pingpong = temp;
+
+		if (depth > traceDepth || dev_path_end == dev_paths) {
 			iterationComplete = true;
 		}
 		if (guiData != NULL)
