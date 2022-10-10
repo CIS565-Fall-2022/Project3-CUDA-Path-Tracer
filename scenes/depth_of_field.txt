@@ -79,8 +79,8 @@ FILE        cornell
 EYE         0.0 5 10.5
 LOOKAT      0 5 0
 UP          0 1 0
-LENS        0.025
-FOCAL       10
+LENS        0.3
+FOCAL       7
 
 
 // Ceiling light
@@ -131,26 +131,18 @@ TRANS       5 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
-// Sphere 1
+// Sphere 2
 OBJECT 6
 sphere
-material 4
-TRANS       -3 2 -1
+material 2
+TRANS       -2 7 -3
 ROTAT       0 0 0
 SCALE       3 3 3
 
-// Sphere 2
+// Sphere 1
 OBJECT 7
 sphere
-material 5
-TRANS       0 4 -1
+material 3
+TRANS       2 2 3
 ROTAT       0 0 0
-SCALE       3 3 3
-
-// Sphere 3
-OBJECT 8
-sphere
-material 6
-TRANS       3 2 -1
-ROTAT       0 0 0
-SCALE       3 3 3
+SCALE       2 2 2

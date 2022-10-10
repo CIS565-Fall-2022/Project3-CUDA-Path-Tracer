@@ -15,6 +15,8 @@ static bool camchanged = true;
 static float dtheta = 0, dphi = 0;
 static glm::vec3 cammove;
 
+static bool stoped = false;
+
 float zoom, theta, phi;
 glm::vec3 cameraPosition;
 glm::vec3 ogLookAt; // for recentering the camera
@@ -107,6 +109,10 @@ void saveImage() {
 }
 
 void runCuda() {
+	if (stoped) {
+		return;
+	}
+
 	if (camchanged) {
 		iteration = 0;
 		Camera& cam = renderState->camera;
@@ -164,6 +170,9 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 			break;
 		case GLFW_KEY_S:
 			saveImage();
+			break;
+		case GLFW_KEY_ENTER:
+			stoped = !stoped;
 			break;
 		case GLFW_KEY_SPACE:
 			camchanged = true;
