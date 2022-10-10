@@ -22,10 +22,16 @@
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
 
 //Personal Trigger(use to do performance analysis)
+
 #define ENABLE_FIRST_INTERSECTION_CACHE 1
+
 #define ENABLE_RAY_SORTING 1
 
-#define ENABLE_DEPTH_OF_FIELD 1
+//Add timer to do data analysis
+
+#define Timer 1
+
+
 
 
 
@@ -118,6 +124,10 @@ static ShadeableIntersection* dev_first_intersect;
 bool bounceAlreadyCached = false;
 #endif
 
+#if Timer
+static cudaEvent_t startEvent = NULL;
+static cudaEvent_t endEvent = NULL;
+#endif
 
 void textureInit(const Texture& tex,int i)
 {
@@ -233,6 +243,12 @@ void pathtraceInit(Scene* scene) {
 
 	cudaMemset(dev_first_intersect,0,pixelcount*sizeof(ShadeableIntersection));
 #endif
+
+#if Timer
+	cudaEventCreate(&startEvent);
+	cudaEventCreate(&endEvent);
+#endif
+
 	checkCUDAError("pathtraceInit");
 }
 
@@ -258,6 +274,13 @@ void pathtraceFree() {
 #if ENABLE_FIRST_INTERSECTION_CACHE
 	cudaFree(dev_first_intersect);
 #endif
+
+#if Timer
+	if (startEvent != NULL)
+		cudaEventDestroy(startEvent);
+	if (endEvent != NULL)
+		cudaEventDestroy(endEvent);
+#endif
 	checkCUDAError("pathtraceFree");
 }
 
@@ -274,7 +297,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
 
-	bool enableDepthField = true;
+	bool enableDepthField = false;
 	bool enableStochasticAA = false;
 
 	if (x < cam.resolution.x && y < cam.resolution.y) {
@@ -674,6 +697,10 @@ void pathtrace(uchar4* pbo, int frame, int iter,bool sortMaterial) {
 		thrust::sort_by_key(thrust::device,dev_intersections,dev_intersections+num_paths,dev_paths,compareIntersection());
 #endif
 
+#if Timer
+		cudaEventRecord(startEvent);
+#endif
+
 	   BSDFShading << <numblocksPathSegmentTracing, blockSize1d >> > (
 			iter,
 			num_paths,
@@ -686,10 +713,24 @@ void pathtrace(uchar4* pbo, int frame, int iter,bool sortMaterial) {
 
 	   //String Compaction Here
 	    dev_paths = thrust::stable_partition(thrust::device,dev_paths,dev_paths+num_paths,isPathCompleted());
+
 		//num_paths was changed here
 		num_paths = dev_path_end - dev_paths;
 		iterationComplete = (num_paths == 0);
 		intersections=NULL;
+
+#if Timer
+		cudaEventRecord(endEvent);
+		cudaEventSynchronize(endEvent);
+		float ms;
+		cudaEventElapsedTime(&ms, startEvent, endEvent);
+		if (depth == 8) {
+			std::cout << iter;
+			std::cout << " " << depth;
+			std::cout << " " << ms;
+			std::cout << " " << num_paths << endl;
+		}
+#endif
 	
 		if (guiData != NULL)
 		{

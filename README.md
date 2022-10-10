@@ -61,20 +61,25 @@ In this project I use the `thrust::stable_partition` kernal to partition these p
 
 This method is really useful for unclosed scene and bring performance improvement to the MCPT since the GPU will compute less rays after each bounce.
 
+![Render Img](img/String%20Compaction.png)
 
-
-But for closed scene, since no ray will bounce outside the scene, this method may not bring performance improvement in this case.
+![Render Img](img/string%20compact%202.png)
 
 ### Ray Sorting
 
 An attempt was made to optimize by sorting the intersection and ray paths based on materials for memory coalescing. For this, the kernel thrust::sort_by_key is used to do key-value sorting. 
 
+![Render Img](img/raySorting.png)
+
+However, it seems that ray sorting does not affect too much on GPU performance, and it even slower since every depth need to do the sort process.
+
+No performance gain indicates that there may be little divergences and most materials are processed in similar execution fashion. Perhaps introducing very distinctively different materials would make a bigger difference.
 
 ### First bounce Caching
 
-Another optimization that's made is caching the intersection data for the first bounce (i.e. depth = 1). Since each ray starts at the same spot for each pixel, the first bounce result will always be the same for all iterations. Although not significant, first bounce caching does make things slightly faster on average.
+Another optimization that's made is caching the intersection data for the first bounce (i.e. depth = 1). Since each ray starts at the same spot for each pixel, the first bounce result will always be the same for all iterations. Although not significant, first bounce caching does make things slightly faster on average, maybe it will bring more performance improvement when having complicated scene.
 
-
+![Render Img](img/first%20bounce%20cache.png)
 
 ### GLTF Mesh Loading
 
