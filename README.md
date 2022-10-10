@@ -150,11 +150,15 @@ My hypothesis is that since the scene is closed, all rays will hit something on 
 
 **Material Sorting Performance**
 
-
+![](img/matSort.png)
 
 **First Bounce Caching**
 
+![](img/cacheComparison.png)
+
 **Bounding Box for OBJ**
+
+![](img/boundbox.png)
 
 ## Bloopers! :)
 
