@@ -3,6 +3,8 @@
 #include <cstring>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
+//#include "main.cpp"
+
 
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
@@ -31,6 +33,8 @@ Scene::Scene(string filename) {
         }
     }
 }
+
+//Should only be called after loading scene
 
 int Scene::loadGeom(string objectid) {
     int id = atoi(objectid.c_str());

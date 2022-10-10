@@ -1,5 +1,6 @@
 #pragma once
 
+
 #include <vector>
 #include <sstream>
 #include <fstream>
@@ -21,6 +22,7 @@ public:
     ~Scene();
 
     std::vector<Geom> geoms;
+    std::vector<Geom> faces;
     std::vector<Material> materials;
     RenderState state;
 };

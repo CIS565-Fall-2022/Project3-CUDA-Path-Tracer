@@ -1,0 +1,174 @@
+// light red
+MATERIAL 0
+RGB         .8 .2 .2
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   5
+
+// Diffuse white
+MATERIAL 1
+RGB         .8 .8 .8
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+//light blue
+MATERIAL 2
+RGB         .2 .2 .65
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   5
+
+//light white soft
+MATERIAL 3
+RGB         1 1 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   2
+
+// Specular Dark Grey
+MATERIAL 4
+RGB         .38 .38 .38
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse blue
+MATERIAL 5
+RGB         .6 .6 .98
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Camera
+CAMERA
+RES         800 800
+FOVY        45
+ITERATIONS  5000
+DEPTH       8
+FILE        cornell
+EYE         0.0 5 10.5
+LOOKAT      0 5 0
+UP          0 1 0
+
+
+// Ceiling light Red
+OBJECT 0
+cube
+material 0
+TRANS       3 10 3
+ROTAT       0 0 0
+SCALE       3 .3 3
+
+// Ceiling light Blue
+OBJECT 1
+cube
+material 2
+TRANS       -3 10 3
+ROTAT       0 0 0
+SCALE       3 .3 3
+
+// Floor
+OBJECT 2
+cube
+material 4
+TRANS       0 0 0
+ROTAT       0 0 0
+SCALE       15 .01 15
+
+
+// Back wall
+OBJECT 3
+cube
+material 5
+TRANS       0 5 -5
+ROTAT       0 90 0
+SCALE       .01 10 10
+
+
+// Ceiling
+OBJECT 4
+cube
+material 5
+TRANS       0 10 0
+ROTAT       0 0 90
+SCALE       .01 15 15
+
+// Forward Light
+OBJECT 5
+cube
+material 3
+TRANS       0 5  12
+ROTAT       0 90 0
+SCALE       .1 8 8
+
+// c1
+OBJECT 6
+cube
+material 5
+TRANS       5 5 -5
+ROTAT       0 0 0
+SCALE       1 11 1
+
+// c2
+OBJECT 7
+cube
+material 5
+TRANS       -5 5 -5
+ROTAT       0 0 0
+SCALE       1 10 1
+
+// c3
+OBJECT 8
+cube
+material 5
+TRANS       7 5 -1
+ROTAT       0 0 0
+SCALE       1 11 1
+
+// c4
+OBJECT 9
+cube
+material 5
+TRANS       -7 5 -1
+ROTAT       0 0 0
+SCALE       1 11 1
+
+// c5
+OBJECT 10
+cube
+material 5
+TRANS       7 5 3
+ROTAT       0 0 0
+SCALE       1 11 1
+
+// c6
+OBJECT 11
+cube
+material 5
+TRANS       -7 5 3
+ROTAT       0 0 0
+SCALE       1 11 1
+
+
+
+
+

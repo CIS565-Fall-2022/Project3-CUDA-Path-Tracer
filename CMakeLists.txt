@@ -72,6 +72,7 @@ set(headers
     src/scene.h
     src/sceneStructs.h
     src/preview.h
+    src/tiny_obj_loader.h
     src/utilities.h
     src/ImGui/imconfig.h
 	
