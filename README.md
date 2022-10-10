@@ -50,7 +50,7 @@ Anti-aliasing can be achieved by jittering the rays shot from the camera such th
 ### Direct Lighting
 A path traced scene can be made brighter by having rays have their final bounce directed towards a lightsource. In my implementation, if a remaining ray only has used its last bounce, then I randomly select a light source and randomly select a point on the light source and set the ray direction to that point. 
 ### Direct Lighting Comparison
-![Lighting](img/directlighting.png)
+![Lighting](img/light_compare.jpg)
 
 ### Performance Analysis: Stream Compaction
 Stream compaction is used to remove any terminated rays. This allows for rays that hit a light or no object to be terminated and improves performances as the number of rays that needs to be used in each bounce decreases over the iteration length. One key factor that affects how many rays remain after each bounce is how much "openness" there is and how big/many light sources there are. This is because the more the open space, the more the likely rays are to hit nothing and terminate and the similarly with lights. The following chart shows the number of remaining active rays over the course of a single iteration in a closed and not closed cornell box.
