@@ -544,9 +544,16 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		// materials you have in the scenefile.
 		// TODO: compare between directly shading the path segments and shading
 		// path segments that have been reshuffled to be contiguous in memory.
-		
+
+		// DEBUG STREAM COMPACT
+		//cudaMemcpy(temp_paths, dev_paths, num_paths * sizeof(PathSegment), cudaMemcpyDeviceToHost);
+		//cout << "BEFORE COMPACTION: " << num_paths << endl;
+		//for (int i = 0; i < num_paths; ++i) {
+		//	cout << "ID: " << temp_paths[i].pixelIndex << ", NUM_BOUNCES: " << temp_paths[i].remainingBounces << endl;
+		//}
+
+		// Thrust stream compact
 		dev_path_end = thrust::partition(thrust::device, dev_paths, dev_paths + num_paths, isNonZero());
-		//cout << num_paths << ", " << dev_path_end - dev_paths << endl;
 		num_paths = dev_path_end - dev_paths;
 
 		// My stream compact
@@ -555,6 +562,14 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 		//PathSegment* temp = dev_paths;
 		//dev_paths = dev_paths_pingpong;
 		//dev_paths_pingpong = temp;
+		
+		// DEBUG STREAM COMPACT
+		//cudaMemcpy(temp_paths, dev_paths, num_paths * sizeof(PathSegment), cudaMemcpyDeviceToHost);
+		//cout << "AFTER COMPACTION: " << num_paths << endl;
+		//for (int i = 0; i < num_paths; ++i) {
+		//	cout << "ID: " << temp_paths[i].pixelIndex << ", NUM_BOUNCES: " << temp_paths[i].remainingBounces << endl;
+		//}
+
 
 		if (depth > traceDepth || dev_path_end == dev_paths) {
 			iterationComplete = true;
