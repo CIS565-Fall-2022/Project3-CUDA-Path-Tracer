@@ -121,7 +121,7 @@ This project implements a spherical skybox using raycast method. Ray hits skybox
 
 - HDR texture support. Currently the program does not support HDR image.
 
-- G buffer. Currently the program renders object 
+- G buffer. Currently the program renders objects in their loading orders and we need to manage their orders carefully for now.
 
 - More texture mapping such as roughness and specular texture.
 
