@@ -6,7 +6,7 @@ SPECRGB     0 0 0
 REFL        0
 REFR        0
 REFRIOR     0
-EMITTANCE   4
+EMITTANCE   6
 
 // Diffuse white
 MATERIAL 1
@@ -65,7 +65,7 @@ SPECEX      0
 SPECRGB     .6705 .8588 .8901
 REFL        1
 REFR        1
-REFRIOR     2.3
+REFRIOR     1.325
 EMITTANCE   0
 
 // Blue floor
@@ -88,11 +88,18 @@ REFR        0
 REFRIOR     0
 EMITTANCE   0
 
+// Crystal
+MATERIAL 9
+RGB         .6549 .847 .8705
+SPECEX      0
+SPECRGB     .6549 .847 .8705
+REFL        1
+REFR        1
+REFRIOR     2.0
+EMITTANCE   0
+
 TEXTURE 0
 PATH ../scenes/textures/titanic.jpg
-
-TEXTURE 1
-PATH ../scenes/textures/Mineways2Skfb-RGBA.png
 
 // Camera
 CAMERA
@@ -110,8 +117,8 @@ OBJECT 0
 cube
 material 0
 TRANS       0 10 0
-ROTAT       0 0 0
-SCALE       5 .3 5
+ROTAT       0 135 0
+SCALE       20 .3 4
 
 // Floor
 OBJECT 1
@@ -161,13 +168,13 @@ TRANS       -0.5 6 0
 ROTAT       0 0 0
 SCALE       3 3 3
 
-// More Light
+// Crystal
 OBJECT 7
 cube
-material 5
-TRANS       14.9 4 0
-ROTAT       0 45 0
-SCALE       .01 2 20
+material 9
+TRANS       5 1 0
+ROTAT       0 0 -45
+SCALE       2 6 20
 
 // Mirror
 OBJECT 8
@@ -179,8 +186,8 @@ SCALE       4 20 4
 
 OBJECT 9
 sphere
-material 0
-TRANS       0 0 18
+material 5
+TRANS       4 8 18
 ROTAT       0 0 0
 SCALE      6 6 0.1
 
