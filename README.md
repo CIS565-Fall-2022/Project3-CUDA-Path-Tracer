@@ -144,3 +144,5 @@ While the number of remaining rays decreases in case of both open and closed box
 ### Sorting rays by material
 
 Each material in the scene has a unique ID that scene intersections reference whenever they collide with a material. Continguous intersections in memory can have different materials between them, thus leading to random memory access in the materials' global memory bank. To improve memory access, intersections who share the same material can be sorted based on material ID, so intersections with the same materials are coalesced in memory.
+
+![](img/performanceAnalysis/sorting.png)
