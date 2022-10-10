@@ -1,0 +1,310 @@
+// Emissive material (light)
+MATERIAL 0
+RGB         1 1 .85
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   7.5
+
+// Diffuse white
+MATERIAL 1
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse blue
+MATERIAL 2
+RGB         .35 .35 .85
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse green
+MATERIAL 3
+RGB         .35 .85 .35
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Perfectly Specular
+MATERIAL 4
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Refractive
+MATERIAL 5
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0
+REFR        1
+REFRIOR     1.5
+EMITTANCE   0
+
+// Imperfect Specular White
+MATERIAL 6
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        .1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Imperfect Specular Red
+MATERIAL 7
+RGB         .85 .35 .35
+SPECEX      0
+SPECRGB     .85 .35 .35
+REFL        .05
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Imperfect Specular Magenta
+MATERIAL 8
+RGB         .85 .35 .85
+SPECEX      0
+SPECRGB     .85 .35 .85
+REFL        .05
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Perfectly Specular Red
+MATERIAL 9
+RGB         .85 .35 .35
+SPECEX      0
+SPECRGB     .85 .35 .35
+REFL        1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Perfectly Specular Magenta
+MATERIAL 10
+RGB         .85 .35 .85
+SPECEX      0
+SPECRGB     .85 .35 .85
+REFL        1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Perfectly Specular Cyan
+MATERIAL 11
+RGB         .85 .85 .35
+SPECEX      0
+SPECRGB     .85 .85 .35
+REFL        1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Emissive material (yellow)
+MATERIAL 12
+RGB         1 1 .35
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   2.5
+
+// Refractive
+MATERIAL 13
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0
+REFR        1
+REFRIOR     1.9
+EMITTANCE   0
+
+// Camera
+CAMERA
+RES         800 800
+FOVY        45
+ITERATIONS  5000
+DEPTH       8
+FILE        cornell
+EYE         0.0 5 10.5
+LOOKAT      0 5 0
+UP          0 1 0
+
+// Ceiling light left
+OBJECT 0
+cube
+material 0
+TRANS       -9 15 -5
+ROTAT       0 0 0
+SCALE       6 .3 3
+
+// Floor
+OBJECT 1
+cube
+material 1
+TRANS       0 1 0
+ROTAT       0 0 0
+SCALE       100 .1 20
+
+// Ceiling
+OBJECT 2
+cube
+material 1
+TRANS       0 15 0
+ROTAT       0 0 90
+SCALE       .1 100 50
+
+// Back wall
+OBJECT 3
+cube
+material 1
+TRANS       0 5 -10
+ROTAT       0 90 0
+SCALE       .1 20 100
+
+// Ceiling light right
+OBJECT 4
+cube
+material 0
+TRANS       9 15 -5
+ROTAT       0 0 0
+SCALE       6 .3 3
+
+// Left wall
+OBJECT 5
+cube
+material 1
+TRANS       -40 5 0
+ROTAT       0 0 0
+SCALE       .1 20 20
+
+// Right wall
+OBJECT 6
+cube
+material 1
+TRANS       40 5 0
+ROTAT       0 0 0
+SCALE       .1 20 20
+
+// Sphere glass
+OBJECT 7
+sphere
+material 5
+TRANS       0 2 3
+ROTAT       0 0 0
+SCALE       2 2 2
+
+// Sphere light
+OBJECT 8
+sphere
+material 12
+TRANS       0 2 3
+ROTAT       0 0 0
+SCALE       .5 .5 .5
+
+// Sphere tip
+OBJECT 9
+sphere
+material 4
+TRANS       0 2 0
+ROTAT       0 0 0
+SCALE       2 2 2
+
+// Sphere layer 1
+OBJECT 10
+sphere
+material 2
+TRANS       1.5 2 1.5
+ROTAT       0 0 0
+SCALE       2 2 2
+
+// Sphere layer 1
+OBJECT 11
+sphere
+material 3
+TRANS       -1.5 2 1.5
+ROTAT       0 0 0
+SCALE       2 2 2
+
+// Sphere layer 2
+OBJECT 12
+sphere
+material 7
+TRANS       -3 2 3
+ROTAT       0 0 0
+SCALE       2 2 2
+
+// Sphere layer 2
+OBJECT 13
+sphere
+material 8
+TRANS       3 2 3
+ROTAT       0 0 0
+SCALE       2 2 2
+
+// Cube right
+OBJECT 14
+cube
+material 5
+TRANS       6 4 -3
+ROTAT       0 45 0
+SCALE       3 4 3
+
+// Cube left
+OBJECT 15
+cube
+material 5
+TRANS       -6 4 -3
+ROTAT       0 45 0
+SCALE       3 4 3
+
+// Sphere in cube left
+//OBJECT 16
+//sphere
+//material 12
+//TRANS       -6 7 -3
+//ROTAT       0 0 0
+//SCALE       .5 .5 .5
+
+// Sphere in cube left
+OBJECT 16
+sphere
+material 4
+TRANS       -6 7 -3
+ROTAT       0 0 0
+SCALE       2 2 2
+
+// Sphere in cube right
+//OBJECT 18
+//sphere
+//material 12
+//TRANS       6 7 -3
+//ROTAT       0 0 0
+//SCALE       .5 .5 .5
+
+// Sphere in cube right
+OBJECT 17
+sphere
+material 4
+TRANS       6 7 -3
+ROTAT       0 0 0
+SCALE       2 2 2

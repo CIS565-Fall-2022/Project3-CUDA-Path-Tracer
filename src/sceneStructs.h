@@ -74,3 +74,17 @@ struct ShadeableIntersection {
   glm::vec3 surfaceNormal;
   int materialId;
 };
+
+// For stream compaction
+struct isNonZero {
+    __host__ __device__ bool operator()(const PathSegment& path) {
+        return path.remainingBounces > 0;
+    }
+};
+
+// For material sorting
+struct sortMaterial {
+    __host__ __device__ bool operator()(const ShadeableIntersection& a, const ShadeableIntersection& b) {
+        return a.materialId < b.materialId;
+    }
+};

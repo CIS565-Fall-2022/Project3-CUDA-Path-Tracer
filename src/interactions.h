@@ -76,4 +76,51 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+
+    thrust::uniform_real_distribution<float> u01(0, 1);
+
+    if(m.hasRefractive) { // Refractive Case, assumes we can only have perfectly refractive objects
+        //Figure out what side of the object we are on (inside or outside)
+        float dot = glm::dot(pathSegment.ray.direction, normal);
+        bool out = dot > 0;
+
+        //Eta is refractive index of the medium of the light, air = 1, glass = 1.5
+        //Eta1 == currently in, eta2 == going into
+        float eta1 = out ? 1.f : m.indexOfRefraction;
+        float eta2 = out ? m.indexOfRefraction : 1.f;
+
+        //Compute schlicks approx to decide whether or not to reflect or refract light
+        float r_0 = ((eta1 - eta2) / (eta1 + eta2)) * ((eta1 - eta2) / (eta1 + eta2));
+
+        float R = r_0 + (1 - eta1) * pow(1 - cos(dot), 5);
+        if (u01(rng) > R) {
+            pathSegment.ray.direction = glm::normalize(glm::refract(pathSegment.ray.direction, normal, eta2 / eta1));
+            pathSegment.ray.origin = intersect + .001f * glm::normalize(pathSegment.ray.direction);
+            pathSegment.color *= m.color;
+        }
+        else {
+            pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+            //pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
+            pathSegment.ray.origin = intersect;
+            pathSegment.color *= m.specular.color;
+        }
+        
+    }
+    else {
+        //0 = diffuse 1 = specular
+        float diffuseSpecularThresh = 1.f - m.hasReflective;
+        float diffuseSpecularRand = u01(rng);
+        if (diffuseSpecularRand > diffuseSpecularThresh) { // Specular case
+            pathSegment.color *= m.specular.color;
+            pathSegment.ray.direction = glm::normalize(glm::reflect(pathSegment.ray.direction, normal));
+            pathSegment.ray.origin = intersect;
+            //float exp = m.specular.exponent;
+        }
+        else { // Diffuse case
+            pathSegment.color *= m.color;
+            pathSegment.ray.direction = calculateRandomDirectionInHemisphere(normal, rng);
+            pathSegment.ray.origin = intersect;
+        }
+    }
+    pathSegment.remainingBounces--;
 }

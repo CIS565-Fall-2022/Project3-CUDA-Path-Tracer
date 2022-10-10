@@ -30,6 +30,8 @@ Scene::Scene(string filename) {
             }
         }
     }
+    cout << "Populating Lights" << endl;
+    getLights();
 }
 
 int Scene::loadGeom(string objectid) {
@@ -184,5 +186,14 @@ int Scene::loadMaterial(string materialid) {
         }
         materials.push_back(newMaterial);
         return 1;
+    }
+}
+
+void Scene::getLights() {
+    for (int i = 0; i < geoms.size(); ++i) {
+        Geom g = geoms[i];
+        if (materials[g.materialid].emittance > 0) {
+            lights.push_back(i);
+        }
     }
 }
