@@ -162,9 +162,13 @@ Implementing material sorting actually decreased the performance for scenes with
 
 **First Bounce Caching**
 
+As explained earlier, first bounce caching is useful when we have one camera angle and running 5000 calls of pathtrace() on that one camera angle, because the first intersections by shooting rays from the camera to each pixel is deterministic. Based on the results below, we can see a slight increase in FPS by using first bounce cache.
+
 ![](img/cacheComparison.png)
 
 **Bounding Box for OBJ**
+
+Based on the results below, using a bounding box for OBJ will generally decrease the Runtime requried for the program overall. In this case, I recorded the output of the first 17 iterations. It can be observed that each iteration's runtime has the bound box scene running much faster than the non bound box scene.
 
 ![](img/boundbox.png)
 
