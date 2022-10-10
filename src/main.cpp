@@ -39,6 +39,8 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
+
+
 	const char* sceneFile = argv[1];
 
 	// Load scene file
