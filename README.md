@@ -13,8 +13,7 @@ This project implemented a GPU-based path tracer using CUDA with several visual 
 ![main_with_des](https://user-images.githubusercontent.com/33616958/194778938-be4f9d29-40d6-491c-b5fc-df4efbe4aff5.jpg)
 
 
-
-#### Feature Implemented:
+### Feature Implemented:
 * Visual
     * Shading kernel with BSDF evaluation for diffuse, specular-reflective and refractive surfaces.
     * Stochastic Sampled Antialiasing
