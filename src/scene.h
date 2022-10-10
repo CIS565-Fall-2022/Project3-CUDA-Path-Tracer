@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <set>
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -13,7 +14,9 @@ using namespace std;
 class Scene {
 private:
     ifstream fp_in;
+    int loadObj(const char* filename, std::vector<Triangle>* triangleArray, const char* basepath, bool triangulate);
     int loadMaterial(string materialid);
+    int loadTexture(string textureid);
     int loadGeom(string objectid);
     int loadCamera();
 public:
@@ -22,5 +25,13 @@ public:
 
     std::vector<Geom> geoms;
     std::vector<Material> materials;
+
+    // for textures
+    std::vector<Texture> textures;
+    // std::vector<int> textureChannels;
+
     RenderState state;
+
+    std::vector<Geom> lights;
+    int numLights = 0;
 };

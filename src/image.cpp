@@ -19,6 +19,10 @@ void image::setPixel(int x, int y, const glm::vec3 &pixel) {
     pixels[(y * xSize) + x] = pixel;
 }
 
+glm::vec3 image::getPixel(int x, int y) {
+    return pixels[(y * xSize) + x];
+}
+
 void image::savePNG(const std::string &baseFilename) {
     unsigned char *bytes = new unsigned char[3 * xSize * ySize];
     for (int y = 0; y < ySize; y++) {

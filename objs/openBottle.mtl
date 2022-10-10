@@ -1,0 +1,88 @@
+newmtl crystal1:BaseCrystal
+illum 4
+Kd 0.02 0.02 0.01
+Ka 1.00 1.00 1.00
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 32.00
+newmtl crystal1:Crystal
+illum 4
+Kd 0.00 0.00 0.00
+Ka 1.00 1.00 1.00
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 250.00
+newmtl crystal2:BaseCrystal
+illum 4
+Kd 0.02 0.02 0.01
+Ka 1.00 1.00 1.00
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 32.00
+newmtl crystal2:Crystal
+illum 4
+Kd 0.00 0.00 0.00
+Ka 1.00 1.00 1.00
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 250.00
+newmtl openBottle:Blue
+illum 4
+Kd 0.19 0.28 0.80
+Ka 0.17 0.17 0.17
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 360.00
+newmtl openBottle:Green
+illum 4
+Kd 0.25 0.80 0.14
+Ka 0.17 0.17 0.17
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 360.00
+newmtl openBottle:Pampur
+illum 4
+Kd 0.23 0.14 0.08
+Ka 1.00 1.00 1.00
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 0.00
+newmtl openBottle:Purple
+illum 4
+Kd 0.51 0.01 0.80
+Ka 0.17 0.17 0.17
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 360.00
+newmtl openBottle:White
+illum 4
+Kd 0.71 0.71 0.71
+Ka 0.17 0.17 0.17
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 360.00
+newmtl openBottle:Yellow
+illum 4
+Kd 0.80 0.80 0.80
+Ka 0.17 0.17 0.17
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 360.00
+newmtl openBottle:material
+illum 4
+Kd 0.80 0.09 0.07
+Ka 0.17 0.17 0.17
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 360.00

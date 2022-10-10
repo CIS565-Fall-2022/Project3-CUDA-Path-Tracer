@@ -1,0 +1,32 @@
+newmtl crystal1:BaseCrystal
+illum 4
+Kd 0.02 0.02 0.01
+Ka 1.00 1.00 1.00
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 32.00
+newmtl crystal1:Crystal
+illum 4
+Kd 0.00 0.00 0.00
+Ka 1.00 1.00 1.00
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 250.00
+newmtl crystal2:BaseCrystal
+illum 4
+Kd 0.02 0.02 0.01
+Ka 1.00 1.00 1.00
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 32.00
+newmtl crystal2:Crystal
+illum 4
+Kd 0.00 0.00 0.00
+Ka 1.00 1.00 1.00
+Tf 1.00 1.00 1.00
+Ni 1.50
+Ks 0.50 0.50 0.50
+Ns 250.00

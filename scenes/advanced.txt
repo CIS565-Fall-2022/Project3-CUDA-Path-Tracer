@@ -1,0 +1,454 @@
+// Emissive material (light)
+MATERIAL 0
+RGB         1 1 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   5
+
+// Diffuse white
+MATERIAL 1
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse red
+MATERIAL 2
+RGB         .85 .35 .35
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse green
+MATERIAL 3
+RGB         .35 .85 .35
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Specular white
+MATERIAL 4
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Refractive glass
+MATERIAL 5
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0.4
+REFR        0.3
+REFRIOR     1.52
+EMITTANCE   0
+
+// stone color
+MATERIAL 6
+RGB         .6 .6 .5
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse yellow
+MATERIAL 7
+RGB         1 .9 .5
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// dark turquoise
+MATERIAL 8
+RGB         0.05 .3 .3
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// dark brown floor
+MATERIAL 9
+RGB         0.27, 0.26, 0.14
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Emissive material (light 2)
+MATERIAL 10
+RGB         0.2 0.6 0.6
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   5
+
+// Emissive material (light 2)
+MATERIAL 11
+RGB         1 0.2 0.4
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   5
+
+// Refractive glass purple
+MATERIAL 12
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .20 .98
+REFL        0
+REFR        1
+REFRIOR     1.6
+EMITTANCE   0
+
+// Refractive glass blue
+MATERIAL 13
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .20 .98 .98
+REFL        0
+REFR        1
+REFRIOR     1.6
+EMITTANCE   0
+
+// Emissive material ( yellow )
+MATERIAL 14
+RGB         0.6 0.6 0
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   5
+
+// water
+MATERIAL 15
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0.3
+REFR        0.7
+REFRIOR     1.6
+EMITTANCE   0
+
+// Imperfect specular refractive white
+MATERIAL 16
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0.5
+REFR        0.3
+REFRIOR     0
+EMITTANCE   0
+
+// Box texture
+TEXTURE 0
+PATH ../Project3-CUDA-Path-Tracer/objs/textures/linkFlippedVertical.png
+
+// Box texture
+TEXTURE 1
+PATH ../Project3-CUDA-Path-Tracer/objs/textures/boxOutline.png
+
+// Camera
+CAMERA
+RES         1400 1400
+FOVY        45
+ITERATIONS  5000
+DEPTH       8
+FILE        cornell
+EYE         0.0 5 10.5
+LOOKAT      0 5 0
+UP          0 1 0
+
+
+// red light
+OBJECT 0
+cube
+material 11
+TRANS       -3 0 -3
+ROTAT       0 0 0
+SCALE       1 0.3 1
+
+// blue light
+OBJECT 1
+cube
+material 10
+TRANS       7 1 -1
+ROTAT       0 0 0
+SCALE       1 .3 1
+
+// ceil light
+OBJECT 2
+cube
+material 0
+TRANS       0 15 0
+ROTAT       0 0 0
+SCALE       10 .3 10
+
+// low ceiling light
+OBJECT 3
+cube
+material 0
+TRANS       -3 5 13
+ROTAT       -45 0 0
+SCALE       10 .3 5
+
+// Floor
+OBJECT 4
+cube
+material 15
+TRANS       0 0.1 0
+ROTAT       0 0 0
+SCALE       20 .01 20
+
+// Ceiling
+OBJECT 5
+cube
+material 1
+TRANS       0 15 0
+ROTAT       0 0 90
+SCALE       .01 20 20
+
+// Back wall
+OBJECT 6
+cube
+material 8
+TRANS       0 5 -5
+ROTAT       0 90 0
+SCALE       .01 20 20
+
+// Left wall
+OBJECT 7
+cube
+material 8
+TRANS       -10 5 0
+ROTAT       0 0 0
+SCALE       .01 20 20
+
+// Right wall
+OBJECT 8
+cube
+material 8
+TRANS       10 5 0
+ROTAT       0 0 0
+SCALE       .01 20 20
+
+// link obj
+OBJECT 9
+../Project3-CUDA-Path-Tracer/objs/link.obj
+material 1
+TRANS		0 0.5 3
+ROTAT	      0 -20 0
+SCALE		0.3 0.3 0.3
+TEXTURE 0
+
+// non texture stone 1
+OBJECT 10
+../Project3-CUDA-Path-Tracer/objs/rocks/rock1.obj
+material 6
+TRANS		-5 2 2
+ROTAT	      0 0 0
+SCALE		5 5 5
+
+// non texture stone 2
+// this obj's origin might be really screwed up
+OBJECT 11
+../Project3-CUDA-Path-Tracer/objs/rocks/rock2.obj
+material 6
+TRANS		-3 2.25 -4
+ROTAT	      0 0 0
+SCALE		5 5 5
+
+// non texture stone 3
+// this obj's origin might be really screwed up
+OBJECT 12
+../Project3-CUDA-Path-Tracer/objs/rocks/rock3.obj
+material 6
+TRANS		-2 2.25 3
+ROTAT	      0 0 0
+SCALE		5 5 5
+
+// non texture stone 4
+// this obj's origin might be really screwed up
+OBJECT 13
+../Project3-CUDA-Path-Tracer/objs/rocks/rock4.obj
+material 6
+TRANS		-1 2.5 3
+ROTAT	      0 0 0
+SCALE		5 5 5
+
+// non texture stone 5
+// this obj's origin might be really screwed up
+OBJECT 14
+../Project3-CUDA-Path-Tracer/objs/rocks/rock5.obj
+material 6
+TRANS		-10 2.5 0
+ROTAT	      0 0 0
+SCALE		5 5 5
+
+// non texture quartz
+// this obj's origin might be really screwed up
+OBJECT 15
+../Project3-CUDA-Path-Tracer/objs/crystals/crystal1.obj
+material 12
+TRANS		-3 0 -3
+ROTAT	      0 0 0
+SCALE		3 3 3
+
+// non texture quartz
+// this obj's origin might be really screwed up
+OBJECT 16
+../Project3-CUDA-Path-Tracer/objs/crystals/crystal2.obj
+material 15
+TRANS		7 0 -1
+ROTAT	      0 0 0
+SCALE		3 3 3
+
+// bottle
+OBJECT 17
+../Project3-CUDA-Path-Tracer/objs/openBottle.obj
+material 5
+TRANS		-1.5 0.5 4
+ROTAT	      0 0 0
+SCALE		1 1 1
+
+// fairy in bottle
+OBJECT 18
+sphere
+material 14
+TRANS		-1.5 1 4
+ROTAT	      0 0 0
+SCALE		0.3 0.3 0.3 
+
+// fairy
+OBJECT 19
+sphere
+material 14
+TRANS		-3 8 0
+ROTAT	      0 0 0
+SCALE		0.2 0.2 0.2 
+
+// fairy
+OBJECT 20
+sphere
+material 14
+TRANS		-1 7 5
+ROTAT	      0 0 0
+SCALE		0.2 0.2 0.2 
+
+// fairy
+OBJECT 21
+sphere
+material 14
+TRANS		3 8 2
+ROTAT	      0 0 0
+SCALE		0.2 0.2 0.2 
+
+// fairy
+OBJECT 22
+sphere
+material 14
+TRANS		-3 5 2
+ROTAT	      0 0 0
+SCALE		0.2 0.2 0.2 
+
+// fairy
+OBJECT 23
+sphere
+material 14
+TRANS		-2 3 -1
+ROTAT	      0 0 0
+SCALE		0.2 0.2 0.2 
+
+// fairy
+OBJECT 24
+sphere
+material 14
+TRANS		-5 3 -1
+ROTAT	      0 0 0
+SCALE		0.2 0.2 0.2 
+
+// fairy
+OBJECT 25
+sphere
+material 14
+TRANS		-5 2 5
+ROTAT	      0 0 0
+SCALE		0.2 0.2 0.2 
+
+// floor below dirt
+OBJECT 26
+cube
+material 7
+TRANS       0 0 0
+ROTAT       0 0 0
+SCALE       20 .01 20
+
+// dirt
+OBJECT 27
+../Project3-CUDA-Path-Tracer/objs/dirt.obj
+material 9
+TRANS		0 -1 0
+ROTAT	      0 0 0
+SCALE		1 1 1 
+
+// non texture stone 6
+// this obj's origin might be really screwed up
+OBJECT 28
+../Project3-CUDA-Path-Tracer/objs/rocks/rock6.obj
+material 6
+TRANS		-3 0 5
+ROTAT	      0 0 0
+SCALE		5 5 5
+
+// non texture stone 6
+// this obj's origin might be really screwed up
+OBJECT 29
+../Project3-CUDA-Path-Tracer/objs/rocks/rock6.obj
+material 6
+TRANS		-2 0 3
+ROTAT	      0 0 0
+SCALE		2 2 2
+
+// fairy
+OBJECT 30
+sphere
+material 14
+TRANS		-3 7 5
+ROTAT	      0 0 0
+SCALE		0.25 0.25 0.25 
+
+// fairy
+OBJECT 31
+sphere
+material 14
+TRANS		4 2 4
+ROTAT	      0 0 0
+SCALE		0.2 0.2 0.2 
