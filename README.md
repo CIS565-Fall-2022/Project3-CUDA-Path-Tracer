@@ -45,11 +45,12 @@ Anti-aliasing can be achieved by jittering the rays shot from the camera such th
 ### Anti-Aliasing Comparison
 ![Diffuse](img/diffuse.png)
 ![AA](img/AA.png)
+### Anti-Aliasing on Left
 ![Comparison](img/aa_compare.png)
 
 ### Direct Lighting
 A path traced scene can be made brighter by having rays have their final bounce directed towards a lightsource. In my implementation, if a remaining ray only has used its last bounce, then I randomly select a light source and randomly select a point on the light source and set the ray direction to that point. 
-### Direct Lighting Comparison
+### Direct Lighting Comparison (Direct Lighting on Left)
 ![Lighting](img/light_compare.jpg)
 
 ### Performance Analysis: Stream Compaction
