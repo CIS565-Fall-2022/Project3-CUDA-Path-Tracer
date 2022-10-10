@@ -136,9 +136,9 @@ I also implemented bump mapping for uv textures. I followed these slides for ins
 
 **Stream compaction helps most after a few bounces. Print and plot the effects of stream compaction within a single iteration (i.e. the number of unterminated rays after each bounce) and evaluate the benefits you get from stream compaction.**
 
-![](img/streamCompactionBasic.png)
-
-![](img/depthVsTime.png)
+_No Direct Lighting_            |  _Direct Lighting_ 
+:-------------------------:|:-------------------------:
+![](img/streamCompactionBasic.png) |  ![](img/depthVsTime.png)
 
 **Compare scenes which are open (like the given cornell box) and closed (i.e. no light can escape the scene). Again, compare the performance effects of stream compaction! Remember, stream compaction only affects rays which terminate, so what might you expect?**
 
