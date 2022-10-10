@@ -130,6 +130,8 @@ void runCuda() {
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
+	bool sortMaterial = true;
+
 	if (iteration == 0) {
 		pathtraceFree();
 		pathtraceInit(scene);
@@ -142,7 +144,7 @@ void runCuda() {
 
 		// execute the kernel
 		int frame = 0;
-		pathtrace(pbo_dptr, frame, iteration);
+		pathtrace(pbo_dptr, frame, iteration,sortMaterial);
 
 		// unmap buffer object
 		cudaGLUnmapBufferObject(pbo);
