@@ -128,11 +128,13 @@ Note, it becomes even more expensive if implemented along with intersection cach
 
 ### Path continuation/termination using stream compaction
 
-In an open cornell box used above, stream compaction greatly improves performance. We can see how stream compaction efficiently removes the rays that are terminated which extremely reduces the time taken per bounce.
+In an open cornell box used above, stream compaction greatly improves performance. We can see how stream compaction efficiently removes the rays that are terminated which extremely reduces the time taken per bounce. Since the number of rays getting terminated per depth would be very large in case of an open cornell box, we also need to observe if it improves performance in a closed cornell box. The following graph shows the number of remaining paths per bounce when stream compaction is off against observations when it is turned on for a open box as well as an closed cornell box. Number of paths in case of both open and closed box remains constant when stream compaction is off.
 
 | Number of paths remaining versus depth (1 iteration cycle)|
 |---|
 |![](img/performanceAnalysis/streamcompaction_path.png)|
+
+While the number of remaining rays decreases in case of both open and closed box, the following graph shows us that stream compaction may be very efficient for an open cornell box because many rays get terminated per iteration when they do not hit anything. In case of closed cornell box however, even though time taken is decreasing per bounce, the cost of computation for stream compaction increases the overall time taken. 
 
 | Time-taken by GPU versus depth (1 iteration cycle)|
 |---|
