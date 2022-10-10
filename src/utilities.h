@@ -27,6 +27,7 @@
 #define USE_BVH           DISABLE
 #define USE_BVH_MIDPOINT  ENABLE
 #define USE_BVH_SAH       DISABLE
+#define DISPLAY_HEATMAP   DISABLE
 
 class GuiDataContainer
 {

@@ -113,7 +113,7 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
 //    return tmin <= tmax && tmax >= 0.0;
 //}
 
-__host__ __device__ bool aabbIntersectionTest(AABB aabb, Ray r, float& t) {
+__host__ __device__ bool aabbIntersectionTest(AABB aabb, Ray &r, float& t) {
     //glm::vec3 invR = glm::vec3(1.0, 1.0, 1.0) / r.direction;
     glm::vec3 invR = r.invDirection;
 
@@ -146,6 +146,7 @@ __host__ __device__ bool aabbIntersectionTest(AABB aabb, Ray r, float& t) {
         return tmax;
     }
     return tmin <= tmax && tmax >= 0;*/
+    r.intersectionCount++;
     return intersect;
 }
 
@@ -199,7 +200,6 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     if (!outside) {
         //normal = -normal;
     }
-
     return glm::length(r.origin - intersectionPoint);
 }
 
@@ -211,12 +211,13 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ float triangleIntersectionTest(Triangle tri, Ray r,
+__host__ __device__ float triangleIntersectionTest(Triangle tri, Ray &r,
     glm::vec3& barycenter) {
 
     bool intersect = glm::intersectRayTriangle(r.origin, r.direction,
                                                tri.verts[0], tri.verts[1], tri.verts[2],
                                                barycenter);
+    r.intersectionCount++;
     if (!intersect) return -1.f;
 
     return barycenter.z;
@@ -230,7 +231,7 @@ __host__ __device__ float triangleIntersectionTest(Triangle tri, Ray r,
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ float meshIntersectionTest(Geom mesh, Ray r,
+__host__ __device__ float meshIntersectionTest(Geom mesh, Ray &r,
     const Triangle* tris, glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
 
     //float min_t = INFINITY;
@@ -279,7 +280,7 @@ __host__ __device__ bool devIsLeaf(const LBVHNode* node) {
     return node->left == 0xFFFFFFFF && node->right == 0xFFFFFFFF;
 }
 
-__host__ __device__ void lbvhIntersectTriangle(const Triangle* tris, Ray r, int objectId,
+__host__ __device__ void lbvhIntersectTriangle(const Triangle* tris, Ray &r, int objectId,
     Triangle& min_tri, glm::vec3& min_barycenter, float& min_t) {
 
     glm::vec3 barycenter;
@@ -300,7 +301,7 @@ __host__ __device__ void lbvhIntersectTriangle(const Triangle* tris, Ray r, int 
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ float lbvhIntersectionTest(const LBVHNode* nodes, const Triangle* tris, Ray r, int triangleCount,
+__host__ __device__ float lbvhIntersectionTest(const LBVHNode* nodes, const Triangle* tris, Ray &r, int triangleCount,
      glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
 
     float stack[16];
@@ -364,7 +365,7 @@ __host__ __device__ bool devBvhIsLeaf(const BVHNode* node) {
     return (node->numTris > 0);
 }
 
-__host__ __device__ void bvhIntersectTriangles(const Triangle* tris, Ray r, int start, int numTris,
+__host__ __device__ void bvhIntersectTriangles(const Triangle* tris, Ray &r, int start, int numTris,
     Triangle& min_tri, glm::vec3& min_barycenter, float& min_t) {
 
     for (int i = start; i < start + numTris; ++i) {
@@ -387,7 +388,7 @@ __host__ __device__ void bvhIntersectTriangles(const Triangle* tris, Ray r, int 
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ float bvhIntersectionTest(const BVHNode* nodes, const Triangle* tris, Ray r, int triangleCount,
+__host__ __device__ float bvhIntersectionTest(const BVHNode* nodes, const Triangle* tris, Ray &r, int triangleCount,
     glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
 
     float stack[20];

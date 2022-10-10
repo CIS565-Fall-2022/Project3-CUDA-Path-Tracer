@@ -47,8 +47,9 @@ glm::vec3 calculateFresnel(const Material &m, float cosTheta) {
     float etaT = m.indexOfRefraction;
     float cosThetaI = glm::clamp(cosThetaI, -1.f, 1.f);
     
-    bool entering = (cosThetaI > 0.f);
-    if (!entering) {
+    // Check if entering or leaving medium, and swap indices of refraction if necessary
+    bool leaving = (cosThetaI < 0.f);
+    if (leaving) {
         float tmp = etaI;
         etaI = etaT;
         etaT = tmp;
@@ -63,13 +64,14 @@ glm::vec3 calculateFresnel(const Material &m, float cosTheta) {
     // Total internal reflection
     if (sinThetaT >= 1.0) return glm::vec3(1.0, 1.0, 1.0);
 
+    // Compute Fresnel reflectance (see equation in PBRT 8.2.1)
     float cosThetaT = glm::sqrt(glm::max(0.0, 1.0 - sinThetaT * sinThetaT));
-    float Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
+    float rParallel = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
         ((etaT * cosThetaI) + (etaI * cosThetaT));
-    float Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
+    float rPerp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
         ((etaI * cosThetaI) + (etaT * cosThetaT));
 
-    return glm::vec3((Rparl * Rparl + Rperp * Rperp) / 2.0);
+    return glm::vec3((rParallel * rParallel + rPerp * rPerp) * 0.5f);
 }
 
 __host__ __device__

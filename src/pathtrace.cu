@@ -86,6 +86,17 @@ __host__ __device__ glm::vec3 gammaCorrect(glm::vec3 c) {
 	return pow(c, gamma);
 }
 
+// Use a cosine-based color palette to map intersection count to color - from "Color Palettes" - Inigo Quilez
+__host__ __device__ glm::vec3 palette(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, float t) {
+	return a + b * cos(6.28318f * (c * t + d));
+}
+
+__host__ __device__ glm::vec3 intToColor(float count) {
+	// Map value to [0, 1] range
+	float val = count * (1.f / 250.f);
+	return palette(glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(1.f, 0.7f, 0.4f), glm::vec3(0.f, 0.15f, 0.2f), val);
+}
+
 //Kernel that writes the image to the OpenGL PBO directly.
 __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
 	int iter, glm::vec3* image) {
@@ -196,10 +207,10 @@ void pathtraceFree() {
 */
 __host__ __device__ glm::vec3 concentricSampleDisk(glm::vec2 &sample)
 {
-	// Map sample point (uniform random numbers) to range [-1, 1]^2
+	// Map sample point (uniform random numbers) to range [-1, 1]
 	glm::vec2 mappedSample = 2.f * sample - glm::vec2(1.f, 1.f);
 
-	// Handle origin
+	// Handle origin to avoid divide by zero
 	if (mappedSample.x == 0.f && mappedSample.y == 0.f) {
 		return glm::vec3(0.f);
 	}
@@ -270,6 +281,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 			segment.ray.direction = glm::normalize(focalPoint - segment.ray.origin);
 		}
 		segment.ray.invDirection = glm::vec3(1.0, 1.0, 1.0) / segment.ray.direction;
+		segment.ray.intersectionCount = 0.f;
 		segment.pixelIndex = index;
 		segment.remainingBounces = traceDepth;
 	}
@@ -299,7 +311,7 @@ __global__ void computeIntersections(
 		//{
 		//	return;
 		//}
-		PathSegment pathSegment = pathSegments[path_index];
+		PathSegment &pathSegment = pathSegments[path_index];
 
 		float t;
 		glm::vec3 intersect_point;
@@ -485,7 +497,11 @@ __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iteration
 	if (index < nPaths)
 	{
 		PathSegment iterationPath = iterationPaths[index];
+#if DISPLAY_HEATMAP
+		image[iterationPath.pixelIndex] += intToColor(iterationPath.ray.intersectionCount);
+#else
 		image[iterationPath.pixelIndex] += iterationPath.color;
+#endif
 	}
 }
 
