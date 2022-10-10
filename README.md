@@ -154,6 +154,10 @@ The results fit my origial hypothesis.
 
 **Material Sorting Performance**
 
+Implementing material sorting actually decreased the performance for scenes with 7 different types of materials and 27 different types of materials both. My understanding is that sorting the materials would make sense if the scene had a lot of materials (we could see a performance improvement if we had over 100 materials in one scene). However, compared between the performance with material sorting in 7Mat Scene vs. 27 Mat Scene, we can curiously see that 27 materials generally has lower runtime than 7 materials once we get to trace depth 4 and above.
+
+
+***LOWER IS BETTER***
 ![](img/matSort.png)
 
 **First Bounce Caching**
