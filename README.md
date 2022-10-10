@@ -72,7 +72,7 @@ Admittedly, getting this to work took a lot longer than it should have.
 </br >
 </br >
 This pile of mess occured because I was not properly changing my random numbers. The random number generator I was using requires a seed. This seed is generated using a number of inputs, one of them being a pixel index. Instead of indexing every pixel uniquely. I indexed using x and y. This means pixels that share the same row and column were getting the same random number. Hence all those lines. After figuring this one out, I stumbled upon this. 
-![](img/dof1.PNG)
+![](img/dof1.png)
 </br >
 </br >
 This happens because I was till caching the first bounce. Meaning the ray was shooting into the exact same spot for every sample. 
@@ -90,6 +90,7 @@ Here is a render with anti-aliasing
 </br >
 </br >
 Frankly, I cannot see a difference. I suspect that it has to do with the random offset being too small. That being said, it certainly looks better than this.
+</br >
 ![](img/tvstoppedworking.PNG)
 </br >
 </br >
@@ -101,4 +102,44 @@ OBJ files basically encode 3d objects. [TinyObjLoader](https://github.com/tinyob
 </br >
 </br >
 Here is a comparison between objects of differing complexities. Each object was rendered in a scene with and without a bounding box and timed to 100 samples.
+
 ![](img/chart3.png)
+
+</br >
+</br >
+The objects of middle and most complexity both experienced around a 10% reduction in runtime. The use of a bounding box is much less noticable for the low complexity object. This is quite expectd. As the bounding box is saving more work of higher complexity objects. What perhaps is more interesting though, is comparing the effects of having and not having the bounding box, on the same object at different scale factors.
+
+![](img/chart4.png)
+</br >
+For reference: This is the object when scaled by twice it's size (last column)
+![](img/teapotbig.png)
+and this is the object when scaled by .25 it's size (first column)
+![](img/teapotsmall.png)
+When the object is small, we are saving significantly more time than if the same object was big. Much fewer rays would intersect the small object, so keeping the majority or rays from checking against it is quite significant. On the other hand, the majority of rays would intersect the big object anyway, so using the bounding box doesn't save as much time. 
+
+###Restartable Path-tracer
+Despite all the performance improvements, the path tracer could still take hours to render an image. It is thus beneficial to be able to stop the execution, and pick up from where was left off upon running the pather tracer again, rather than need to restart the whole process. One may also want to adjust paramaters or make small adjustments to the scene while not fully restarting. While running the path tracer, one can press 'x' on their keyboard to save the current state of the execution. When launching the path tracer, one has the option to load the most recently saved state and pick up from there. This isn't really a performance or aesthetic improvement, but a quality of life one. Here is the feature in action
+![](img/restart.gif)
+</br >
+</br >
+One pretty interesting unintentional consequence of this feature is the ability to save a render state, load a different scene, and then load the render state. From this we can get interesting renders like this one
+</br >
+![](img/RestartFail.PNG)
+</br >
+This was actually a bug caused by an indexing error, but the thought still stands.
+
+###References
+</br >
+[Angel Obj](https://www.cgtrader.com/free-3d-models/character/fantasy-character/lucy-a-christian-angel-statue-bb54169c38f87b1130bf72bfa18b3d9c)
+</br >
+[Discus Thrower Obj](https://www.turbosquid.com/3d-models/free-obj-mode-sculpture-discobolus-discus-thrower/1093054)
+</br >
+[Teapot Obj](https://graphics.stanford.edu/courses/cs148-10-summer/as3/code/as3/teapot.obj)
+</br >
+[Cube Obj](https://gist.github.com/MaikKlein/0b6d6bb58772c13593d0a0add6004c1c)
+</br >
+[Paul Bourke Anti-Aliasing](http://paulbourke.net/miscellaneous/raytracing/)
+</br >
+[TinyObjLoader](https://github.com/tinyobjloader/tinyobjloader)
+</br >
+[PBRT](https://pbr-book.org/3ed-2018/contents)
