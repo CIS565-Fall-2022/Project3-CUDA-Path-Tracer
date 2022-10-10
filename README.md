@@ -105,7 +105,7 @@ Refractive Stanford Bunny, 5000 iterations
 
 Broken AABB intersection test
 
-![](img/bloopers/cornell.2022-10-06_04-26-16z.5000samp.PNG)
+![](img/bloopers/cornell.2022-10-06_04-26-16z.5000samp.png)
 
 Flat normals
 ![](img/bloopers/cornell.2022-10-06_05-12-34z.5000samp.png)
