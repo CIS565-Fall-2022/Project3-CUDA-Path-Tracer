@@ -1,6 +1,10 @@
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+
 #include "main.h"
 #include "preview.h"
 #include <cstring>
+
 
 static std::string startTimeString;
 
@@ -23,6 +27,9 @@ Scene* scene;
 GuiDataContainer* guiData;
 RenderState* renderState;
 int iteration;
+
+int cur_x;
+int cur_y;
 
 int width;
 int height;
@@ -49,6 +56,8 @@ int main(int argc, char** argv) {
 
 	// Set up camera stuff from loaded path tracer settings
 	iteration = 0;
+	cur_x = 0;
+	cur_y = 0;
 	renderState = &scene->state;
 	Camera& cam = renderState->camera;
 	width = cam.resolution.x;
@@ -129,7 +138,6 @@ void runCuda() {
 
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
-
 	if (iteration == 0) {
 		pathtraceFree();
 		pathtraceInit(scene);
@@ -147,12 +155,12 @@ void runCuda() {
 		// unmap buffer object
 		cudaGLUnmapBufferObject(pbo);
 	}
-	else {
+	/*else {
 		saveImage();
 		pathtraceFree();
 		cudaDeviceReset();
 		exit(EXIT_SUCCESS);
-	}
+	}*/
 }
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -189,13 +197,13 @@ void mousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
 	if (xpos == lastX || ypos == lastY) return; // otherwise, clicking back into window causes re-start
 	if (leftMousePressed) {
 		// compute new camera parameters
-		phi -= (xpos - lastX) / width;
-		theta -= (ypos - lastY) / height;
+		phi -= ((xpos - lastX) / width) * 2.5f;
+		theta -= ((ypos - lastY) / height) * 2.5f;
 		theta = std::fmax(0.001f, std::fmin(theta, PI));
 		camchanged = true;
 	}
 	else if (rightMousePressed) {
-		zoom += (ypos - lastY) / height;
+		zoom += ((ypos - lastY) / height) * 7.5f;
 		zoom = std::fmax(0.1f, zoom);
 		camchanged = true;
 	}

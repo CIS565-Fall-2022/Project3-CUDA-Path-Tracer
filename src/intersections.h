@@ -6,6 +6,9 @@
 #include "sceneStructs.h"
 #include "utilities.h"
 
+#define MIN_INTERSECT_DIST 0.0001f
+#define MAX_INTERSECT_DIST 10000.0f
+
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
  */
@@ -25,7 +28,7 @@ __host__ __device__ inline unsigned int utilhash(unsigned int a) {
  * Falls slightly short so that it doesn't intersect the object it's hitting.
  */
 __host__ __device__ glm::vec3 getPointOnRay(Ray r, float t) {
-    return r.origin + (t - .0001f) * glm::normalize(r.direction);
+    return r.origin + t * glm::normalize(r.direction);
 }
 
 /**
@@ -34,6 +37,24 @@ __host__ __device__ glm::vec3 getPointOnRay(Ray r, float t) {
 __host__ __device__ glm::vec3 multiplyMV(glm::mat4 m, glm::vec4 v) {
     return glm::vec3(m * v);
 }
+
+__host__ __device__ float squareplaneIntersectionTest(Geom& squareplane, Ray& r, glm::vec3& normal) {
+    Ray q;
+    q.origin = multiplyMV(squareplane.inverseTransform, glm::vec4(r.origin, 1.0f));
+    q.direction = glm::normalize(multiplyMV(squareplane.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+    float t = glm::dot(glm::vec3(0.0f, 0.0f, 1.0f), (glm::vec3(0.5f, 0.5f, 0.0f) - q.origin)) / glm::dot(glm::vec3(0.0f, 0.0f, 1.0f), q.direction);
+    glm::vec3 objspaceIntersection = getPointOnRay(q, t);
+
+    if (t > 0.0001f && objspaceIntersection.x >= -0.5001f && objspaceIntersection.x <= 0.5001f && objspaceIntersection.y >= -0.5001f && objspaceIntersection.y <= 0.5001f) {
+        glm::vec3 intersectionPoint = multiplyMV(squareplane.transform, glm::vec4(objspaceIntersection, 1.0f));
+        normal = glm::normalize(multiplyMV(squareplane.invTranspose, glm::vec4(0.0f, 0.0f, 1.0f, 0.0f)));
+        return glm::length(r.origin - intersectionPoint);
+    }
+
+    return MAX_INTERSECT_DIST;
+}
+
 
 // CHECKITOUT
 /**
@@ -45,8 +66,7 @@ __host__ __device__ glm::vec3 multiplyMV(glm::mat4 m, glm::vec4 v) {
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ float boxIntersectionTest(Geom box, Ray r,
-        glm::vec3 &intersectionPoint, glm::vec3 &normal, bool &outside) {
+__host__ __device__ float boxIntersectionTest(Geom &box, Ray &r, glm::vec3 &normal) {
     Ray q;
     q.origin    =                multiplyMV(box.inverseTransform, glm::vec4(r.origin   , 1.0f));
     q.direction = glm::normalize(multiplyMV(box.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -63,8 +83,8 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
             float ta = glm::min(t1, t2);
             float tb = glm::max(t1, t2);
             glm::vec3 n;
-            n[xyz] = t2 < t1 ? +1 : -1;
-            if (ta > 0 && ta > tmin) {
+            n[xyz] = t2 < t1 ? +1.0f : -1.0f;
+            if (ta > 0.0f && ta > tmin) {
                 tmin = ta;
                 tmin_n = n;
             }
@@ -75,18 +95,16 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
         }
     }
 
-    if (tmax >= tmin && tmax > 0) {
-        outside = true;
-        if (tmin <= 0) {
+    if (tmax >= tmin && tmax > 0.0f) {
+        if (tmin <= 0.0f) {
             tmin = tmax;
             tmin_n = tmax_n;
-            outside = false;
         }
-        intersectionPoint = multiplyMV(box.transform, glm::vec4(getPointOnRay(q, tmin), 1.0f));
+        glm::vec3 intersectionPoint = multiplyMV(box.transform, glm::vec4(getPointOnRay(q, tmin), 1.0f));
         normal = glm::normalize(multiplyMV(box.invTranspose, glm::vec4(tmin_n, 0.0f)));
         return glm::length(r.origin - intersectionPoint);
     }
-    return -1;
+    return MAX_INTERSECT_DIST;
 }
 
 // CHECKITOUT
@@ -99,9 +117,8 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
  * @param outside            Output param for whether the ray came from outside.
  * @return                   Ray parameter `t` value. -1 if no intersection.
  */
-__host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
-        glm::vec3 &intersectionPoint, glm::vec3 &normal, bool &outside) {
-    float radius = .5;
+__host__ __device__ float sphereIntersectionTest(Geom &sphere, Ray &r, glm::vec3 &normal) {
+    float radius = 0.5f;
 
     glm::vec3 ro = multiplyMV(sphere.inverseTransform, glm::vec4(r.origin, 1.0f));
     glm::vec3 rd = glm::normalize(multiplyMV(sphere.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -111,9 +128,9 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     rt.direction = rd;
 
     float vDotDirection = glm::dot(rt.origin, rt.direction);
-    float radicand = vDotDirection * vDotDirection - (glm::dot(rt.origin, rt.origin) - powf(radius, 2));
-    if (radicand < 0) {
-        return -1;
+    float radicand = vDotDirection * vDotDirection - (glm::dot(rt.origin, rt.origin) - powf(radius, 2.0f));
+    if (radicand < 0.0f) {
+        return MAX_INTERSECT_DIST;
     }
 
     float squareRoot = sqrt(radicand);
@@ -121,24 +138,51 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     float t1 = firstTerm + squareRoot;
     float t2 = firstTerm - squareRoot;
 
-    float t = 0;
-    if (t1 < 0 && t2 < 0) {
-        return -1;
-    } else if (t1 > 0 && t2 > 0) {
+    float t = 0.0f;
+    if (t1 < 0.0f && t2 < 0.0f) {
+        return MAX_INTERSECT_DIST;
+    } else if (t1 > 0.0f && t2 > 0.0f) {
         t = min(t1, t2);
-        outside = true;
     } else {
         t = max(t1, t2);
-        outside = false;
     }
 
     glm::vec3 objspaceIntersection = getPointOnRay(rt, t);
 
-    intersectionPoint = multiplyMV(sphere.transform, glm::vec4(objspaceIntersection, 1.f));
-    normal = glm::normalize(multiplyMV(sphere.invTranspose, glm::vec4(objspaceIntersection, 0.f)));
-    if (!outside) {
-        normal = -normal;
-    }
+    glm::vec3 intersectionPoint = multiplyMV(sphere.transform, glm::vec4(objspaceIntersection, 1.0f));
+    normal = glm::normalize(multiplyMV(sphere.invTranspose, glm::vec4(objspaceIntersection, 0.0f)));
 
     return glm::length(r.origin - intersectionPoint);
+}
+
+
+// CHECKITOUT
+/**
+ * Test intersection between a ray and a triangle.
+ *
+ * @param intersectionPoint  Output parameter for point of intersection.
+ * @param normal             Output parameter for surface normal.
+ * @param outside            Output param for whether the ray came from outside.
+ * @return                   Ray parameter `t` value. -1 if no intersection.
+ */
+__host__ __device__ float triIntersectionTest(Tri &tri, Ray &r, glm::vec3& normal) {
+    //glm::vec3 bary_coords;
+    //t = glm::intersectRayTriangle(pathSegment.ray.origin, pathSegment.ray.direction, tri.p0, tri.p1, tri.p2, bary_coords);
+        //1. Ray-plane intersection
+    float t = glm::dot(tri.plane_normal, (tri.p0 - r.origin)) / glm::dot(tri.plane_normal, r.direction);
+    if (t < 0.0f) return t;
+
+    glm::vec3 P = r.origin + t * r.direction;
+    //2. Barycentric test
+    float S = 0.5f * glm::length(glm::cross(tri.p0 - tri.p1, tri.p0 - tri.p2));
+    float s1 = 0.5f * glm::length(glm::cross(P - tri.p1, P - tri.p2)) / S;
+    float s2 = 0.5f * glm::length(glm::cross(P - tri.p2, P - tri.p0)) / S;
+    float s3 = 0.5f * glm::length(glm::cross(P - tri.p0, P - tri.p1)) / S;
+    float sum = s1 + s2 + s3;
+
+    if (s1 >= 0 && s1 <= 1 && s2 >= 0 && s2 <= 1 && s3 >= 0 && s3 <= 1 && sum == 1.0f) {
+        normal = tri.plane_normal;
+        return t;
+    }
+    return -1.0f;
 }
