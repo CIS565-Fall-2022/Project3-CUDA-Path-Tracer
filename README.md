@@ -88,25 +88,27 @@ From the left to the right, the refraction indices are 1.33 (water), 1.77 (sapph
 ## <a name="dof">Depth of Field</a>
 Depth of Field in a path tracer is done by jittering rays within an aperture. It will add noises to the rays that does hit objects on the focal length, and create a blurry effect.   
 To enable DOF, set `DEPTH_OF_FIELD` to 1 in `pathtrace.cu`, and use `FOCAL_LENGTH` and `APERTURE` to adjust the effect.    
+The following scene has an aperture of 1.2 and a focal length of 10. It is easy to see that only the sphere in the center is clear, while eveything else seems blurred.       
 ![DOF](img/dof.png)
 
 ## <a name="directlighting">Direct Lighting</a>
 In a path tracer, light intensity is the most important information, and ideally we want each bounce and iteration to carry as much information as possible. One way to achieve this is by always taking the final ray directly to a random point on the light source.   
 To enable direct lighting, set `DIRECT_LIGHTING` to 1 in `pathtrace.cu`.   
-Comparing the same scene with direct lighting on (left) and off (right), direct lighting makes the scene brighter.    
-![Directlighting](img/directlighting.png) ![no_directlighting](img/nodirectlighting.png)
+Comparing the same scene with direct lighting on (left) and off (right), direct lighting makes the scene brighter. Additionally, it also converges faster when the iteration count is still low.       
+![Directlighting](img/directlighting.png =800px) ![no_directlighting](img/nodirectlighting.png =800px)
 
 ## <a name="motionblur">Motion Blur</a>
 Motion blur is achieved by averaging samples at different times in the animation.    
 To enable direct lighting, set `MOTION_BLUR` to 1 in `pathtrace.cu`, and define the motion of the objects in the scene by setting its "ENDPOS". The object will then move from its starting postion to the endpos.    
+In the following example, the sphere is moving down by 2 unit   
 ![motionblur](img/motionblur.png)
 
 ## <a name="ssaa">Stochastic Sampled Anti-aliasing</a>
 Stochastic sampled anti-aliasing is a relatively low-cost anti-aliasing technique ahieved by jittering the sample locations that are spaced out regularly. This increase in low frequency noise would cause an image convoluted with this filter to scatter the high frequencies into low frequencies. Since the human visual system is more sensitive to low frequencies, this "tricks" people into thinking the there are less aliasing in the scene.    
 To enable antialiasing, set `ANTI_ALIASING` to 1. Note that in my current implementation, DOF can't be turned on with AA simultaneously.       
 Below is the comparison of the same scene with anti-aliasing on (left) and off (right).   
-![Anti-aliasing](img/antialiasing.png) ![no anti-aliasing](img/no-antialiasing.png)    
-Maginified comparison:
+![Anti-aliasing](img/antialiasing.png = 800px) ![no anti-aliasing](img/no-antialiasing.png =800px)    
+The following maginified image shows that with anti-aliasing (below), the image indeed look less "noisy". 
 ![no anti-aliasing](img/aa_compare.png)   
 
 ## <a name="mesh">Mesh Loading</a>
@@ -119,7 +121,8 @@ Please see the sample scene files to learn how to load a mesh into the scene.
 
 ## <a name="texture">Texture Mapping with Simple Procedural Texture</a>
 Loading a mesh without its texture is no fun! Fortunately, my pathtracer also loads the texture and maps it on the mesh according to the given uv coordinates.    
-When there is no texture file, it will generate a simple procedural texture. 
+When there is no texture file, it will generate a simple procedural texture.    
+In the following scene, Mario is using a image texture, and the cow is using a procedural texture.
 Please see the sample scene files to learn how to load a texture into the scene.   
  ![Texture-mapping](img/texture.png)   
 ### Performance Analysis - Image Texture vs. Procedural Texture
@@ -131,12 +134,16 @@ To enable direct lighting, set `POST_PROCESS` to 1 in `pathtrace.cu`, and set th
 ### No Filter
 ![nofilter](img/nofilter.png)        
 ### Greyscale   
+Greyscale filter converts the color information to only light intensity information. The image will have many shades of gray in between. Greyscale color = 0.21R + 0.72G + 0.07B   
 ![Greyscale](img/greyscale.png)   
 ### Sepia   
+Sepia filter is a reddish-brown tone, and it is a chemical process used in photography. Sepia adjust each color channel with a certain value to add shades of brown to the image.    
 ![Sepia](img/sepia.png)   
 ### Inverted   
+Inverted filter is simply inverting the color of the scene. It makes the original dark pixels bright and bright pixels dark. It can be simply achieved by new color = 1 - original color.   
 ![Inverted](img/inverted.png)   
 ### High-contrast   
+High-contrast filter makes bright pixels brighter and dark pixels darker by multiplying the color according to its brightness by a small number.    
 ![High-contrast](img/high-contrast.png) 
 
 # <a name="bloopers">Bloopers</a>

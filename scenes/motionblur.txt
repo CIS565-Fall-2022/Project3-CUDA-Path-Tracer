@@ -50,7 +50,7 @@ EMITTANCE   0
 
 // Diffuse Blue
 MATERIAL 5
-RGB         .0 .98 .0
+RGB         .0 .0 .98
 SPECEX      0
 SPECRGB     0 0 0
 REFL        0
@@ -78,41 +78,11 @@ REFR        0
 REFRIOR     0
 EMITTANCE   0
 
-// Water
-MATERIAL 8
-RGB         .8314 .9451 .9765
-SPECEX      0
-SPECRGB     .8314 .9451 .9765
-REFL        1
-REFR        1
-REFRIOR     1.33
-EMITTANCE   0
-
-// Sapphire
-MATERIAL 9
-RGB         .059 .322 .729
-SPECEX      0
-SPECRGB     .059 .322 .729
-REFL        1
-REFR        1
-REFRIOR     1.77
-EMITTANCE   0
-
-// Diamond
-MATERIAL 10
-RGB         .7255 .949 .99
-SPECEX      0
-SPECRGB     .7255 .949 .99
-REFL        1
-REFR        1
-REFRIOR     2.42
-EMITTANCE   0
-
 // Camera
 CAMERA
-RES         800 800
+RES         1600 1600
 FOVY        45
-ITERATIONS  5000
+ITERATIONS  500
 DEPTH       8
 FILE        cornell
 EYE         0.0 5 10.5
@@ -126,7 +96,7 @@ cube
 material 0
 TRANS       0 10 0
 ROTAT       0 0 0
-SCALE       3 .3 3
+SCALE       5 .3 5
 
 // Floor
 OBJECT 1
@@ -139,7 +109,7 @@ SCALE       10 .01 10
 // Ceiling
 OBJECT 2
 cube
-material 7
+material 1
 TRANS       0 10 0
 ROTAT       0 0 90
 SCALE       .01 10 10
@@ -170,26 +140,9 @@ SCALE       .01 10 10
 
 // Sphere
 OBJECT 6
-sphere
-material 8
-TRANS       -3 4 0
+cube
+material 6
+TRANS       0 6 0
 ROTAT       0 0 0
-SCALE       3 3 3
-ENDPOS	    -3 0 0
-
-// Sphere
-OBJECT 7
-sphere
-material 9
-TRANS       0 4 0
-ROTAT       0 0 0
-SCALE       3 3 3
-
-// Sphere
-OBJECT 8
-sphere
-material 10
-TRANS       3 4 0
-ROTAT       0 0 0
-SCALE       3 3 3
-ENDPOS      -3 8 0
+SCALE       4 4 4
+ENDPOS	    0 5 0
