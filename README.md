@@ -74,11 +74,15 @@ iterationComplete = (num_paths == 0);
 
 ## <a name="ray_sorting">Sorting Rays</a>
 To enable ray sorting, set `SORT_RAYS` to 1 in `pathtrace.cu`.   
-Since each ray can hit a material of different BSDF computation, some rays might terminate early, while others can be in flight for a long time. This results in threads finishing at different times. To solve this problem, we can use radix sort to sort the rays by the material types. By making the rays that hit the same material contiguous in memory, we can improve the performance by terminating the idling warps early so they can be utilized again. However, since sorting adds a significant amount of computation overheads, this algorithm only helps improve the performance when there are many different material types in the scene. In a simple scene like Cornell box, toggling sorting rays on will actually decrease the performance.
+Since each ray can hit a material of different BSDF computation, some rays might terminate early, while others can be in flight for a long time. This results in threads finishing at different times. To solve this problem, we can use radix sort to sort the rays by the material types. By making the rays that hit the same material contiguous in memory, we can improve the performance by terminating the idling warps early so they can be utilized again. However, since sorting adds a significant amount of computation overheads, this algorithm only helps improve the performance when there are many different material types in the scene. In a simple scene like Cornell box, toggling sorting rays on will actually decrease the performance.   
+I'm getting **19.2** fps for ray sorting on vs. **19.7** fps for ray sorting off for the refraction scene (higher is better), where there are 10 materials.  
+Then I added 8 more materials and 8 more spheres. I'm getting **18.6** fps for ray sorting on vs. **16.9** fps for ray soring off. It clearly proves that when there are less materials/objects in the scene, ray sorting may actually be slower than without it. But as the scene gets more complicated, sorting rays will increase the performance significantly.
+
 
 ## <a name="cache">Caching the First Bounce Intersections   </a>
 To enable first bounce intersections caching, set `CACHE_FIRST_BOUNCE` to 1 in `pathtrace.cu`.    
-One small improvement is to cache the first bounce intersections so it can be re-used for all the subsequent iterations. According to my test result, this provides a very small performance improvement. 
+One small improvement is to cache the first bounce intersections so it can be re-used for all the subsequent iterations. According to my test result, this provides a very small performance improvement.    
+From my tests on different scenes, caching the first bounce intersection generally gives a roughly **1/60 performance boost**. 
 
 ## <a name="refract">Refraction</a>
 This uses the Schlick's approximation to implement the refraction effect.    
@@ -117,6 +121,8 @@ It also does bounding volume intersection culling by first checking rays against
 Please see the sample scene files to learn how to load a mesh into the scene.     
 ![mesh](img/mesh.png)
 ### Performance Analysis - Bounding Volume Check On vs. Off   
+I'm getting **1.8 fps** for the bounding culling on vs. **1.6 fps** for the bounding culling off (higher is better).    
+Bounding volume culling does give a slight performance boost. It is not a big difference, but that's mostly because I'm only testing the cow mesh. If the mesh is more complicated and has more out-of-bound vertices, the benefits are expected to be significantly bigger. 
 
 ## <a name="texture">Texture Mapping with Simple Procedural Texture</a>
 Loading a mesh without its texture is no fun! Fortunately, my pathtracer also loads the texture and maps it on the mesh according to the given uv coordinates.    
@@ -125,6 +131,8 @@ In the following scene, Mario is using a image texture, and the cow is using a p
 Please see the sample scene files to learn how to load a texture into the scene.   
  ![Texture-mapping](img/texture.png)   
 ### Performance Analysis - Image Texture vs. Procedural Texture
+I'm getting **1.8 fps** for the image texture vs. **1.7 fps** for the procedural texture (higher is better).    
+It's not a huge difference, and it makes sense because image texture is simply reading data from an image, while procedural texture involves computing noises and generating a new color. Additionally, I'm only generating the noise from a simple noise function. If a fansy procedural texture is desired, it will require multiple layers of noises, which is expected to slow down the frame rate even more. 
 
 ## <a name="post">Final Rays Post-processing</a>
 Final rays post-processing is basically taking the final color of the scene, and apply interesting filters to it by tuning its rgb value.    
