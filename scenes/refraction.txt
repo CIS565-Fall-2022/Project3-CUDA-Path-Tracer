@@ -1,0 +1,220 @@
+// Red Light
+MATERIAL 0
+RGB         1 0.3 0.3
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   10
+
+// Blue Light
+MATERIAL 1
+RGB         0.3 0.3 0.7
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   10
+
+// Diffuse white
+MATERIAL 2
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse red
+MATERIAL 3
+RGB         .85 .35 .35
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse green
+MATERIAL 4
+RGB         .35 .25 .85
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Specular white
+MATERIAL 5
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Refractive Material
+MATERIAL 6
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     .98 .98 .98
+REFL        0
+REFR        1
+REFRIOR     0
+EMITTANCE   0
+
+// White Light
+MATERIAL 7
+RGB         1 1 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   1
+
+
+// Camera
+CAMERA
+RES         1080 1080
+FOVY        45
+ITERATIONS  50000
+DEPTH       32
+LENSR       0.1
+FOCALD      7.5
+FILE        cornell
+EYE         0.0 5 10.5
+LOOKAT      0 5 0
+UP          0 1 0
+
+
+// Ceiling light
+OBJECT 0
+cube
+material 0
+TRANS       -3 17 2
+ROTAT       0 0 0
+SCALE       4 0.1 4
+VELOCITY    0 0 0
+
+// Ceiling light
+OBJECT 1
+cube
+material 1
+TRANS       3 17 2
+ROTAT       0 0 0
+SCALE       4 0.1 4
+VELOCITY    0 0 0
+
+// Floor
+OBJECT 2
+cube
+material 2
+TRANS       0 0 0
+ROTAT       0 0 0
+SCALE       40 .01 100
+VELOCITY    0 0 0
+
+// Left wall
+OBJECT 3
+cube
+material 2
+TRANS       -10 5 0
+ROTAT       0 0 0
+SCALE       .01 50 100
+VELOCITY    0 0 0
+
+// Right wall
+OBJECT 4
+cube
+material 2
+TRANS       10 5 0
+ROTAT       0 0 0
+SCALE       .01 50 100
+VELOCITY    0 0 0
+
+// Glass Sphere
+OBJECT 5
+sphere
+material 6
+TRANS       0 13.5 3
+ROTAT       0 0 0
+SCALE       7 7 7
+VELOCITY    0 0 0
+
+// Glass Sphere
+OBJECT 6
+sphere
+material 6
+TRANS       0 6.75 3
+ROTAT       0 0 0
+SCALE       5 5 5
+VELOCITY    0 0 0
+
+// Glass Sphere
+OBJECT 7
+sphere
+material 6
+TRANS       0 2.5 3
+ROTAT       0 0 0
+SCALE       3 3 3
+VELOCITY    0 0 0
+
+// Back wall
+OBJECT 8
+cube
+material 3
+TRANS       -5 3.75 -5
+ROTAT       0 90 0
+SCALE       .01 7.5 10
+VELOCITY    0 0 0
+
+// Back wall
+OBJECT 9
+cube
+material 4
+TRANS       5 3.75 -5
+ROTAT       0 90 0
+SCALE       .01 7.5 10
+VELOCITY    0 0 0
+
+// Back wall
+OBJECT 10
+cube
+material 4
+TRANS       -5 11.25 -5
+ROTAT       0 90 0
+SCALE       .01 7.5 10
+VELOCITY    0 0 0
+
+// Back wall
+OBJECT 11
+cube
+material 3
+TRANS       5 11.25 -5
+ROTAT       0 90 0
+SCALE       .01 7.5 10
+VELOCITY    0 0 0
+
+// Back wall
+OBJECT 12
+cube
+material 3
+TRANS       -5 18.75 -5
+ROTAT       0 90 0
+SCALE       .01 7.5 10
+VELOCITY    0 0 0
+
+// Back wall
+OBJECT 13
+cube
+material 4
+TRANS       5 18.75 -5
+ROTAT       0 90 0
+SCALE       .01 7.5 10
+VELOCITY    0 0 0

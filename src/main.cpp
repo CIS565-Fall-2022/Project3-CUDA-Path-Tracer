@@ -107,6 +107,7 @@ void saveImage() {
 }
 
 void runCuda() {
+
 	if (camchanged) {
 		iteration = 0;
 		Camera& cam = renderState->camera;
@@ -124,7 +125,9 @@ void runCuda() {
 		cam.position = cameraPosition;
 		cameraPosition += cam.lookAt;
 		cam.position = cameraPosition;
+
 		camchanged = false;
+
 	}
 
 	// Map OpenGL buffer object for writing from CUDA on a single GPU

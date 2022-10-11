@@ -74,6 +74,8 @@ int Scene::loadGeom(string objectid) {
                 newGeom.rotation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
             } else if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
                 newGeom.scale = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+            } else if (strcmp(tokens[0].c_str(), "VELOCITY") == 0) {
+                newGeom.velocity = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
             }
 
             utilityCore::safeGetline(fp_in, line);
@@ -85,6 +87,9 @@ int Scene::loadGeom(string objectid) {
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
 
         geoms.push_back(newGeom);
+        if (materials[newGeom.materialid].emittance > 0) {
+            lights.push_back(newGeom);
+        }
         return 1;
     }
 }
@@ -96,7 +101,7 @@ int Scene::loadCamera() {
     float fovy;
 
     //load static properties
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 7; i++) {
         string line;
         utilityCore::safeGetline(fp_in, line);
         vector<string> tokens = utilityCore::tokenizeString(line);
@@ -109,9 +114,13 @@ int Scene::loadCamera() {
             state.iterations = atoi(tokens[1].c_str());
         } else if (strcmp(tokens[0].c_str(), "DEPTH") == 0) {
             state.traceDepth = atoi(tokens[1].c_str());
-        } else if (strcmp(tokens[0].c_str(), "FILE") == 0) {
+        } else if (strcmp(tokens[0].c_str(), "LENSR") == 0) {
+            camera.lensRadius = atof(tokens[1].c_str());
+        } else if (strcmp(tokens[0].c_str(), "FOCALD") == 0) {
+            camera.focalDistance = atof(tokens[1].c_str());
+        } else if (strcmp(tokens[0].c_str(), "FILE") == 0 ) {
             state.imageName = tokens[1];
-        }
+        } 
     }
 
     string line;
@@ -124,7 +133,7 @@ int Scene::loadCamera() {
             camera.lookAt = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
         } else if (strcmp(tokens[0].c_str(), "UP") == 0) {
             camera.up = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
-        }
+        } 
 
         utilityCore::safeGetline(fp_in, line);
     }

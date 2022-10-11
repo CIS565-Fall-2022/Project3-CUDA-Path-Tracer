@@ -1,0 +1,8 @@
+// Definitions for features
+#define DEBUG 0
+#define BOUNCES 4
+#define MATERIALSORT 1
+#define CACHING 0
+#define ANTIALIASING 1
+#define THINLENS 1
+#define MOTIONBLUR 1
