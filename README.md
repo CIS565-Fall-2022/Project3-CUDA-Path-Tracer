@@ -94,9 +94,8 @@ The following scene has an aperture of 1.2 and a focal length of 10. It is easy 
 ## <a name="directlighting">Direct Lighting</a>
 In a path tracer, light intensity is the most important information, and ideally we want each bounce and iteration to carry as much information as possible. One way to achieve this is by always taking the final ray directly to a random point on the light source.   
 To enable direct lighting, set `DIRECT_LIGHTING` to 1 in `pathtrace.cu`.   
-Comparing the same scene with direct lighting on (left) and off (right), direct lighting makes the scene brighter. Additionally, it also converges faster when the iteration count is still low.       
-![Directlighting](img/directlighting.png =800px) ![no_directlighting](img/nodirectlighting.png =800px)
-
+Comparing the same scene with direct lighting on (left) and off (right), direct lighting makes the scene brighter. Additionally, it also converges faster when the iteration count is still low.     
+<img src="img/directlighting.png" height="400px" width="400px"> <img src="img/nodirectlighting.png" height="400px" width="400px">
 ## <a name="motionblur">Motion Blur</a>
 Motion blur is achieved by averaging samples at different times in the animation.    
 To enable direct lighting, set `MOTION_BLUR` to 1 in `pathtrace.cu`, and define the motion of the objects in the scene by setting its "ENDPOS". The object will then move from its starting postion to the endpos.    
@@ -107,7 +106,7 @@ In the following example, the sphere is moving down by 2 unit
 Stochastic sampled anti-aliasing is a relatively low-cost anti-aliasing technique ahieved by jittering the sample locations that are spaced out regularly. This increase in low frequency noise would cause an image convoluted with this filter to scatter the high frequencies into low frequencies. Since the human visual system is more sensitive to low frequencies, this "tricks" people into thinking the there are less aliasing in the scene.    
 To enable antialiasing, set `ANTI_ALIASING` to 1. Note that in my current implementation, DOF can't be turned on with AA simultaneously.       
 Below is the comparison of the same scene with anti-aliasing on (left) and off (right).   
-![Anti-aliasing](img/antialiasing.png = 800px) ![no anti-aliasing](img/no-antialiasing.png =800px)    
+<img src="img/antialiasing.png" height="400px" width="400px"><img src="img/no-antialiasing.png" height="400px" width="400px">   
 The following maginified image shows that with anti-aliasing (below), the image indeed look less "noisy". 
 ![no anti-aliasing](img/aa_compare.png)   
 
