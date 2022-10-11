@@ -75,3 +75,5 @@ The effect of caching is very much evident and it increases as the size of the i
 This is because we're precomputing a potentially very large computation, sparing ourselves the trouble for upcoming iterations
 
 The effect of material sorting doesn't seem to be too encouraging; initially I tried testing it on a scene with one material, it wasn't an improvement (since we'd be sorting to avoid nonexistent warp divergence). However I switched to a scene with diffuse, reflective, and refractive material to no avail:
+
+<img align="center" src="img/materialsortchart.png" width=50% height=50%>
