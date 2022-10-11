@@ -20,13 +20,13 @@ Features implemented include:
 * [Stochastic Antialiasing](#stochastic-antialiasing)
 * [Direct Lighting](#direct-lighting)
 
-Specular Reflective Material(#reflective-material)
+#Specular Reflective Material
 ================
 The specular reflective material either reflects light perfectly (incident angle == exitent angle), or diffusely, the rate of each is manually set and the two percentages sum up to 100% (for example, if the material was 63% specular, it'd have to be 37% diffuse):
 
 <img align="center" src="img/cornell.2022-10-11_03-01-03z.11379samp.png" width=50% height=50%>
 
-Refractive Material(#refractive-material)
+#Refractive Material
 ================
 The specular refractive material either reflects light or transmits it according to [Snell's Law](https://en.wikipedia.org/wiki/Snell%27s_law), the rate of each is based on the material type and index of refration. This is usually calculated by the [Fresnel Equations](https://en.wikipedia.org/wiki/Fresnel_equations), however, here I use the [Schlick approximation](https://en.wikipedia.org/wiki/Schlick%27s_approximation) to calculate the rates as it's more computationally efficient with a very low error rate:
 
@@ -34,7 +34,7 @@ The specular refractive material either reflects light or transmits it according
 
 <img align="center" src="img/cornell.2022-10-11_00-50-38z.5598samp.png" width=50% height=50%>
 
-Thin Lens Model DOF(#thin-lens)
+#Thin Lens Model DOF
 ================
 I utilized the [Thin Lens Model](https://pbr-book.org/3ed-2018/Camera_Models/Projective_Camera_Models#TheThinLensModelandDepthofField) in order to replace the pinhole camera we have with a more realistic virtual lens which allows me to introduce depth of field effects and bokeh:
 
@@ -43,11 +43,11 @@ I utilized the [Thin Lens Model](https://pbr-book.org/3ed-2018/Camera_Models/Pro
 | Iterations | 7759 | 5082 | 5142 | 5009 |
 | Scene | <img src="img/cornell.2022-10-11_02-43-13z.7759samp.png"> | <img src="img/cornell.2022-10-11_01-23-17z.5082samp.png"> | <img src="img/cornell.2022-10-10_23-09-12z.5142samp.png"> |  <img src="img/cornell.2022-10-11_01-07-49z.5009samp.png"> |
 
-Motion Blur(#motion-blur)
+#Motion Blur
 ================
 I added a velocity component to the geometry struct and that allows me to render the image in such a way that it seems the object is moving in the direction of the velocity:
 
-Stochastic Antialiasing(#antialiasing)
+#Stochastic Antialiasing
 ================
 I added support for stochastic antialiasing by jittering the ray produced from the camera randomly within the range of a pixel length:
 
@@ -56,13 +56,13 @@ I added support for stochastic antialiasing by jittering the ray produced from t
 | Scene | <img src="img/cornell.2022-10-11_03-38-02z.1000samp.png"> | <img src="img/cornell.2022-10-11_03-40-14z.1000samp.png"> |
 | Scene | <img src="img/cornell.2022-10-11_03-54-58z.1000samp.png"> | <img src="img/cornell.2022-10-11_03-53-19z.1000samp.png"> |
 
-Direct Lighting(#direct-lighting)
+#Direct Lighting
 ================
 To optimize the result and speed up the convergence of the image, I had the pathtracer trace its last ray to a light source in the scene, guaranteeing that we get light contribution. To demonstrate, I've rendered the same scene up to 1000 iterations with and without direct lighting:
 
-| Direct Lighting | With | Without |
+| Direct Lighting | Without | With |
 | :------- | :-------: | :-------: |
-| Scene | <img src=""> | <img src=""> |
+| Scene | <img src="img/"> | <img src="img/"> |
 
 Performance Testing
 ================
