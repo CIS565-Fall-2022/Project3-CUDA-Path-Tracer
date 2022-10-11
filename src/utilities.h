@@ -20,33 +20,6 @@
 #define SQRT_OF_ONE_THIRD 0.5773502691896257645091487805019574556476f
 #define EPSILON           0.00001f
 
-
-class octree;
-class GuiDataContainer
-{
-public:
-    GuiDataContainer();
-    ~GuiDataContainer();
-    void Reset();
-    int traced_depth;
-    char** scene_file_names;
-    char** save_file_names;
-    int num_saves;
-    int num_scenes; 
-    int cur_scene;
-    int cur_save;
-    char buf[256];
-    char const* prompt_text;
-    bool draw_coord_frame;
-    bool draw_debug_aabb;
-    bool draw_world_aabb;
-    bool draw_GPU_tree;
-    int octree_depth;
-    int octree_depth_filter;
-    int octree_intersection_cnt;
-    octree* test_tree;
-};
-
 // convenience macro
 #ifndef NDEBUG
 void checkCUDAErrorFn(const char* msg, const char* file, int line);
@@ -169,13 +142,14 @@ Span<T> make_span(int n) {
 }
 
 namespace utilityCore {
-    extern float clamp(float f, float min, float max);
-    extern bool replaceString(std::string& str, const std::string& from, const std::string& to);
-    extern glm::vec3 clampRGB(glm::vec3 color);
-    extern bool epsilonCheck(float a, float b);
-    extern std::vector<std::string> tokenizeString(std::string str);
-    extern glm::mat4 buildTransformationMatrix(glm::vec3 translation, glm::vec3 rotation, glm::vec3 scale);
-    extern std::string convertIntToString(int number);
-    extern std::istream& safeGetline(std::istream& is, std::string& t); //Thanks to http://stackoverflow.com/a/6089413
-    extern std::istream& peekline(std::istream& is, std::string& t);
+    std::vector<std::string> getFilesInDir(char const* dir);
+    float clamp(float f, float min, float max);
+    bool replaceString(std::string& str, const std::string& from, const std::string& to);
+    glm::vec3 clampRGB(glm::vec3 color);
+    bool epsilonCheck(float a, float b);
+    std::vector<std::string> tokenizeString(std::string str);
+    glm::mat4 buildTransformationMatrix(glm::vec3 translation, glm::vec3 rotation, glm::vec3 scale);
+    std::string convertIntToString(int number);
+    std::istream& safeGetline(std::istream& is, std::string& t); //Thanks to http://stackoverflow.com/a/6089413
+    std::istream& peekline(std::istream& is, std::string& t);
 }

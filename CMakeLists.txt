@@ -77,6 +77,8 @@ set(headers
     src/Collision/DebugDrawer.h
     src/consts.h
     src/Octree/octree.h
+    src/Denoise/denoise.cuh
+    src/guiData.h
 
     src/ImGui/imconfig.h
 	src/ImGui/imgui.h
@@ -104,7 +106,8 @@ set(sources
     src/utilities.cpp
     src/rendersave.cpp
     src/Collision/DebugDrawer.cpp
-    
+    src/guiData.cpp
+
     src/pathtrace.cu
 
     src/ImGui/imgui.cpp 

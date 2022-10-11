@@ -4,6 +4,7 @@
 #include "consts.h"
 #include <cstring>
 #include <iostream>
+#include <ctime>
 
 static std::string startTimeString;
 
@@ -28,6 +29,13 @@ int iteration;
 int width;
 int height;
 
+std::string currentTimeString() {
+	time_t now;
+	time(&now);
+	char buf[sizeof "0000-00-00_00-00-00z"];
+	strftime(buf, sizeof buf, "%Y-%m-%d_%H-%M-%Sz", gmtime(&now));
+	return std::string(buf);
+}
 //-------------------------------
 //-------------MAIN--------------
 //-------------------------------
@@ -41,8 +49,7 @@ int main(int argc, char** argv) {
 	std::cin >> save_files_dir;
 #endif // NO_DEFAULT_PATHS
 
-
-	startTimeString = Preview::currentTimeString();
+	startTimeString = currentTimeString();
 	height = width = 800;
 
 	// Initialize ImGui Data
