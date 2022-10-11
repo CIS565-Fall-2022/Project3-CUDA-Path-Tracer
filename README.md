@@ -39,7 +39,7 @@ Thin Lens Model DOF(#thin-lens)
 I utilized the [Thin Lens Model](https://pbr-book.org/3ed-2018/Camera_Models/Projective_Camera_Models#TheThinLensModelandDepthofField) in order to replace the pinhole camera we have with a more realistic virtual lens which allows me to introduce depth of field effects and bokeh:
 
 | Focal Distance | 0 | 3 | 8.5 | 20.5 |
-| :------- | :-------: | :-------: | :-------: |
+| :------- | :-------: | :-------: | :-------: | :-------: |
 | Iterations | 7759 | 5082 | 5142 | 5009 |
 | Scene | <img src="img/cornell.2022-10-11_02-43-13z.7759samp.png"> | <img src="img/cornell.2022-10-11_01-23-17z.5082samp.png"> | <img src="img/cornell.2022-10-10_23-09-12z.5142samp.png"> |  <img src="img/cornell.2022-10-11_01-07-49z.5009samp.png"> |
 
@@ -52,7 +52,7 @@ Stochastic Antialiasing(#antialiasing)
 I added support for stochastic antialiasing by jittering the ray produced from the camera randomly within the range of a pixel length:
 
 | Antialiasing | Without | With |
-| :------- | :-------: |
+| :------- | :-------: | :-------: |
 | Scene | <img src="img/cornell.2022-10-11_03-38-02z.1000samp.png"> | <img src="img/cornell.2022-10-11_03-40-14z.1000samp.png"> |
 | Scene | <img src="img/cornell.2022-10-11_03-54-58z.1000samp.png"> | <img src="img/cornell.2022-10-11_03-53-19z.1000samp.png"> |
 
