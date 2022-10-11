@@ -16,11 +16,20 @@ private:
     int loadMaterial(string materialid);
     int loadGeom(string objectid);
     int loadCamera();
+    int loadObj(Geom&, const char*);
+    int loadTexture(string textureID);
 public:
     Scene(string filename);
     ~Scene();
 
     std::vector<Geom> geoms;
+    std::vector<Triangle> triangles;
+    std::vector<Texture> textures;
+    std::vector<glm::vec3> textureColors;
     std::vector<Material> materials;
     RenderState state;
+
+    std::vector<Geom> lights;
+    int lightCount = 0;
 };
+

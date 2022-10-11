@@ -4,6 +4,10 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+#include <stb_image.h>
+
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;
@@ -28,6 +32,11 @@ Scene::Scene(string filename) {
                 loadCamera();
                 cout << " " << endl;
             }
+            else if (strcmp(tokens[0].c_str(), "TEXTURE") == 0)
+            {
+                loadTexture(tokens[1]);
+                cout << " " << endl;
+            }
         }
     }
 }
@@ -37,7 +46,8 @@ int Scene::loadGeom(string objectid) {
     if (id != geoms.size()) {
         cout << "ERROR: OBJECT ID does not match expected number of geoms" << endl;
         return -1;
-    } else {
+    }
+    else {
         cout << "Loading Geom " << id << "..." << endl;
         Geom newGeom;
         string line;
@@ -51,6 +61,16 @@ int Scene::loadGeom(string objectid) {
             } else if (strcmp(line.c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
+            }
+            else if (strcmp(line.c_str(), "obj_mesh") == 0)
+            {
+                cout << "Creating new obj mesh..." << endl;
+                newGeom.type = OBJ_MESH;
+                utilityCore::safeGetline(fp_in, line);
+                if (!line.empty() && fp_in.good()) {
+                    const char* filename = line.c_str();
+                    loadObj(newGeom, filename);
+                }
             }
         }
 
@@ -70,10 +90,16 @@ int Scene::loadGeom(string objectid) {
             //load tranformations
             if (strcmp(tokens[0].c_str(), "TRANS") == 0) {
                 newGeom.translation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+                newGeom.endpos = newGeom.translation;
             } else if (strcmp(tokens[0].c_str(), "ROTAT") == 0) {
                 newGeom.rotation = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
             } else if (strcmp(tokens[0].c_str(), "SCALE") == 0) {
                 newGeom.scale = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+            } else if (strcmp(tokens[0].c_str(), "ENDPOS") == 0) {
+                newGeom.endpos = glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+            }
+            else if (strcmp(tokens[0].c_str(), "TEXTURE") == 0) {
+                newGeom.textureId = atoi(tokens[1].c_str());
             }
 
             utilityCore::safeGetline(fp_in, line);
@@ -83,6 +109,13 @@ int Scene::loadGeom(string objectid) {
                 newGeom.translation, newGeom.rotation, newGeom.scale);
         newGeom.inverseTransform = glm::inverse(newGeom.transform);
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
+
+        // Store the light sources
+        if (newGeom.materialid == 0)
+        {
+            this->lights.push_back(newGeom);
+            this->lightCount++;
+        }
 
         geoms.push_back(newGeom);
         return 1;
@@ -185,4 +218,184 @@ int Scene::loadMaterial(string materialid) {
         materials.push_back(newMaterial);
         return 1;
     }
+}
+
+// Reference: https://github.com/tinyobjloader/tinyobjloader
+int Scene::loadObj(Geom& geo, const char* inputfile)
+{
+    tinyobj::ObjReader reader;
+    tinyobj::ObjReaderConfig reader_config;
+
+
+    if (!reader.ParseFromFile(inputfile, reader_config)) {
+        if (!reader.Error().empty()) {
+            std::cerr << "TinyObjReader: " << reader.Error();
+        }
+        exit(1);
+    }
+    if (!reader.Warning().empty()) {
+        std::cout << "TinyObjReader: " << reader.Warning();
+    }
+
+    tinyobj::attrib_t attrib = reader.GetAttrib();
+    std::vector<tinyobj::shape_t> shapes = reader.GetShapes();
+
+    geo.triangleStart = triangles.size();
+
+    // Loop over shapes and attributes
+    for (size_t s = 0; s < shapes.size(); s++) {
+        Triangle face;     // current face to be loaded
+
+        size_t idx = 0;
+        float maxX = FLT_MAX, maxY = FLT_MAX, maxZ = FLT_MAX;
+        float minX = FLT_MIN, minY = FLT_MIN, minZ = FLT_MIN;
+
+        // Loop over faces
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) 
+        {
+            size_t num_v = size_t(shapes[s].mesh.num_face_vertices[f]);
+
+            glm::vec3 vert;
+            glm::vec3 norm;
+            glm::vec2 texture;
+
+            // Loop over vertices
+            for (size_t v = 0; v < num_v; v++)
+            {
+
+                tinyobj::index_t v_idx = shapes[s].mesh.indices[idx + v];
+                tinyobj::real_t vx = attrib.vertices[3 * size_t(v_idx.vertex_index) + 0];
+                tinyobj::real_t vy = attrib.vertices[3 * size_t(v_idx.vertex_index) + 1];
+                tinyobj::real_t vz = attrib.vertices[3 * size_t(v_idx.vertex_index) + 2];
+
+                vert = glm::vec3(vx, vy, vz);
+                
+                // Compute the bounding box
+                if (vx > maxX)
+                {
+                    maxX = vx;
+                }
+                if (vy > maxY)
+                {
+                    maxY = vy;
+                }
+                if (vz > maxZ)
+                {
+                    maxZ = vz;
+                }
+                if (vx < minX)
+                {
+                    minX = vx;
+                }
+                if (vy < minY)
+                {
+                    minY = vy;
+                }
+                if (vz < minZ)
+                {
+                    minZ = vz;
+                }
+
+                if (v_idx.normal_index >= 0) {
+                    tinyobj::real_t nx = attrib.normals[3 * size_t(v_idx.normal_index) + 0];
+                    tinyobj::real_t ny = attrib.normals[3 * size_t(v_idx.normal_index) + 1];
+                    tinyobj::real_t nz = attrib.normals[3 * size_t(v_idx.normal_index) + 2];
+                    norm = glm::vec3(nx, ny, nz);
+                }
+
+                if (v_idx.texcoord_index >= 0) {
+                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(v_idx.texcoord_index) + 0];
+                    tinyobj::real_t ty = attrib.texcoords[2 * size_t(v_idx.texcoord_index) + 1];
+                    texture = glm::vec2(tx, ty);
+                }
+
+                if (v == 0)
+                {
+                    face.v1 = vert;
+                    face.n1 = norm;
+                    face.t1 = texture;
+                }
+                else if (v == 1)
+                {
+                    face.v2 = vert;
+                    face.n2 = norm;
+                    face.t2 = texture;
+                }
+                else if (v == 2)
+                {
+                    face.v3 = vert;
+                    face.n3= norm;
+                    face.t3 = texture;
+                }
+                else
+                {
+                    std::cout << "Quad face detected" << reader.Warning();
+                }
+            }
+            idx += num_v;
+            triangles.push_back(face);
+            geo.boundingBoxMax = glm::vec3(maxX, maxY, maxZ);
+            geo.boundingBoxMin = glm::vec3(minX, minY, minZ);
+        }
+    }
+    geo.triangleEnd = triangles.size();
+
+    return 1;
+}
+
+float noise(float x)
+{
+    float r = (sin(x * 127.1) * 43758.5453);
+    return r - (long)r;
+}
+
+int Scene::loadTexture(string textureID)
+{
+    int id = atoi(textureID.c_str());
+    std::cout << "Loading texture file: " << id <<" starting index: "<< textureColors.size() <<endl;
+
+    Texture texture;
+    texture.id = id;
+    texture.idx = textureColors.size();
+    int width, height, channels;
+
+    string line;
+    utilityCore::safeGetline(fp_in, line);
+    vector<string> tokens = utilityCore::tokenizeString(line);
+
+    if (strcmp(tokens[0].c_str(), "PATH") == 0) {
+        const char* filepath = tokens[1].c_str();
+        unsigned char* img = stbi_load(filepath, &width, &height, &channels, 0);
+        if (img != nullptr && width > 0 && height > 0)
+        {
+                texture.width = width;
+                texture.height = height;
+                texture.channel = channels;
+
+                for (int i = 0; i < width * height; ++i)
+                {
+                    glm::vec3 col = glm::vec3(img[3 * i + 0], img[3 * i + 1] , img[3 * i + 2]) / 255.f;
+                    textureColors.emplace_back(col);
+                }
+        }
+        stbi_image_free(img);
+        textures.push_back(texture);
+        return 1;
+    }
+    else if (strcmp(tokens[0].c_str(), "PROCEDURAL") == 0)
+    {
+        texture.width = 1000;
+        texture.height = 1;
+        texture.channel = 3;
+        for (float i = 0.f; i < 1000.f; ++i)
+        {
+            glm::vec3 col = glm::vec3(noise(i), noise(i * 2.f), noise(i * 3.f));
+            textureColors.emplace_back(col);
+        }
+        textures.push_back(texture);
+        return 1;
+    }
+    std::cout << "Texture path does not exist" << endl;
+    return -1;
+
 }

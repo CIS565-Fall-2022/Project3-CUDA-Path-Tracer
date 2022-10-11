@@ -10,6 +10,7 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    OBJ_MESH,
 };
 
 struct Ray {
@@ -24,8 +25,37 @@ struct Geom {
     glm::vec3 rotation;
     glm::vec3 scale;
     glm::mat4 transform;
+    glm::vec3 endpos;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+    glm::vec3 boundingBoxMin;
+    glm::vec3 boundingBoxMax;
+    int triangleStart;
+    int triangleEnd;
+    int textureId = -1;
+};
+
+struct Triangle {
+    // Vertices
+    glm::vec3 v1;
+    glm::vec3 v2;
+    glm::vec3 v3;
+    // Normals
+    glm::vec3 n1;
+    glm::vec3 n2;
+    glm::vec3 n3;
+    // Texcoords
+    glm::vec2 t1;
+    glm::vec2 t2;
+    glm::vec2 t3;
+};
+
+struct Texture {
+    int id;
+    int channel;
+    int width;
+    int height;
+    int idx;
 };
 
 struct Material {
@@ -73,4 +103,24 @@ struct ShadeableIntersection {
   float t;
   glm::vec3 surfaceNormal;
   int materialId;
+  glm::vec2 uv;
+  int textureId;
+};
+
+struct compareIntersections 
+{
+    __host__ __device__
+        bool operator()(const ShadeableIntersection& a, const ShadeableIntersection& b) 
+    {
+        return a.materialId < b.materialId;
+    }
+};
+
+struct rayTerminated 
+{
+    __host__ __device__
+        bool operator()(const PathSegment& pathSegment)
+    {
+        return pathSegment.remainingBounces;
+    }
 };
