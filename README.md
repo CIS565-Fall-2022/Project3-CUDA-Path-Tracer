@@ -105,7 +105,9 @@ To enable direct lighting, set `MOTION_BLUR` to 1 in `pathtrace.cu`, and define 
 Stochastic sampled anti-aliasing is a relatively low-cost anti-aliasing technique ahieved by jittering the sample locations that are spaced out regularly. This increase in low frequency noise would cause an image convoluted with this filter to scatter the high frequencies into low frequencies. Since the human visual system is more sensitive to low frequencies, this "tricks" people into thinking the there are less aliasing in the scene.    
 To enable antialiasing, set `ANTI_ALIASING` to 1. Note that in my current implementation, DOF can't be turned on with AA simultaneously.       
 Below is the comparison of the same scene with anti-aliasing on (left) and off (right).   
-![Anti-aliasing](img/antialiasing.png) ![no anti-aliasing](img/no-antialiasing.png)
+![Anti-aliasing](img/antialiasing.png) ![no anti-aliasing](img/no-antialiasing.png)    
+Maginified comparison:
+![no anti-aliasing](img/aa_compare.png)   
 
 ## <a name="mesh">Mesh Loading</a>
 My pathtracer supports loading any number of arbitrary meshes in .obj format into the scene.    
@@ -120,7 +122,6 @@ Loading a mesh without its texture is no fun! Fortunately, my pathtracer also lo
 When there is no texture file, it will generate a simple procedural texture. 
 Please see the sample scene files to learn how to load a texture into the scene.   
  ![Texture-mapping](img/texture.png)   
- ![Procedural-texture](img/procedural-texture.png)    
 ### Performance Analysis - Image Texture vs. Procedural Texture
 
 ## <a name="post">Final Rays Post-processing</a>

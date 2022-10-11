@@ -50,7 +50,7 @@ EMITTANCE   0
 
 // Diffuse Blue
 MATERIAL 5
-RGB         .0 .98 .0
+RGB         .0 .0 .98
 SPECEX      0
 SPECRGB     0 0 0
 REFL        0
@@ -110,7 +110,7 @@ EMITTANCE   0
 
 // Camera
 CAMERA
-RES         800 800
+RES         1600 1600
 FOVY        45
 ITERATIONS  5000
 DEPTH       8
@@ -126,7 +126,7 @@ cube
 material 0
 TRANS       0 10 0
 ROTAT       0 0 0
-SCALE       3 .3 3
+SCALE       6 .3 6
 
 // Floor
 OBJECT 1
@@ -139,7 +139,7 @@ SCALE       10 .01 10
 // Ceiling
 OBJECT 2
 cube
-material 7
+material 6
 TRANS       0 10 0
 ROTAT       0 0 90
 SCALE       .01 10 10
@@ -172,7 +172,7 @@ SCALE       .01 10 10
 OBJECT 6
 sphere
 material 8
-TRANS       -3 4 2
+TRANS       -2 4 2
 ROTAT       0 0 0
 SCALE       6 6 6
 
@@ -182,4 +182,4 @@ cube
 material 6
 TRANS       3 4 2
 ROTAT       0 0 0
-SCALE       6 6 6
+SCALE       2 2 2

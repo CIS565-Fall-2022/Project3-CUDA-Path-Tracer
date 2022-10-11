@@ -50,7 +50,7 @@ EMITTANCE   0
 
 // Diffuse Blue
 MATERIAL 5
-RGB         .0 .98 .0
+RGB         .0 .0 .98
 SPECEX      0
 SPECRGB     0 0 0
 REFL        0
@@ -90,20 +90,23 @@ LOOKAT      0 5 0
 UP          0 1 0
 
 TEXTURE 0
-PATH ../scenes/textures/wahoo.jpg
+PATH ../scenes/textures/wahoo.bmp
+
+TEXTURE 1
+PROCEDURAL
 
 // Ceiling light
 OBJECT 0
 cube
 material 0
-TRANS       0 10 0
+TRANS       0 10 5
 ROTAT       0 0 0
-SCALE       5 .3 5
+SCALE       8 .3 8
 
 // Floor
 OBJECT 1
 cube
-material 1
+material 6
 TRANS       0 0 0
 ROTAT       0 0 0
 SCALE       10 .01 10
@@ -119,7 +122,7 @@ SCALE       .01 10 10
 // Back wall
 OBJECT 3
 cube
-material 3
+material 6
 TRANS       0 5 -5
 ROTAT       0 90 0
 SCALE       .01 10 10
@@ -127,7 +130,7 @@ SCALE       .01 10 10
 // Left wall
 OBJECT 4
 cube
-material 2
+material 6
 TRANS       -5 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
@@ -135,7 +138,7 @@ SCALE       .01 10 10
 // Right wall
 OBJECT 5
 cube
-material 5
+material 6
 TRANS       5 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
@@ -144,16 +147,16 @@ SCALE       .01 10 10
 OBJECT 6
 obj_mesh
 ../scenes/objs/wahoo.obj
-material 4
-TRANS       -2 4 3
-ROTAT       0 0 0
+material 1
+TRANS       -2 4 5
+ROTAT       0 15 0
 SCALE       0.5 0.5 0.5
 
 // cow
 OBJECT 7
 obj_mesh
 ../scenes/objs/cow.obj
-material 6
-TRANS       2 4 3
-ROTAT       0 0 0
+material 1
+TRANS       1.5 4 5
+ROTAT       0 -75 0
 SCALE       0.5 0.5 0.5
