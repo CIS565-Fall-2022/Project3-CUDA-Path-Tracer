@@ -30,7 +30,7 @@ Path Termination using Stream Compaction
 ============
 CUDA can only launch a finite number of blocks at a time. Some threads end with only a few bounces while others may end with a lot. Therefore, we will waste a lot of threads. 
 
-To solve this problem, we launch a kernel that traces ONE bounce for every ray in the pool. The ray should be terminated while its remaining bounce equals 0 (reaches the limit or hits the light source). According to the results, we remove terminated rays from the ray pool with stream compaction. Therefore, we free idle threads and could save many computation resources.
+To solve this problem, we launch a kernel that traces ONE bounce for every ray in the pool. The ray should be terminated while its remaining bounce equals 0 (reaches the limit or hits the light source). According to the results, we remove terminated rays from the ray pool with stream compaction by partitioning the running rays and terminated rays. As a result, we could free idle threads and could save many computation resources.
 
 I initially tested with the Cornell Box scene and it does not seem to have a difference. However, if I switch the camera directly towards the light(ray will be terminated and removed by stream compaction), we can see that the method gives an improvement to the overall performance.
 
@@ -40,9 +40,9 @@ I initially tested with the Cornell Box scene and it does not seem to have a dif
 
 Sort by Materials Type 
 ============
-Using Radix Sort by material ID, we can batch rays according to material type. Therefore, we can further parallelize rays and perform intersection testing and shading evaluation in separate kernels. 
+Rays hit different materials will evaluate different BSDF. As a result, the thread in a single warp has to handle all kinds of materials. Some threads will end ealier and be idled. To solve this, we could use Radix Sort by material ID to make rays that hit the same type of material contiguous in memory. Therefore, we can further parallelize rays and perform intersection testing and shading evaluation in separate kernels. 
 
-We tested the method in a scene that has more than 10 material types. We can see from the figrue below that there is no sigificant difference between two methods, altough turning material sort on will be slightly faster.
+Since the sorting algorithm leads to some overhead, this will only add to efficiency when there are many materials in the scene. We tested the method in a scene that has more than 10 unique material types. We can see from the figrue below that there is no sigificant difference between two methods, altough turning material sort on will be slightly faster.
 
 | With vs Without Material Sorting |
 :-------:|
@@ -51,7 +51,7 @@ We tested the method in a scene that has more than 10 material types. We can see
 
 First Bounce Intersection Cache
 ============
-We further cache the first bounce intersection and store it in a buffer. Later bounces can use it since this bounce stays the same regardless of iterations. 
+We further cache the first bounce intersection and store it in a buffer. Later bounces can use it since the camera shoots each ray towards a fixed direction and the first bounce intersection will remain the same regardless of iterations. 
 
 From the figure below, we don't see a sigificant difference with our single bunny object. Perhaps this will work in scenarios with denser objects or high resolution. 
 
@@ -67,7 +67,7 @@ The refraction effects was implemented using glm's `refract()` function accordin
 :-------:|:-------:
 |![](img/refraction.png)|![](img/refraction2.png)|
 
-Anti-aliasing
+Stochastic Anti-aliasing
 ===========
 The anti-alising was implemented by jittering the direction of sample ray with random numbers. From the figure below, we find that the result is acceptable.
 
