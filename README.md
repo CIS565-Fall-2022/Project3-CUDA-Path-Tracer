@@ -83,7 +83,7 @@ One small improvement is to cache the first bounce intersections so it can be re
 ## <a name="refract">Refraction</a>
 This uses the Schlick's approximation to implement the refraction effect.    
 From the left to the right, the refraction indices are 1.33 (water), 1.77 (sapphire), and 2.42 (diamond)   
-![Refraction](img/refraction.png)
+![Refraction](img/refract.png)
 
 ## <a name="dof">Depth of Field</a>
 Depth of Field in a path tracer is done by jittering rays within an aperture. It will add noises to the rays that does hit objects on the focal length, and create a blurry effect.   
