@@ -13,7 +13,7 @@ This project is a CUDA-based GPU path tracer capable of rendering globally-illum
 
 # Table of Contents  
 [Features](#features)   
-[Feature Showcase](#showcase)   
+[Feature Showcase and Analysis](#showcase)   
 [Bloopers](#bloopers)    
 [Reference](#reference)
 
