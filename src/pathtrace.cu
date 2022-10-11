@@ -22,22 +22,22 @@
 #include "../stream_compaction/efficient.h"
 
 
-#define ERRORCHECK 1
+#define ERRORCHECK 0
 #define SORT_RAYS 0
 #define CACHE_FIRST_BOUNCE 0
 #define ANTI_ALIASING 0
 
 #define DEPTH_OF_FIELD 0
-#define FOCAL_LENGTH 15.0f
-#define APERTURE 0.5f
+#define FOCAL_LENGTH 10.0f
+#define APERTURE 0.3f
 
 #define MESH_BOUNDING_BOX 1
 
 #define POST_PROCESS 0
-#define GREYSCALE 1
+#define GREYSCALE 0
 #define SEPIA 0
 #define INVERTED 0
-#define CONTRAST 0
+#define CONTRAST 1
 
 #define MOTION_BLUR 0
 
@@ -215,11 +215,11 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 #endif
 
 #if DEPTH_OF_FIELD
-		float jX = u01(rng);
-		float jY = u01(rng);
+		float jXd = u01(rng);
+		float jYd = u01(rng);
 
 		glm::vec3 focalPoint = segment.ray.direction * FOCAL_LENGTH;
-		glm::vec3 shift = glm::vec3(jX, jY, 0.0f) * APERTURE;
+		glm::vec3 shift = glm::vec3(jXd, jYd, 0.0f) * APERTURE;
 
 		segment.ray.origin += shift;
 		segment.ray.direction = glm::normalize(focalPoint - shift);
