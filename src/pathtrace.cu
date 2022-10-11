@@ -31,11 +31,11 @@
 // Definitions for features
 #define DEBUG 0
 #define BOUNCES 4
-#define MATERIALSORT 1
+#define MATERIALSORT 0
 #define CACHING 0
 #define ANTIALIASING 1
 #define THINLENS 1
-#define MOTIONBLUR 1
+#define MOTIONBLUR 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -545,6 +545,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 				, dev_geoms
 				, hst_scene->geoms.size()
 				, dev_intersections
+				, iter
 				);
 		}
 		if (iter == 1 && depth == 0) {
