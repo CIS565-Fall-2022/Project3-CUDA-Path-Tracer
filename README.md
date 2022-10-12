@@ -419,6 +419,8 @@ Adam Mally's CIS 560 and 561 Slides and Lectures
 
 Physically Based Rendering: https://pbrt.org/
 
+TinyOBJ: https://github.com/tinyobjloader/tinyobjloader
+
 Jacco Bikker Blog on BVHs: https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/
 
 Alec Jacobson Common 3D Test Models: https://github.com/alecjacobson/common-3d-test-models
@@ -430,4 +432,3 @@ Eric Veach. Multiple Importance Sampling: https://graphics.stanford.edu/courses/
 expf Reinhard Tone Mapping post: https://expf.wordpress.com/2010/05/04/reinhards_tone_mapping_operator/
 
 LearnOpenGL Gamma Correction: https://learnopengl.com/Advanced-Lighting/Gamma-Correction
-
