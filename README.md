@@ -421,7 +421,9 @@ Adam Mally's CIS 560 and 561 Slides and Lectures
 
 Physically Based Rendering: https://pbrt.org/
 
-TinyOBJ: https://github.com/tinyobjloader/tinyobjloader
+TinyOBJ (used for obj loading): https://github.com/tinyobjloader/tinyobjloader
+
+AABB traversal help: https://tavianator.com/2011/ray_box.html
 
 Jacco Bikker Blog on BVHs: https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/
 
