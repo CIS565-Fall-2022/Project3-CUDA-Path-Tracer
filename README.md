@@ -7,6 +7,8 @@ CUDA Path Tracer
   * [LinkedIn](https://www.linkedin.com/in/nick-moon1/), [personal website](https://nicholasmoon.github.io/)
 * Tested on: Windows 10, AMD Ryzen 9 5900HS @ 3.0GHz 32GB, NVIDIA RTX 3060 Laptop 6GB (Personal Laptop)
 
+**USED 4 LATE DAYS**
+
 
 **This is an offline Physically-Based Path Tracer accelerated on the GPU with CUDA. Path Tracing is a
 technique of simulating the actual way light bounces around a scene from light sources towards an eye or
