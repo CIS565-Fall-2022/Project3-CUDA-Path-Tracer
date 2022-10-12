@@ -11,7 +11,7 @@ CUDA Path Tracer
 **This is an offline Physically-Based Path Tracer accelerated on the GPU with CUDA. Path Tracing is a
 technique of simulating the actual way light bounces around a scene from light sources towards an eye or
 camera. Physically-Based implies energy conservation and plausibly accurate light simulation via solving
-the Light Transport Equation originally proposed by Kajiya.** \
+the Light Transport Equation** \
 \
 **I used this project to: learn path tracing
 optimization techniques by utilizing the parallel nature of the GPU; review, reimplement, and extend
@@ -25,25 +25,41 @@ per second.**
 ## RESULTS
 
 ![](img/renders/objs.PNG)
+*7000 spp, ~300,000 triangles, max ray depth 16, rendered in ~1 hour*
 
 ![](img/renders/teapot.PNG)
 
+*8000 spp, ~20,000 triangles, max ray depth 16, rendered in ~50 minutes*
+
 ![](img/renders/dragons.PNG)
+
+*11000 spp, ~2,500,000 triangles, max ray depth 16, rendered in ~2 hour*
 
 ## IMPLEMENTATION
 
 ### Physically-Based Rendering
 
-The following explanation is borrowed from Adam Mally's explanation of the Light Transport Equation
+Physically based rendering involves solving the Light Transport Equation, which describes how light is transmitted
+from one direction into another at a particular surface. It is shown here below:
 
-![](img/figures/adams_LTE.PNG)
+![](img/figures/LTE.png)
+
+Lo is the direction in which a surface is viewed. Le is the light emitted from that surface. The integral indicates
+a summing of all directions in the hemisphere surrounding the surface normal (all wi's). The f term represents the amount of light
+transmitted from a certain incoming direction wi towards the viewing direction wo. The Li term represents the incoming
+light from the direction wi. The V term is visiblity i.e. whether that surface is visible from the viewing direction.
+The dot term represents the lambertian term, i.e. that less contribution of incoming
+light is reflected the more perpendicular to the surface normal that the incoming direction is.
 
 ### Bidirectional Scattering Distribution Functions (BSDFs)
 
 Bidirectional Scattering Distribution Functions describe the scattering of energy on a surface as a result
 of the surface's material properties. Components of a BSDF can include the 
 Bidirectional Reflectance Distribution Function and the Bidirectional Transmittance Distribution Function.
-These describe the reflective and transmissive properties respectively.
+These describe the reflective and transmissive properties respectively. Sampling a BSDF involves generating
+the **wi**, **pdf**, and **f** terms from the LTE in the above section. The **pdf** is needed, because we will never
+be able to sample all possible ray directions in the hemisphere directed along the surface normal, so we need to account
+for how much of the total domain of directions this wi takes up with respect to the particular BSDF.
 
 #### Diffuse BRDF
 
@@ -86,16 +102,47 @@ mirror-like surface.
 
 ### Multiple Importance Sampling (MIS)
 
+Multiple Importance Sampling, as well as Direct Light Sampling, are methods of optimizing the way rays are cast throughout
+a scene. Direct Light Sampling, for every vertex along a path, sends a ray towards a light source in an effort to
+directly sample the source for its incoming light. This ensures that every ray path at least tries to hit a light
+source, instead of randomly being sent into a new direction based on the surface's BSDF.
+
+The problem with this approach is that it does not work as well for nearly specular surfaces. Although I did not implement
+microfacet BSDFs in this assignment, the idea is that directly sampling a light source for incoming light information
+in a nearly specular surface doesn't account for the fact that a nearly specular surface only allows incoming light
+to reflect off itself if it is within its "glossy lobe", which encompasses directions near the perfect "specular" reflection
+direction where some amount of reflection can still occur. It would be better in this case to actually use the BSDF
+to generate the new ray direction, because this will ensure that, if a light source is hit, that is from a direction
+within this lobe. Multiple Importance Sampling seeks to bridge these two sampling techniques, Direct Light Sampling and
+BSDF Sampling, and does both samples for every vertex in a ray path. The contribution from these two sampling rays are
+then weighted based on how much that ray directiona aligns with the BSDF ray direction domain. This is a concept originally
+proposed by Eric Veach, who also proposed the *Power Heuristic* as a good method of combining the two samples. That is
+what is used in this path tracer.
+
+This is the result of using a ray depth of 1, which is essentially just direct lighting. Note the glass teardrop is black
+because there is no refraction or reflection with ray depth 1.
 ![](img/renders/depth_1.PNG)
+
+At ray depth 8, all the effects of global illumination are now visable.
 ![](img/renders/depth_8.PNG)
 
+This render shows the result of 1 sample of the scene rendered. In just 1 sample, we get a pretty good idea of what
+the scene should look like:
 ![](img/renders/iter_1.PNG)
+
+And with 100 iterations, it looks nearly converged. This scene with roughly 5000 triangles and 100 iterations
+at 1080p with ray depth 8 took only 25 seconds to render
 ![](img/renders/iter_100.PNG)
-![](img/renders/iter_100_mis.PNG)
 
 ### Depth of Field
 
 ![](img/renders/depth_of_field.PNG)
+
+Depth of Field models the way a lens works in the real world. In the real world, a lens is normally disk shaped,
+and this causes the rays to focus on a certain distance in space depending on the radius of the lens and the
+focal distance. Note that the curvature or thickness of the lens is not included in this **thin lens** approximation.
+Thus, in order to achieve this effect, we simply need to randomly choose a point in a disk to set as the ray origin
+for each of the rays we generate in a sample. This yields the blurring effect seen above.
 
 ### Stochastic Anti-Aliasing
 
@@ -178,7 +225,33 @@ to optimize this ray-scene intersection test. Instead of intersecting with every
 interesects with nodes in the BVH, represented spatially as an Axis Aligned Bounding Box (AABB). An intersection
 test will only be performed on a node if the intersection test with its parent was found to be a hit. The
 leaf nodes store the actual primitives, so the triangle intersection test, which is more expensive than
-the AABB
+the AABB, is only done once a leaf node AABB is hit.
+
+In terms of how to split a node in the BVH, I opted for splitting along the max extent of the centroids of the
+triangles contained within the node. This is similar to the naive approach that PBRT takes. Thus,
+all triangles with a centroid less than the average centroid value in the max extent axis is put in the
+left node, and the rest in the right. If I had more time,
+I would have tried the Surface Area Heuristic instead, as it constructs more well formed trees.
+
+I then have to convert the CPU side nodes to GPU side nodes. This means storing the tree in an array.
+I used some optimizations explained by PBRT, which includes
+storing the tree in depth first order. What this means is that, for all nodes, their left child is always in the
+next index of the array from it, while the second child is further down the array. This means an index to the first
+child does not need to be stored in the nodes, and it also means that nodes will always be continuous in memory if
+traversing down the left child path.
+
+For traversing, recursion cannot be used, because it is on the GPU. So, an iterative approach must be
+taken, which also means I must use a stack. While the stack is not empty, the front of the stack is popped and
+the popped node is the current one. Its AABB is intersected with, and if it is not hit, then continue on to the next
+thing in the stack. Otherwise, if the node is a leaf node, then intersect the ray with the node's triangle, and update
+the ray t value. If the stack is empty, this means we are done, and have fully traversed the tree. Otherwise we go get
+the next thing on the stack. If the node is not a leaf node, then we add the right child to the stack to process, and
+set the next node to process to be the left child, as this is more memory coherent. At the end of traversal we have
+our hit triangle.
+
+This optimization should hopefully provide **O(logn)** runtime, as opposed to the **O(n)** of the naive linear scan.
+
+
 
 #### Russian Roulette Ray Termination
 
@@ -297,7 +370,13 @@ these are beyond the scope of this project, but would be an exciting test to run
 ![](img/figures/firstbounce.png)
 
 The above chart shows the performance impact of adding a first bounce cache to the rendering pipeline (without AA or DOF).
-As can be seen above,
+As can be seen above, the performance impact is actually not that much. This is because of the other features I have
+implemented, specifically the BVH and MIS. MIS means that, per depth, 3 intersection tests are made. So, caching
+only the first intersection test of the first depth is not much in the grand scheme of things. The BVH means that the
+intersection test is much faster, which decreases the total amount of impact that caching one of these tests can have
+overall. As the ray depth increases, the performance impact from caching also decreased, as now the cached bounce is
+only, for the example of max ray depth 8, 1 of 24 total intersection tests made per sample, as opposed to 1 of 3 total for
+max ray depth 1.
 
 ### Anti Aliasing and Depth of Field
 
@@ -313,7 +392,7 @@ This chart shows the average runtime across 50 pixel samples:
 
 ![](img/figures/bvhruntime.png)
 
-As can be seen from the chart above, the runtime of the linear triangle intersection search is indeed O(n^2). And,
+As can be seen from the chart above, the runtime of the linear triangle intersection search is indeed O(n) (remember logarithmic axes). And,
 the runtime with the BVH appears to be logarithmic. Note that there was some variance in the objects used, and mesh
 topology, and scale in the scene definitely play a role in making the runtime vary per object tested. For anything past
 1000 triangles, the linear search was less than 1 frame a second, and became untennable to actually test the runtime for.
@@ -337,4 +416,6 @@ Jacco Bikker Blog on BVHs: https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh
 Alec Jacobson Common 3D Test Models: https://github.com/alecjacobson/common-3d-test-models
 
 Morgan McGuire Computer Graphics Archive: https://casual-effects.com/data/
+
+Eric Veach. Multiple Importance Sampling: https://graphics.stanford.edu/courses/cs348b-03/papers/veach-chapter9.pdf
 
