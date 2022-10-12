@@ -149,40 +149,10 @@ struct DenoiseBuffers {
 // pathtracer state
 static bool enable_denoise = false;
 static bool render_paused = false;
+static bool texture_debug_active = false;
 static int cur_iter;
-
 static DenoiseBuffers denoise_buffers;
 static Denoiser::ParamDesc denoise_params;
-
-// helper for displaying a texture for debugging purposes
-struct DebugTexScope {
-	DebugTexScope(DebugTexScope const&) = delete;
-	DebugTexScope(DebugTexScope&&) = delete;
-
-	DebugTexScope(DebugTextureType type, uchar4* pbo) {
-		glm::vec3 const* tex;
-		switch (type) {
-		case DebugTextureType::DIFFUSE_BUF: tex = denoise_buffers.d; break;
-		case DebugTextureType::NORM_BUF: tex = denoise_buffers.n; break;
-		case DebugTextureType::POS_BUF: tex = denoise_buffers.x; break;
-		default: throw;
-		}
-		render_paused = true;
-		Camera const& cam = hst_scene->state.camera;
-		int pixelcount = cam.resolution.x * cam.resolution.y;
-
-		if (type == DebugTextureType::NORM_BUF) {
-			thrust::transform(thrust::device, tex, tex + pixelcount, pbo, NormalToRGBA());
-		} else {
-			thrust::transform(thrust::device, tex, tex + pixelcount, pbo, NormalizedRGBToRGBA());
-		}
-	}
-
-	~DebugTexScope() {
-		render_paused = false;
-	}
-};
-static DebugTexScope* s_debug_tex_scope = nullptr;
 
 void PathTracer::beginFrame(unsigned int pbo_id) {
 	s_pbo_id = pbo_id;
@@ -238,11 +208,6 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state, bool force_chan
 
 void PathTracer::pathtraceFree(Scene* scene, bool force_change) {
 	bool scene_changed = force_change || !scene || cur_scene != scene->filename;
-
-	if (s_debug_tex_scope) {
-		delete s_debug_tex_scope;
-		s_debug_tex_scope = nullptr;
-	}
 
 	FREE(dev_image);
 	FREE(dev_paths);
@@ -509,7 +474,6 @@ int PathTracer::pathtrace(int iter) {
 		return iter;
 	}
 
-	++cur_iter;
 
     const int traceDepth = hst_scene->state.traceDepth;
     const Camera &cam = hst_scene->state.camera;
@@ -604,6 +568,11 @@ int PathTracer::pathtrace(int iter) {
 				Denoiser::IntersectionToDiffuse(dev_mesh_info.materials));
 		}
 
+		// stop here if we're currently displaying a debug texture
+		if (texture_debug_active) {
+			return iter;
+		}
+
 		// --- Shading Stage ---
 		// Shade path segments based on intersections and generate new rays by evaluating the BSDF.
 #ifdef SORT_MAT
@@ -637,7 +606,9 @@ int PathTracer::pathtrace(int iter) {
 	// Assemble this iteration and apply it to the image
     finalGather KERN_PARAM(DIV_UP(pixelcount, BLOCK_SIZE), BLOCK_SIZE) (pixelcount, dev_image, dev_paths);
 	cudaDeviceSynchronize();
+	++cur_iter;
 
+	// ----- write raytraced image to PBO ------
 	// denoise
 	if (enable_denoise) {
 		thrust::transform(
@@ -679,10 +650,6 @@ bool PathTracer::saveRenderState(char const* filename) {
 }
 
 void PathTracer::togglePause() {
-	if (s_debug_tex_scope) {
-		// if a debug texture is being displayed, do nothing
-		return;
-	}
 	render_paused = !render_paused;
 }
 
@@ -704,19 +671,32 @@ void PathTracer::setDenoise(Denoiser::ParamDesc const& desc) {
 }
 
 void PathTracer::debugTexture(DebugTextureType type) {
-	if (s_debug_tex_scope) {
-		delete s_debug_tex_scope;
-	}
+	glm::vec3 const* tex;
+
 	switch (type) {
-	case DebugTextureType::NORM_BUF:
-	case DebugTextureType::POS_BUF:
 	case DebugTextureType::DIFFUSE_BUF:
-		s_debug_tex_scope = new DebugTexScope(type, s_pbo_dptr);
-		return;
+		tex = denoise_buffers.d;
+		break;
+	case DebugTextureType::NORM_BUF:
+		tex = denoise_buffers.n;
+		break;
+	case DebugTextureType::POS_BUF:
+		tex = denoise_buffers.x;
+		break;
 	case DebugTextureType::NONE:
 	default:
-		render_paused = false;
-		s_debug_tex_scope = nullptr;
+		texture_debug_active = false;
 		return;
+	}
+
+	texture_debug_active = true;
+	
+	Camera const& cam = hst_scene->state.camera;
+	int pixelcount = cam.resolution.x * cam.resolution.y;
+
+	if (type == DebugTextureType::NORM_BUF) {
+		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, NormalToRGBA());
+	} else {
+		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, NormalizedRGBToRGBA());
 	}
 }

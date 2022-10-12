@@ -3,6 +3,16 @@
 #include <thrust/transform.h>
 
 namespace Denoiser {
+	struct Demodulate {
+		__device__ color_t operator()(color_t const& c, color_t const& albedo) const {
+			return c / (albedo + EPSILON);
+		}
+	};
+	struct Modulate {
+		__device__ color_t operator()(color_t const& c, color_t const& albedo) const {
+			return c * (albedo + EPSILON);
+		}
+	};
 	// reference: https://jo.dreggn.org/home/2010_atrous.pdf
 	__global__ void kern_denoise(
 		color_t* out,
@@ -68,10 +78,19 @@ namespace Denoiser {
 		color_t* bufs[2];
 		ALLOC(bufs[0], rt.size());
 		ALLOC(bufs[1], rt.size());
-
-
 		int buf_idx = 0;
 		D2D(bufs[buf_idx], rt.get(), rt.size());
+
+#ifdef DENOISE_USE_DIFFUSE_MAP
+		// demodulate
+		thrust::transform(
+			thrust::device,
+			bufs[buf_idx],
+			bufs[buf_idx] + rt.size(),
+			diffuse_map,
+			bufs[buf_idx],
+			Demodulate());
+#endif
 
 		const dim3 block_size(8, 8);
 		const dim3 blocks_per_grid(
@@ -85,15 +104,15 @@ namespace Denoiser {
 			buf_idx = 1 - buf_idx;
 		}
 		
-		// multiply by diffuse map
 #ifdef DENOISE_USE_DIFFUSE_MAP
+		// multiply by diffuse map, i.e. modulate
 		thrust::transform(
 			thrust::device,
 			bufs[buf_idx],
 			bufs[buf_idx] + rt.size(),
 			diffuse_map,
 			bufs[buf_idx],
-			thrust::multiplies<color_t>());
+			Modulate());
 #endif
 
 		D2D(rt.get(), bufs[buf_idx], rt.size());
