@@ -175,7 +175,10 @@ This is the result of adding Reinhard HDR tone mapping to the render:
 ![](img/renders/hdr_no_gamma.PNG)
 
 The intense color near the tip of the teardrop has been eased out, providing a much more natural looking
-diffuse gradient from top to bottom.
+diffuse gradient from top to bottom. This is achieved by dividing the final color by the final color plus 1.
+The effect of this is that very high intensity light values are always less than 1, but the amount there are less than
+one is not linear. Small light values will pretty much remain the same, while larger light values will be shrunk much
+more.
 
 
 This is the result of adding gamma correction to the render:
@@ -184,14 +187,16 @@ This is the result of adding gamma correction to the render:
 
 The color near the edge of the screen has now been boosted to more closely match human color perception,
 and now those areas are now all clearly illuminated by a mix of global illumination and the far away light source.
-However, without the Reinhard operator, the tip of the teardrop is still to bright.
+However, without the Reinhard operator, the tip of the teardrop is still to bright. Gamma correction is implemented by
+taking the final color and taking it to the power of 1 / 2.2.
 
 Finally, combining both operations together yields:
 
 ![](img/renders/diffuse.PNG)
 
 This render has been properly tone mapped and gamma corrected, and now looks more cohesive, natural, and
-follows physically-based rendering principles.
+follows physically-based rendering principles. See the links in the references for more detail in how these operations
+work.
 
 ### OBJ Loading with TinyOBJ
 
@@ -421,4 +426,8 @@ Alec Jacobson Common 3D Test Models: https://github.com/alecjacobson/common-3d-t
 Morgan McGuire, Computer Graphics Archive, July 2017 (https://casual-effects.com/data)
 
 Eric Veach. Multiple Importance Sampling: https://graphics.stanford.edu/courses/cs348b-03/papers/veach-chapter9.pdf
+
+expf Reinhard Tone Mapping post: https://expf.wordpress.com/2010/05/04/reinhards_tone_mapping_operator/
+
+LearnOpenGL Gamma Correction: https://learnopengl.com/Advanced-Lighting/Gamma-Correction
 
