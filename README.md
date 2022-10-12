@@ -241,26 +241,71 @@ improve the runtime.
 
 ### Stream Compaction and Russian Roulette Ray Termination
 
-![](img/figures/streamcompactrays.png)
-
-![](img/figures/streamcompactraysopen.png)
+**All the below figures are in a scene with 32 max depth (unless otherwise noted)
+, 1920x1080 render target, 250000 tris, and 1 light. Runtimes
+of an iteration are averaged over 50 samples.**
 
 ![](img/figures/streamcompactclosedruntime.png)
 
 ![](img/figures/streamcompactopenruntime.png)
 
+As can be seen from the two charts above, adding stream compaction actually increased the runtime. I believe this was
+mostly because, in all my kernels, I always made sure to check that the returning bounces amount was 0, and to return
+if so. This essentially negated a lot of the perceived benefit of the ray termination. Although not as many threads were
+being launched by kernel calls, the performance impact this gave was negated by the cost in running the stream compact
+algorithm. Like expected, the performance penalty of stream compaction was indeed smaller with the open scene,
+where more rays terminate. However, it is still slightly worse than without, again because I still have those checks
+in all my kernels.
+
 ![](img/figures/RRclosedruntime.png)
 
 ![](img/figures/RRopenruntime.png)
 
+Next, as can be seen from the two charts above, adding Russian Roulette Ray Termination **greatly** increases performance.
+This is because, even in closed scenes, which normally would only terminate rays that hit the light, there are still
+many rays per iteration that become terminated due to the feature. The performance gain from this feature is also better
+when a higher max depth is used.
+
+![](img/figures/streamcompactrays.png)
+
+![](img/figures/streamcompactraysopen.png)
+
+Finally, the above two charts showcase the number of active rays at each depth for a single sample.
+As can be seen, without Russian Roulette in a closed scene, the number of rays that terminate per depth is very very
+small. with Russian Roulette, the number of rays terminated almost matches that for the open scene. Except for the
+first three depth, as this is before the feature takes effect. For the open scene,
+the number of rays remaining with and without Russian Roulette is very similar. This is because most rays in the scene
+are being terminated by hitting the void. If a ray is already terminated by hitting the void, then Russian Roulette
+will not even be used on those rays. Overall, it appears that Russian Roulette Ray termination is a very useful and
+cheap method of ray termiantion, whereas stream compaction is too expensive to justify its inclusion.
+
 
 ### Material Sorting
 
+![](img/figures/matsort4.png)
+
+![](img/figures/matsort8.png)
+
+The above two charts display the runtime impact of material sorting with different numbers of materials. As can be seen,
+while the runtime with material sorting got a bit faster with double the amount of materials, the runtime without
+material sorting in both cases still is incredibly faster. This is probably because the impact of material sorting
+can only really be felt with thousands of materials in the scene and much more expensive BSDF calculations. Both of
+these are beyond the scope of this project, but would be an exciting test to run in the future.
+
 ### First Bounce Caching
 
-### Anti Aliasing
+![](img/figures/firstbounce.png)
 
-### Depth of Field
+The above chart shows the performance impact of adding a first bounce cache to the rendering pipeline (without AA or DOF).
+As can be seen above,
+
+### Anti Aliasing and Depth of Field
+
+![](img/figures/aadof.png)
+
+The chart above shows the performance penalties for Anti Aliasing and Depth of Field. Both of these features have very
+small impact on the overall runtime of the program relative to the first bounce caching optimization, especially
+because I handle most calculations and random number generation CPU side to make things easier for the kernel.
 
 ### Bounding Volume Hierarchy (BVH)
 
