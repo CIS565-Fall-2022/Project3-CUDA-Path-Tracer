@@ -152,13 +152,13 @@ for each of the rays we generate in a sample. This yields the blurring effect se
 Naively generating rays causes the primary ray from the camera for every pixel to deterministically hit
 the same object every sample. The result of this is the appearance of "jaggies" as seen below:
 
-![](img/figures/no_aa_fig.png)
+![](img/figures/no_aa_fig.PNG)
 
 By providing a small, random jitter in the x and y directions of a pixels grid cell and 
 modifying the ray direction using this jittered value, the rays shot from a single pixel grid cell can
 thus hit different, neighboring objects each sample yielding anti-aliasing for "free":
 
-![](img/figures/aa_fig.png)
+![](img/figures/aa_fig.PNG)
 
 ### Tone Mapping and Gamma Correction
 
