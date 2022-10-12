@@ -141,7 +141,7 @@ this sample point, we add it to the ray origin and compute the focal distance as
 
 | No Depth-of-Field             |  Depth-of-Field (Lens Radius: 0.5) |
 :-------------------------:|:-------------------------:
-![](img/final/gamma.PNG)  |  ![](img/final/dof.png)
+![](img/final/gamma.PNG)  |  ![](img/final/dof.PNG)
 
 #### Reinhard Tone Mapping and Gamma Correction
 
@@ -184,7 +184,7 @@ and re-ordering materials so that they are contiguous in memory before shading.
 #### Testing Methodology
 
 To measure performance, I used a `PerformanceTimer` class with methods `startGpuTimer()`, `endGpuTimer()`, 
-and `getGpuElapsedTimeForPreviousOperation()`. These methods are wrappers around calls to to the CUDA runtime library.
+and `getGpuElapsedTimeForPreviousOperation()`. These methods are wrappers around calls to the CUDA runtime library.
 For measuring individual kernels, I placed a call to `startGpuTimer` and `endGpuTimer` around the kernel and called `getGpuElapsedTime` after 
 the call to `endGpuTimer`. To measure the performance of one iteration, I summed the times for each kernel/thrust call within a single call to the 
 `pathtrace` function. I could have also placed a timer around the `pathtrace` call, but I wanted to obtain timing without memory I/O and setup.  
@@ -199,7 +199,7 @@ that the averages might be slightly higher/lower than normal, but still capture 
 For this project, I wanted to learn more about path tracer performance and acceleration structures, so I chose to implement a Linear Bounding Volume Hierarchy (LBVH), which is described further
 in [this paper](https://research.nvidia.com/sites/default/files/pubs/2012-06_Maximizing-Parallelism-in/karras2012hpg_paper.pdf).
 After implementing this feature, I was interested to see the comparison between an LBVH and a BVH that uses the Midpoint split method
-and the SAH split method, so I added those too. The BVH with both Midpoint and SAH splits is currently functional, but also suffers from performance bug that may be caused by
+and the SAH split method, so I added those too. The BVH with both Midpoint and SAH splits is currently functional, but also suffers from a performance bug that may be caused by
 a bug in the splitting code. Since the LBVH was my main focus, I didn't quite polish this aspect of the BVH (therefore it runs slowly for larger triangle counts), 
 but have still included it here in the discussion.
 
@@ -230,13 +230,13 @@ the parents' bounding boxes based off of those. This is to ensure less overlap b
 To traverse the LBVH, we use an iterative traversal with a per-thread stack. For each node, we check whether the current ray intersects the children, and depending
 on the results, we choose whether to keep traversing the left subtree, right subtree, or both. If we choose to traverse both, we move to the left child, and push the right
 child onto the stack. This essentially allows us to search the entire left subtree first before moving to the right-hand side. One downside of the LBVH is that it is optimized for 
-fast construction, which isn't really necessary for this path tracer since the construction is only done once at startup. If this were a dynamic scene with moving, then it would have been more important 
+fast construction, which isn't really necessary for this path tracer since the construction is only done once at startup. If this were a dynamic scene with moving objects, then it would have been more important 
 to have optimized construction. As a result, this can lead to less-optimal or unbalanced tree structures.
 
 ##### Bounding Volume Hierarchy (Midpoint and SAH)
 
 Initially, I was only planning to implement the LBVH, but after getting extremely slow runtimes for it, 
-I decided to try out a BVH with Midpoint split. Turns out, the LBVH was working fine, but I just had a minor bug in my AABB intersection
+I decided to try out a BVH with Midpoint split. Turns out, the LBVH was working fine, I just had a minor bug in my AABB intersection
 test! (see the bloopers below). After I fixed that, the LBVH outperformed the BVH.
 
 The first method I implemented was splitting by the midpoint of the triangles' centroids. This gave some performance improvement, but led to very
@@ -245,20 +245,20 @@ general it is possible for Midpoint split to result in very unbalanced trees. Si
 a try. In this method, we compute the cost of splitting along a particular axis at a triangle's centroid. This means we perform `3 * num_triangles` cost checks 
 to determine a split. The cost function is dependent on the number of triangles that would be placed in each child of the current node as well as
 the surface area of those boxes. We give a higher probability of being hit by a ray to larger boxes. After implementing this heuristic, the trees were more balanced,
-but the construction time had increased immensely. The construction time was too long for the Stanford Bunny and Stanford Dragon, so I have omitted these from the
+but the construction time had increased immensely because of the cost checks. The construction time was too long for the Stanford Bunny and Stanford Dragon, so I have omitted these from the
 graphs.   
 
 ##### Bounding Box Culling
 
 A basic optimization I implemented was bounding box culling for loaded meshes. This can be toggled with `BB_CULLING` in `utilities.h`. 
 I calculated a bounding box for the entire mesh once loaded, and if the ray hits this box during intersection testing, it will check all its triangles.
-If it misses, it will skip the entire mesh. Bounding box culling works best if the mesh takes up a smaller portion of the screen. If the mesh is very large, then
+If it misses, it will skip the entire mesh. Bounding box culling works best if the mesh takes up a smaller portion of the screen. If the mesh is very large,
 the probability of hitting the bounding box and check all the triangles is higher. 
 
 The follow meshes were used to analyze the performance of each acceleration structure:
 
 | Teapot           |  Bunny  | Dragon
-:-------------------------:|:-------------------------:
+:-------------------------:|:-------------------------:|:-------------------------:
 ![](img/final/acceleration_teapot.PNG)  |  ![](img/final/acceleration_bunny.PNG) |  ![](img/final/acceleration_dragon.PNG)
 
 Performance comparisons for each acceleration structure can be found in the table and chart below:
@@ -279,7 +279,7 @@ of the nodes (see heatmap below). Sibling nodes are always next to each other in
 runtimes are unusually long.
 
 <p align="center">
-  <img alt="Stream Compaction Chart" src="img/final/heatmap.PNG" />
+  <img alt="Stream Compaction Chart" src="img/final/heatmap.png" />
 </p>
 <p align="center"><em>Stanford Dragon Heatmap</em></p>
 
@@ -359,8 +359,8 @@ that materials with similar computational complexity will be executed together.
 </p>
 <p align="center"><em>Figure 7. Shading Kernel Execution Time, Sorting vs. No Sorting</em></p>
 
-Based on this graph, material did improve performance for this scene. I think this is slightly suprising because
-when I tested on simpler scenes, it led to a major performance decrease. I suspected that it was because there are only a 
+Based on this graph, material sorting did improve performance for this scene. I think this is slightly suprising because
+when I tested simpler scenes, it led to a major performance decrease. I suspected that it was because there are only a 
 handful of materials in the scene, making the benefits of sorting unnoticeable. My assumption was that sorting will only improve performance
 when there is a large number of different materials in the scene, but it was nice to see that re-ordering the materials had a positive impact
 for this particular scene. 
