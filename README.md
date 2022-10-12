@@ -47,39 +47,49 @@ These describe the reflective and transmissive properties respectively.
 
 #### Diffuse BRDF
 
-The Diffuse BRDF scatters light in all directions
-
 ![](img/renders/diffuse.PNG)
+
+The Diffuse BRDF scatters light in all directions in the hemisphere oriented along the surface normal.
 
 #### Specular BRDF
 
 ![](img/renders/spec_brdf.PNG)
 
+The Specular BRDF reflects rays in only a single direction: the incoming ray reflected about the surface normal.
+This yields a perfect mirror-like reflectance model.
+
 #### Specular BTDF
 
 ![](img/renders/spec_btdf.PNG)
+
+The Specular BTDF reflects rays in only a single direction: the incoming ray refracted about the surface normal
+based on the specified index of refraction according to Snell's Law. At some points of interesection, this may yield
+total internal reflection, at which point the ray should be reflected outwards similar to the Specular BRDF. However,
+this specific case is handled in full in the Specular Glass BxDF below.
 
 #### Specular Glass BxDF
 
 ![](img/renders/spec_glass.PNG)
 
+Specular Glass combines both the Specular BRDF and the Specular BTDF into one BSDF. The mix of reflection vs. refraction
+is modulated by the Fresnel term for dielectrics, which specifies that more reflection occurs where the surface normal
+is more perpendicular to the look direction, whilst
+more refraction occurs in cases where the surface normal is more parallel with the look direction.
+
 #### Specular Plastic BxDF
 
 ![](img/renders/spec_plastic.PNG)
 
+Specular Plastic is a BxDF mix between the diffuse BRDF and the specular BRDF. It functions nearly
+identically to glass in terms of mixing these two BSDFs, and yields a partially rough and partially
+mirror-like surface.
+
 ### Multiple Importance Sampling (MIS)
 
 ![](img/renders/depth_1.PNG)
-![](img/renders/depth_2.PNG)
-![](img/renders/depth_3.PNG)
-![](img/renders/depth_4.PNG)
-![](img/renders/depth_5.PNG)
 ![](img/renders/depth_8.PNG)
 
 ![](img/renders/iter_1.PNG)
-![](img/renders/iter_5.PNG)
-![](img/renders/iter_10.PNG)
-![](img/renders/iter_50.PNG)
 ![](img/renders/iter_100.PNG)
 ![](img/renders/iter_100_mis.PNG)
 
@@ -89,9 +99,16 @@ The Diffuse BRDF scatters light in all directions
 
 ### Stochastic Anti-Aliasing
 
-![](img/figures/no_aa.png)
+Naively generating rays causes the primary ray from the camera for every pixel to deterministically hit
+the same object every sample. The result of this is the appearance of "jaggies" as seen below:
 
-![](img/figures/aa.png)
+![](img/figures/no_aa_fig.png)
+
+By providing a small, random jitter in the x and y directions of a pixels grid cell and 
+modifying the ray direction using this jittered value, the rays shot from a single pixel grid cell can
+thus hit different, neighboring objects each sample yielding anti-aliasing for "free":
+
+![](img/figures/aa_fig.png)
 
 ### Tone Mapping and Gamma Correction
 
@@ -128,6 +145,11 @@ follows physically-based rendering principles.
 
 ### OBJ Loading with TinyOBJ
 
+Using the TinyOBJ library, a. .obj file can be specified in the scene description and then read in via
+the library into arrays of triangle positions, normals, and texture coordinates. These are then grouped together
+in a struct, and an array of these structs is sent to the GPU to be rendered. The wire frame render of the
+teardrop model looks like this:
+
 ![](img/renders/wireframe.PNG)
 
 P.S. In order to render this wireframe version while still in a physically-based framework and in an
@@ -135,7 +157,8 @@ easy and quick to implement way, I changed my triangle intersection test. In the
 the barycentric coordinates of the hit point are within the triangle, I simply added an upper limit to
 the distance from an edge a point is that will still count as an intersection.
 
-
+By using the normals read in from the obj file, the normal at the hit point of the ray-triangle intersection
+test can be interpolated using the barycentric coordinates, yielding smooth shading, like that below:
 
 ![](img/renders/diffuse.PNG)
 
@@ -216,10 +239,57 @@ improve the runtime.
 
 ## Performance Analysis
 
+### Stream Compaction and Russian Roulette Ray Termination
+
+![](img/figures/streamcompactrays.png)
+
+![](img/figures/streamcompactraysopen.png)
+
+![](img/figures/streamcompactclosedruntime.png)
+
+![](img/figures/streamcompactopenruntime.png)
+
+![](img/figures/RRclosedruntime.png)
+
+![](img/figures/RRopenruntime.png)
+
+
+### Material Sorting
+
+### First Bounce Caching
+
+### Anti Aliasing
+
+### Depth of Field
+
+### Bounding Volume Hierarchy (BVH)
+
+This chart shows the average runtime across 50 pixel samples:
+
+![](img/figures/bvhruntime.png)
+
+As can be seen from the chart above, the runtime of the linear triangle intersection search is indeed O(n^2). And,
+the runtime with the BVH appears to be logarithmic. Note that there was some variance in the objects used, and mesh
+topology, and scale in the scene definitely play a role in making the runtime vary per object tested. For anything past
+1000 triangles, the linear search was less than 1 frame a second, and became untennable to actually test the runtime for.
+
+
 ## Bloopers
 
 ![](img/bloops/lotsadragons.PNG)
 Accidentally made the walls specular
 
 **For more bloopers, see img/bloops :)**
+
+## References
+
+Adam Mally's CIS 560 and 561 Slides and Lectures
+
+Physically Based Rendering: https://pbrt.org/
+
+Jacco Bikker Blog on BVHs: https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/
+
+Alec Jacobson Common 3D Test Models: https://github.com/alecjacobson/common-3d-test-models
+
+Morgan McGuire Computer Graphics Archive: https://casual-effects.com/data/
 
