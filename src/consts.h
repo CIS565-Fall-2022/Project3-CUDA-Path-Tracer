@@ -31,6 +31,8 @@
 // #define ANTI_ALIAS_JITTER
 // #define FAKE_SHADE
 
+// #define DENOISE_USE_DIFFUSE_MAP
+
 #define CACHE_FIRST_BOUNCE
 #if (defined(CACHE_FIRST_BOUNCE) && defined(ANTI_ALIAS_JITTER)) || (defined(CACHE_FIRST_BOUNCE) && defined(DEPTH_OF_FIELD)) 
 #error "ANTI_ALIAS_JITTER or CACHE_FIRST_BOUNCE cannot be used with CACHE_FIRST_BOUNCE"

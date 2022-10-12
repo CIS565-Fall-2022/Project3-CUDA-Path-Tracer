@@ -86,6 +86,7 @@ namespace Denoiser {
 		}
 		
 		// multiply by diffuse map
+#ifdef DENOISE_USE_DIFFUSE_MAP
 		thrust::transform(
 			thrust::device,
 			bufs[buf_idx],
@@ -93,6 +94,7 @@ namespace Denoiser {
 			diffuse_map,
 			bufs[buf_idx],
 			thrust::multiplies<color_t>());
+#endif
 
 		D2D(rt.get(), bufs[buf_idx], rt.size());
 
