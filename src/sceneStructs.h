@@ -10,6 +10,7 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    MESH,
 };
 
 struct Ray {
@@ -28,6 +29,19 @@ struct Geom {
     glm::mat4 invTranspose;
 };
 
+struct TriangleGeom {
+    glm::vec3 v1;
+    glm::vec3 v2;
+    glm::vec3 v3;
+    glm::vec3 n1;
+    glm::vec3 n2;
+    glm::vec3 n3;
+};
+struct MeshGeom {
+    std::vector<TriangleGeom> triangleGeoms;
+    glm::vec3 min;
+    glm::vec3 max;
+};
 struct Material {
     glm::vec3 color;
     struct {
@@ -49,6 +63,8 @@ struct Camera {
     glm::vec3 right;
     glm::vec2 fov;
     glm::vec2 pixelLength;
+    float radius;
+    float focalDistance;
 };
 
 struct RenderState {
@@ -65,6 +81,7 @@ struct PathSegment {
     int pixelIndex;
     int remainingBounces;
 };
+
 
 // Use with a corresponding PathSegment to do:
 // 1) color contribution computation

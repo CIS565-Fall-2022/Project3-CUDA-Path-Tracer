@@ -118,16 +118,6 @@ TRANS       8 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
-
-
-// Sphere 3
-//OBJECT 6
-//sphere
-//material 5
-//TRANS       -5 4 -1
-//ROTAT       0 0 0
-//SCALE       3 3 3
-
 // Back wall
 OBJECT 6
 cube
@@ -136,10 +126,10 @@ TRANS       0 5 -6
 ROTAT       0 90 0
 SCALE       .01 20 20
 
-// Bunny
+// Dragon
 OBJECT 7
 obj
-material 4
-TRANS       0 -2 0
-ROTAT       0 0 0
-SCALE       50 50 50
+material 5
+TRANS       0 -1 0
+ROTAT       0 180 0
+SCALE       0.01 0.01 0.01

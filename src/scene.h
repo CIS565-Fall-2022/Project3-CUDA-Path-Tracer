@@ -15,12 +15,16 @@ private:
     ifstream fp_in;
     int loadMaterial(string materialid);
     int loadGeom(string objectid);
+    int loadOBJ(int id);
     int loadCamera();
+    
 public:
     Scene(string filename);
     ~Scene();
 
     std::vector<Geom> geoms;
+    //std::vector<TriangleGeom> triangleGeoms;
+    MeshGeom meshGeoms;
     std::vector<Material> materials;
     RenderState state;
 };
