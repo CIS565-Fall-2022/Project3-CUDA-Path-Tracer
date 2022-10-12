@@ -35,6 +35,9 @@ per second.**
 
 *11000 spp, ~2,500,000 triangles, max ray depth 16, rendered in ~2 hour*
 
+**All models obtained from either Alec Jacobson's or Morgan McGuire's common 3D model repositories. See references
+at the bottom of readme**
+
 ## IMPLEMENTATION
 
 ### Physically-Based Rendering
@@ -415,7 +418,7 @@ Jacco Bikker Blog on BVHs: https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh
 
 Alec Jacobson Common 3D Test Models: https://github.com/alecjacobson/common-3d-test-models
 
-Morgan McGuire Computer Graphics Archive: https://casual-effects.com/data/
+Morgan McGuire, Computer Graphics Archive, July 2017 (https://casual-effects.com/data)
 
 Eric Veach. Multiple Importance Sampling: https://graphics.stanford.edu/courses/cs348b-03/papers/veach-chapter9.pdf
 
