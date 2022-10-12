@@ -38,7 +38,7 @@ extern int height;
 
 bool switchScene(Scene* scene, int start_iter, bool from_save, bool force);
 bool switchScene(char const* path, bool force = false);
-void runCuda(bool init);
+void runCuda();
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
 void mousePositionCallback(GLFWwindow* window, double xpos, double ypos);
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);

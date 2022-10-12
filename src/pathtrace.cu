@@ -1,5 +1,9 @@
 #include <cstdio>
 #include <cuda.h>
+
+#include <GL/glew.h>
+#include <cuda_gl_interop.h>
+
 #include <cmath>
 #include <thrust/execution_policy.h>
 #include <thrust/device_ptr.h>
@@ -20,6 +24,7 @@
 #include "Collision/AABB.h"
 #include "Octree/octree.h"
 #include "consts.h"
+#include "Denoise/denoise.cuh"
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #ifndef NDEBUG
@@ -41,93 +46,52 @@ void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #endif
 }
 
+// functors
+struct RadianceToNormalizedRGB {
+	int iter;
+	RadianceToNormalizedRGB(int iter) : iter(iter) { }
+	__host__ __device__ color_t operator()(color_t const& r) const {
+		if (!iter) {
+			return color_t(0);
+		}
+		return glm::clamp(r / (float) iter, 0.f, 1.f);
+	}
+};
+struct RadianceToRGBA {
+	int iter;
+	RadianceToRGBA(int iter) : iter(iter) { }
+	__host__ __device__ uchar4 operator()(color_t const& r) const {
+		if (!iter) {
+			return make_uchar4(0, 0, 0, 0);
+		}
+		return make_uchar4(
+			glm::clamp((int)(r.x / iter * 255.f), 0, 255),
+			glm::clamp((int)(r.y / iter * 255.f), 0, 255),
+			glm::clamp((int)(r.z / iter * 255.f), 0, 255),
+			0);
+	}
+};
+struct NormalizedRGBToRGBA {
+	__host__ __device__ uchar4 operator()(color_t const& r) const {
+		return make_uchar4(
+			glm::clamp((int)(r.x * 255.f), 0, 255),
+			glm::clamp((int)(r.y * 255.f), 0, 255),
+			glm::clamp((int)(r.z * 255.f), 0, 255),
+			0);
+	}
+};
+
 __host__ __device__
 thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int depth) {
 	int h = utilhash((1 << 31) | (depth << 22) | iter) ^ utilhash(index);
 	return thrust::default_random_engine(h);
 }
 
-__device__ int f(int i) {
-	if (!i) return 1;
-	return f(i - 1) * i;
-}
-__global__ void recur_test() {
-	printf("recur_test: %d", f(5));
-}
-
-__global__ void print2d(Span<Span<int>> arr) {
-	for (int i = 0; i < arr.size(); ++i) {
-		for (int j = 0; j < arr[i].size(); ++j) {
-			printf("%d ", arr[i][j]);
-		}
-		printf("\n");
-	}
-}
-void PathTracer::unitTest() {
-#ifndef NDEBUG
-	// test 2d span
-#define SECTION(name) std::cout << "========= " << name << " =========\n";
-	SECTION("test 2d array") {
-		thrust::default_random_engine rng = makeSeededRandomEngine(0, 0, 0);
-		thrust::uniform_int_distribution<int> udist(3, 10);
-		std::vector<std::vector<int>> jagged(udist(rng));
-		for (int i = 0; i < jagged.size(); ++i) {
-			jagged[i].resize(udist(rng));
-			for (int j = 0; j < jagged[i].size(); ++j) {
-				jagged[i][j] = (i + 1) * (j + 1);
-			}
-		}
-
-		std::vector<Span<int>> dev_arrs;
-		for (auto const& v : jagged) {
-			int* arr;
-			ALLOC(arr, v.size());
-			H2D(arr, v.data(), v.size());
-			dev_arrs.emplace_back(v.size(), arr);
-		}
-
-		Span<int>* arrs;
-		ALLOC(arrs, jagged.size());
-		H2D(arrs, dev_arrs.data(), jagged.size());
-
-		print2d KERN_PARAM(1, 1) ( { (int)jagged.size(), arrs } );
-		for (int i = 0; i < jagged.size(); ++i) {
-			FREE(dev_arrs[i]);
-		}
-		FREE(arrs);
-	}
-	
-	SECTION("recursion test") {
-		recur_test KERN_PARAM(1, 1) ();
-	}
-#endif // !NDEBUG
-}
-
-//Kernel that writes the image to the OpenGL PBO directly.
-__global__ void sendImageToPBO(int iter, glm::vec3* pixs, uchar4* pbo, glm::ivec2 resolution) {
-	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
-	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
-
-	if (x < resolution.x && y < resolution.y) {
-		int index = x + (y * resolution.x);
-		glm::vec3 pix = pixs[index];
-
-		glm::ivec3 color;
-		color.x = glm::clamp((int)(pix.x / iter * 255.0), 0, 255);
-		color.y = glm::clamp((int)(pix.y / iter * 255.0), 0, 255);
-		color.z = glm::clamp((int)(pix.z / iter * 255.0), 0, 255);
-
-		// Each thread writes one pixel location in the texture (textel)
-		pbo[index].w = 0;
-		pbo[index].x = color.x;
-		pbo[index].y = color.y;
-		pbo[index].z = color.z;
-	}
-}
+void PathTracer::unitTest() {  }
 
 static RenderState* renderState = nullptr;
 static Scene* hst_scene = nullptr;
-static std::string cur_scene;
+static std::string cur_scene = "";
 
 static Span<glm::vec3>             dev_image;
 static Span<Geom>                  dev_geoms;
@@ -140,16 +104,70 @@ static Span<ShadeableIntersection> dev_cached_intersections;
 static Span<Light> dev_lights;
 static MeshInfo dev_mesh_info;
 
-static thrust::device_ptr<PathSegment> dev_thrust_paths;
 static std::vector<TextureGPU> dev_texs;
 
-// TODO
 static octree* tree;
 static octreeGPU dev_tree;
 
+GLuint s_pbo_id = -1;
+uchar4* s_pbo_dptr = nullptr;
+
+struct DenoiseBuffers {
+	DenoiseBuffers() = default;
+	DenoiseBuffers(DenoiseBuffers const&) = delete;
+	DenoiseBuffers(DenoiseBuffers&&) = delete;
+
+	void init(int pixelcount) {
+		rt = make_span<color_t>(pixelcount);
+		d = make_span<glm::vec3>(pixelcount);
+		n = make_span<glm::vec3>(pixelcount);
+		x = make_span<glm::vec3>(pixelcount);
+	}
+	void free() {
+		FREE(rt);
+		FREE(n);
+		FREE(x);
+		FREE(d);
+	}
+
+	Span<color_t> rt;
+	Span<glm::vec3> n, x, d;
+};
+
 // pathtracer state
+static bool enable_denoise = false;
 static bool render_paused = false;
 static int cur_iter;
+
+static DenoiseBuffers denoise_buffers;
+static Denoiser::ParamDesc denoise_params;
+
+// helper for displaying a texture for debugging purposes
+struct DebugTexScope {
+	DebugTexScope(DebugTexScope const&) = delete;
+	DebugTexScope(DebugTexScope&&) = delete;
+
+	DebugTexScope(glm::vec3 const* tex, uchar4* pbo) {
+		render_paused = true;
+		Camera const& cam = hst_scene->state.camera;
+		int pixelcount = cam.resolution.x * cam.resolution.y;
+		thrust::transform(thrust::device, tex, tex + pixelcount, pbo, NormalizedRGBToRGBA());
+	}
+
+	~DebugTexScope() {
+		render_paused = false;
+	}
+};
+static DebugTexScope* s_debug_tex_scope = nullptr;
+
+void PathTracer::beginFrame(unsigned int pbo_id) {
+	s_pbo_id = pbo_id;
+	CHECK_CUDA(cudaGLMapBufferObject((void**)&s_pbo_dptr, s_pbo_id));
+}
+
+void PathTracer::endFrame() {
+	CHECK_CUDA(cudaGLUnmapBufferObject(s_pbo_id));
+}
 
 void PathTracer::pathtraceInit(Scene* scene, RenderState* state, bool force_change) {
 	if (!scene) throw;
@@ -167,9 +185,10 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state, bool force_chan
 #ifdef CACHE_FIRST_BOUNCE
 	dev_cached_intersections = make_span<ShadeableIntersection>(pixelcount);
 #endif // CACHE_FIRST_BOUNCE
-	dev_thrust_paths = thrust::device_ptr<PathSegment>((PathSegment*)dev_paths);
 
 	if (scene_changed) {
+		denoise_buffers.init(pixelcount);
+
 		dev_geoms = make_span(scene->geoms);
 		dev_lights = make_span(scene->lights);
 		dev_mesh_info.vertices = make_span(scene->vertices);
@@ -196,13 +215,21 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state, bool force_chan
 void PathTracer::pathtraceFree(Scene* scene, bool force_change) {
 	bool scene_changed = force_change || !scene || cur_scene != scene->filename;
 
+	if (s_debug_tex_scope) {
+		delete s_debug_tex_scope;
+		s_debug_tex_scope = nullptr;
+	}
+
 	FREE(dev_image);
 	FREE(dev_paths);
 	FREE(dev_intersections);
 #ifdef CACHE_FIRST_BOUNCE
 	FREE(dev_cached_intersections);
 #endif // CACHE_FIRST_BOUNCE
+
 	if (scene_changed) {
+		denoise_buffers.free();
+
 		FREE(dev_geoms);
 		FREE(dev_lights);
 		FREE(dev_mesh_info.vertices);
@@ -452,23 +479,23 @@ __global__ void finalGather(int numPixels, glm::vec3* image, PathSegment* iterat
  * 
  * Returns the new iteration
  */
-int PathTracer::pathtrace(uchar4 *pbo, int iter) {
+int PathTracer::pathtrace(int iter) {
 	cur_iter = iter;
 	if (render_paused) {
 		return iter;
 	}
+
+	++cur_iter;
 
     const int traceDepth = hst_scene->state.traceDepth;
     const Camera &cam = hst_scene->state.camera;
     const int pixelcount = cam.resolution.x * cam.resolution.y;
 
     // 2D block for generating ray from camera
-    const dim3 blockSize2d(8, 8);
-    const dim3 blocksPerGrid2d(
-            (cam.resolution.x + blockSize2d.x - 1) / blockSize2d.x,
-            (cam.resolution.y + blockSize2d.y - 1) / blockSize2d.y);
+	dim3 blk_per_grid2d(DIV_UP(cam.resolution.x, 8), DIV_UP(cam.resolution.y, 8));
+	dim3 blk_sz2d(8,8);
 
-    generateRayFromCamera KERN_PARAM(blocksPerGrid2d, blockSize2d) (cam, iter, traceDepth, dev_paths);
+    generateRayFromCamera KERN_PARAM(blk_per_grid2d, blk_sz2d) (cam, iter, traceDepth, dev_paths);
     checkCUDAError("generate camera ray");
 
     // --- PathSegment Tracing Stage ---
@@ -500,6 +527,7 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 		dev_inters = dev_intersections;
 		dev_cached_inters = nullptr;
 #endif
+
 		// split dev_paths [0 : num_paths] into chunks
 #ifndef MAX_INTERSECTION_TEST_SIZE // if not defined, launch all paths at once
 #define MAX_INTERSECTION_TEST_SIZE num_paths
@@ -524,17 +552,38 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 			cudaDeviceSynchronize();
 		}
 
+		// initialize position and normal buffers for denoising
+		// NOTE: must do this before the material sorting
+		if (!depth && !iter) {
+			// normal
+			thrust::transform(
+				thrust::device,
+				dev_inters,
+				dev_inters + pixelcount,
+				denoise_buffers.n.get(),
+				Denoiser::IntersectionToNormal());
+
+			// position
+			thrust::transform(
+				thrust::device,
+				dev_inters,
+				dev_inters + pixelcount,
+				denoise_buffers.x.get(),
+				Denoiser::IntersectionToPos());
+
+			// diffuse
+			thrust::transform(
+				thrust::device,
+				dev_inters,
+				dev_inters + pixelcount,
+				denoise_buffers.d.get(),
+				Denoiser::IntersectionToDiffuse(dev_mesh_info.materials));
+		}
 
 		// --- Shading Stage ---
-		// Shade path segments based on intersections and generate new rays by
-		// evaluating the BSDF.
-		// Start off with just a big kernel that handles all the different
-		// materials you have in the scenefile.
-		// TODO: compare between directly shading the path segments and shading
-		// path segments that have been reshuffled to be contiguous in memory.
+		// Shade path segments based on intersections and generate new rays by evaluating the BSDF.
 #ifdef SORT_MAT
-		thrust::device_ptr<ShadeableIntersection> dev_thrust_inters(dev_inters);
-		thrust::sort_by_key(dev_thrust_inters, dev_thrust_inters + num_paths, dev_thrust_paths);
+		thrust::sort_by_key(thrust::device, dev_inters, dev_inters + num_paths, dev_paths.get());
 #endif
 
 #ifdef FAKE_SHADE
@@ -552,11 +601,7 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 		cudaDeviceSynchronize();
 
 #ifdef COMPACTION
-#ifdef COMPACTION_USE_PARTITION
-		num_paths = thrust::partition(dev_thrust_paths, dev_thrust_paths + num_paths, PathSegment::PartitionRule()) - dev_thrust_paths;
-#else
-		num_paths = thrust::remove_if(dev_thrust_paths, dev_thrust_paths + num_paths, PathSegment::RemoveRule()) - dev_thrust_paths;
-#endif // COMPACTION_USE_PARTITION
+		num_paths = thrust::partition(thrust::device, dev_paths.get(), dev_paths.get() + num_paths, PathSegment::PartitionRule()) - dev_paths.get();
 #endif // COMPACTION
 
 #ifdef MAX_DEPTH_OVERRIDE
@@ -567,19 +612,42 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 	
 	// Assemble this iteration and apply it to the image
     finalGather KERN_PARAM(DIV_UP(pixelcount, BLOCK_SIZE), BLOCK_SIZE) (pixelcount, dev_image, dev_paths);
+	cudaDeviceSynchronize();
+
+	// denoise
+	if (enable_denoise) {
+		thrust::transform(
+			thrust::device, 
+			dev_image.get(),
+			dev_image.get() + pixelcount,
+			denoise_buffers.rt.get(),
+			RadianceToNormalizedRGB(cur_iter));
+
+		Denoiser::denoise(denoise_buffers.rt, denoise_buffers.n, denoise_buffers.x, denoise_buffers.d, denoise_params);
+
+		thrust::transform(
+			thrust::device,
+			denoise_buffers.rt.get(),
+			denoise_buffers.rt.get() + pixelcount,
+			s_pbo_dptr,
+			NormalizedRGBToRGBA()
+		);
+	} else {
+		thrust::transform(
+			thrust::device,
+			dev_image.get(),
+			dev_image.get() + pixelcount,
+			s_pbo_dptr,
+			RadianceToRGBA(cur_iter));
+	}
 
     ///////////////////////////////////////////////////////////////////////////
-
-    // Send results to OpenGL buffer for rendering
-    sendImageToPBO KERN_PARAM(blocksPerGrid2d, blockSize2d) (iter, dev_image, pbo, cam.resolution);
-
     // Retrieve image from GPU
-    cudaMemcpy(hst_scene->state.image.data(), dev_image,
-            pixelcount * sizeof(glm::vec3), cudaMemcpyDeviceToHost);
+	D2H(hst_scene->state.image.data(), dev_image, pixelcount);
 
     checkCUDAError("pathtrace");
 
-	return cur_iter = iter + 1;
+	return cur_iter;
 }
 
 bool PathTracer::saveRenderState(char const* filename) {
@@ -587,6 +655,10 @@ bool PathTracer::saveRenderState(char const* filename) {
 }
 
 void PathTracer::togglePause() {
+	if (s_debug_tex_scope) {
+		// if a debug texture is being displayed, do nothing
+		return;
+	}
 	render_paused = !render_paused;
 }
 
@@ -594,6 +666,36 @@ bool PathTracer::isPaused() {
 	return render_paused;
 }
 
+void PathTracer::enableDenoise() {
+	enable_denoise = true;
+}
+void PathTracer::disableDenoise() {
+	enable_denoise = false;
+}
 octreeGPU PathTracer::getTree() {
 	return dev_tree;
+}
+void PathTracer::setDenoise(Denoiser::ParamDesc const& desc) {
+	denoise_params = desc;
+}
+
+void PathTracer::debugTexture(DebugTextureType type) {
+	if (s_debug_tex_scope) {
+		delete s_debug_tex_scope;
+	}
+
+	switch (type) {
+	case DebugTextureType::G_BUF:
+	case DebugTextureType::NORM_BUF:
+		s_debug_tex_scope = new DebugTexScope(denoise_buffers.n, s_pbo_dptr);
+		return;
+	case DebugTextureType::POS_BUF:
+		s_debug_tex_scope = new DebugTexScope(denoise_buffers.x, s_pbo_dptr);
+		return;
+	case DebugTextureType::NONE:
+	default:
+		render_paused = false;
+		s_debug_tex_scope = nullptr;
+		return;
+	}
 }

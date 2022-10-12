@@ -11,13 +11,13 @@ class AABB {
 	glm::vec3 _max;
 
 public:
-	HOST_DEVICE AABB() : _min(0), _max(0) {}
-	HOST_DEVICE AABB(glm::vec3 const& min, glm::vec3 const& max) : _min(min), _max(max) { }
-	HOST_DEVICE glm::vec3 const& min() const { return _min; }
-	HOST_DEVICE glm::vec3 const& max() const { return _max; }
-	HOST_DEVICE glm::vec3 center() const { return (_min + _max) * 0.5f; }
-	HOST_DEVICE glm::vec3 extent() const { return (_max - _min) * 0.5f; }
-	HOST_DEVICE void vertices(glm::vec3(&out)[8], bool world) const {
+	HOST DEVICE INLINE AABB() : _min(0), _max(0) {}
+	HOST DEVICE INLINE AABB(glm::vec3 const& min, glm::vec3 const& max) : _min(min), _max(max) { }
+	HOST DEVICE INLINE glm::vec3 const& min() const { return _min; }
+	HOST DEVICE INLINE glm::vec3 const& max() const { return _max; }
+	HOST DEVICE INLINE glm::vec3 center() const { return (_min + _max) * 0.5f; }
+	HOST DEVICE INLINE glm::vec3 extent() const { return (_max - _min) * 0.5f; }
+	HOST DEVICE INLINE void vertices(glm::vec3(&out)[8], bool world) const {
 		glm::vec3 ex = extent(), ct = center();
 		int i = 0;
 		for (float x : { -ex.x, ex.x }) {

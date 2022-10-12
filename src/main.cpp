@@ -18,7 +18,9 @@ static bool middleMousePressed = false;
 static double lastX;
 static double lastY;
 
+static bool fromSave = false;
 static bool camchanged = true;
+static bool forceChange = false;
 
 JunksFromMain g_mainJunks;
 
@@ -91,7 +93,6 @@ void resetCamState() {
 	cam.position = cameraPosition;
 	cameraPosition += cam.lookAt;
 	cam.position = cameraPosition;
-	camchanged = false;
 }
 bool switchScene(Scene* scene, int start_iter, bool from_save, bool force) {
 	// Set up camera stuff from loaded path tracer settings
@@ -103,6 +104,7 @@ bool switchScene(Scene* scene, int start_iter, bool from_save, bool force) {
 
 	iteration = start_iter;
 	g_renderState = &scene->state;
+	fromSave = from_save;
 
 	if (!from_save) {
 		Camera const& cam = g_renderState->camera;
@@ -129,13 +131,13 @@ bool switchScene(Scene* scene, int start_iter, bool from_save, bool force) {
 
 
 	camchanged = true;
+	forceChange = force;
+
 	leftMousePressed = rightMousePressed = middleMousePressed = false;
 	lastX = lastY = 0;
 	Preview::InitImguiData();
 
 	resetCamState();
-	PathTracer::pathtraceFree(scene, force);
-	PathTracer::pathtraceInit(scene, g_renderState, force);
 
 	return true;
 }
@@ -172,35 +174,34 @@ void saveImage() {
 	//img.saveHDR(filename);  // Save a Radiance HDR file
 }
 
-void runCuda(bool init) {
+void runCuda() {
+	PathTracer::beginFrame(pbo);
 
-	if (camchanged) {
-		iteration = 0;
-
-		if (!init) {
-			// clear image buffer
+	if (camchanged || forceChange) {
+		// clear image buffer
+		if (!fromSave) {
+			iteration = 0;
 			std::fill(g_renderState->image.begin(), g_renderState->image.end(), glm::vec3(0));
 		}
-		PathTracer::pathtraceFree(g_scene);
-		PathTracer::pathtraceInit(g_scene, g_renderState);
+
+		PathTracer::pathtraceFree(g_scene, forceChange);
+		PathTracer::pathtraceInit(g_scene, g_renderState, forceChange);
 
 		resetCamState();
+
+		fromSave = false;
+		camchanged = false;
+		forceChange = false;
 	}
 
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
 	if (iteration < g_renderState->iterations) {
-		uchar4* pbo_dptr = NULL;
-		cudaGLMapBufferObject((void**)&pbo_dptr, pbo);
-
-		// execute the kernel
-		int frame = 0;
-		iteration = PathTracer::pathtrace(pbo_dptr, iteration);
-
-		// unmap buffer object
-		cudaGLUnmapBufferObject(pbo);
+		iteration = PathTracer::pathtrace(iteration);
+		PathTracer::endFrame();
 	} else {
+		PathTracer::endFrame();
 		saveImage();
 		PathTracer::pathtraceFree(nullptr);
 		cudaDeviceReset();

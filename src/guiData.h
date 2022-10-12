@@ -1,12 +1,16 @@
 #pragma once
+#include "Denoise/denoise.h"
 
 class octree;
+
 class GuiDataContainer
 {
 public:
     GuiDataContainer();
     ~GuiDataContainer();
     void Reset();
+
+    bool hide_gui;
     int traced_depth;
     char** scene_file_names;
     char** save_file_names;
@@ -25,12 +29,9 @@ public:
     int octree_intersection_cnt;
     octree* test_tree;
 
+    Denoiser::ParamDesc desc;
     struct {
-        bool is_on;
-        int filter_size;
-        float color_weight;
-        float normal_weight;
-        float pos_weight;
-        bool show_gbuf;
+        bool is_on;    
+        int debug_tex_idx;
     } denoiser_options;
 };

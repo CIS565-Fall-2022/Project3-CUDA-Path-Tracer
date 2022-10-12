@@ -4,6 +4,7 @@
 #include <algorithm>
 
 GuiDataContainer::GuiDataContainer() :
+    hide_gui(false),
     traced_depth(0),
     cur_scene(0),
     cur_save(0),
@@ -15,9 +16,12 @@ GuiDataContainer::GuiDataContainer() :
     octree_depth(0),
     octree_depth_filter(-1),
     octree_intersection_cnt(0),
-    test_tree(nullptr)
+    test_tree(nullptr),
+    desc(width, glm::ivec2(width, height), 0.5f, 0.5f, 0.5f)
 {
-    memset(&denoiser_options, 0, sizeof(denoiser_options));
+    denoiser_options.is_on = false;
+    denoiser_options.debug_tex_idx = 0;
+
     memset(save_file_name_buf, 0, sizeof(save_file_name_buf));
 
     auto scene_files = utilityCore::getFilesInDir(scene_files_dir.c_str());
@@ -40,7 +44,9 @@ GuiDataContainer::GuiDataContainer() :
     }
 }
 void GuiDataContainer::Reset() {
-    memset(&denoiser_options, 0, sizeof(denoiser_options));
+    denoiser_options.is_on = false;
+    denoiser_options.debug_tex_idx = 0;
+
     memset(save_file_name_buf, 0, sizeof(save_file_name_buf));
 
     prompt_text = "";

@@ -64,11 +64,15 @@ static inline void setGPU(T * dev, int i, T val) {
 }
 
 #ifdef __CUDACC__
-#define DEVICE __device__ __forceinline__
-#define HOST_DEVICE __host__ __device__ __forceinline__
+#define DEVICE __device__
+#define HOST __host__
+#define INLINE __forceinline__
+#define GLOBAL __global__
 #else
 #define DEVICE
-#define HOST_DEVICE
+#define HOST
+#define INLINE
+#define GLOBAL
 #endif
 
 /// <summary>
@@ -80,12 +84,12 @@ template<typename T>
 struct Span {
     int _size;
     T* _arr;
-    HOST_DEVICE Span() : _size(0), _arr(nullptr) { }
-    HOST_DEVICE Span(int size, T* arr) : _size(size), _arr(arr) { }
-    HOST_DEVICE operator T* () const {
+    HOST DEVICE INLINE Span() : _size(0), _arr(nullptr) { }
+    HOST DEVICE INLINE Span(int size, T* arr) : _size(size), _arr(arr) { }
+    HOST DEVICE INLINE operator T* () const {
         return _arr;
     }
-    HOST_DEVICE Span<T> subspan(int idx, int sub_sz) const {
+    HOST DEVICE INLINE Span<T> subspan(int idx, int sub_sz) const {
 #ifndef NDEBUG
         if (idx < 0 || idx + sub_sz > _size) {
             assert(!"invalid subspan");
@@ -93,7 +97,7 @@ struct Span {
 #endif
         return Span<T>(sub_sz, _arr + idx);
     }
-    DEVICE T& operator[](int idx) {
+    DEVICE INLINE T& operator[](int idx) {
 #ifndef NDEBUG
         if (idx < 0 || idx >= _size) {
             printf("array out of bounds, idx=%d, size=%d\n", idx, _size);
@@ -102,10 +106,12 @@ struct Span {
 #endif // !NDEBUG
         return _arr[idx];
     }
-    DEVICE T const& operator[](int idx) const {
+    DEVICE INLINE T const& operator[](int idx) const {
         return const_cast<Span<T>*>(this)->operator[](idx);
     }
-    HOST_DEVICE int size() const { return _size; }
+    HOST DEVICE INLINE T*& get() { return _arr; }
+    HOST DEVICE INLINE T* const& get() const { return _arr; }
+    HOST DEVICE INLINE int size() const { return _size; }
 };
 
 

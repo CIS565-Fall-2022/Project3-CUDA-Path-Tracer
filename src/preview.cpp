@@ -11,6 +11,7 @@
 #include "pathtrace.h"
 #include "Collision/DebugDrawer.h"
 #include "Octree/octree.h"
+#include "Denoise/denoise.h"
 
 GLuint positionLocation = 0;
 GLuint texcoordsLocation = 1;
@@ -196,6 +197,13 @@ void Preview::InitImguiData() {
 	} else {
 		guiData->Reset();
 	}
+
+	if (guiData->denoiser_options.is_on) {
+		PathTracer::enableDenoise();
+	} else {
+		PathTracer::disableDenoise();
+	}
+	PathTracer::setDenoise(guiData->desc);
 }
 
 static void RenderMainMenu() {
@@ -351,16 +359,34 @@ static void RenderMainMenu() {
 
 static void RenderDenoiserMenu() {
 	auto& ops = guiData->denoiser_options;
+	auto& params = guiData->desc;
+
 	ImGui::Checkbox("Denoise", &ops.is_on);
 
-	ImGui::SliderInt("Filter Size", &ops.filter_size, 0, 100);
-	ImGui::SliderFloat("Color Weight", &ops.color_weight, 0.0f, 10.0f);
-	ImGui::SliderFloat("Normal Weight", &ops.normal_weight, 0.0f, 10.0f);
-	ImGui::SliderFloat("Position Weight", &ops.pos_weight, 0.0f, 10.0f);
+	ImGui::SliderInt("Filter Size", &params.filter_size, 0, 100);
+	ImGui::SliderFloat("Color Weight", &params.c_phi, 0.0f, 10.0f);
+	ImGui::SliderFloat("Normal Weight", &params.n_phi, 0.0f, 10.0f);
+	ImGui::SliderFloat("Position Weight", &params.p_phi, 0.0f, 10.0f);
 
 	ImGui::Separator();
 
-	ImGui::Checkbox("Show GBuffer", &ops.show_gbuf);
+	static constexpr char const* texture_options[DebugTextureType::NUM_OPTIONS] = {
+		"None",
+		"Show G Buffer",
+		"Show Normal Buffer",
+		"Show Position Buffer"
+	};
+
+	ImGui::Combo("Show Texture", &guiData->denoiser_options.debug_tex_idx, texture_options, DebugTextureType::NUM_OPTIONS);
+	if (ops.is_on) {
+		PathTracer::enableDenoise();
+	} else {
+		PathTracer::disableDenoise();
+	}
+	if (guiData->denoiser_options.debug_tex_idx != DebugTextureType::NONE) {
+		PathTracer::debugTexture((DebugTextureType)guiData->denoiser_options.debug_tex_idx);
+	}
+	PathTracer::setDenoise(guiData->desc);
 }
 
 // LOOK: Un-Comment to check ImGui Usage
@@ -375,7 +401,17 @@ static void RenderImGui() {
 		ImGui::End();
 		return;
 	}
-	ImGui::SetWindowSize(ImVec2(400, 80));
+
+	ImGui::SetWindowSize(ImVec2(400, 120));
+	ImGui::Text("press H to hide GUI completely.");
+	if (ImGui::IsKeyPressed('H')) {
+		guiData->hide_gui = !guiData->hide_gui;
+	}
+	if (guiData->hide_gui) {
+		ImGui::SetNextWindowSize(ImVec2(-1, -1));
+		return;
+	}
+	
 	if (ImGui::CollapsingHeader("Main Menu")) {
 		ImGui::SetWindowSize(ImVec2(400, 300));
 		RenderMainMenu();
@@ -459,10 +495,9 @@ bool Preview::CapturingKeyboard() {
 	return io->WantCaptureKeyboard;
 }
 void Preview::mainLoop() {
-	bool once = true;
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
-		runCuda(once); once = false;
+		runCuda();
 
 		string title = "CIS565 Path Tracer | " + utilityCore::convertIntToString(iteration) + " Iterations";
 		glfwSetWindowTitle(window, title.c_str());

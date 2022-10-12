@@ -22,7 +22,6 @@
 
 // impl switches
 #define COMPACTION
-#define COMPACTION_USE_PARTITION
 
 #define SORT_MAT
 #define AABB_CULLING
