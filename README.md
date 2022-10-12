@@ -24,14 +24,14 @@ per second.**
 
 ## RESULTS
 
-![](img/renders/objs.PNG)
+![](img/renders/objs_clipped.png)
 *7000 spp, ~300,000 triangles, max ray depth 16, rendered in ~1 hour*
 
-![](img/renders/teapot.PNG)
+![](img/renders/teapot_clipped.png)
 
 *8000 spp, ~20,000 triangles, max ray depth 16, rendered in ~50 minutes*
 
-![](img/renders/dragons.PNG)
+![](img/renders/dragons2_clipped.png)
 
 *11000 spp, ~2,500,000 triangles, max ray depth 16, rendered in ~2 hour*
 
