@@ -41,6 +41,115 @@ glm::vec3 calculateRandomDirectionInHemisphere(
         + sin(around) * over * perpendicularDirection2;
 }
 
+__host__ __device__
+glm::vec3 calculateFresnel(const Material &m, float cosTheta) {
+    float etaI = 1.0;
+    float etaT = m.indexOfRefraction;
+    float cosThetaI = glm::clamp(cosThetaI, -1.f, 1.f);
+    
+    // Check if entering or leaving medium, and swap indices of refraction if necessary
+    bool leaving = (cosThetaI < 0.f);
+    if (leaving) {
+        float tmp = etaI;
+        etaI = etaT;
+        etaT = tmp;
+        cosThetaI = glm::abs(cosThetaI);
+    }
+    float eta = etaI / etaT;
+
+    // Snell's Law
+    float sinThetaI = glm::sqrt(max(0.0, 1.0 - cosThetaI * cosThetaI));
+    float sinThetaT = eta * sinThetaI;
+
+    // Total internal reflection
+    if (sinThetaT >= 1.0) return glm::vec3(1.0, 1.0, 1.0);
+
+    // Compute Fresnel reflectance (see equation in PBRT 8.2.1)
+    float cosThetaT = glm::sqrt(glm::max(0.0, 1.0 - sinThetaT * sinThetaT));
+    float rParallel = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
+        ((etaT * cosThetaI) + (etaI * cosThetaT));
+    float rPerp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
+        ((etaI * cosThetaI) + (etaT * cosThetaT));
+
+    return glm::vec3((rParallel * rParallel + rPerp * rPerp) * 0.5f);
+}
+
+__host__ __device__
+glm::vec3 sample_diffuse(
+    glm::vec3 &normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 wo, glm::vec3& wi) 
+{
+    wi = calculateRandomDirectionInHemisphere(normal, rng);
+    return m.color;
+}
+
+__host__ __device__
+glm::vec3 sample_specular_refl(
+    glm::vec3 &normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 wo, glm::vec3& wi) 
+{
+    wi = glm::reflect(wo, normal);
+    return m.specular.color;
+}
+
+__host__ __device__
+glm::vec3 sample_specular_trans(
+    glm::vec3 &normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 wo, glm::vec3& wi) 
+{
+    float entering = (glm::dot(wo, normal) < 0);
+    float eta = (entering) ? 1.f / m.indexOfRefraction : m.indexOfRefraction;
+
+    // Flip normal to be in same hemisphere as wo
+    bool flip = (glm::dot(wo, normal) > 0.f);
+    normal = (flip) ? -normal : normal;
+    wi = glm::refract(wo, normal, eta);
+  
+    // Total internal reflection
+    if (glm::length(wi) < 0) {
+        wi = glm::reflect(wo, normal);
+        return glm::vec3(0.0, 0.0, 0.0);
+    }
+    return m.specular.color;
+}
+
+__host__ __device__
+glm::vec3 sample_glass(
+    glm::vec3& normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 wo, glm::vec3& wi)
+{
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    bool reflect = u01(rng) < 0.5;
+
+    float cosTheta = glm::dot(wo, normal);
+    glm::vec3 Fr = calculateFresnel(m, cosTheta);
+    glm::vec3 f = glm::vec3(0.0, 0.0, 0.0);
+    if (reflect) {
+        f = sample_specular_refl(normal, m, rng, wo, wi);
+        return 2.f * Fr * f;
+    }
+    else {
+        f = sample_specular_trans(normal, m, rng, wo, wi);
+        return 2.f * (glm::vec3(1.f, 1.f, 1.f) - Fr) * f;
+    }
+}
+
+__host__ __device__
+glm::vec3 sample_plastic(
+    glm::vec3& normal, const Material& m, thrust::default_random_engine& rng, glm::vec3 wo, glm::vec3& wi)
+{
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    bool reflect = u01(rng) < 0.5;
+
+    float cosTheta = glm::dot(wo, normal);
+    glm::vec3 Fr = calculateFresnel(m, cosTheta);
+    glm::vec3 f = glm::vec3(0.0, 0.0, 0.0);
+    if (reflect) {
+        f = sample_specular_refl(normal, m, rng, wo, wi);
+        return 2.f * Fr * f;
+    }
+    else {
+        f = sample_diffuse(normal, m, rng, wo, wi);
+        return 2.f * (glm::vec3(1.f, 1.f, 1.f) - Fr) * f;
+    }
+}
+
 /**
  * Scatter a ray with some probabilities according to the material properties.
  * For example, a diffuse surface scatters in a cosine-weighted hemisphere.
@@ -76,4 +185,32 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    if (pathSegment.remainingBounces <= 0) {
+        return;
+    }
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    float xi = u01(rng);
+
+    glm::vec3 wi = glm::vec3(0.0, 0.0, 0.0);
+    glm::vec3 f = glm::vec3(0.0, 0.0, 0.0);
+    if (m.hasReflective && m.hasRefractive) {
+        f = sample_glass(normal, m, rng, pathSegment.ray.direction, wi);
+    }
+    else if (m.hasReflective && glm::length(m.color) > 0) {
+        f = sample_plastic(normal, m, rng, pathSegment.ray.direction, wi);
+    }
+    else if (m.hasReflective) {
+        f = sample_specular_refl(normal, m, rng, pathSegment.ray.direction, wi);
+    }
+    else if (m.hasRefractive) {
+        f = sample_specular_trans(normal, m, rng, pathSegment.ray.direction, wi);
+    }
+    else {
+        f = sample_diffuse(normal, m, rng, pathSegment.ray.direction, wi);
+    }
+    pathSegment.throughput *= f;
+    pathSegment.ray.direction = wi;
+    pathSegment.ray.invDirection = glm::vec3(1.0, 1.0, 1.0) / pathSegment.ray.direction;
+    pathSegment.ray.origin = intersect + 0.01f * pathSegment.ray.direction;
+    pathSegment.remainingBounces--;
 }

@@ -10,15 +10,73 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    MESH
 };
 
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
+    glm::vec3 invDirection;
+    float intersectionCount;
+};
+
+struct AABB {
+    glm::vec3 min;
+    glm::vec3 max;
+
+    float surfaceArea() {
+        glm::vec3 e = min - max;
+        return 2.f * (e.x * e.y + e.x * e.z + e.y * e.z);
+    };
+};
+
+struct MortonCode {
+    int objectId;
+    unsigned int code;
+};
+
+struct Triangle {
+    AABB aabb;
+    glm::vec3 centroid;
+    glm::vec3 verts[3];
+    glm::vec3 norms[3];
+    int objectId;
+
+    void computeAABB() {
+        aabb.min = glm::min(verts[0], glm::min(verts[1], verts[2]));
+        aabb.max = glm::max(verts[0], glm::max(verts[1], verts[2]));
+    }
+
+    void computeCentroid() {
+        centroid = (verts[0] + verts[1] + verts[2]) / glm::vec3(3.f, 3.f, 3.f);
+    }
+};
+
+struct NodeRange {
+    int i;
+    int j;
+    int l;
+    int d;
+};
+
+struct BVHNode {
+    AABB aabb;
+    unsigned int left, right;
+    int firstTri, numTris;
+};
+
+struct LBVHNode {
+    AABB aabb;
+    int objectId;
+    unsigned int left;
+    unsigned int right;
 };
 
 struct Geom {
     enum GeomType type;
+    AABB aabb;
+    int startIdx; 
+    int triangleCount;
     int materialid;
     glm::vec3 translation;
     glm::vec3 rotation;
@@ -49,6 +107,8 @@ struct Camera {
     glm::vec3 right;
     glm::vec2 fov;
     glm::vec2 pixelLength;
+    float lens_radius;
+    float focal_dist;
 };
 
 struct RenderState {
@@ -61,7 +121,8 @@ struct RenderState {
 
 struct PathSegment {
     Ray ray;
-    glm::vec3 color;
+    glm::vec3 color; // accumulated light
+    glm::vec3 throughput;
     int pixelIndex;
     int remainingBounces;
 };

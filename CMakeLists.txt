@@ -71,9 +71,11 @@ set(headers
     src/pathtrace.h
     src/scene.h
     src/sceneStructs.h
+    src/tiny_obj_loader.h
     src/preview.h
     src/utilities.h
     src/ImGui/imconfig.h
+    src/lbvh.h
 	
 	src/ImGui/imgui.h
     src/ImGui/imconfig.h
@@ -95,6 +97,7 @@ set(sources
     src/scene.cpp
     src/preview.cpp
     src/utilities.cpp
+    src/lbvh.cu
 	
     src/ImGui/imgui.cpp 
       src/ImGui/imgui_demo.cpp 
@@ -111,6 +114,7 @@ list(SORT sources)
 source_group(Headers FILES ${headers})
 source_group(Sources FILES ${sources})
 
+#add_subdirectory(src/libmorton)
 #add_subdirectory(src/ImGui)
 #add_subdirectory(stream_compaction)  # TODO: uncomment if using your stream compaction
 

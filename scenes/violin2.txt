@@ -1,0 +1,167 @@
+// Emissive material (light)
+MATERIAL 0
+RGB         1 1 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   20
+
+// Diffuse white
+MATERIAL 1
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse red
+MATERIAL 2
+RGB         .85 .35 .35
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse aqua
+MATERIAL 3
+RGB         0.4 0.9 0.6
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse grey
+MATERIAL 4
+RGB         0.4 0.4 0.4
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse purple
+MATERIAL 5
+RGB         0 0 0
+SPECEX      0
+SPECRGB     0.7 0.3 0.9
+REFL        1
+REFR        1
+REFRIOR     1.55
+EMITTANCE   0
+
+// Specular pink
+MATERIAL 6
+RGB         0 0 0
+SPECEX      0
+SPECRGB     0.9 0.6 0.9
+REFL        1
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Transmissive orange
+MATERIAL 7
+RGB         0 0 0
+SPECEX      0
+SPECRGB     0.98 0.98 0.98
+REFL        1
+REFR        1
+REFRIOR     1.55
+EMITTANCE   0
+
+// Imperfect specular green
+MATERIAL 8
+RGB         0.6 1.0 0.5
+SPECEX      0
+SPECRGB     0.98 0.98 0.98
+REFL        1
+REFR        0
+REFRIOR     1.55
+EMITTANCE   0
+
+// Camera
+CAMERA
+RES         800 800
+FOVY        35
+ITERATIONS  5000
+DEPTH       5
+FILE        performance_testing
+LENS_RADIUS 0.0
+FOCAL_DIST  29.5
+EYE         0.0 5 10.5
+LOOKAT      0 5 0
+UP          0 1 0
+
+
+// Ceiling light middle
+OBJECT 0
+cube
+material 0
+TRANS       0 10 0
+ROTAT       0 0 0
+SCALE       3 .3 3
+
+// Floor
+OBJECT 1
+cube
+material 1
+TRANS       0 0 0
+ROTAT       0 0 0
+SCALE       40 .01 40
+
+// Ceiling
+OBJECT 2
+cube
+material 4
+TRANS       0 10 0
+ROTAT       0 0 90
+SCALE       .01 40 40
+
+// Back wall
+OBJECT 3
+cube
+material 4
+TRANS       0 5 -5
+ROTAT       0 90 0
+SCALE       .01 20 40
+
+// Left wall
+OBJECT 4
+cube
+material 3
+TRANS       -20 5 0
+ROTAT       0 0 0
+SCALE       .01 10 40
+
+// Right wall
+OBJECT 5
+cube
+material 3
+TRANS       20 5 0
+ROTAT       0 0 0
+SCALE       .01 10 40
+
+// Mesh
+OBJECT 6
+mesh violin.obj
+material 5
+TRANS       0 0 0
+ROTAT       0 0 0
+SCALE       1 1 1
+
+// Sphere
+OBJECT 7
+sphere
+material 5
+TRANS       1 1.25 1.5
+ROTAT       0 0 0
+SCALE       2.5 2.5 2.5

@@ -16,6 +16,7 @@
 
 #include "sceneStructs.h"
 #include "image.h"
+#include "lbvh.h"
 #include "pathtrace.h"
 #include "utilities.h"
 #include "scene.h"

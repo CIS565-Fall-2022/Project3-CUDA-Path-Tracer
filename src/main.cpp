@@ -44,6 +44,16 @@ int main(int argc, char** argv) {
 	// Load scene file
 	scene = new Scene(sceneFile);
 
+	// Generate BVH
+	if (scene->triangles.size() > 0)
+	{
+#if USE_LBVH
+		generateLBVH(scene);
+#elif USE_BVH
+		generateBVH(scene);
+#endif
+	}
+
 	//Create Instance for ImGUIData
 	guiData = new GuiDataContainer();
 
@@ -196,7 +206,7 @@ void mousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
 	}
 	else if (rightMousePressed) {
 		zoom += (ypos - lastY) / height;
-		zoom = std::fmax(0.1f, zoom);
+		zoom = std::fmax(0.8f, zoom);
 		camchanged = true;
 	}
 	else if (middleMousePressed) {
