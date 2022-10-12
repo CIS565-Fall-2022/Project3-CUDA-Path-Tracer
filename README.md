@@ -37,8 +37,7 @@ per second.**
 
 *11000 spp, ~2,500,000 triangles, max ray depth 16, rendered in ~2 hour*
 
-**All models obtained from either Alec Jacobson's or Morgan McGuire's common 3D model repositories. See references
-at the bottom of readme**
+### All models obtained from either Alec Jacobson's or Morgan McGuire's common 3D model repositories. See references at the bottom of readme
 
 ## IMPLEMENTATION
 
