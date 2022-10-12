@@ -11,9 +11,9 @@ namespace Denoiser {
 
 enum DebugTextureType {
 	NONE,
-	G_BUF,
 	NORM_BUF,
 	POS_BUF,
+	DIFFUSE_BUF,
 	NUM_OPTIONS
 };
 

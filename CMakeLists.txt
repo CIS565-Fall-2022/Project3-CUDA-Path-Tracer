@@ -78,6 +78,7 @@ set(headers
     src/consts.h
     src/Octree/octree.h
     src/Denoise/denoise.cuh
+    src/Denoise/denoise.h
     src/guiData.h
 
     src/ImGui/imconfig.h

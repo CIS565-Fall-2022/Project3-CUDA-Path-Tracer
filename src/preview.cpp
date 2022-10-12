@@ -372,9 +372,9 @@ static void RenderDenoiserMenu() {
 
 	static constexpr char const* texture_options[DebugTextureType::NUM_OPTIONS] = {
 		"None",
-		"Show G Buffer",
 		"Show Normal Buffer",
-		"Show Position Buffer"
+		"Show Position Buffer",
+		"Show Diffuse Buffer"
 	};
 
 	ImGui::Combo("Show Texture", &guiData->denoiser_options.debug_tex_idx, texture_options, DebugTextureType::NUM_OPTIONS);
@@ -383,9 +383,7 @@ static void RenderDenoiserMenu() {
 	} else {
 		PathTracer::disableDenoise();
 	}
-	if (guiData->denoiser_options.debug_tex_idx != DebugTextureType::NONE) {
-		PathTracer::debugTexture((DebugTextureType)guiData->denoiser_options.debug_tex_idx);
-	}
+	PathTracer::debugTexture((DebugTextureType)guiData->denoiser_options.debug_tex_idx);
 	PathTracer::setDenoise(guiData->desc);
 }
 

@@ -11,6 +11,8 @@
 #include <thrust/remove.h>
 
 #include <thrust/random.h>
+#include <thrust/transform.h>
+
 #include <thrust/sort.h>
 #include "sceneStructs.h"
 #include "scene.h"
@@ -47,6 +49,7 @@ void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 }
 
 // functors
+
 struct RadianceToNormalizedRGB {
 	int iter;
 	RadianceToNormalizedRGB(int iter) : iter(iter) { }
@@ -80,7 +83,16 @@ struct NormalizedRGBToRGBA {
 			0);
 	}
 };
-
+struct NormalToRGBA {
+	__host__ __device__ uchar4 operator()(glm::vec3 const& n) const {
+		// convert from the range [-1, 1] to [0, 1]
+		return make_uchar4(
+			glm::clamp((int)(((n.x + 1.f) / 2.f) * 255.f), 0, 255),
+			glm::clamp((int)(((n.y + 1.f) / 2.f) * 255.f), 0, 255),
+			glm::clamp((int)(((n.z + 1.f) / 2.f) * 255.f), 0, 255),
+			0);
+	}
+};
 __host__ __device__
 thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int depth) {
 	int h = utilhash((1 << 31) | (depth << 22) | iter) ^ utilhash(index);
@@ -147,11 +159,23 @@ struct DebugTexScope {
 	DebugTexScope(DebugTexScope const&) = delete;
 	DebugTexScope(DebugTexScope&&) = delete;
 
-	DebugTexScope(glm::vec3 const* tex, uchar4* pbo) {
+	DebugTexScope(DebugTextureType type, uchar4* pbo) {
+		glm::vec3 const* tex;
+		switch (type) {
+		case DebugTextureType::DIFFUSE_BUF: tex = denoise_buffers.d; break;
+		case DebugTextureType::NORM_BUF: tex = denoise_buffers.n; break;
+		case DebugTextureType::POS_BUF: tex = denoise_buffers.x; break;
+		default: throw;
+		}
 		render_paused = true;
 		Camera const& cam = hst_scene->state.camera;
 		int pixelcount = cam.resolution.x * cam.resolution.y;
-		thrust::transform(thrust::device, tex, tex + pixelcount, pbo, NormalizedRGBToRGBA());
+
+		if (type == DebugTextureType::NORM_BUF) {
+			thrust::transform(thrust::device, tex, tex + pixelcount, pbo, NormalToRGBA());
+		} else {
+			thrust::transform(thrust::device, tex, tex + pixelcount, pbo, NormalizedRGBToRGBA());
+		}
 	}
 
 	~DebugTexScope() {
@@ -683,14 +707,11 @@ void PathTracer::debugTexture(DebugTextureType type) {
 	if (s_debug_tex_scope) {
 		delete s_debug_tex_scope;
 	}
-
 	switch (type) {
-	case DebugTextureType::G_BUF:
 	case DebugTextureType::NORM_BUF:
-		s_debug_tex_scope = new DebugTexScope(denoise_buffers.n, s_pbo_dptr);
-		return;
 	case DebugTextureType::POS_BUF:
-		s_debug_tex_scope = new DebugTexScope(denoise_buffers.x, s_pbo_dptr);
+	case DebugTextureType::DIFFUSE_BUF:
+		s_debug_tex_scope = new DebugTexScope(type, s_pbo_dptr);
 		return;
 	case DebugTextureType::NONE:
 	default:

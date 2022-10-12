@@ -1,5 +1,6 @@
 #pragma once
 #include "denoise.h"
+#include <thrust/transform.h>
 
 namespace Denoiser {
 	// reference: https://jo.dreggn.org/home/2010_atrous.pdf
@@ -8,7 +9,6 @@ namespace Denoiser {
 		color_t const* color_map,
 		glm::vec3 const* norm_map,
 		glm::vec3 const* pos_map,
-		color_t const* diffuse_map,
 		int step,
 		ParamDesc const desc
 	) {
@@ -53,7 +53,7 @@ namespace Denoiser {
 		}
 
 		idx = FLATTEN(x, y);
-		out[idx] = sum * diffuse_map[idx] / cum_w;
+		out[idx] = sum / cum_w;
 #undef FLATTEN
 	}
 
@@ -80,11 +80,20 @@ namespace Denoiser {
 
 		bool flag = false;
 		for (int step = 1; step <= desc.filter_size; step <<= 1, desc.c_phi /= 2) {
-			kern_denoise KERN_PARAM(blocks_per_grid, block_size) (bufs[1 - buf_idx], bufs[buf_idx], norm_map, pos_map, diffuse_map, step, desc);
+			kern_denoise KERN_PARAM(blocks_per_grid, block_size) (bufs[1 - buf_idx], bufs[buf_idx], norm_map, pos_map, step, desc);
 			checkCUDAError("denoise");
 			buf_idx = 1 - buf_idx;
 		}
 		
+		// multiply by diffuse map
+		thrust::transform(
+			thrust::device,
+			bufs[buf_idx],
+			bufs[buf_idx] + rt.size(),
+			diffuse_map,
+			bufs[buf_idx],
+			thrust::multiplies<color_t>());
+
 		D2D(rt.get(), bufs[buf_idx], rt.size());
 
 		FREE(bufs[0]);
