@@ -75,14 +75,14 @@ namespace Denoiser {
 		color_t const* diffuse_map,
 		ParamDesc desc) {
 
-		color_t* bufs[2];
-		ALLOC(bufs[0], rt.size());
-		ALLOC(bufs[1], rt.size());
 		int buf_idx = 0;
-		D2D(bufs[buf_idx], rt.get(), rt.size());
+		color_t* bufs[2];
+
+		bufs[buf_idx] = rt;
+		ALLOC(bufs[1 - buf_idx], rt.size());
 
 #ifdef DENOISE_USE_DIFFUSE_MAP
-		// demodulate
+		// divide by diffuse map, i.e. demodulate
 		thrust::transform(
 			thrust::device,
 			bufs[buf_idx],
@@ -114,10 +114,16 @@ namespace Denoiser {
 			bufs[buf_idx],
 			Modulate());
 #endif
+		if (bufs[buf_idx] != rt) {
+			D2D(rt.get(), bufs[buf_idx], rt.size());
+		}
 
-		D2D(rt.get(), bufs[buf_idx], rt.size());
-
-		FREE(bufs[0]);
-		FREE(bufs[1]);
+		// avoid freeing supplied pointer
+		if (bufs[0] != rt) {
+			FREE(bufs[0]);
+		}
+		if (bufs[1] != rt) {
+			FREE(bufs[1]);
+		}
 	}
 }

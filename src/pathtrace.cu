@@ -27,6 +27,7 @@
 #include "Octree/octree.h"
 #include "consts.h"
 #include "Denoise/denoise.cuh"
+#include "Profile/pathtracer_profile.h"
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #ifndef NDEBUG
@@ -121,8 +122,8 @@ static std::vector<TextureGPU> dev_texs;
 static octree* tree;
 static octreeGPU dev_tree;
 
-GLuint s_pbo_id = -1;
-uchar4* s_pbo_dptr = nullptr;
+static GLuint s_pbo_id = -1;
+static uchar4* s_pbo_dptr = nullptr;
 
 struct DenoiseBuffers {
 	DenoiseBuffers() = default;
@@ -153,6 +154,13 @@ static bool texture_debug_active = false;
 static int cur_iter;
 static DenoiseBuffers denoise_buffers;
 static Denoiser::ParamDesc denoise_params;
+
+// profiling
+std::unordered_map<std::string, Profiling::ProfileData> s_prof_data;
+std::unordered_map<std::string, Profiling::ProfileData>&
+PathTracer::GetProfileData() {
+	return s_prof_data;
+}
 
 void PathTracer::beginFrame(unsigned int pbo_id) {
 	s_pbo_id = pbo_id;
@@ -474,6 +482,7 @@ int PathTracer::pathtrace(int iter) {
 		return iter;
 	}
 
+	ProfileHelper frame_profiling("frame");
 
     const int traceDepth = hst_scene->state.traceDepth;
     const Camera &cam = hst_scene->state.camera;
@@ -483,9 +492,10 @@ int PathTracer::pathtrace(int iter) {
 	dim3 blk_per_grid2d(DIV_UP(cam.resolution.x, 8), DIV_UP(cam.resolution.y, 8));
 	dim3 blk_sz2d(8,8);
 
-    generateRayFromCamera KERN_PARAM(blk_per_grid2d, blk_sz2d) (cam, iter, traceDepth, dev_paths);
-    checkCUDAError("generate camera ray");
-
+	frame_profiling.call(generateRayFromCamera, blk_per_grid2d, blk_sz2d, 
+		cam, iter, traceDepth, dev_paths);
+	checkCUDAError("generate camera ray");
+    
     // --- PathSegment Tracing Stage ---
     // Shoot ray into scene, bounce between objects, push shading chunks
 
@@ -525,7 +535,7 @@ int PathTracer::pathtrace(int iter) {
 			int j = std::min(num_paths, i + MAX_INTERSECTION_TEST_SIZE);
 			int size = j - i;
 
-			computeIntersections KERN_PARAM(DIV_UP(size, BLOCK_SIZE), BLOCK_SIZE) (
+			frame_profiling.call(computeIntersections, DIV_UP(size, BLOCK_SIZE), BLOCK_SIZE,
 				i,
 				dev_paths.subspan(0, num_paths),
 				dev_geoms,
@@ -534,12 +544,13 @@ int PathTracer::pathtrace(int iter) {
 				dev_cached_inters,
 				dev_tree
 			);
-			
+
 			checkCUDAError(std::string("trace one bounce, inters size = " +
 				std::to_string(MAX_INTERSECTION_TEST_SIZE)).c_str());
 			cudaDeviceSynchronize();
 		}
 
+#ifdef DENOISE
 		// initialize position and normal buffers for denoising
 		// NOTE: must do this before the material sorting
 		if (!depth && !iter) {
@@ -567,8 +578,9 @@ int PathTracer::pathtrace(int iter) {
 				denoise_buffers.d.get(),
 				Denoiser::IntersectionToDiffuse(dev_mesh_info.materials));
 		}
+#endif
 
-		// stop here if we're currently displaying a debug texture
+		// stop before the shading stage if we're currently displaying a debug texture
 		if (texture_debug_active) {
 			return iter;
 		}
@@ -582,19 +594,20 @@ int PathTracer::pathtrace(int iter) {
 #ifdef FAKE_SHADE
 #define shadeMaterial shadeFakeMaterial
 #endif
-		shadeMaterial KERN_PARAM(DIV_UP(num_paths, BLOCK_SIZE), BLOCK_SIZE) (
+		frame_profiling.call(shadeMaterial, DIV_UP(num_paths, BLOCK_SIZE), BLOCK_SIZE,
 			iter,
 			dev_paths.subspan(0, num_paths),
 			dev_lights,
 			dev_inters,
 			dev_mesh_info.materials
 		);
-
 		checkCUDAError("shadeMaterial");
 		cudaDeviceSynchronize();
 
 #ifdef COMPACTION
+		frame_profiling.begin();
 		num_paths = thrust::partition(thrust::device, dev_paths.get(), dev_paths.get() + num_paths, PathSegment::PartitionRule()) - dev_paths.get();
+		frame_profiling.end();
 #endif // COMPACTION
 
 #ifdef MAX_DEPTH_OVERRIDE
@@ -604,20 +617,22 @@ int PathTracer::pathtrace(int iter) {
 	}
 	
 	// Assemble this iteration and apply it to the image
-    finalGather KERN_PARAM(DIV_UP(pixelcount, BLOCK_SIZE), BLOCK_SIZE) (pixelcount, dev_image, dev_paths);
+	frame_profiling.call(finalGather, DIV_UP(pixelcount, BLOCK_SIZE), BLOCK_SIZE,
+		pixelcount, dev_image, dev_paths
+	);
 	cudaDeviceSynchronize();
 	++cur_iter;
 
 	// ----- write raytraced image to PBO ------
 	// denoise
 	if (enable_denoise) {
+		frame_profiling.begin();
 		thrust::transform(
 			thrust::device, 
 			dev_image.get(),
 			dev_image.get() + pixelcount,
 			denoise_buffers.rt.get(),
 			RadianceToNormalizedRGB(cur_iter));
-
 		Denoiser::denoise(denoise_buffers.rt, denoise_buffers.n, denoise_buffers.x, denoise_buffers.d, denoise_params);
 
 		thrust::transform(
@@ -627,13 +642,16 @@ int PathTracer::pathtrace(int iter) {
 			s_pbo_dptr,
 			NormalizedRGBToRGBA()
 		);
+		frame_profiling.end();
 	} else {
+		frame_profiling.begin();
 		thrust::transform(
 			thrust::device,
 			dev_image.get(),
 			dev_image.get() + pixelcount,
 			s_pbo_dptr,
 			RadianceToRGBA(cur_iter));
+		frame_profiling.end();
 	}
 
     ///////////////////////////////////////////////////////////////////////////

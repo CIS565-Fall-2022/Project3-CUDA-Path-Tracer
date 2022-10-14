@@ -24,6 +24,7 @@ endif()
 # CUDA Setup
 ########################################
 find_package(CUDA 10 REQUIRED)
+
 include(${CMAKE_MODULE_PATH}/CUDAComputesList.cmake)
 
 list(APPEND CUDA_NVCC_FLAGS ${CUDA_GENERATE_CODE})
@@ -79,6 +80,8 @@ set(headers
     src/Octree/octree.h
     src/Denoise/denoise.cuh
     src/Denoise/denoise.h
+    src/Profile/timer.h
+    src/Profile/pathtracer_profile.h
     src/guiData.h
 
     src/ImGui/imconfig.h
@@ -107,6 +110,8 @@ set(sources
     src/utilities.cpp
     src/rendersave.cpp
     src/Collision/DebugDrawer.cpp
+    src/Profile/timer.cpp
+
     src/guiData.cpp
 
     src/pathtrace.cu

@@ -2,7 +2,7 @@
 
 #include <vector>
 #include "scene.h"
-
+#include "Profile/timer.h"
 
 struct octreeGPU;
 namespace Denoiser {
@@ -35,4 +35,6 @@ namespace PathTracer {
 
 	void beginFrame(unsigned int pbo_id);
 	void endFrame();
+
+	std::unordered_map<std::string, Profiling::ProfileData>& GetProfileData();
 }

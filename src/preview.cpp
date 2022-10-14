@@ -387,9 +387,33 @@ static void RenderDenoiserMenu() {
 	PathTracer::setDenoise(guiData->desc);
 }
 
+static void RenderProfilingStats() {
+	auto& data = PathTracer::GetProfileData();
+	if (ImGui::BeginTable("profile data", 3)) {
+		for (auto it = data.begin(); it != data.end(); ++it) {
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("%s", it->first);
+
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text("%s", it->second.to_string().c_str());
+		
+			ImGui::TableSetColumnIndex(2);
+			if (ImGui::Button("clear")) {
+				it->second.clear();
+			}
+		}
+		ImGui::EndTable();
+	}
+}
+
 // LOOK: Un-Comment to check ImGui Usage
 static void RenderImGui() {
+	// very ugly, I know
 	extern Scene* g_scene;
+	static constexpr float k_menu_width = 400.f;
+	static constexpr float k_collapsable_width = 60.f;
+
 
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
@@ -400,7 +424,7 @@ static void RenderImGui() {
 		return;
 	}
 
-	ImGui::SetWindowSize(ImVec2(400, 120));
+	ImGui::SetWindowSize(ImVec2(k_menu_width, 3 * k_collapsable_width));
 	ImGui::Text("press H to hide GUI completely.");
 	if (ImGui::IsKeyPressed('H')) {
 		guiData->hide_gui = !guiData->hide_gui;
@@ -411,12 +435,16 @@ static void RenderImGui() {
 	}
 	
 	if (ImGui::CollapsingHeader("Main Menu")) {
-		ImGui::SetWindowSize(ImVec2(400, 300));
+		ImGui::SetWindowSize(ImVec2(k_menu_width, 300));
 		RenderMainMenu();
 	}
 	if (ImGui::CollapsingHeader("Denoiser")) {
-		ImGui::SetWindowSize(ImVec2(400, 250));
+		ImGui::SetWindowSize(ImVec2(k_menu_width, 250));
 		RenderDenoiserMenu();
+	}
+	if (ImGui::CollapsingHeader("Profiling Stats")) {
+		ImGui::SetWindowSize(ImVec2(k_menu_width, 250));
+		RenderProfilingStats();
 	}
 	ImGui::End();
 
