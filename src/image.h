@@ -1,9 +1,8 @@
 #pragma once
 
 #include <glm/glm.hpp>
-
-using namespace std;
-
+#include <vector_types.h>
+struct RenderState;
 class image {
 private:
     int xSize;
@@ -17,3 +16,7 @@ public:
     void savePNG(const std::string &baseFilename);
     void saveHDR(const std::string &baseFilename);
 };
+
+void saveImage(glm::vec3 const* src, std::string const& name, bool radiance);
+void saveImage(RenderState const* state);
+void saveImage(uchar4 const* pbo);

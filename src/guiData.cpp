@@ -17,7 +17,7 @@ GuiDataContainer::GuiDataContainer() :
     octree_depth_filter(-1),
     octree_intersection_cnt(0),
     test_tree(nullptr),
-    desc(glm::min(60, width), glm::ivec2(width, height), 0.5f, 0.5f, 0.5f)
+    desc(Denoiser::FilterType::ATROUS, glm::min(60, width), glm::ivec2(width, height), 0.5f, 0.5f, 0.5f)
 {
     denoiser_options.is_on = false;
     denoiser_options.debug_tex_idx = 0;

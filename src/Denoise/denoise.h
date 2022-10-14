@@ -6,30 +6,19 @@
 #include "../sceneStructs.h"
 
 namespace Denoiser {
-	struct ParamDesc {
-		ParamDesc() {}
-		ParamDesc(int filter_size, glm::ivec2 res, float c_phi, float n_phi, float p_phi)
-			: filter_size(filter_size), res(res), c_phi(c_phi), n_phi(n_phi), p_phi(p_phi) {
-			// set up kernel and offset
-			for (int i = -2, k = 0; i <= 2; ++i) {
-				for (int j = -2; j <= 2; ++j) {
-					offsets[k] = glm::ivec2(i, j);
-					int x = glm::min(glm::abs(i), glm::abs(j));
-					if (x == 0) {
-						kernel[k] = 3. / 8;
-					} else if (x == 1) {
-						kernel[k] = 1. / 4;
-					} else {
-						kernel[k] = 1. / 16;
-					}
-					++k;
-				}
-			}
-		}
+	enum FilterType {
+		ATROUS,
+		GAUSSIAN,
+		NUM_FILTERS
+	};
 
+	struct ParamDesc {
+		ParamDesc(FilterType type, int filter_size, glm::ivec2 res, float c_phi, float n_phi, float p_phi)
+			: type(type), filter_size(filter_size), s_dev(1), res(res), c_phi(c_phi), n_phi(n_phi), p_phi(p_phi) { }
+
+		FilterType type;
 		int filter_size;
-		glm::ivec2 offsets[25];
-		float kernel[25];
+		float s_dev; //standard deviation, only used by Gaussian
 		glm::ivec2 res;
 		float c_phi, n_phi, p_phi;
 	};

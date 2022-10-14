@@ -4,6 +4,7 @@
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_glfw.h"
 #include "ImGui/imgui_impl_opengl3.h"
+#include "image.h"
 
 #include "guiData.h"
 
@@ -346,7 +347,7 @@ static void RenderMainMenu() {
 				DebugDrawer::DrawAABB(node.bounds, { 0,1,0 });
 				guiData->octree_intersection_cnt += node.leaf_infos.size();
 			}
-			});
+		});
 		std::string info = "intersection cnt: " + std::to_string(guiData->octree_intersection_cnt) +
 			"\ntotal triangles: " + std::to_string(g_scene->triangles.size());
 
@@ -358,17 +359,10 @@ static void RenderMainMenu() {
 }
 
 static void RenderDenoiserMenu() {
-	auto& ops = guiData->denoiser_options;
-	auto& params = guiData->desc;
-
-	ImGui::Checkbox("Denoise", &ops.is_on);
-
-	ImGui::SliderInt("Filter Size", &params.filter_size, 0, 100);
-	ImGui::SliderFloat("Color Weight", &params.c_phi, 0.0f, 10.0f);
-	ImGui::SliderFloat("Normal Weight", &params.n_phi, 0.0f, 10.0f);
-	ImGui::SliderFloat("Position Weight", &params.p_phi, 0.0f, 10.0f);
-
-	ImGui::Separator();
+	static constexpr char const* filter_options[Denoiser::FilterType::NUM_FILTERS] = {
+		"A Trous",
+		"Gaussian",
+	};
 
 	static constexpr char const* texture_options[DebugTextureType::NUM_OPTIONS] = {
 		"None",
@@ -377,6 +371,23 @@ static void RenderDenoiserMenu() {
 		"Show Diffuse Buffer"
 	};
 
+	auto& ops = guiData->denoiser_options;
+	auto& params = guiData->desc;
+
+	ImGui::Checkbox("Denoise", &ops.is_on);
+
+	ImGui::Combo("Filter Type", (int*)&params.type, filter_options, Denoiser::FilterType::NUM_FILTERS);
+	ImGui::SliderInt("Filter Size", &params.filter_size, 0, 100);
+	ImGui::SliderFloat("Color Weight", &params.c_phi, 0.0f, 10.0f);
+	ImGui::SliderFloat("Normal Weight", &params.n_phi, 0.0f, 10.0f);
+	ImGui::SliderFloat("Position Weight", &params.p_phi, 0.0f, 10.0f);
+	if (params.type == Denoiser::FilterType::GAUSSIAN) {
+		ImGui::SliderFloat("Std. Dev.", &params.s_dev, 1.0f, 10.0f);
+	}
+
+	ImGui::Separator();
+
+
 	ImGui::Combo("Show Texture", &guiData->denoiser_options.debug_tex_idx, texture_options, DebugTextureType::NUM_OPTIONS);
 	if (ops.is_on) {
 		PathTracer::enableDenoise();
@@ -384,7 +395,7 @@ static void RenderDenoiserMenu() {
 		PathTracer::disableDenoise();
 	}
 	PathTracer::debugTexture((DebugTextureType)guiData->denoiser_options.debug_tex_idx);
-	PathTracer::setDenoise(guiData->desc);
+	PathTracer::setDenoise(params);
 }
 
 static void RenderProfilingStats() {
@@ -445,6 +456,9 @@ static void RenderImGui() {
 	if (ImGui::CollapsingHeader("Profiling Stats")) {
 		ImGui::SetWindowSize(ImVec2(k_menu_width, 250));
 		RenderProfilingStats();
+	}
+	if (ImGui::Button("Write PBO to Image")) {
+		saveImage(PathTracer::getPBO());
 	}
 	ImGui::End();
 

@@ -153,7 +153,7 @@ static bool render_paused = false;
 static bool texture_debug_active = false;
 static int cur_iter;
 static DenoiseBuffers denoise_buffers;
-static Denoiser::ParamDesc denoise_params;
+static std::unique_ptr<Denoiser::ParamDesc> denoise_params;
 
 // profiling
 std::unordered_map<std::string, Profiling::ProfileData> s_prof_data;
@@ -633,7 +633,7 @@ int PathTracer::pathtrace(int iter) {
 			dev_image.get() + pixelcount,
 			denoise_buffers.rt.get(),
 			RadianceToNormalizedRGB(cur_iter));
-		Denoiser::denoise(denoise_buffers.rt, denoise_buffers.n, denoise_buffers.x, denoise_buffers.d, denoise_params);
+		Denoiser::denoise(denoise_buffers.rt, denoise_buffers.n, denoise_buffers.x, denoise_buffers.d, *denoise_params);
 
 		thrust::transform(
 			thrust::device,
@@ -684,9 +684,18 @@ void PathTracer::disableDenoise() {
 octreeGPU PathTracer::getTree() {
 	return dev_tree;
 }
-void PathTracer::setDenoise(Denoiser::ParamDesc const& desc) {
-	denoise_params = desc;
+uchar4 const* PathTracer::getPBO() {
+	return s_pbo_dptr;
 }
+
+void PathTracer::setDenoise(Denoiser::ParamDesc const& desc) {
+	if (!denoise_params) {
+		denoise_params = std::make_unique<Denoiser::ParamDesc>(desc);
+	} else {
+		*denoise_params = desc;
+	}
+}
+
 
 void PathTracer::debugTexture(DebugTextureType type) {
 	glm::vec3 const* tex;

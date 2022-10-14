@@ -13,7 +13,103 @@ namespace Denoiser {
 			return c * (albedo + EPSILON);
 		}
 	};
+
+	struct Filter {
+		struct Data {
+			int nx, ny;
+			float weight;
+		};
+		__device__ virtual Data operator*() const = 0;
+		__device__ virtual void operator++() = 0;
+		__device__ virtual operator bool() const = 0;
+	};
+	struct ATrousFilter : public Filter {
+		int x, y, step;
+		ParamDesc const& desc;
+
+		// state
+		// i : [-2, 2]
+		// j : [-2, 2]
+		int i, j;
+		float weight;
+
+		__device__ ATrousFilter(int x, int y, int step, ParamDesc const& desc) 
+			: x(x), y(y), step(step), desc(desc), i(-2), j(-2), weight(1. / 16) { }
+		__device__ virtual Data operator*() const {
+			return {
+				glm::clamp(x + i * step, 0, desc.res[0] - 1),
+				glm::clamp(y + j * step, 0, desc.res[1] - 1),
+				weight
+			};
+		}
+		__device__ virtual void operator++() {
+			if (j < 2) {
+				++j;
+			} else {
+				++i;
+				j = -2;
+			}
+
+			int x = glm::min(glm::abs(i), glm::abs(j));
+			if (x == 0) {
+				weight = 3. / 8;
+			} else if (x == 1) {
+				weight = 1. / 4;
+			} else {
+				weight = 1. / 16;
+			}
+		}
+		__device__ virtual operator bool() const {
+			return i <= 2;
+		}
+	};
+
+	struct GaussianFilter : public Filter {
+		int x, y;
+		int si, ei;
+		float two_d;
+		ParamDesc const& desc;
+
+		// state
+		// i : [-w/2, w/2]
+		// j : [-w/2, w/2]
+		int i, j;
+		float weight;
+
+		__device__ GaussianFilter(int x, int y, int step, ParamDesc const& desc)
+			: x(x), y(y), desc(desc), si(-step/2), ei(step/2), two_d(desc.s_dev * desc.s_dev) {
+			i = si, j = si;
+			weight = glm::exp(-(i * i + j * j) * 0.5f) / (2 * PI);
+		}
+
+		__device__ virtual Data operator*() const {
+			return {
+				glm::clamp(x + i, 0, desc.res[0] - 1),
+				glm::clamp(y + j, 0, desc.res[1] - 1),
+				weight
+			};
+		}
+
+		__device__ virtual void operator++() {
+			if (j < ei) {
+				++j;
+			} else {
+				++i;
+				j = si;
+			}
+
+			// sample weight from 2D Gaussian
+			weight = glm::exp(-(i * i + j * j) / (2 * two_d)) / (2 * PI * two_d);
+		}
+
+		__device__ virtual operator bool() const {
+			return i <= ei;
+		}
+	};
+
+
 	// reference: https://jo.dreggn.org/home/2010_atrous.pdf
+	template<typename FilterT>
 	__global__ void kern_denoise(
 		color_t* out,
 		color_t const* color_map,
@@ -36,11 +132,10 @@ namespace Denoiser {
 		glm::vec3 pval = pos_map[idx];
 		glm::vec3 sum(0, 0, 0);
 		float cum_w = 0.f;
-		for (size_t i = 0; i < 25; ++i) {
-			int nx = glm::clamp(x + desc.offsets[i][0] * step, 0, w - 1);
-			int ny = glm::clamp(y + desc.offsets[i][1] * step, 0, h - 1);
+		for (FilterT filter{ x,y,step,desc }; filter; ++filter) {
+			auto data = *filter;
 			
-			idx = FLATTEN(nx, ny);
+			idx = FLATTEN(data.nx, data.ny);
 			color_t ctmp = color_map[idx];
 			color_t t = cval - ctmp;
 
@@ -58,8 +153,8 @@ namespace Denoiser {
 			float pw = glm::min(glm::exp(-dist2 / desc.p_phi), 1.f);
 			float weight = cw * nw * pw;
 
-			sum += ctmp * weight * desc.kernel[i];
-			cum_w += weight * desc.kernel[i];
+			sum += ctmp * weight * data.weight;
+			cum_w += weight * data.weight;
 		}
 
 		idx = FLATTEN(x, y);
@@ -73,7 +168,8 @@ namespace Denoiser {
 		glm::vec3 const* norm_map,
 		glm::vec3 const* pos_map,
 		color_t const* diffuse_map,
-		ParamDesc desc) {
+		ParamDesc desc
+	) {
 
 		int buf_idx = 0;
 		color_t* bufs[2];
@@ -97,12 +193,25 @@ namespace Denoiser {
 			DIV_UP(desc.res[0], block_size.x),
 			DIV_UP(desc.res[1], block_size.y));
 
-		bool flag = false;
-		for (int step = 1; step <= desc.filter_size; step <<= 1, desc.c_phi /= 2) {
-			kern_denoise KERN_PARAM(blocks_per_grid, block_size) (bufs[1 - buf_idx], bufs[buf_idx], norm_map, pos_map, step, desc);
-			checkCUDAError("denoise");
-			buf_idx = 1 - buf_idx;
+		switch (desc.type) {
+		case FilterType::ATROUS:
+			for (int step = 1; step <= desc.filter_size; step <<= 1, desc.c_phi /= 2) {
+				kern_denoise<ATrousFilter> KERN_PARAM(blocks_per_grid, block_size) (bufs[1 - buf_idx], bufs[buf_idx], norm_map, pos_map, step, desc);
+				checkCUDAError("denoise");
+				buf_idx = 1 - buf_idx;
+			}
+			break;
+		case FilterType::GAUSSIAN:
+			for (int step = 3; step <= desc.filter_size; step <<= 1, desc.c_phi /= 2) {
+				kern_denoise<GaussianFilter> KERN_PARAM(blocks_per_grid, block_size) (bufs[1 - buf_idx], bufs[buf_idx], norm_map, pos_map, step, desc);
+				checkCUDAError("denoise");
+				buf_idx = 1 - buf_idx;
+			}
+			break;
+		default:
+			break;
 		}
+
 		
 #ifdef DENOISE_USE_DIFFUSE_MAP
 		// multiply by diffuse map, i.e. modulate

@@ -3,6 +3,7 @@
 #include <stb_image_write.h>
 
 #include "image.h"
+#include "main.h"
 
 image::image(int x, int y) :
         xSize(x),
@@ -42,4 +43,41 @@ void image::saveHDR(const std::string &baseFilename) {
     std::string filename = baseFilename + ".hdr";
     stbi_write_hdr(filename.c_str(), xSize, ySize, 3, (const float *) pixels);
     std::cout << "Saved " + filename + "." << std::endl;
+}
+
+void saveImage(glm::vec3 const* src, std::string const& name, bool radiance) {
+    float samples = iteration;
+    // output image file
+    image img(width, height);
+
+    for (int x = 0; x < width; x++) {
+        for (int y = 0; y < height; y++) {
+            int index = x + (y * width);
+            glm::vec3 pix = src[index];
+            if (radiance) pix /= samples;
+            img.setPixel(width - 1 - x, y, pix);
+        }
+    }
+
+    std::ostringstream ss;
+    ss << name << "." << currentTimeString() << "." << samples << "samp";
+
+    img.savePNG(ss.str());
+}
+
+void saveImage(RenderState const* state) {
+    saveImage(state->image.data(), state->imageName, true);
+}
+
+void saveImage(uchar4 const* pbo) {
+    int sz = width * height;
+    uchar4* img = new uchar4[sz];
+    glm::vec3* img_normalized = new glm::vec3[sz];
+    D2H(img, pbo, width * height);
+    std::transform(img, img + sz, img_normalized, [](uchar4 const& pix) {
+        return glm::vec3(pix.x / 255.f, pix.y / 255.f, pix.z / 255.f);
+    });
+    saveImage(img_normalized, "pbo", false);
+    delete[] img;
+    delete[] img_normalized;
 }

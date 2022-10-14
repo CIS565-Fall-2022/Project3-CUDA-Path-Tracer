@@ -6,8 +6,6 @@
 #include <iostream>
 #include <ctime>
 
-static std::string startTimeString;
-
 std::string scene_files_dir = "../scenes/";
 std::string save_files_dir = "../saves/";
 
@@ -51,7 +49,6 @@ int main(int argc, char** argv) {
 	std::cin >> save_files_dir;
 #endif // NO_DEFAULT_PATHS
 
-	startTimeString = currentTimeString();
 	height = width = 800;
 
 	// Initialize ImGui Data
@@ -151,28 +148,7 @@ bool switchScene(char const* path, bool force) {
 	return switchScene(g_scene, 0, false, force);
 }
 
-void saveImage() {
-	float samples = iteration;
-	// output image file
-	image img(width, height);
 
-	for (int x = 0; x < width; x++) {
-		for (int y = 0; y < height; y++) {
-			int index = x + (y * width);
-			glm::vec3 pix = g_renderState->image[index];
-			img.setPixel(width - 1 - x, y, glm::vec3(pix) / samples);
-		}
-	}
-
-	std::string filename = g_renderState->imageName;
-	std::ostringstream ss;
-	ss << filename << "." << startTimeString << "." << samples << "samp";
-	filename = ss.str();
-
-	// CHECKITOUT
-	img.savePNG(filename);
-	//img.saveHDR(filename);  // Save a Radiance HDR file
-}
 
 void runCuda() {
 	PathTracer::beginFrame(pbo);
@@ -202,7 +178,7 @@ void runCuda() {
 		PathTracer::endFrame();
 	} else {
 		PathTracer::endFrame();
-		saveImage();
+		saveImage(g_renderState);
 		PathTracer::pathtraceFree(nullptr);
 		cudaDeviceReset();
 		exit(EXIT_SUCCESS);
@@ -215,12 +191,12 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 	if (action == GLFW_PRESS) {
 		switch (key) {
 		case GLFW_KEY_ESCAPE:
-			saveImage();
+			saveImage(g_renderState);
 			glfwSetWindowShouldClose(window, GL_TRUE);
 			break;
 		case GLFW_KEY_S:
 			if (!Preview::CapturingMouse() && !Preview::CapturingKeyboard()) {
-				saveImage();
+				saveImage(g_renderState);
 			}
 			break;
 		case GLFW_KEY_SPACE:

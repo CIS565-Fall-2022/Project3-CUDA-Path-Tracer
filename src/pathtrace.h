@@ -3,6 +3,7 @@
 #include <vector>
 #include "scene.h"
 #include "Profile/timer.h"
+#include <vector_types.h>
 
 struct octreeGPU;
 namespace Denoiser {
@@ -29,6 +30,7 @@ namespace PathTracer {
 
 	bool isPaused();
 	octreeGPU getTree();
+	uchar4 const* getPBO();
 
 	void setDenoise(Denoiser::ParamDesc const& param);
 	void debugTexture(DebugTextureType type);
