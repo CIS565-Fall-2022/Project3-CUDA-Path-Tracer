@@ -31,6 +31,8 @@ namespace PathTracer {
 		~ProfileHelper() {
 			GetProfileData()[id].add_time(total_t);
 		}
+
+		// not using forwarding refs here because params must be passed by copy to GPU
 		template<typename T, typename... Args>
 		void call(T kern, dim3 x, dim3 y, Args... args) {
 #ifdef PROFILE

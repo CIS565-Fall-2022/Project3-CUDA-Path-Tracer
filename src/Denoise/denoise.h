@@ -22,7 +22,6 @@ namespace Denoiser {
 		glm::ivec2 res;
 		float c_phi, n_phi, p_phi;
 	};
-
 	// functors
 	struct IntersectionToNormal {
 		__host__ __device__ glm::vec3 operator()(ShadeableIntersection const& s) const {

@@ -125,34 +125,15 @@ static octreeGPU dev_tree;
 static GLuint s_pbo_id = -1;
 static uchar4* s_pbo_dptr = nullptr;
 
-struct DenoiseBuffers {
-	DenoiseBuffers() = default;
-	DenoiseBuffers(DenoiseBuffers const&) = delete;
-	DenoiseBuffers(DenoiseBuffers&&) = delete;
-
-	void init(int pixelcount) {
-		rt = make_span<color_t>(pixelcount);
-		d = make_span<glm::vec3>(pixelcount);
-		n = make_span<glm::vec3>(pixelcount);
-		x = make_span<glm::vec3>(pixelcount);
-	}
-	void free() {
-		FREE(rt);
-		FREE(n);
-		FREE(x);
-		FREE(d);
-	}
-
-	Span<color_t> rt;
-	Span<glm::vec3> n, x, d;
-};
-
 // pathtracer state
 static bool enable_denoise = false;
 static bool render_paused = false;
 static bool texture_debug_active = false;
 static int cur_iter;
-static DenoiseBuffers denoise_buffers;
+
+// copy of the radiance buffer for denoising
+color_t* denoise_image;
+static Denoiser::DenoiseBuffers denoise_buffers;
 static std::unique_ptr<Denoiser::ParamDesc> denoise_params;
 
 // profiling
@@ -187,6 +168,8 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state, bool force_chan
 #ifdef CACHE_FIRST_BOUNCE
 	dev_cached_intersections = make_span<ShadeableIntersection>(pixelcount);
 #endif // CACHE_FIRST_BOUNCE
+
+	denoise_image = make_span(state->image);
 
 	if (scene_changed) {
 		denoise_buffers.init(pixelcount);
@@ -223,6 +206,7 @@ void PathTracer::pathtraceFree(Scene* scene, bool force_change) {
 #ifdef CACHE_FIRST_BOUNCE
 	FREE(dev_cached_intersections);
 #endif // CACHE_FIRST_BOUNCE
+	FREE(denoise_image);
 
 	if (scene_changed) {
 		denoise_buffers.free();
@@ -554,29 +538,7 @@ int PathTracer::pathtrace(int iter) {
 		// initialize position and normal buffers for denoising
 		// NOTE: must do this before the material sorting
 		if (!depth && !iter) {
-			// normal
-			thrust::transform(
-				thrust::device,
-				dev_inters,
-				dev_inters + pixelcount,
-				denoise_buffers.n.get(),
-				Denoiser::IntersectionToNormal());
-
-			// position
-			thrust::transform(
-				thrust::device,
-				dev_inters,
-				dev_inters + pixelcount,
-				denoise_buffers.x.get(),
-				Denoiser::IntersectionToPos());
-
-			// diffuse
-			thrust::transform(
-				thrust::device,
-				dev_inters,
-				dev_inters + pixelcount,
-				denoise_buffers.d.get(),
-				Denoiser::IntersectionToDiffuse(dev_mesh_info.materials));
+			denoise_buffers.set(dev_inters, dev_mesh_info.materials);
 		}
 #endif
 
@@ -627,18 +589,20 @@ int PathTracer::pathtrace(int iter) {
 	// denoise
 	if (enable_denoise) {
 		frame_profiling.begin();
+
 		thrust::transform(
 			thrust::device, 
 			dev_image.get(),
 			dev_image.get() + pixelcount,
-			denoise_buffers.rt.get(),
+			denoise_image,
 			RadianceToNormalizedRGB(cur_iter));
-		Denoiser::denoise(denoise_buffers.rt, denoise_buffers.n, denoise_buffers.x, denoise_buffers.d, *denoise_params);
+
+		Denoiser::denoise(denoise_image, denoise_buffers, *denoise_params);
 
 		thrust::transform(
 			thrust::device,
-			denoise_buffers.rt.get(),
-			denoise_buffers.rt.get() + pixelcount,
+			denoise_image,
+			denoise_image + pixelcount,
 			s_pbo_dptr,
 			NormalizedRGBToRGBA()
 		);
@@ -702,13 +666,13 @@ void PathTracer::debugTexture(DebugTextureType type) {
 
 	switch (type) {
 	case DebugTextureType::DIFFUSE_BUF:
-		tex = denoise_buffers.d;
+		tex = denoise_buffers.get_diffuse();
 		break;
 	case DebugTextureType::NORM_BUF:
-		tex = denoise_buffers.n;
+		tex = denoise_buffers.get_normal();
 		break;
 	case DebugTextureType::POS_BUF:
-		tex = denoise_buffers.x;
+		tex = denoise_buffers.get_pos();
 		break;
 	case DebugTextureType::NONE:
 	default:

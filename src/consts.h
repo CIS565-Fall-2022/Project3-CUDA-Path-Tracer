@@ -33,8 +33,14 @@
 
 #define PROFILE
 
+
+
+
 #define DENOISE
 #define DENOISE_USE_DIFFUSE_MAP
+// #define DENOISE_GBUF_OPTIMIZATION
+
+
 
 // #define CACHE_FIRST_BOUNCE
 #if (defined(CACHE_FIRST_BOUNCE) && defined(ANTI_ALIAS_JITTER)) || (defined(CACHE_FIRST_BOUNCE) && defined(DEPTH_OF_FIELD)) 
