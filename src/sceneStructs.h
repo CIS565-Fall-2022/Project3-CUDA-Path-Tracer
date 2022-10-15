@@ -168,13 +168,6 @@ struct Geom {
     glm::mat4 invTranspose;
 };
 
-// the result of 0 sanity
-struct JunksFromMain {
-    float zoom, theta, phi;
-    glm::vec3 cameraPosition;
-    glm::vec3 ogLookAt;
-};
-
 struct RenderState {
     Camera camera;
     unsigned int iterations;
@@ -182,7 +175,6 @@ struct RenderState {
     std::vector<glm::vec3> image;
     std::string imageName;
 };
-
 
 struct PathSegment {
     struct PartitionRule {

@@ -24,7 +24,7 @@ JunksFromMain g_mainJunks;
 
 Scene* g_scene;
 RenderState* g_renderState;
-int iteration;
+int g_iteration;
 
 int width;
 int height;
@@ -99,7 +99,7 @@ bool switchScene(Scene* scene, int start_iter, bool from_save, bool force) {
 	auto& cameraPosition = g_mainJunks.cameraPosition;
 	auto& ogLookAt = g_mainJunks.ogLookAt;
 
-	iteration = start_iter;
+	g_iteration = start_iter;
 	g_renderState = &scene->state;
 	fromSave = from_save;
 
@@ -156,7 +156,7 @@ void runCuda() {
 	if (camchanged || forceChange) {
 		// clear image buffer
 		if (!fromSave) {
-			iteration = 0;
+			g_iteration = 0;
 			std::fill(g_renderState->image.begin(), g_renderState->image.end(), glm::vec3(0));
 		}
 
@@ -173,8 +173,8 @@ void runCuda() {
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
-	if (iteration < g_renderState->iterations) {
-		iteration = PathTracer::pathtrace(iteration);
+	if (g_iteration < g_renderState->iterations) {
+		g_iteration = PathTracer::pathtrace(g_iteration);
 		PathTracer::endFrame();
 	} else {
 		PathTracer::endFrame();

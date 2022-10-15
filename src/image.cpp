@@ -46,7 +46,7 @@ void image::saveHDR(const std::string &baseFilename) {
 }
 
 void saveImage(glm::vec3 const* src, std::string const& name, bool radiance) {
-    float samples = iteration;
+    float samples = g_iteration;
     // output image file
     image img(width, height);
 

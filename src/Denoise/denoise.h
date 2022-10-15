@@ -14,7 +14,7 @@ namespace Denoiser {
 
 	struct ParamDesc {
 		ParamDesc(FilterType type, int filter_size, glm::ivec2 res, float c_phi, float n_phi, float p_phi)
-			: type(type), filter_size(filter_size), s_dev(1), res(res), c_phi(c_phi), n_phi(n_phi), p_phi(p_phi) { }
+			: type(type), filter_size(filter_size), s_dev(7), res(res), c_phi(c_phi), n_phi(n_phi), p_phi(p_phi) { }
 
 		FilterType type;
 		int filter_size;

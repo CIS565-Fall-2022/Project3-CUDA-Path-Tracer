@@ -1,12 +1,16 @@
 #pragma once
 #include "denoise.h"
+
+#include <glm/gtx/transform.hpp>
 #include <thrust/transform.h>
 #include <thrust/execution_policy.h>
 
 namespace Denoiser {
 	class DenoiseBuffers {
 		int pixelcount;
-		glm::vec3* n, * x, * d; // no need to make these spans because sizes are all the same
+		glm::vec3* n;
+		glm::vec3* x;
+		glm::vec3* d; // no need to make these spans because sizes are all the same
 
 	public:
 		DenoiseBuffers() = default;
@@ -72,6 +76,7 @@ namespace Denoiser {
 		}
 		__host__ __device__ glm::vec3 get_pos(int i) const {
 #ifdef DENOISE_GBUF_OPTIMIZATION
+			
 #else
 			return x[i];
 #endif

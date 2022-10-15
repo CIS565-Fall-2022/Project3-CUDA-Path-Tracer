@@ -509,7 +509,7 @@ void Preview::DoPreloadMenu() {
 			if (guiData->num_scenes > 0) {
 				switchScene(guiData->scene_file_names[guiData->cur_scene]);
 			} else {
-				cout << "No Scene Found !!" << endl;
+				std::cout << "No Scene Found !!" << std::endl;
 				exit(1);
 			}
 		} else {
@@ -519,7 +519,7 @@ void Preview::DoPreloadMenu() {
 					switchScene(g_scene, iter, true, true);
 				}
 			} else {
-				cout << "No Saves Found !!" << endl;
+				std::cout << "No Saves Found !!" << std::endl;
 				exit(1);
 			}
 		}
@@ -539,7 +539,7 @@ void Preview::mainLoop() {
 		glfwPollEvents();
 		runCuda();
 
-		string title = "CIS565 Path Tracer | " + utilityCore::convertIntToString(iteration) + " Iterations";
+		std::string title = "CIS565 Path Tracer | " + utilityCore::convertIntToString(g_iteration) + " Iterations";
 		glfwSetWindowTitle(window, title.c_str());
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
 		glBindTexture(GL_TEXTURE_2D, displayImage);

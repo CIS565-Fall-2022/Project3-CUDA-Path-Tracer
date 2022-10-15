@@ -1,6 +1,9 @@
 #include <cstdio>
 #include <cuda.h>
 
+#include <glm/glm.hpp>
+#include <glm/gtx/norm.hpp>
+
 #include <GL/glew.h>
 #include <cuda_gl_interop.h>
 
@@ -16,8 +19,8 @@
 #include <thrust/sort.h>
 #include "sceneStructs.h"
 #include "scene.h"
-#include "glm/glm.hpp"
-#include "glm/gtx/norm.hpp"
+
+
 #include "utilities.h"
 #include "pathtrace.h"
 #include "intersections.cuh"
@@ -265,8 +268,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
 		);
 
-		PathSegment& segment = pathSegments[index];
-		segment.init(traceDepth, index, cam_ray);
+		pathSegments[index].init(traceDepth, index, cam_ray);
 	}
 }
 
@@ -289,7 +291,7 @@ __global__ void computeIntersections(
 	PathSegment path = paths[path_index];
 
 #ifndef COMPACTION
-	if (!path.remainingBounces) {
+	if (path.remainingBounces <= 0) {
 		return;
 	}
 #endif // COMPACTION
@@ -352,16 +354,17 @@ __global__ void shadeMaterial(
 	}
 
 	PathSegment& path = paths[idx];
-	ShadeableIntersection intersection = shadeableIntersections[idx];
 
 #ifndef COMPACTION
-	if (!path.remainingBounces) {
+	if (path.remainingBounces <= 0) {
 		return;
 	}
 #endif // COMPACTION
 
 	assert(path.remainingBounces > 0);
 
+
+	ShadeableIntersection intersection = shadeableIntersections[idx];
 	if (intersection.t > 0.0f) {
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
 		thrust::uniform_real_distribution<float> u01(0, 1);
@@ -404,7 +407,11 @@ __global__ void shadeFakeMaterial(
 		PathSegment& path = paths[idx];
 		ShadeableIntersection intersection = shadeableIntersections[idx];
 
-		assert(path.remainingBounces > 0);
+#ifndef COMPACTION
+		if (path.remainingBounces <= 0) {
+			return;
+		}
+#endif // COMPACTION
 
 		if (intersection.t > 0.0f) { // if the intersection exists...
 		  // Set up the RNG
@@ -568,7 +575,9 @@ int PathTracer::pathtrace(int iter) {
 
 #ifdef COMPACTION
 		frame_profiling.begin();
-		num_paths = thrust::partition(thrust::device, dev_paths.get(), dev_paths.get() + num_paths, PathSegment::PartitionRule()) - dev_paths.get();
+		{
+			num_paths = thrust::partition(thrust::device, dev_paths.get(), dev_paths.get() + num_paths, PathSegment::PartitionRule()) - dev_paths.get();
+		}
 		frame_profiling.end();
 #endif // COMPACTION
 
@@ -589,32 +598,35 @@ int PathTracer::pathtrace(int iter) {
 	// denoise
 	if (enable_denoise) {
 		frame_profiling.begin();
+		{
+			thrust::transform(
+				thrust::device,
+				dev_image.get(),
+				dev_image.get() + pixelcount,
+				denoise_image,
+				RadianceToNormalizedRGB(cur_iter));
 
-		thrust::transform(
-			thrust::device, 
-			dev_image.get(),
-			dev_image.get() + pixelcount,
-			denoise_image,
-			RadianceToNormalizedRGB(cur_iter));
+			Denoiser::denoise(denoise_image, denoise_buffers, *denoise_params);
 
-		Denoiser::denoise(denoise_image, denoise_buffers, *denoise_params);
-
-		thrust::transform(
-			thrust::device,
-			denoise_image,
-			denoise_image + pixelcount,
-			s_pbo_dptr,
-			NormalizedRGBToRGBA()
-		);
+			thrust::transform(
+				thrust::device,
+				denoise_image,
+				denoise_image + pixelcount,
+				s_pbo_dptr,
+				NormalizedRGBToRGBA()
+			);
+		}
 		frame_profiling.end();
 	} else {
 		frame_profiling.begin();
-		thrust::transform(
-			thrust::device,
-			dev_image.get(),
-			dev_image.get() + pixelcount,
-			s_pbo_dptr,
-			RadianceToRGBA(cur_iter));
+		{
+			thrust::transform(
+				thrust::device,
+				dev_image.get(),
+				dev_image.get() + pixelcount,
+				s_pbo_dptr,
+				RadianceToRGBA(cur_iter));
+		}
 		frame_profiling.end();
 	}
 

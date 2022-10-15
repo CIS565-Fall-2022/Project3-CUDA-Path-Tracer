@@ -1,18 +1,18 @@
 #include "DebugDrawer.h"
 #include <glm/glm.hpp>
-#include <glm/ext.hpp>
+
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/transform.hpp>
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include "../sceneStructs.h"
 #include "../ImGui/imgui.h"
 #include "../ImGui/imgui_impl_glfw.h"
 #include "../ImGui/imgui_impl_opengl3.h"
-#include "../consts.h"
 
-extern RenderState* g_renderState;
-extern JunksFromMain g_mainJunks;
-extern int width;
-extern int height;
+#include "../consts.h"
+#include "../sceneStructs.h"
+#include "../camState.h"
 
 // world to screen
 static glm::vec2 w2s(glm::mat4 const& model, glm::vec3 const& point) {

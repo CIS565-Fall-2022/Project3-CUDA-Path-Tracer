@@ -22,13 +22,12 @@
 
 // impl switches
 #define COMPACTION
-
-#define SORT_MAT
+// #define SORT_MAT
 #define AABB_CULLING
 #define OCTREE_CULLING
 // #define DEPTH_OF_FIELD
 
-#define ANTI_ALIAS_JITTER
+// #define ANTI_ALIAS_JITTER
 // #define FAKE_SHADE
 
 #define PROFILE
