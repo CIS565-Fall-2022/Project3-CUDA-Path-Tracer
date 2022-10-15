@@ -1,35 +1,141 @@
 #pragma once
 #include "denoise.h"
 
+#ifdef DENOISE_GBUF_OPTIMIZATION
+#include "../sceneStructs.h"
+#include "../camState.h"
+#endif // DENOISE_GBUF_OPTIMIZATION
+
 #include <glm/gtx/transform.hpp>
 #include <thrust/transform.h>
 #include <thrust/execution_policy.h>
 
 namespace Denoiser {
+#ifdef DENOISE_GBUF_OPTIMIZATION
+	struct NormPos {
+		float2 encoded_norm;
+		float  pos_depth; // depth in clip space
+	};
+	struct EncodeNormPos {
+		glm::mat4x4 view, proj;
+		__host__ __device__ EncodeNormPos(glm::mat4x4 const& view, glm::mat4x4 const& proj) : view(view), proj(proj) { }
+		__device__ NormPos operator()(ShadeableIntersection const& inters) const {
+			if (inters.t < 0) {
+				return { 0, 0, 0 };
+			}
+			glm::vec4 tmp = proj * (view * glm::vec4(inters.hitPoint, 1.f));
+			tmp /= tmp.w;
+			return { inters.surfaceNormal.x, inters.surfaceNormal.y, tmp.z };
+		}
+	};
+	struct DecodeNorm {
+		__device__ glm::vec3 operator()(NormPos const& xn) const {
+			float x = xn.encoded_norm.x;
+			float y = xn.encoded_norm.y;
+			float z = glm::sqrt(1.f - x * x - y * y);
+			return glm::vec3(x, y, z);
+		}
+	};
+	struct DecodeNormRGBA {
+		__device__ uchar4 operator()(NormPos const& xn) const {
+			return NormalToRGBA()(DecodeNorm()(xn));
+		}
+	};
+	struct DecodePos {
+		glm::mat4x4 inv_view, inv_proj;
+		float x, y;
+		__host__ __device__ DecodePos(
+			glm::mat4x4 const& inv_view, 
+			glm::mat4x4 const& inv_proj, 
+			glm::ivec2 const& viewport_coord, 
+			glm::ivec2 const& res)
+			: inv_view(inv_view), inv_proj(inv_proj) {
+			x = viewport_coord.x / (float)res.x;
+			y = viewport_coord.y / (float)res.y;
+
+			x = x * 2 - 1;
+			y = (1 - y) * 2 - 1;
+		}
+		__device__ glm::vec3 operator()(NormPos const& xn) {
+			glm::vec4 pos4 = inv_proj * glm::vec4(x, y, xn.pos_depth, 1);
+			pos4 /= pos4.w;
+
+			return glm::vec3(inv_view * pos4);
+		}
+	};
+	struct DecodePosRGBA {
+		glm::mat4x4 inv_view, inv_proj;
+		glm::ivec2 viewport_coord;
+		glm::ivec2 res;
+		__host__ __device__ DecodePosRGBA(
+			glm::mat4x4 const& inv_view,
+			glm::mat4x4 const& inv_proj,
+			glm::ivec2 const& viewport_coord,
+			glm::ivec2 const& res)
+			: inv_view(inv_view), inv_proj(inv_proj), viewport_coord(viewport_coord), res(res) { }
+		__device__ uchar4 operator()(NormPos const& xn) {
+			return NormalizedRGBToRGBA()(DecodePos(inv_view, inv_proj, viewport_coord, res)(xn));
+		}
+	};
+#endif
+
 	class DenoiseBuffers {
 		int pixelcount;
-		glm::vec3* n;
-		glm::vec3* x;
-		glm::vec3* d; // no need to make these spans because sizes are all the same
+		int w, h;
+
+		// no need to make these spans because sizes are all the same
+#ifdef DENOISE_GBUF_OPTIMIZATION
+		using vec_type = NormPos;
+		
+		NormPos* xn;
+		glm::mat4x4 inv_view, inv_proj;
+#else
+		using vec_type = glm::vec3;
+
+		glm::vec3* n, *x;
+#endif
+		glm::vec3* d;
 
 	public:
 		DenoiseBuffers() = default;
 		DenoiseBuffers(DenoiseBuffers const& o) = default;
 		DenoiseBuffers(DenoiseBuffers&&) = delete;
 
-		void init(int pixelcount) {
-			this->pixelcount = pixelcount;
+		void init(int w, int h) {
+			this->w = w;
+			this->h = h;
+			this->pixelcount = w * h;
 			d = make_span<glm::vec3>(pixelcount);
+
+#ifdef DENOISE_GBUF_OPTIMIZATION
+			inv_view = glm::inverse(CamState::get_view());
+			inv_proj = glm::inverse(CamState::get_proj());
+
+			xn = make_span<NormPos>(pixelcount);
+#else
 			n = make_span<glm::vec3>(pixelcount);
 			x = make_span<glm::vec3>(pixelcount);
+#endif
 		}
 		void free() {
+			FREE(d);
+#ifdef DENOISE_GBUF_OPTIMIZATION
+			FREE(xn);
+#else
 			FREE(n);
 			FREE(x);
-			FREE(d);
+#endif
 		}
 		void set(ShadeableIntersection const* dev_inters, Material const* materials) {
 #ifdef DENOISE_GBUF_OPTIMIZATION
+			thrust::transform(
+				thrust::device,
+				dev_inters,
+				dev_inters + pixelcount,
+				xn,
+				Denoiser::EncodeNormPos(CamState::get_view(), CamState::get_proj())
+			);
+
 #else
 			// normal
 			thrust::transform(
@@ -46,6 +152,7 @@ namespace Denoiser {
 				dev_inters + pixelcount,
 				x,
 				Denoiser::IntersectionToPos());
+#endif
 
 			// diffuse
 			thrust::transform(
@@ -54,38 +161,45 @@ namespace Denoiser {
 				dev_inters + pixelcount,
 				d,
 				Denoiser::IntersectionToDiffuse(materials));
-#endif
 		}
 		__host__ __device__ int size() const {
 			return pixelcount;
 		}
-		__host__ __device__ glm::vec3 const* get_normal() const {
+		__host__ __device__ vec_type const* get_normal() const {
+#ifdef DENOISE_GBUF_OPTIMIZATION
+			return xn;
+#else
 			return n;
+#endif
 		}
-		__host__ __device__ glm::vec3 const* get_pos() const {
+		__host__ __device__ vec_type const* get_pos() const {
+#ifdef DENOISE_GBUF_OPTIMIZATION
+			return xn;
+#else
 			return x;
+#endif
 		}
 		__host__ __device__ glm::vec3 const* get_diffuse() const {
 			return d;
 		}
-		__host__ __device__ glm::vec3 get_normal(int i) const {
+		__device__ glm::vec3 get_normal(int i) const {
 #ifdef DENOISE_GBUF_OPTIMIZATION
+			return DecodeNorm()(xn[i]);
 #else
 			return n[i];
 #endif
 		}
-		__host__ __device__ glm::vec3 get_pos(int i) const {
+		__device__ glm::vec3 get_pos(int i) const {
 #ifdef DENOISE_GBUF_OPTIMIZATION
-			
+			int x = i % w;
+			int y = i / w;
+			return DecodePos(inv_view, inv_proj, glm::ivec2(x, y), glm::ivec2(w, h))(xn[i]);
 #else
 			return x[i];
 #endif
 		}
-		__host__ __device__ glm::vec3 get_diffuse(int i) const {
-#ifdef DENOISE_GBUF_OPTIMIZATION
-#else
+		__device__ glm::vec3 get_diffuse(int i) const {
 			return d[i];
-#endif
 		}
 	};
 

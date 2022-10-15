@@ -20,7 +20,6 @@
 #include "sceneStructs.h"
 #include "scene.h"
 
-
 #include "utilities.h"
 #include "pathtrace.h"
 #include "intersections.cuh"
@@ -52,51 +51,6 @@ void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #endif
 }
 
-// functors
-
-struct RadianceToNormalizedRGB {
-	int iter;
-	RadianceToNormalizedRGB(int iter) : iter(iter) { }
-	__host__ __device__ color_t operator()(color_t const& r) const {
-		if (!iter) {
-			return color_t(0);
-		}
-		return glm::clamp(r / (float) iter, 0.f, 1.f);
-	}
-};
-struct RadianceToRGBA {
-	int iter;
-	RadianceToRGBA(int iter) : iter(iter) { }
-	__host__ __device__ uchar4 operator()(color_t const& r) const {
-		if (!iter) {
-			return make_uchar4(0, 0, 0, 0);
-		}
-		return make_uchar4(
-			glm::clamp((int)(r.x / iter * 255.f), 0, 255),
-			glm::clamp((int)(r.y / iter * 255.f), 0, 255),
-			glm::clamp((int)(r.z / iter * 255.f), 0, 255),
-			0);
-	}
-};
-struct NormalizedRGBToRGBA {
-	__host__ __device__ uchar4 operator()(color_t const& r) const {
-		return make_uchar4(
-			glm::clamp((int)(r.x * 255.f), 0, 255),
-			glm::clamp((int)(r.y * 255.f), 0, 255),
-			glm::clamp((int)(r.z * 255.f), 0, 255),
-			0);
-	}
-};
-struct NormalToRGBA {
-	__host__ __device__ uchar4 operator()(glm::vec3 const& n) const {
-		// convert from the range [-1, 1] to [0, 1]
-		return make_uchar4(
-			glm::clamp((int)(((n.x + 1.f) / 2.f) * 255.f), 0, 255),
-			glm::clamp((int)(((n.y + 1.f) / 2.f) * 255.f), 0, 255),
-			glm::clamp((int)(((n.z + 1.f) / 2.f) * 255.f), 0, 255),
-			0);
-	}
-};
 __host__ __device__
 thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int depth) {
 	int h = utilhash((1 << 31) | (depth << 22) | iter) ^ utilhash(index);
@@ -175,7 +129,7 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state, bool force_chan
 	denoise_image = make_span(state->image);
 
 	if (scene_changed) {
-		denoise_buffers.init(pixelcount);
+		denoise_buffers.init(cam.resolution.x, cam.resolution.y);
 
 		dev_geoms = make_span(scene->geoms);
 		dev_lights = make_span(scene->lights);
@@ -671,35 +625,58 @@ void PathTracer::setDenoise(Denoiser::ParamDesc const& desc) {
 		*denoise_params = desc;
 	}
 }
+#ifdef DENOISE_GBUF_OPTIMIZATION
+__global__ void kern_visualize_pos(
+	uchar4* pbo,
+	glm::mat4x4 inv_view,
+	glm::mat4x4 inv_proj,
+	glm::ivec2 res,
+	Denoiser::NormPos const* gbuf
+) {
+	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
+	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+	int w = res[0], h = res[1];
 
+	if (x >= w || y >= h)
+		return;
 
+	int idx = x + (y * w);
+	pbo[idx] = Denoiser::DecodePosRGBA(inv_view, inv_proj, glm::ivec2(x, y), res)(gbuf[idx]);
+}
+#endif
 void PathTracer::debugTexture(DebugTextureType type) {
-	glm::vec3 const* tex;
+	Camera const& cam = hst_scene->state.camera;
+	int pixelcount = cam.resolution.x * cam.resolution.y;
 
-	switch (type) {
-	case DebugTextureType::DIFFUSE_BUF:
-		tex = denoise_buffers.get_diffuse();
-		break;
-	case DebugTextureType::NORM_BUF:
-		tex = denoise_buffers.get_normal();
-		break;
-	case DebugTextureType::POS_BUF:
-		tex = denoise_buffers.get_pos();
-		break;
-	case DebugTextureType::NONE:
-	default:
+	if (type == DebugTextureType::DIFFUSE_BUF) {
+		auto tex = denoise_buffers.get_diffuse();
+		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, NormalizedRGBToRGBA());
+	} else if (type == DebugTextureType::NORM_BUF) {
+		auto tex = denoise_buffers.get_normal();
+#ifdef DENOISE_GBUF_OPTIMIZATION
+		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, Denoiser::DecodeNormRGBA());
+#else
+		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, NormalToRGBA());
+#endif
+	} else if (type == DebugTextureType::POS_BUF) {
+		auto tex = denoise_buffers.get_pos();
+#ifdef DENOISE_GBUF_OPTIMIZATION
+		dim3 x(DIV_UP(cam.resolution.x, 8), DIV_UP(cam.resolution.y, 8));
+		dim3 y(8, 8);
+		kern_visualize_pos KERN_PARAM(x,y) (
+			s_pbo_dptr,
+			glm::inverse(CamState::get_view()),
+			glm::inverse(CamState::get_proj()),
+			cam.resolution,
+			tex
+		);
+#else
+		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, NormalizedRGBToRGBA());
+#endif
+	} else {
 		texture_debug_active = false;
 		return;
 	}
 
 	texture_debug_active = true;
-	
-	Camera const& cam = hst_scene->state.camera;
-	int pixelcount = cam.resolution.x * cam.resolution.y;
-
-	if (type == DebugTextureType::NORM_BUF) {
-		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, NormalToRGBA());
-	} else {
-		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, NormalizedRGBToRGBA());
-	}
 }

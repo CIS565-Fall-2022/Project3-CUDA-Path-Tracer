@@ -1,6 +1,7 @@
 #pragma once
 
-#include "glm/glm.hpp"
+#include <glm/glm.hpp>
+
 #include "intellisense.h"
 #include <cuda.h>
 

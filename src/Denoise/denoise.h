@@ -5,6 +5,51 @@
 #include "../utilities.h"
 #include "../sceneStructs.h"
 
+// functors
+struct RadianceToNormalizedRGB {
+	int iter;
+	RadianceToNormalizedRGB(int iter) : iter(iter) { }
+	__device__ color_t operator()(color_t const& r) const {
+		if (!iter) {
+			return color_t(0);
+		}
+		return glm::clamp(r / (float)iter, 0.f, 1.f);
+	}
+};
+struct RadianceToRGBA {
+	int iter;
+	RadianceToRGBA(int iter) : iter(iter) { }
+	__device__ uchar4 operator()(color_t const& r) const {
+		if (!iter) {
+			return make_uchar4(0, 0, 0, 0);
+		}
+		return make_uchar4(
+			glm::clamp((int)(r.x / iter * 255.f), 0, 255),
+			glm::clamp((int)(r.y / iter * 255.f), 0, 255),
+			glm::clamp((int)(r.z / iter * 255.f), 0, 255),
+			0);
+	}
+};
+struct NormalizedRGBToRGBA {
+	__device__ uchar4 operator()(color_t const& r) const {
+		return make_uchar4(
+			glm::clamp((int)(r.x * 255.f), 0, 255),
+			glm::clamp((int)(r.y * 255.f), 0, 255),
+			glm::clamp((int)(r.z * 255.f), 0, 255),
+			0);
+	}
+};
+struct NormalToRGBA {
+	__device__ uchar4 operator()(glm::vec3 const& n) const {
+		// convert from the range [-1, 1] to [0, 1]
+		return make_uchar4(
+			glm::clamp((int)(((n.x + 1.f) / 2.f) * 255.f), 0, 255),
+			glm::clamp((int)(((n.y + 1.f) / 2.f) * 255.f), 0, 255),
+			glm::clamp((int)(((n.z + 1.f) / 2.f) * 255.f), 0, 255),
+			0);
+	}
+};
+
 namespace Denoiser {
 	enum FilterType {
 		ATROUS,
@@ -22,6 +67,7 @@ namespace Denoiser {
 		glm::ivec2 res;
 		float c_phi, n_phi, p_phi;
 	};
+
 	// functors
 	struct IntersectionToNormal {
 		__host__ __device__ glm::vec3 operator()(ShadeableIntersection const& s) const {
@@ -30,6 +76,9 @@ namespace Denoiser {
 	};
 	struct IntersectionToPos {
 		__host__ __device__ glm::vec3 operator()(ShadeableIntersection const& s) const {
+			if (s.t < 0.f) {
+				return glm::vec3(0);
+			}
 			return s.hitPoint;
 		}
 	};
@@ -37,6 +86,9 @@ namespace Denoiser {
 		Material const* mats;
 		IntersectionToDiffuse(Material const* mats) : mats(mats) { }
 		__host__ __device__ color_t operator()(ShadeableIntersection const& s) const {
+			if (s.t < 0.f) {
+				return BACKGROUND_COLOR;
+			}
 			if (mats[s.materialId].textures.diffuse != -1) {
 				return s.tex_color;
 			} else {

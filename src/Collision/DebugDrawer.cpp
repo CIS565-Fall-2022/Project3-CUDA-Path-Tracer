@@ -16,23 +16,14 @@
 
 // world to screen
 static glm::vec2 w2s(glm::mat4 const& model, glm::vec3 const& point) {
-	glm::vec2 const& pixel_len = g_renderState->camera.pixelLength;
 	glm::vec3 const& look_point = g_renderState->camera.lookAt;
 	glm::vec3 const& eye = g_mainJunks.cameraPosition;
 	float fov = glm::radians(g_renderState->camera.fov.y * 2.0f);
 
 	glm::mat4 view = glm::lookAt(eye, look_point, WORLD_UP);
 	glm::mat4 proj = glm::perspective(fov, width / (float)height, 0.12f, 100.0f);
-	glm::vec4 tmp = proj * (view * (model * glm::vec4(point, 1)));
-	tmp /= tmp.w;
-
-	float w = width * 0.5f;
-	float h = height * 0.5f;
-	glm::vec2 ret(tmp.x * w, tmp.y * h);
-	// to viewport
-	ret.x = w + ret.x;
-	ret.y = h - ret.y;
-	return ret;
+	glm::vec4 tmp = CamState::get_proj() * (CamState::get_view() * (model * glm::vec4(point, 1)));
+	return glm::vec2(CamState::clip_to_viewport(tmp));
 }
 
 void DebugDrawer::DrawRect(float x, float y, float w, float h, color_t color) {

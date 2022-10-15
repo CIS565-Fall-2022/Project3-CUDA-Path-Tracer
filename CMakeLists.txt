@@ -83,6 +83,7 @@ set(headers
     src/Profile/timer.h
     src/Profile/pathtracer_profile.h
     src/guiData.h
+    src/camState.h
 
     src/ImGui/imconfig.h
 	src/ImGui/imgui.h
