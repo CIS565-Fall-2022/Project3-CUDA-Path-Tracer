@@ -13,6 +13,34 @@
 - Although a simple and powerful algorithm, path tracing can be quite costly as it simulates thousands if not millions of rays bouncing around in a 3D space. Spatial data structures are often used to quickly perform ray-object intersection tests.
 	- In this project, I implemented an octree to avoid unnecessary computation in sparse areas of the scene.
 
+## Table of Contents
+- [Feature Overview](#features)
+- [Implementation Toggles](#implementation-toggles)
+- [Physically Based Rendering](#physically-based-rendering)
+	- [Microfacet Reflection](#microfacet-reflection)
+- [Denoising](#denoising)
+	- [Edge Avoidance](#edge-avoidance)
+	- [Diffuse (Albedo) Map](#diffuse-map)
+	- [G Buffer](#g-buffer)
+	- [G Buffer Optimization](#g-buffer-optimization)
+	- [Performance Analysis](#performance-analysis)
+- [Anti-aliasing](#anti-aliasing)
+- [Mesh Loading and Texture Mapping](#mesh-loading-and-texture-mapping)
+	- [Diffuse Texture Mapping](#diffuse-texture-sampling)
+	- [Normal Mapping](#normal-mapping)
+	- [Per-face Material](#per-face-material)
+- [Performance Improvements](#performance-improvements)
+	- [Stream Compaction](#stream-compaction)
+	- [Material Sorting](#material-sorting)
+	- [First Bounce Caching](#first-bounce-cache)
+	- [Performance Analysis of the Above](#performance-impact-by-the-above-optimizations)
+	- [AABB Culling](#aabb-culling)
+	- [Octree](#octree)
+	- [Performance Analysis of the Above](#performance-comparison-intersection-test)
+	- [Room for Further Improvement](#room-for-further-improvement)
+- [Restartable Ray Tracing](#restartable-ray-tracing-saving--loading)
+
+
 ## Features
 ### Visual Features
 - [x] Simple Diffuse
@@ -22,6 +50,7 @@
 - [x] Transparency
 - [x] Antialiasing
 - [ ] Depth of Field
+- [x] Edge-avoiding A-trous Denoiser
 
 ### Performance Improvement
 - [x] AABB bounding box
@@ -47,6 +76,27 @@
 	- [Sofa](https://free3d.com/3d-model/sofa-801691.html)
 	- [Toy Truck](https://free3d.com/3d-model/toy-truck-481161.html)
 
+## Implementation Toggles
+- most features can be turned on or off by macro defines in `src/consts.h`
+- below is a table pairing the macros with functionalities they toggle 
+
+| macro define | functionality |
+|--|--|
+|`OCTREE_BOX_EPS`|epsilon used by octree for node AABB|
+|`OCTREE_DEPTH`|maximum depth of the octree|
+|`OCTREE_MESH_ONLY`|only store mesh triangles in octree|
+|`COMPACTION`| use stream compaction for the path pool|
+|`SORT_MAT`|sort materials|
+|`CACHE_FIRST_BOUNCE`|cache first bounce intersections|
+|`AABB_CULLING`|use AABB to optimize intersection test for meshes and primitives|
+|`OCTREE_CULLING`|use octree to optimize intersection test|
+|`ANTI_ALIAS_JITTER`|use stochastic anti-aliasing|
+|`FAKE_SHADE`|use a fake (minimal) shading kernel|
+|`PROFILE`|record profiling information and display it in GUI|
+|`DENOISE`|use denoiser|
+|`DENOISE_GBUF_OPTIMIZATION`|use g-buffer optimization for the denoiser|
+|`DENOISE_IMG_COMP`|compute and display in GUI the image distance as a measure of how visually accptable a denoised is|
+
 ## Physically-based Rendering
 - I heavily referenced [Physically Based Rendering: From Theory to Implementation](https://pbrt.org/) when writing the shading code.
 - The cover image is actually a full picture of all the BSDFs I have implemented so far, as shown.
@@ -57,6 +107,71 @@
 - When combined with reflection, a microfacet model is excellent in simulating an imperfect metallic surface, with a sharp highlight that gradually falls off.
 - The roughness factor (r) controls how rough the surface is. Its effect is illustrated below.
 ![](./img/Visual/microfacet_comp_illus.png)
+
+
+## Denoising
+- Denoising is a technique that averages the pixels in some way to smooth out an image with "noises" (black dots resulting from lights dying off and not enough samples are being accumulated)
+- The denoising technique used in the path tracer is based on A-trous wavelet filter from the paper https://jo.dreggn.org/home/2010_atrous.pdf
+- It is a guided-blurring filter driven by G-buffer data such as position map, normal map, and diffuse map.
+- It approximates the expensive gaussian filter by dilated convolution.
+![](img/Denoise/conv.png)
+	> image taken from [ResearchGate](https://www.researchgate.net/figure/The-illustration-of-the-2D-dilated-convolution-with-spatial-size-of-33-and-dilation_fig1_338780378) under the [Creative Common Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/)
+- in the following analysis, two images will be put alongside the denoised ones for reference
+	- one image is the path-traced output at the same SPP (samples per pixel) as the denoised images, and the other one is the final path-traced output (usually 5000 SPP).
+
+### Edge Avoidance
+- Edge-avoiding techniques detect the presence of edges by comparing the normals & positions of neighbor pixels and thus avoid blurring out the edges in the image.
+- Below is a comparison between A-trous filter with edge avoiding techniques and without them.
+
+| naive convolution at 80 SPP | edge avoiding at 80 SPP | none at 80 SPP | reference at 5000 SPP |
+|--|--|--|--|
+|![](./img/Denoise/simple_blur_no_diffuse.png)|![](./img/Denoise/arous_no_diffuse.png)|![](./img/Denoise/none_80.png)|![](./img/Denoise/ref_5000.png)|
+
+### Diffuse Map
+- The output doesn't look good with only edge avoidance. The texture details are lost as a result of blurring.
+- The Diffuse Map (Albedo Map) helps preserve texture details.
+
+| diffuse map at 80 SPP | edge avoiding + diffuse map at 80 SPP | none at 80 SPP | reference at 5000 SPP |
+|--|--|--|--|
+|![](./img/Denoise/simple_blur_diffuse.png)|![](./img/Denoise/atrous_diffuse.png)|![](./img/Denoise/none_80.png)|![](./img/Denoise/ref_5000.png)|
+
+### G-buffer
+- The above techniques rely on the information stored in G-buffer. In the case of Edge-avoiding A-trous filter, the following maps are used:
+
+| diffuse map | normal map | position map | path-traced image |
+|--|--|--|--|
+|![](./img/Denoise/Buffers/diffuse.png)|![](./img/Denoise/Buffers/normal.png)|![](./img/Denoise/Buffers/pos.png)|![](./img/Denoise/ref_5000.png)|
+
+### G-buffer Optimization
+- space-time trade off
+- normal map space optimization (float3 --> float2)
+	- only x and y values of normals are stored
+	- the z value is computed by `sqrt(1 - x * x - y * y)`
+- position map space optimization (float3 --> float)
+	- only clip space depth is stored
+	- the position is recovered by inverse view and projection matrix + screen coordinate + clip space depth
+- in this way, we save the space of a `float3` in the G buffer at the cost of more computation to reconstruct normals and postions
+- Before G-buffer optimization, performance is not bottlenecked by computation but rather by memory access. Profiling data suggest that the denoiser kernel has significant long scoreboard stalls, which means warps often need to wait for memory loads.
+![](./img/Denoise/pa2.png)
+- Although this doesn't have a noticeable impact on SPP time, I see a great improvement on cache hit rate and a reduction of memory usage, as expected.
+	- no optimization
+![](./img/Denoise/pa3.png)
+	- with gbuf optimization
+![](./img/Denoise/pa4.png)
+
+### Performance Analysis
+- The following chart shows the impact on the time per SPP by denoising
+- Test specification
+	- G-buffer Optimization is off
+	- Material Sorting is off
+	- Tested on Windows 10, i7-8700 @ 3.20 GHz 16GB, RTX 2070
+	- Time per SPP is an average value over 100 iterations
+	- Filter Size is set to 60, all weights to 0.5
+
+![](./img/Denoise/chart1.png)
+- As shown, A-trous adds around 12ms to the SPP time. It is a significant improvement on the Gaussian filter it approximates.
+- The reason why Gaussian filter is so slow is that it has an O(n<sup>2</sup>) time complexity w.r.t. the filter size, whereas A-trous does a constant amount of work per iteration. To illustrate this, consider the simple 1D case below:
+![](./img/Denoise/pa1.png)
 
 ## Anti-aliasing
 - Stochastic Anti-aliasing is used to reduce aliasing artifacts.

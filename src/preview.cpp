@@ -362,20 +362,21 @@ static void RenderDenoiserMenu() {
 	static constexpr char const* filter_options[Denoiser::FilterType::NUM_FILTERS] = {
 		"A Trous",
 		"Gaussian",
+		"Simple Blur",
 	};
 
 	static constexpr char const* texture_options[DebugTextureType::NUM_OPTIONS] = {
 		"None",
 		"Show Normal Buffer",
 		"Show Position Buffer",
-		"Show Diffuse Buffer"
+		"Show Diffuse Buffer",
 	};
 
 	auto& ops = guiData->denoiser_options;
 	auto& params = guiData->desc;
 
 	ImGui::Checkbox("Denoise", &ops.is_on);
-
+	ImGui::Checkbox("Use Diffuse Map", &params.use_diffuse);
 	ImGui::Combo("Filter Type", (int*)&params.type, filter_options, Denoiser::FilterType::NUM_FILTERS);
 	ImGui::SliderInt("Filter Size", &params.filter_size, 0, 100);
 	ImGui::SliderFloat("Color Weight", &params.c_phi, 0.0f, 10.0f);

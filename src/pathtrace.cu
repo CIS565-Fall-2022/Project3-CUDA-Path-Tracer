@@ -676,7 +676,8 @@ void PathTracer::debugTexture(DebugTextureType type) {
 			tex
 		);
 #else
-		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, NormalizedRGBToRGBA());
+		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, 
+			PosToRGBA(hst_scene->world_AABB.min(), hst_scene->world_AABB.max()));
 #endif
 	} else {
 		texture_debug_active = false;

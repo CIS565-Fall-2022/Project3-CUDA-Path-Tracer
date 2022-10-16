@@ -426,6 +426,34 @@ namespace Denoiser {
 #undef FLATTEN
 	}
 
+	__global__ void kern_denoise_pure_blur(color_t* out, color_t* in, int step, ParamDesc desc) {
+		int x = (blockIdx.x * blockDim.x) + threadIdx.x;
+		int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+		int w = desc.res[0], h = desc.res[1];
+
+		if (x >= w || y >= h)
+			return;
+
+#define FLATTEN(i, j) (i + (j * w))
+		int idx = FLATTEN(x, y);
+		color_t cval = in[idx];
+		glm::vec3 sum(0, 0, 0);
+		float cum_w = 0.f;
+		for (ATrousFilter filter{ x,y,step,desc }; filter; ++filter) {
+			auto data = *filter;
+
+			idx = FLATTEN(data.nx, data.ny);
+			color_t ctmp = in[idx];
+
+			sum += ctmp * data.weight;
+			cum_w += data.weight;
+		}
+
+		idx = FLATTEN(x, y);
+		out[idx] = sum / cum_w;
+#undef FLATTEN
+	}
+
 	// wrapper that launches the denoiser
 	void denoise(color_t* denoise_image, DenoiseBuffers gbuf, ParamDesc desc) {
 		int buf_idx = 0;
@@ -434,16 +462,17 @@ namespace Denoiser {
 		bufs[buf_idx] = denoise_image;
 		ALLOC(bufs[1 - buf_idx], gbuf.size());
 
-#ifdef DENOISE_USE_DIFFUSE_MAP
-		// divide by diffuse map, i.e. demodulate
-		thrust::transform(
-			thrust::device,
-			bufs[buf_idx],
-			bufs[buf_idx] + gbuf.size(),
-			gbuf.get_diffuse(),
-			bufs[buf_idx],
-			Demodulate());
-#endif
+		if (desc.use_diffuse) {
+			// divide by diffuse map, i.e. demodulate
+			thrust::transform(
+				thrust::device,
+				bufs[buf_idx],
+				bufs[buf_idx] + gbuf.size(),
+				gbuf.get_diffuse(),
+				bufs[buf_idx],
+				Demodulate());
+		}
+
 		const dim3 block_size(8, 8);
 		const dim3 blocks_per_grid(
 			DIV_UP(desc.res[0], block_size.x),
@@ -474,21 +503,27 @@ namespace Denoiser {
 				buf_idx = 1 - buf_idx;
 			}
 			break;
+		case FilterType::BLUR:
+			for (int step = 1; step <= desc.filter_size; step <<= 1, desc.c_phi /= 2) {
+				kern_denoise_pure_blur KERN_PARAM(blocks_per_grid, block_size) (bufs[1 - buf_idx], bufs[buf_idx], step, desc);
+				checkCUDAError("denoise");
+				buf_idx = 1 - buf_idx;
+			}
 		default:
 			break;
 		}
 
-		
-#ifdef DENOISE_USE_DIFFUSE_MAP
-		// multiply by diffuse map, i.e. modulate
-		thrust::transform(
-			thrust::device,
-			bufs[buf_idx],
-			bufs[buf_idx] + gbuf.size(),
-			gbuf.get_diffuse(),
-			bufs[buf_idx],
-			Modulate());
-#endif
+		if (desc.use_diffuse) {
+			// multiply by diffuse map, i.e. modulate
+			thrust::transform(
+				thrust::device,
+				bufs[buf_idx],
+				bufs[buf_idx] + gbuf.size(),
+				gbuf.get_diffuse(),
+				bufs[buf_idx],
+				Modulate());
+		}
+
 		if (bufs[buf_idx] != denoise_image) {
 			D2D(denoise_image, bufs[buf_idx], gbuf.size());
 		}

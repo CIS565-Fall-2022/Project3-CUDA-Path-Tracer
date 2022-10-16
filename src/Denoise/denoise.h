@@ -39,6 +39,22 @@ struct NormalizedRGBToRGBA {
 			0);
 	}
 };
+
+struct PosToRGBA {
+	glm::vec3 min_pos, max_pos;
+	PosToRGBA(glm::vec3 min_pos, glm::vec3 max_pos) 
+		: min_pos(min_pos), max_pos(max_pos) { }
+	__device__ uchar4 operator()(glm::vec3 pos) const {
+		pos = (pos - min_pos) / (max_pos - min_pos);
+
+		return make_uchar4(
+			glm::clamp((int)(pos.x * 255.f), 0, 255),
+			glm::clamp((int)(pos.y * 255.f), 0, 255),
+			glm::clamp((int)(pos.z * 255.f), 0, 255),
+			0);
+	}
+};
+
 struct NormalToRGBA {
 	__device__ uchar4 operator()(glm::vec3 const& n) const {
 		// convert from the range [-1, 1] to [0, 1]
@@ -54,13 +70,15 @@ namespace Denoiser {
 	enum FilterType {
 		ATROUS,
 		GAUSSIAN,
+		BLUR,
 		NUM_FILTERS
 	};
 
 	struct ParamDesc {
 		ParamDesc(FilterType type, int filter_size, glm::ivec2 res, float c_phi, float n_phi, float p_phi)
-			: type(type), filter_size(filter_size), s_dev(7), res(res), c_phi(c_phi), n_phi(n_phi), p_phi(p_phi) { }
+			: use_diffuse(true), type(type), filter_size(filter_size), s_dev(7), res(res), c_phi(c_phi), n_phi(n_phi), p_phi(p_phi) { }
 
+		bool use_diffuse;
 		FilterType type;
 		int filter_size;
 		float s_dev; //standard deviation, only used by Gaussian
