@@ -560,7 +560,12 @@ int PathTracer::pathtrace(int iter) {
 				denoise_image,
 				RadianceToNormalizedRGB(cur_iter));
 
-			Denoiser::denoise(denoise_image, denoise_buffers, *denoise_params);
+			ProfileHelper denoise_profiling("denoise");
+			denoise_profiling.begin();
+			{
+				Denoiser::denoise(denoise_image, denoise_buffers, *denoise_params);
+			}
+			denoise_profiling.end();
 
 			thrust::transform(
 				thrust::device,

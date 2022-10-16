@@ -308,6 +308,77 @@ namespace Denoiser {
 	};
 
 
+	// processes a tile of TILE_SIZE x TILE_SIZE elements
+	// launch parameters:
+	// TILE_SIZE x TILE_SIZE threads per block
+	// DIV_UP(w, TILE_SIZE) x DIV_UP(h, TILE_SIZE) blocks
+
+	template<size_t TILE_SIZE_X, size_t TILE_SIZE_Y>
+	__global__ void kern_atrous_denoise_shared(color_t* out, color_t* in, DenoiseBuffers gbuf, int step, ParamDesc desc) {
+		__shared__ struct { 
+			color_t color;
+			glm::vec3 normal, pos;
+			float weight;
+		} smem_in[TILE_SIZE_X][TILE_SIZE_Y][25];
+
+		static constexpr float kernels[3] = { 3. / 8, 1. / 4, 1. / 16 };
+
+		int x = blockIdx.x * blockDim.x + threadIdx.x;
+		int y = blockIdx.y * blockDim.y + threadIdx.y;
+		int w = desc.res[0], h = desc.res[1];
+
+		// set up shared memory
+		if (x < w && y < h) {
+			for (int j = -2, k = 0; j <= 2; ++j) {
+				for (int i = -2; i <= 2; ++i) {
+					int idx = glm::clamp(x + i * step, 0, w - 1) + w * glm::clamp(y + j * step, 0, h - 1);
+
+					auto& data = smem_in[threadIdx.x][threadIdx.y][k];
+					data.color = in[idx];
+					data.normal = gbuf.get_normal(idx);
+					data.pos = gbuf.get_pos(idx);
+					data.weight = kernels[glm::min(glm::abs(i), glm::abs(j))];
+					
+					++k;
+				}
+			}
+		} else {
+			return;
+		}
+
+		int idx = x + y * w;
+		color_t cval = in[idx];
+		glm::vec3 nval = gbuf.get_normal(idx);
+		glm::vec3 pval = gbuf.get_pos(idx);
+		glm::vec3 sum(0, 0, 0);
+		float cum_w = 0.f;
+
+#pragma unroll 25
+		for (int i = 0; i < 25; ++i) {
+			auto const& data = smem_in[threadIdx.x][threadIdx.y][i];
+			color_t ctmp = data.color;
+			color_t t = cval - ctmp;
+
+			float dist2 = glm::dot(t, t);
+			float cw = glm::min(glm::exp(-dist2 / desc.c_phi), 1.f);
+			glm::vec3 ntmp = data.normal;
+			t = nval - ntmp;
+
+			dist2 = glm::max(glm::dot(t, t) / (step * step), 0.f);
+			float nw = glm::min(glm::exp(-dist2 / desc.n_phi), 1.f);
+			glm::vec3 ptmp = data.pos;
+			t = pval - ptmp;
+
+			dist2 = glm::dot(t, t);
+			float pw = glm::min(glm::exp(-dist2 / desc.p_phi), 1.f);
+			float weight = cw * nw * pw;
+
+			sum += ctmp * weight * data.weight;
+			cum_w += weight * data.weight;
+		}
+		out[idx] = sum / cum_w;
+	}
+
 	// reference: https://jo.dreggn.org/home/2010_atrous.pdf
 	template<typename FilterT>
 	__global__ void kern_denoise(color_t* out, color_t* in, DenoiseBuffers gbuf, int step, ParamDesc desc) {
@@ -373,7 +444,6 @@ namespace Denoiser {
 			bufs[buf_idx],
 			Demodulate());
 #endif
-
 		const dim3 block_size(8, 8);
 		const dim3 blocks_per_grid(
 			DIV_UP(desc.res[0], block_size.x),
@@ -382,7 +452,17 @@ namespace Denoiser {
 		switch (desc.type) {
 		case FilterType::ATROUS:
 			for (int step = 1; step <= desc.filter_size; step <<= 1, desc.c_phi /= 2) {
-				kern_denoise<ATrousFilter> KERN_PARAM(blocks_per_grid, block_size) (bufs[1 - buf_idx], bufs[buf_idx], gbuf, step, desc);
+#ifdef DENOISE_SHARED_MEM
+				const dim3 block_size(4, 8);
+				const dim3 blocks_per_grid(
+					DIV_UP(desc.res[0], block_size.x),
+					DIV_UP(desc.res[1], block_size.y));
+
+				kern_atrous_denoise_shared<4,8> KERN_PARAM(blocks_per_grid, block_size) (bufs[1 - buf_idx], bufs[buf_idx], gbuf, step, desc);
+#else
+				kern_denoise<ATrousFilter> KERN_PARAM(blocks_per_grid, block_size) (bufs[1 - buf_idx], bufs[buf_idx], gbuf, step, desc);			
+#endif
+
 				checkCUDAError("denoise");
 				buf_idx = 1 - buf_idx;
 			}
