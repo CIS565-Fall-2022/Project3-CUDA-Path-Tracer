@@ -5,10 +5,6 @@
 #include <cstring>
 #include <iostream>
 #include <ctime>
-
-std::string scene_files_dir = "../scenes/";
-std::string save_files_dir = "../saves/";
-
 // For camera controls
 static bool leftMousePressed = false;
 static bool rightMousePressed = false;
@@ -41,13 +37,6 @@ std::string currentTimeString() {
 //-------------------------------
 
 int main(int argc, char** argv) {
-
-#ifdef NO_DEFAULT_PATHS
-	std::cout << "Enter Scene Files Dir: \n";
-	std::cin >> scene_files_dir;
-	std::cout << "Enter Save Files Dir: \n";
-	std::cin >> save_files_dir;
-#endif // NO_DEFAULT_PATHS
 
 	height = width = 800;
 

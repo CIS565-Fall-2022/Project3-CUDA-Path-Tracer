@@ -7,12 +7,14 @@
 #include "image.h"
 
 #include "guiData.h"
+#include "guiFileDialog.h"
 
 #include "rendersave.h"
 #include "pathtrace.h"
 #include "Collision/DebugDrawer.h"
 #include "Octree/octree.h"
 #include "Denoise/denoise.h"
+
 
 GLuint positionLocation = 0;
 GLuint texcoordsLocation = 1;
@@ -208,16 +210,23 @@ void Preview::InitImguiData() {
 }
 
 static void RenderMainMenu() {
-	int lastScene;
+	static ImGui::FileDialogue scene_dialogue("Select Scene File", false, ".txt");
+	static ImGui::FileDialogue save_dialogue("Select Save Folder", true, ".sav");
+
+	std::string lastScene;
 	{
 		ImGui::Text("Traced Depth %d", guiData->traced_depth);
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
 		lastScene = guiData->cur_scene;
-		ImGui::Combo("Switch Scenes", &guiData->cur_scene, guiData->scene_file_names, guiData->num_scenes);
+		std::string filename;
+		if (ImGui::OpenFileDialogue(scene_dialogue, "Scene File: ", filename)) {
+			guiData->cur_scene = filename;
+			switchScene(filename.c_str());
+		}
 
 		if (ImGui::Button("Reload Scene")) {
-			switchScene(guiData->scene_file_names[guiData->cur_scene], true);
+			switchScene(guiData->cur_scene.c_str(), true);
 		}
 
 		if (PathTracer::isPaused()) {
@@ -229,26 +238,10 @@ static void RenderMainMenu() {
 				PathTracer::togglePause();
 			}
 		}
-		ImGui::Text(guiData->prompt_text);
-		ImGui::InputText("Save File Name", guiData->save_file_name_buf, sizeof(guiData->save_file_name_buf));
-		if (ImGui::Button("Save Render")) {
-			if (strlen(guiData->save_file_name_buf) == 0) {
-				guiData->prompt_text = "Please Enter a File Name";
-			} else {
-				static constexpr char const* illegals = "<>:\"/\\|?*";
-				bool has_illegal = false;
-				for (size_t i = 0; i < sizeof(illegals) && !has_illegal; ++i) {
-					if (strchr(guiData->save_file_name_buf, illegals[i]))
-						has_illegal = true;
-				}
 
-				if (has_illegal) {
-					guiData->prompt_text = "Please Enter a Valid File Name";
-				} else {
-					if (!PathTracer::saveRenderState(guiData->save_file_name_buf)) {
-						guiData->prompt_text = "Failed to Save! Some Error Occurred";
-					}
-				}
+		if (ImGui::OpenFileDialogue(save_dialogue, "Save File: ", filename)) {
+			if (!PathTracer::saveRenderState(filename.c_str())) {
+				std::cerr << "failed to save\n";
 			}
 		}
 
@@ -353,9 +346,7 @@ static void RenderMainMenu() {
 
 		ImGui::Text(info.c_str());
 	}
-	if (lastScene != guiData->cur_scene) {
-		switchScene(guiData->scene_file_names[guiData->cur_scene]);
-	}
+
 }
 
 static void RenderDenoiserMenu() {
@@ -472,6 +463,10 @@ static void RenderImGui() {
 /// </summary>
 void Preview::DoPreloadMenu() {
 	bool load_scene = false, load_save = false;
+	std::string scene_file, save_file;
+	ImGui::FileDialogue scene_dialogue("Select Scene File", false, ".txt");
+	ImGui::FileDialogue save_dialogue("Select Save File", false, ".sav");
+
 	while (!load_scene && !load_save && !glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
@@ -481,15 +476,8 @@ void Preview::DoPreloadMenu() {
 
 		ImGui::Begin("WELCOME", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 		{
-			ImGui::Combo("Scenes", &guiData->cur_scene, guiData->scene_file_names, guiData->num_scenes);
-			if (ImGui::Button("Load Scene")) {
-				load_scene = true;
-			}
-
-			ImGui::Combo("Saved Render Progress", &guiData->cur_save, guiData->save_file_names, guiData->num_saves);
-			if (ImGui::Button("Load Saved Render")) {
-				load_save = true;
-			}
+			load_scene = ImGui::OpenFileDialogue(scene_dialogue, "Scene File Name: ", scene_file);
+			load_save = ImGui::OpenFileDialogue(save_dialogue, "Save File Name: ", save_file);
 		}
 		ImGui::End();
 
@@ -507,21 +495,13 @@ void Preview::DoPreloadMenu() {
 
 	if (!glfwWindowShouldClose(window)) {
 		if (load_scene) {
-			if (guiData->num_scenes > 0) {
-				switchScene(guiData->scene_file_names[guiData->cur_scene]);
-			} else {
-				std::cout << "No Scene Found !!" << std::endl;
-				exit(1);
-			}
+			switchScene(scene_file.c_str());
+			guiData->cur_scene = std::move(scene_file);
+
 		} else {
-			if (guiData->num_saves > 0) {
-				int iter;
-				if (read_state(guiData->save_file_names[guiData->cur_save], iter, g_scene)) {
-					switchScene(g_scene, iter, true, true);
-				}
-			} else {
-				std::cout << "No Saves Found !!" << std::endl;
-				exit(1);
+			int iter;
+			if (read_state(save_file.c_str(), iter, g_scene)) {
+				switchScene(g_scene, iter, true, true);
 			}
 		}
 	} else {
