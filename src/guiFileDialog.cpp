@@ -138,7 +138,8 @@ void FileDialogue::FileDialogButton(char const* label) {
 	DoWindow();
 }
 
-bool ImGui::OpenFileDialogue(FileDialogue& dialogue, char const* label, std::string& result) {
+std::string ImGui::OpenFileDialogue(FileDialogue& dialogue, char const* label) {
+	std::string ret;
 	ImGui::Text(label);
 	ImGui::SameLine();
 	std::string id = "select file";
@@ -146,9 +147,8 @@ bool ImGui::OpenFileDialogue(FileDialogue& dialogue, char const* label, std::str
 	id += dialogue._name;
 	dialogue.FileDialogButton(id.c_str());
 	if (dialogue.Finished()) {
-		result = dialogue.GetPath();
+		ret = dialogue.GetPath();
 		dialogue.Reset();
-		return true;
 	}
-	return false;
+	return ret;
 }

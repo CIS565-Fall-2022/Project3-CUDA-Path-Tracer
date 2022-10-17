@@ -217,12 +217,14 @@ static void RenderMainMenu() {
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
 	lastScene = guiData->cur_scene;
-	std::string filename;
-	if (ImGui::OpenFileDialogue(guiData->scene_file_dialog, "Scene File: ", filename)) {
+	std::string filename = ImGui::OpenFileDialogue(guiData->scene_file_dialog, "Scene File: ");
+	if (filename.size()) {
 		guiData->cur_scene = filename;
 		switchScene(filename.c_str());
 	}
-	if (ImGui::OpenFileDialogue(guiData->save_file_dialog, "Save File: ", filename)) {
+
+	filename = ImGui::OpenFileDialogue(guiData->save_file_dialog, "Save File: ");
+	if (filename.size()) {
 		if (!PathTracer::saveRenderState(filename.c_str())) {
 			std::cerr << "failed to save\n";
 		}
@@ -261,7 +263,7 @@ static void RenderDenoiserMenu() {
 	ImGui::Checkbox("Denoise", &ops.is_on);
 	ImGui::Checkbox("Use Diffuse Map", &params.use_diffuse);
 	ImGui::Combo("Filter Type", (int*)&params.type, filter_options, Denoiser::FilterType::NUM_FILTERS);
-	ImGui::SliderInt("Filter Size", &params.filter_size, 0, 100);
+	ImGui::SliderInt("Filter Size", &params.filter_size, 3, 500);
 	ImGui::SliderFloat("Color Weight", &params.c_phi, 0.0f, 10.0f);
 	ImGui::SliderFloat("Normal Weight", &params.n_phi, 0.0f, 10.0f);
 	ImGui::SliderFloat("Position Weight", &params.p_phi, 0.0f, 10.0f);
@@ -271,8 +273,8 @@ static void RenderDenoiserMenu() {
 
 	ImGui::Separator();
 
-	std::string filename;
-	if (ImGui::OpenFileDialogue(guiData->img_file_dialog, "Select a Reference Image", filename)) {
+	std::string filename = ImGui::OpenFileDialogue(guiData->img_file_dialog, "Select a Reference Image");
+	if (filename.size()) {
 		guiData->ref_img = std::make_unique<Image>(filename);
 		guiData->ref_img_file = std::move(filename);
 	}
@@ -283,8 +285,18 @@ static void RenderDenoiserMenu() {
 		if (guiData->ref_img) {
 			DebugDrawer::DrawImage(guiData->ref_img_file.c_str(), 256, 256);
 			Image img1{ width, height, PathTracer::getPBO() };
-			float val = ImageUtils::CalculatePSNR(width * height, img1.getPixels(), guiData->ref_img->getPixels());
-			ImGui::Text("PSNR = %f db", val);
+
+			float mse_val = ImageUtils::CalculateMSE(width * height, img1.getPixels(), guiData->ref_img->getPixels());
+			float psnr_val = ImageUtils::CalculatePSNR(mse_val);
+			ImGui::Text("PSNR = %f, MSE = %f", psnr_val, mse_val);
+
+			std::string filename = ImGui::OpenFileDialogue(guiData->img_file_data_dialog, "Select A File to Save Data");
+			if (filename.size()) {
+				guiData->img_data_file = filename;
+			}
+			if (g_iteration % 100 == 0 && guiData->img_data_file.size()) {
+				utilityCore::CreateOrAppendCSV(guiData->img_data_file, g_iteration, psnr_val, mse_val);
+			}
 		} else {
 			ImGui::Text("No Reference Image");
 		}
@@ -477,7 +489,6 @@ static void RenderImGui() {
 	if (ImGui::CollapsingHeader("Debug")) {
 		RenderDebugMenu();
 	}
-
 	ImGui::End();
 
 	ImGui::Render();
@@ -488,12 +499,11 @@ static void RenderImGui() {
 /// renders a pre-scene load menu
 /// </summary>
 void Preview::DoPreloadMenu() {
-	bool load_scene = false, load_save = false;
 	std::string scene_file, save_file;
 	ImGui::FileDialogue scene_dialogue("Select Scene File", false, ".txt");
 	ImGui::FileDialogue save_dialogue("Select Save File", false, ".sav");
 
-	while (!load_scene && !load_save && !glfwWindowShouldClose(window)) {
+	while (scene_file.empty() && save_file.empty() && !glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
 		ImGui_ImplOpenGL3_NewFrame();
@@ -505,8 +515,8 @@ void Preview::DoPreloadMenu() {
 			ImGui::Text("Choose a Scene File or a Save File to continue");
 			ImGui::Separator();
 
-			load_scene = ImGui::OpenFileDialogue(scene_dialogue, "Scene File Name: ", scene_file);
-			load_save = ImGui::OpenFileDialogue(save_dialogue, "Save File Name: ", save_file);
+			scene_file = ImGui::OpenFileDialogue(scene_dialogue, "Scene File Name: ");
+			save_file = ImGui::OpenFileDialogue(save_dialogue, "Save File Name: ");
 		}
 		ImGui::End();
 
@@ -523,7 +533,7 @@ void Preview::DoPreloadMenu() {
 	}
 
 	if (!glfwWindowShouldClose(window)) {
-		if (load_scene) {
+		if (scene_file.size()) {
 			switchScene(scene_file.c_str());
 			guiData->cur_scene = std::move(scene_file);
 

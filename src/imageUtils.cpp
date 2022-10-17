@@ -6,6 +6,12 @@
 #include <algorithm>
 #include <numeric>
 
+void ImageUtils::SaveImage(Image const& img, std::string const& name) {
+    std::ostringstream ss;
+    ss << name << "." << currentTimeString() << "." << g_iteration << "samp";
+    img.savePNG(ss.str());
+}
+
 void ImageUtils::SaveImage(glm::vec3 const* src, std::string const& name, bool radiance) {
     float samples = g_iteration;
     // output image file
@@ -19,11 +25,7 @@ void ImageUtils::SaveImage(glm::vec3 const* src, std::string const& name, bool r
             img.setPixel(width - 1 - x, y, pix);
         }
     }
-
-    std::ostringstream ss;
-    ss << name << "." << currentTimeString() << "." << samples << "samp";
-
-    img.savePNG(ss.str());
+    SaveImage(img, name);
 }
 
 void ImageUtils::SaveImage(RenderState const* state) {
@@ -45,14 +47,16 @@ void ImageUtils::SaveImage(uchar4 const* pbo) {
 
 struct MSE_OP {
     float operator()(glm::vec3 const& lhs, glm::vec3 const& rhs) const {
-        return glm::length2(lhs - rhs);
+        return glm::length2((lhs - rhs) * 255.f);
     }
 };
 float ImageUtils::CalculateMSE(int size, glm::vec3 const* img1, glm::vec3 const* img2) {
     return (1.f / size) * std::inner_product(img1, img1 + size, img2, 0, std::plus<float>(), MSE_OP());
 }
 float ImageUtils::CalculatePSNR(int size, glm::vec3 const* img1, glm::vec3 const* img2) {
-    float mse = CalculateMSE(size, img1, img2);
+    return CalculatePSNR(CalculateMSE(size, img1, img2));
+}
+float ImageUtils::CalculatePSNR(float mse) {
     if (glm::abs(mse) <= EPSILON) {
         return 100.f; // no noise
     }

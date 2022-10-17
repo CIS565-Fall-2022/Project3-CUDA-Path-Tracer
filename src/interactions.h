@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "intersections.cuh"
 #include "utilities.h"
 #include <thrust/random.h>

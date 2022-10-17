@@ -24,6 +24,7 @@
 	- [G Buffer](#g-buffer)
 	- [G Buffer Optimization](#g-buffer-optimization)
 	- [Performance Analysis](#performance-analysis)
+	- [How Good is the Denoiser?](#how-good-is-the-denoiser)
 - [Anti-aliasing](#anti-aliasing)
 - [Mesh Loading and Texture Mapping](#mesh-loading-and-texture-mapping)
 	- [Diffuse Texture Mapping](#diffuse-texture-sampling)
@@ -95,7 +96,7 @@
 |`PROFILE`|record profiling information and display it in GUI|
 |`DENOISE`|use denoiser|
 |`DENOISE_GBUF_OPTIMIZATION`|use g-buffer optimization for the denoiser|
-|`DENOISE_IMG_COMP`|compute and display in GUI the image distance as a measure of how visually accptable a denoised is|
+
 
 ## Physically-based Rendering
 - I heavily referenced [Physically Based Rendering: From Theory to Implementation](https://pbrt.org/) when writing the shading code.
@@ -167,11 +168,30 @@
 	- Tested on Windows 10, i7-8700 @ 3.20 GHz 16GB, RTX 2070
 	- Time per SPP is an average value over 100 iterations
 	- Filter Size is set to 60, all weights to 0.5
+	- Time refers to the total time that the relevant kernels have been running on GPU; CPU operations in the interim are not measured.
 
+#### Filter Size vs. Denoising Time
+![](./img/Denoise/chart2.png)
+- The number of applications of the A-trous filter has a logarithmic time complexity w.r.t. the desired filter size, so the denoising kernel stays performant despite the increasing filter size.
+
+#### A-trous Filter vs. Gaussian Filter vs. No Denoising
 ![](./img/Denoise/chart1.png)
 - As shown, A-trous adds around 12ms to the SPP time. It is a significant improvement on the Gaussian filter it approximates.
 - The reason why Gaussian filter is so slow is that it has an O(n<sup>2</sup>) time complexity w.r.t. the filter size, whereas A-trous does a constant amount of work per iteration. To illustrate this, consider the simple 1D case below:
 ![](./img/Denoise/pa1.png)
+
+### How Good is the Denoiser?
+- To measure how "smooth" the image is after denoising, I used Peak Signal-to-Noise Ratio (abbr. PSNR). It can be defined in terms of Mean Square Error (MSE) as shown:
+$$
+\mathrm{MSE}\left( S,R \right) =\frac{1}{N}\sum_{i=0}^{n-1}{\left( S_i-R_i \right) ^2}
+\\
+\mathrm{PSNR}\left( S,R \right) =10\log _{10}\left( \frac{255^2}{\mathrm{MSE}\left( S,R \right)} \right) 
+$$
+
+- I have incorporated the functionality of measuring PSNR interactively through ImGui. Below is a simple demo of how to do it.
+![](./img/Denoise/PSNR/psnr_demo.gif)
+- Given a reference image of 20000 SPP (ground truth), the following charts shows how the quality of image changes (1) over time, (2) over increasing filter size.
+
 
 ## Anti-aliasing
 - Stochastic Anti-aliasing is used to reduce aliasing artifacts.

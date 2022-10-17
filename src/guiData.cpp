@@ -13,6 +13,7 @@ GuiDataContainer::GuiDataContainer() :
     scene_file_dialog("Select Scene File", false, ".txt"),
     save_file_dialog("Select Save File", true, ".sav"),
     img_file_dialog("Select Image File", false),
+    img_file_data_dialog("Select Save File", true, ".csv"),
     buf_id(0)
 {
     denoiser_options.is_on = false;
@@ -42,5 +43,14 @@ void GuiDataContainer::Reset() {
 GuiDataContainer::~GuiDataContainer() {
     if (test_tree) {
         delete test_tree;
+    }
+}
+
+void GuiDataContainer::OpenFileDialogue(char const* label, bool dirmode, char const* ext) {
+    NextBuf<ImGui::FileDialogue>(label, dirmode, ext);
+    std::string tmp = ImGui::OpenFileDialogue(CurBufData<ImGui::FileDialogue>(), label);
+    if (tmp.size()) {
+        NextBuf<std::string>(tmp);
+        std::cout << CurBufData<std::string>() << std::endl;
     }
 }

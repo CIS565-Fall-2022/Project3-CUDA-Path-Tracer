@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <istream>
 #include <ostream>
+#include <fstream>
 #include <iostream>
 #include <iterator>
 #include <sstream>
@@ -159,4 +160,15 @@ namespace utilityCore {
     std::string convertIntToString(int number);
     std::istream& safeGetline(std::istream& is, std::string& t); //Thanks to http://stackoverflow.com/a/6089413
     std::istream& peekline(std::istream& is, std::string& t);
+
+    template<typename Arg, typename... Args>
+    void CreateOrAppendCSV(std::string const& filename, Arg&& arg, Args&&... args) {
+        std::ofstream fout(filename, std::ios_base::app);
+        fout << std::forward<Arg>(arg);
+        using expander = int[];
+        (void)expander {
+            0, (void(fout << ',' << std::forward<Args>(args)), 0)...
+        };
+        fout << std::endl;
+    }
 }

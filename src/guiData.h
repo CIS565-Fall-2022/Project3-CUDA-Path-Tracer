@@ -25,7 +25,9 @@ public:
     ImGui::FileDialogue scene_file_dialog;
     ImGui::FileDialogue save_file_dialog;
     ImGui::FileDialogue img_file_dialog;
+    ImGui::FileDialogue img_file_data_dialog;
 
+    std::string img_data_file;
     std::string ref_img_file;
     std::unique_ptr<Image> ref_img;
 
@@ -45,7 +47,7 @@ public:
     void NextBuf(Args&&... args) {
         if (buf_id >= bufs.size()) {
             bufs.emplace_back(new T(std::forward<Args>(args)...));
-            default_bufs.emplace_back(sizeof(T), new T(std::forward<Args>(args)...));
+            default_bufs.emplace_back(sizeof(T), new T(*std::static_pointer_cast<T>(bufs.back())));
         }
         ++buf_id;
     }
@@ -54,4 +56,10 @@ public:
     std::shared_ptr<T> CurBuf() const { 
         return std::static_pointer_cast<T>(bufs[buf_id-1]);
     }
+    template<typename T>
+    T& CurBufData() const {
+        return *CurBuf<T>();
+    }
+
+    void OpenFileDialogue(char const* label, bool dirmode, char const* ext);
 };

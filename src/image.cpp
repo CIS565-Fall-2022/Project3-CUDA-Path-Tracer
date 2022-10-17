@@ -14,11 +14,14 @@ Image::Image(int x, int y) :
 
 Image::Image(std::string const& file) {
     int comp;
-    float* data = stbi_loadf(file.c_str(), &xSize, &ySize, &comp, 3);
+    unsigned char* data = stbi_load(file.c_str(), &xSize, &ySize, &comp, 3);
     pixels = new glm::vec3[size_t(xSize) * ySize];
 
-    for (size_t i = 2; i < size_t(xSize) * ySize * 3; i += 3) {
-        pixels[i / 3] = glm::vec3(data[i - 2], data[i - 1], data[i]);
+    for (int x = 0; x < xSize; ++x) {
+        for (int y = 0; y < ySize; ++y) {
+            int i = x + y * xSize;
+            setPixel(xSize - 1 - x, y, glm::vec3(data[3 * i], data[3 * i + 1], data[3 * i + 2]) / 255.f);
+        }
     }
     stbi_image_free(data);
 }
@@ -28,13 +31,17 @@ Image::Image(int x, int y, uchar4 const* dev_img) :
     ySize(y),
     pixels(new glm::vec3[size_t(x) * y])
 {
-    uchar4* tmp = new uchar4[size_t(x) * y];
-    D2H(tmp, dev_img, size_t(x) * y);
-    for (size_t i = 0; i < size_t(x) * y; ++i) {
-        pixels[i] = glm::vec3(tmp[i].x / 255.f, tmp[i].y / 255.f, tmp[i].z / 255.f);
+    uchar4* data = new uchar4[size_t(x) * y];
+    D2H(data, dev_img, size_t(x) * y);
+
+    for (int x = 0; x < xSize; ++x) {
+        for (int y = 0; y < ySize; ++y) {
+            int i = x + y * xSize;
+            setPixel(x, y, glm::vec3(data[i].x, data[i].y, data[i].z) / 255.f);
+        }
     }
 
-    delete[] tmp;
+    delete[] data;
 }
 
 Image::~Image() {
@@ -46,7 +53,7 @@ void Image::setPixel(int x, int y, const glm::vec3 &pixel) {
     pixels[(y * xSize) + x] = pixel;
 }
 
-void Image::savePNG(const std::string &baseFilename) {
+void Image::savePNG(const std::string &baseFilename) const {
     unsigned char *bytes = new unsigned char[3 * size_t(xSize) * ySize];
     for (int y = 0; y < ySize; y++) {
         for (int x = 0; x < xSize; x++) { 
@@ -65,7 +72,7 @@ void Image::savePNG(const std::string &baseFilename) {
     delete[] bytes;
 }
 
-void Image::saveHDR(const std::string &baseFilename) {
+void Image::saveHDR(const std::string &baseFilename) const {
     std::string filename = baseFilename + ".hdr";
     stbi_write_hdr(filename.c_str(), xSize, ySize, 3, (const float *) pixels);
     std::cout << "Saved " + filename + "." << std::endl;

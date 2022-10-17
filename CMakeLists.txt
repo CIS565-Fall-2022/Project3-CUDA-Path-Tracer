@@ -85,6 +85,7 @@ set(headers
     src/guiData.h
     src/guiFileDialog.h
     src/camState.h
+    src/imageUtils.h
 
     src/ImGui/imconfig.h
 	src/ImGui/imgui.h
@@ -116,6 +117,7 @@ set(sources
 
     src/guiData.cpp
     src/guiFileDialog.cpp
+    src/imageUtils.cpp
 
     src/pathtrace.cu
 

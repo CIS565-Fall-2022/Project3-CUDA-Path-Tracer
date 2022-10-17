@@ -31,10 +31,9 @@ namespace ImGui {
 		std::string GetPath() const;
 		void FileDialogButton(char const* label);
 
-		friend bool OpenFileDialogue(FileDialogue& dialogue, char const* label, std::string& result);
+		friend std::string OpenFileDialogue(FileDialogue& dialogue, char const* label);
 	};
-
-	bool OpenFileDialogue(FileDialogue& dialogue, char const* label, std::string& result);
+	std::string OpenFileDialogue(FileDialogue& dialogue, char const* label);
 };
 
 #endif // !GUI_FILE_DIALOG
