@@ -21,3 +21,6 @@
 // Texture setting
 #define ENABLE_TEXTURE 1
 #define ENABLE_NORMAL_MAP 1
+
+// Denoiser
+#define ENABLE_NOISER 1

@@ -143,6 +143,10 @@ static LinearBVHNode* dev_bvhNodes = NULL;
 static TextureInfo* dev_skyBbxTexture = NULL;
 static glm::vec3* dev_skyboxPixels = NULL;
 
+// Denoiser
+static glm::vec3* dev_bufferPos = NULL;
+static glm::vec3* dev_bufferNor = NULL;
+
 // Cache first bounce
 #if CACHE_FIRST_INTERSECTIONS
 static ShadeableIntersection* dev_intersectionsCache = NULL;
@@ -156,8 +160,8 @@ void InitDataContainer(GuiDataContainer* imGuiData)
 	guiData = imGuiData;
 }
 
-// ============== Texture related =====================
 
+// ============== Texture related =====================
 void LoadTexturesToDevice(Scene* scene)
 {
     std::cout << "Load Textures to device starts..." << std::endl;
@@ -259,7 +263,6 @@ void LoadTexturesToDevice(Scene* scene)
 
     std::cout << "Load texture to device done" << std::endl;
 }
-
 void FreeTextures()
 {
     std::cout << "Free Texures " << std::endl;
@@ -274,7 +277,6 @@ void FreeTextures()
     cudaFree(dev_normals);
 #endif
 }
-
 __host__ __device__ int getTextureElementIndex(const TextureInfo&tex, glm::vec2 uv)
 {
     // UV to pixel space
@@ -286,12 +288,10 @@ __host__ __device__ int getTextureElementIndex(const TextureInfo&tex, glm::vec2 
 
     return pixelIndex + tex.startIndex;
 }
-
-
 // ====================================================
 
-// ============== BVH related =========================
 
+// ============== BVH related =========================
 void LoadBVHToDevice(Scene* scene)
 {
     std::cout << "Loading BVH nodes to device." << std::endl;
@@ -303,7 +303,6 @@ void LoadBVHToDevice(Scene* scene)
     cudaMalloc((void**)&dev_bvhIndexArrayToUse, BVH_INTERSECT_STACK_SIZE * pixelCount * sizeof(int));
     cudaMemset(dev_bvhIndexArrayToUse, -1, BVH_INTERSECT_STACK_SIZE * pixelCount * sizeof(int));
 }
-
 void FreeBVH()
 {
     std::cout << "Free BVH" << std::endl;
@@ -311,9 +310,10 @@ void FreeBVH()
     cudaFree(dev_bvhNodes);
     cudaFree(dev_bvhIndexArrayToUse);
 }
-
 // ====================================================
 
+
+// ============== Skybox related=======================
 void LoadSkyboxTextureToDevice(Scene* scene)
 {
     int width, height, channels;
@@ -352,12 +352,21 @@ void LoadSkyboxTextureToDevice(Scene* scene)
 
     std::cout << "Skybox texture [" << scene->skyboxId << "] loaded." << std::endl;
 }
-
 void FreeSkyboxTexure()
 {
     cudaFree(dev_skyBbxTexture);
     cudaFree(dev_skyboxPixels);
 }
+// ====================================================
+
+
+// ============== Denoiser related =========================
+void denoise(Scene* scene, float c_phi, float n_phi, float p_phi, float filterSize)
+{
+
+}
+// ====================================================
+
 
 void pathtraceInit(Scene* scene) {
 	hst_scene = scene;
@@ -388,12 +397,11 @@ void pathtraceInit(Scene* scene) {
 
     cudaMalloc((void**)&dev_triangles, scene->triangles.size() * sizeof(Triangle));
     cudaMemcpy(dev_triangles, scene->triangles.data(), scene->triangles.size() * sizeof(Triangle), cudaMemcpyHostToDevice);
-    //std::cout << "copy [" << scene->triangles.size() << "] triangles to device" << std::endl;
-
-    //for (int i = 0; i < scene->geoms.size(); ++i)
-    //{
-    //    std::cout << "geom bvh start index = " << scene->geoms[i].bvhNodeStartIndex << std::endl;
-    //}
+    
+#if ENABLE_DENOISER
+    cudaMalloc((void**)&dev_bufferPos, pixelcount * sizeof(glm::vec3));
+    cudaMalloc((void**)&dev_bufferNor, pixelcount * sizeof(glm::vec3));
+#endif
 
 	checkCUDAError("pathtraceInit");
 }
@@ -415,6 +423,11 @@ void pathtraceFree() {
 #endif
 
     cudaFree(dev_triangles);
+
+#if ENABLE_DENOISER
+    cudaFree(dev_bufferPos);
+    cudaFree(dev_bufferNor);
+#endif
 
 	checkCUDAError("pathtraceFree");
 }
@@ -574,6 +587,8 @@ __global__ void shadeFakeMaterial(
     , glm::vec3* normals
     , TextureInfo* skyboxInfo
     , glm::vec3* skyboxPixels
+    , glm::vec3* bufferPos  // For denoiser
+    , glm::vec3* bufferNor
 )
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -649,7 +664,16 @@ __global__ void shadeFakeMaterial(
                     }
 
                     // Model space to world space
-                    normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(normal, 0.f)));
+                    normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(normal, 0.f)));      
+                }
+#endif
+
+#if ENABLE_DENOISER
+                // Gather pos and nor at first bounce
+                if (depth == 0)
+                {
+                    bufferPos[pathSegments[idx].pixelIndex] = intersect;
+                    bufferNor[pathSegments[idx].pixelIndex] = normal;
                 }
 #endif
 
@@ -672,6 +696,15 @@ __global__ void shadeFakeMaterial(
 #endif
             pathSegments[idx].remainingBounces = -1;
         }
+
+
+
+        if (iter == 1)
+        {
+
+        }
+
+#endif
     }
 }
 
