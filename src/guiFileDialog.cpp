@@ -31,6 +31,10 @@ void FileDialogue::DoWindow() {
 	}
 	Scope _{ImGui::End};
 	if (ImGui::Begin(_name, &_is_open, ImGuiWindowFlags_AlwaysAutoResize)) {
+		{
+			std::string tmp = _result.string();
+			ImGui::Text("Currently Selected:\n %s", _result.empty() ? "None" : tmp.c_str());
+		}
 
 		if (IsDirectoryMode()) {
 			ImGui::InputText("Enter File Name", _buf, 256);
@@ -100,7 +104,7 @@ bool FileDialogue::HasResult() const {
 	if (IsDirectoryMode()) {
 		return fs::is_directory(_result) && strlen(_buf);
 	}
-	return _result.has_extension() && _result.has_filename() && _result.extension() == _ext;
+	return _result.has_extension() && _result.has_filename() && (_ext.empty() || _result.extension() == _ext);
 }
 bool FileDialogue::Finished() const {
 	return HasResult() && _finished;

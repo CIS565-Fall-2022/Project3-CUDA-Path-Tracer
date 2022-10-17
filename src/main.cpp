@@ -2,9 +2,12 @@
 #include "preview.h"
 #include "Collision/DebugDrawer.h"
 #include "consts.h"
+#include "imageUtils.h"
+
 #include <cstring>
 #include <iostream>
 #include <ctime>
+
 // For camera controls
 static bool leftMousePressed = false;
 static bool rightMousePressed = false;
@@ -167,7 +170,7 @@ void runCuda() {
 		PathTracer::endFrame();
 	} else {
 		PathTracer::endFrame();
-		saveImage(g_renderState);
+		ImageUtils::SaveImage(g_renderState);
 		PathTracer::pathtraceFree(nullptr);
 		cudaDeviceReset();
 		exit(EXIT_SUCCESS);
@@ -180,12 +183,12 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 	if (action == GLFW_PRESS) {
 		switch (key) {
 		case GLFW_KEY_ESCAPE:
-			saveImage(g_renderState);
+			ImageUtils::SaveImage(g_renderState);
 			glfwSetWindowShouldClose(window, GL_TRUE);
 			break;
 		case GLFW_KEY_S:
 			if (!Preview::CapturingMouse() && !Preview::CapturingKeyboard()) {
-				saveImage(g_renderState);
+				ImageUtils::SaveImage(g_renderState);
 			}
 			break;
 		case GLFW_KEY_SPACE:

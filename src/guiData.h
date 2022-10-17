@@ -1,43 +1,57 @@
 #pragma once
 #include "Denoise/denoise.h"
+#include "guiFileDialog.h"
 #include <vector>
 #include <string>
 
 class octree;
+class Image;
+
 class GuiDataContainer
 {
 public:
     static constexpr int BUF_SIZE = 256;
-private:
-    struct TextBuf {
-        char* data;
-        TextBuf() { data = new char[BUF_SIZE]; memset(data, 0, sizeof(*data) * BUF_SIZE); }
-        ~TextBuf() { delete[] data; }
-    };
-public:
     GuiDataContainer();
     ~GuiDataContainer();
     void Reset();
-    void ClearBuf();
-    char* NextBuf();
 
-    bool hide_gui;
     int traced_depth;
-    bool draw_coord_frame;
-    bool draw_debug_aabb;
-    bool draw_world_aabb;
-    bool draw_GPU_tree;
     int octree_depth;
     int octree_depth_filter;
     int octree_intersection_cnt;
     octree* test_tree;
     Denoiser::ParamDesc desc;
+    
+    ImGui::FileDialogue scene_file_dialog;
+    ImGui::FileDialogue save_file_dialog;
+    ImGui::FileDialogue img_file_dialog;
+
+    std::string ref_img_file;
+    std::unique_ptr<Image> ref_img;
 
     std::string cur_scene;
-    std::vector<TextBuf> char_bufs;
 
     struct {
-        bool is_on;    
+        bool is_on;
         int debug_tex_idx;
     } denoiser_options;
+
+    // this allows us to create bufs in a completely generic way
+    std::vector<std::shared_ptr<void>> bufs;
+    std::vector<std::pair<int, std::shared_ptr<void>>> default_bufs;
+    int buf_id;
+    void ResetBuf() { buf_id = 0; }
+    template<typename T, typename... Args>
+    void NextBuf(Args&&... args) {
+        if (buf_id >= bufs.size()) {
+            bufs.emplace_back(new T(std::forward<Args>(args)...));
+            default_bufs.emplace_back(sizeof(T), new T(std::forward<Args>(args)...));
+        }
+        ++buf_id;
+    }
+
+    template<typename T>
+    std::shared_ptr<T> CurBuf() const { 
+        return std::static_pointer_cast<T>(bufs[buf_id-1]);
+    }
 };

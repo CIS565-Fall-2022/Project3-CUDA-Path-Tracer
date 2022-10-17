@@ -4,34 +4,31 @@
 #include <algorithm>
 
 GuiDataContainer::GuiDataContainer() :
-    hide_gui(false),
     traced_depth(0),
-    draw_coord_frame(false),
-    draw_debug_aabb(false),
-    draw_world_aabb(false),
-    draw_GPU_tree(false),
     octree_depth(0),
     octree_depth_filter(-1),
     octree_intersection_cnt(0),
     test_tree(nullptr),
-    desc(Denoiser::FilterType::ATROUS, glm::min(60, width), glm::ivec2(width, height), 0.5f, 0.5f, 0.5f)
+    desc(Denoiser::FilterType::ATROUS, glm::min(60, width), glm::ivec2(width, height), 0.5f, 0.5f, 0.5f),
+    scene_file_dialog("Select Scene File", false, ".txt"),
+    save_file_dialog("Select Save File", true, ".sav"),
+    img_file_dialog("Select Image File", false),
+    buf_id(0)
 {
     denoiser_options.is_on = false;
     denoiser_options.debug_tex_idx = 0;
 }
-void GuiDataContainer::ClearBuf() {
-    char_bufs.clear();
-}
-char* GuiDataContainer::NextBuf() {
-    char_bufs.emplace_back();
-    return char_bufs.back().data;
-}
 void GuiDataContainer::Reset() {
-    ClearBuf();
+    for (int i = 0; i < bufs.size(); ++i) {
+        memcpy(bufs[i].get(), default_bufs[i].second.get(), default_bufs[i].first);
+    }
+    ResetBuf();
+
+    ref_img_file.clear();
+    ref_img = nullptr;
     denoiser_options.is_on = false;
     denoiser_options.debug_tex_idx = 0;
 
-    draw_coord_frame = draw_world_aabb = draw_debug_aabb = false;
     octree_depth = 0;
     octree_depth_filter = -1;
     octree_intersection_cnt = 0;

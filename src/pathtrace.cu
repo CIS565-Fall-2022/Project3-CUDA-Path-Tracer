@@ -76,10 +76,10 @@ static MeshInfo dev_mesh_info;
 
 static std::vector<TextureGPU> dev_texs;
 
-static octree* tree;
-static octreeGPU dev_tree;
+static std::unique_ptr<octree> tree;
+static std::unique_ptr<octreeGPU> dev_tree;
 
-static GLuint s_pbo_id = -1;
+static GLuint s_pbo_id = 0;
 static uchar4* s_pbo_dptr = nullptr;
 
 // pathtracer state
@@ -147,8 +147,8 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state, bool force_chan
 		}
 		dev_mesh_info.texs = make_span(dev_texs);
 #ifdef OCTREE_CULLING
-		tree = new octree(*scene, scene->world_AABB, OCTREE_DEPTH);
-		dev_tree.init(*tree, dev_mesh_info, dev_geoms);
+		tree = std::make_unique<octree>(*scene, scene->world_AABB, OCTREE_DEPTH);
+		dev_tree = std::make_unique<octreeGPU>(*tree, dev_mesh_info, dev_geoms);
 #endif // OCTREE_CULLING
 	}
     checkCUDAError("pathtraceInit");
@@ -182,11 +182,6 @@ void PathTracer::pathtraceFree(Scene* scene, bool force_change) {
 		}
 		dev_texs.clear();
 		FREE(dev_mesh_info.texs);
-
-#ifdef OCTREE_CULLING
-		dev_tree.free();
-		delete tree;
-#endif
 	}
     checkCUDAError("pathtraceFree");
 }
@@ -487,7 +482,7 @@ int PathTracer::pathtrace(int iter) {
 				dev_inters,
 				dev_mesh_info,
 				dev_cached_inters,
-				dev_tree
+				*dev_tree
 			);
 
 			checkCUDAError(std::string("trace one bounce, inters size = " +
@@ -617,7 +612,7 @@ void PathTracer::disableDenoise() {
 	enable_denoise = false;
 }
 octreeGPU PathTracer::getTree() {
-	return dev_tree;
+	return *dev_tree;
 }
 uchar4 const* PathTracer::getPBO() {
 	return s_pbo_dptr;

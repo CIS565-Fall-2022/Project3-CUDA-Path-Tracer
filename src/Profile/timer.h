@@ -23,7 +23,8 @@ namespace Profiling {
             return oss.str();
         }
         void clear() {
-            cur_time = tot_time = num_times = 0;
+            cur_time = tot_time = 0.f;
+            num_times = 0;
         }
     };
 

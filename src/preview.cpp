@@ -5,6 +5,7 @@
 #include "ImGui/imgui_impl_glfw.h"
 #include "ImGui/imgui_impl_opengl3.h"
 #include "image.h"
+#include "imageUtils.h"
 
 #include "guiData.h"
 #include "guiFileDialog.h"
@@ -15,6 +16,7 @@
 #include "Octree/octree.h"
 #include "Denoise/denoise.h"
 
+#include <thrust/execution_policy.h>
 
 GLuint positionLocation = 0;
 GLuint texcoordsLocation = 1;
@@ -210,143 +212,33 @@ void Preview::InitImguiData() {
 }
 
 static void RenderMainMenu() {
-	static ImGui::FileDialogue scene_dialogue("Select Scene File", false, ".txt");
-	static ImGui::FileDialogue save_dialogue("Select Save Folder", true, ".sav");
-
 	std::string lastScene;
-	{
-		ImGui::Text("Traced Depth %d", guiData->traced_depth);
-		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	ImGui::Text("Traced Depth %d", guiData->traced_depth);
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-		lastScene = guiData->cur_scene;
-		std::string filename;
-		if (ImGui::OpenFileDialogue(scene_dialogue, "Scene File: ", filename)) {
-			guiData->cur_scene = filename;
-			switchScene(filename.c_str());
-		}
-
-		if (ImGui::Button("Reload Scene")) {
-			switchScene(guiData->cur_scene.c_str(), true);
-		}
-
-		if (PathTracer::isPaused()) {
-			if (ImGui::Button("Resume Render")) {
-				PathTracer::togglePause();
-			}
-		} else {
-			if (ImGui::Button("Pause Render")) {
-				PathTracer::togglePause();
-			}
-		}
-
-		if (ImGui::OpenFileDialogue(save_dialogue, "Save File: ", filename)) {
-			if (!PathTracer::saveRenderState(filename.c_str())) {
-				std::cerr << "failed to save\n";
-			}
-		}
-
-		//DebugDrawer::DrawRect(0, 0, 20, 20, { 0,0,1 });
-		//DebugDrawer::DrawRect(width - 20, height - 20, 20, 20, { 0,0,1 });
-		if (!guiData->draw_coord_frame) {
-			if (ImGui::Button("[DEBUG] Draw World Frame")) {
-				guiData->draw_coord_frame = true;
-			}
-		} else {
-			if (ImGui::Button("[DEBUG] Don't draw World Frame")) {
-				guiData->draw_coord_frame = false;
-			}
-		}
-		if (!guiData->draw_debug_aabb) {
-			if (ImGui::Button("[DEBUG] Draw AABB")) {
-				guiData->draw_debug_aabb = true;
-			}
-		} else {
-			if (ImGui::Button("[DEBUG] Don't draw AABB")) {
-				guiData->draw_debug_aabb = false;
-			}
-		}
-		if (!guiData->draw_world_aabb) {
-			if (ImGui::Button("[DEBUG] Draw World AABB")) {
-				guiData->draw_world_aabb = true;
-			}
-		} else {
-			if (ImGui::Button("[DEBUG] Don't draw World AABB")) {
-				guiData->draw_world_aabb = false;
-			}
-		}
-
-		ImGui::Text("Octree Test");
-		{
-			ImGui::SliderInt("Octree Depth", &guiData->octree_depth, 0, 20);
-			if (ImGui::Button("Generate Octree")) {
-				if (guiData->test_tree) {
-					delete guiData->test_tree;
-					guiData->test_tree = nullptr;
-				}
-
-				guiData->test_tree = new octree(*g_scene, g_scene->world_AABB, guiData->octree_depth);
-			}
-			if (ImGui::Button("Pull Octree From GPU")) {
-				if (guiData->test_tree) {
-					delete guiData->test_tree;
-					guiData->test_tree = nullptr;
-				}
-
-				guiData->test_tree = new octree(PathTracer::getTree());
-			}
-			if (guiData->test_tree) {
-				if (ImGui::Button("Destroy Octree")) {
-					delete guiData->test_tree;
-					guiData->test_tree = nullptr;
-				}
-			}
+	lastScene = guiData->cur_scene;
+	std::string filename;
+	if (ImGui::OpenFileDialogue(guiData->scene_file_dialog, "Scene File: ", filename)) {
+		guiData->cur_scene = filename;
+		switchScene(filename.c_str());
+	}
+	if (ImGui::OpenFileDialogue(guiData->save_file_dialog, "Save File: ", filename)) {
+		if (!PathTracer::saveRenderState(filename.c_str())) {
+			std::cerr << "failed to save\n";
 		}
 	}
-
-	if (guiData->draw_coord_frame) {
-		float x = g_scene->world_AABB.min().x + 1.f;
-		float y = g_scene->world_AABB.min().y + 1.f;
-		glm::vec3 origin{ x, y, 0 };
-		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(2, 0, 0), { 1,0,0 });
-		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(0, 2, 0), { 0,1,0 });
-		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(0, 0, 2), { 0,0,1 });
+	if (ImGui::Button("Reload Scene")) {
+		switchScene(guiData->cur_scene.c_str(), true);
 	}
-	if (guiData->draw_debug_aabb) {
-		for (Geom const& g : g_scene->geoms) {
-			if (g.type == MESH) {
-				DebugDrawer::DrawAABB(g.bounds, { 1,0,0 });
-			}
+	if (PathTracer::isPaused()) {
+		if (ImGui::Button("Resume Render")) {
+			PathTracer::togglePause();
+		}
+	} else {
+		if (ImGui::Button("Pause Render")) {
+			PathTracer::togglePause();
 		}
 	}
-	if (guiData->draw_world_aabb) {
-		DebugDrawer::DrawAABB(g_scene->world_AABB, { 0,0,1 });
-	}
-
-	if (guiData->test_tree) {
-		if (ImGui::Button("Clear Depth Filter")) {
-			if (guiData->octree_depth_filter != -1) {
-				guiData->octree_depth_filter = -1;
-			}
-		}
-		ImGui::SliderInt("Set Depth Filter (-1 means no)", &guiData->octree_depth_filter, -1, guiData->octree_depth);
-		guiData->octree_intersection_cnt = 0;
-		guiData->test_tree->dfs([&](node const& node, int depth) {
-			if (guiData->octree_depth_filter != -1) {
-				if (guiData->octree_depth_filter == depth) {
-					DebugDrawer::DrawAABB(node.bounds, { 0,1,0 });
-					guiData->octree_intersection_cnt += node.leaf_infos.size();
-				}
-			} else {
-				DebugDrawer::DrawAABB(node.bounds, { 0,1,0 });
-				guiData->octree_intersection_cnt += node.leaf_infos.size();
-			}
-		});
-		std::string info = "intersection cnt: " + std::to_string(guiData->octree_intersection_cnt) +
-			"\ntotal triangles: " + std::to_string(g_scene->triangles.size());
-
-		ImGui::Text(info.c_str());
-	}
-
 }
 
 static void RenderDenoiserMenu() {
@@ -379,6 +271,24 @@ static void RenderDenoiserMenu() {
 
 	ImGui::Separator();
 
+	std::string filename;
+	if (ImGui::OpenFileDialogue(guiData->img_file_dialog, "Select a Reference Image", filename)) {
+		guiData->ref_img = std::make_unique<Image>(filename);
+		guiData->ref_img_file = std::move(filename);
+	}
+
+	guiData->NextBuf<bool>();
+	ImGui::Checkbox("Display PSNR value", guiData->CurBuf<bool>().get());
+	if (*guiData->CurBuf<bool>()) {
+		if (guiData->ref_img) {
+			DebugDrawer::DrawImage(guiData->ref_img_file.c_str(), 256, 256);
+			Image img1{ width, height, PathTracer::getPBO() };
+			float val = ImageUtils::CalculatePSNR(width * height, img1.getPixels(), guiData->ref_img->getPixels());
+			ImGui::Text("PSNR = %f db", val);
+		} else {
+			ImGui::Text("No Reference Image");
+		}
+	}
 
 	ImGui::Combo("Show Texture", &guiData->denoiser_options.debug_tex_idx, texture_options, DebugTextureType::NUM_OPTIONS);
 	if (ops.is_on) {
@@ -410,7 +320,120 @@ static void RenderProfilingStats() {
 	}
 }
 
-// LOOK: Un-Comment to check ImGui Usage
+static void RenderDebugMenu() {
+	if (ImGui::Button("Write PBO to Image")) {
+		ImageUtils::SaveImage(PathTracer::getPBO());
+	}
+
+	bool draw_coord_frame, draw_debug_aabb, draw_world_aabb;
+
+	guiData->NextBuf<bool>();
+	if (!*guiData->CurBuf<bool>()) {
+		if (ImGui::Button("[DEBUG] Draw World Frame")) {
+			*guiData->CurBuf<bool>() = true;
+		}
+	} else {
+		if (ImGui::Button("[DEBUG] Don't draw World Frame")) {
+			*guiData->CurBuf<bool>() = false;
+		}
+	}
+	draw_coord_frame = *guiData->CurBuf<bool>();
+
+	guiData->NextBuf<bool>();
+	if (!*guiData->CurBuf<bool>()) {
+		if (ImGui::Button("[DEBUG] Draw AABB")) {
+			*guiData->CurBuf<bool>() = true;
+		}
+	} else {
+		if (ImGui::Button("[DEBUG] Don't draw AABB")) {
+			*guiData->CurBuf<bool>() = false;
+		}
+	}
+	draw_debug_aabb = *guiData->CurBuf<bool>();
+
+	guiData->NextBuf<bool>();
+	if (!*guiData->CurBuf<bool>()) {
+		if (ImGui::Button("[DEBUG] Draw World AABB")) {
+			*guiData->CurBuf<bool>() = true;
+		}
+	} else {
+		if (ImGui::Button("[DEBUG] Don't draw World AABB")) {
+			*guiData->CurBuf<bool>() = false;
+		}
+	}
+	draw_world_aabb = *guiData->CurBuf<bool>();
+
+	ImGui::Text("Octree Test");
+	{
+		ImGui::SliderInt("Octree Depth", &guiData->octree_depth, 0, 20);
+		if (ImGui::Button("Generate Octree")) {
+			if (guiData->test_tree) {
+				delete guiData->test_tree;
+				guiData->test_tree = nullptr;
+			}
+
+			guiData->test_tree = new octree(*g_scene, g_scene->world_AABB, guiData->octree_depth);
+		}
+		if (ImGui::Button("Pull Octree From GPU")) {
+			if (guiData->test_tree) {
+				delete guiData->test_tree;
+				guiData->test_tree = nullptr;
+			}
+
+			guiData->test_tree = new octree(PathTracer::getTree());
+		}
+		if (guiData->test_tree) {
+			if (ImGui::Button("Destroy Octree")) {
+				delete guiData->test_tree;
+				guiData->test_tree = nullptr;
+			}
+		}
+	}
+	if (draw_coord_frame) {
+		float x = g_scene->world_AABB.min().x + 1.f;
+		float y = g_scene->world_AABB.min().y + 1.f;
+		glm::vec3 origin{ x, y, 0 };
+		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(2, 0, 0), { 1,0,0 });
+		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(0, 2, 0), { 0,1,0 });
+		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(0, 0, 2), { 0,0,1 });
+	}
+	if (draw_debug_aabb) {
+		for (Geom const& g : g_scene->geoms) {
+			if (g.type == MESH) {
+				DebugDrawer::DrawAABB(g.bounds, { 1,0,0 });
+			}
+		}
+	}
+	if (draw_world_aabb) {
+		DebugDrawer::DrawAABB(g_scene->world_AABB, { 0,0,1 });
+	}
+
+	if (guiData->test_tree) {
+		if (ImGui::Button("Clear Depth Filter")) {
+			if (guiData->octree_depth_filter != -1) {
+				guiData->octree_depth_filter = -1;
+			}
+		}
+		ImGui::SliderInt("Set Depth Filter (-1 means no)", &guiData->octree_depth_filter, -1, guiData->octree_depth);
+		guiData->octree_intersection_cnt = 0;
+		guiData->test_tree->dfs([&](node const& node, int depth) {
+			if (guiData->octree_depth_filter != -1) {
+				if (guiData->octree_depth_filter == depth) {
+					DebugDrawer::DrawAABB(node.bounds, { 0,1,0 });
+					guiData->octree_intersection_cnt += node.leaf_infos.size();
+				}
+			} else {
+				DebugDrawer::DrawAABB(node.bounds, { 0,1,0 });
+				guiData->octree_intersection_cnt += node.leaf_infos.size();
+			}
+			});
+		std::string info = "intersection cnt: " + std::to_string(guiData->octree_intersection_cnt) +
+			"\ntotal triangles: " + std::to_string(g_scene->triangles.size());
+
+		ImGui::Text(info.c_str());
+	}
+}
+
 static void RenderImGui() {
 	// very ugly, I know
 	extern Scene* g_scene;
@@ -422,36 +445,39 @@ static void RenderImGui() {
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	if (!ImGui::Begin("Path Tracer", nullptr, ImGuiWindowFlags_None)) {
+	if (!ImGui::Begin("Path Tracer", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
 		ImGui::End();
 		return;
 	}
-
+	guiData->ResetBuf();
 	ImGui::SetWindowSize(ImVec2(k_menu_width, 3 * k_collapsable_width));
 	ImGui::Text("press H to hide GUI completely.");
+
+	guiData->NextBuf<bool>();
 	if (ImGui::IsKeyPressed('H')) {
-		guiData->hide_gui = !guiData->hide_gui;
+		*guiData->CurBuf<bool>() = !*guiData->CurBuf<bool>();
 	}
-	if (guiData->hide_gui) {
+	if (*guiData->CurBuf<bool>()) {
 		ImGui::SetNextWindowSize(ImVec2(-1, -1));
 		return;
 	}
 	
 	if (ImGui::CollapsingHeader("Main Menu")) {
-		ImGui::SetWindowSize(ImVec2(k_menu_width, 300));
 		RenderMainMenu();
 	}
+	ImGui::Separator();
 	if (ImGui::CollapsingHeader("Denoiser")) {
-		ImGui::SetWindowSize(ImVec2(k_menu_width, 250));
 		RenderDenoiserMenu();
 	}
+	ImGui::Separator();
 	if (ImGui::CollapsingHeader("Profiling Stats")) {
-		ImGui::SetWindowSize(ImVec2(k_menu_width, 250));
 		RenderProfilingStats();
 	}
-	if (ImGui::Button("Write PBO to Image")) {
-		saveImage(PathTracer::getPBO());
+	ImGui::Separator();
+	if (ImGui::CollapsingHeader("Debug")) {
+		RenderDebugMenu();
 	}
+
 	ImGui::End();
 
 	ImGui::Render();
@@ -476,6 +502,9 @@ void Preview::DoPreloadMenu() {
 
 		ImGui::Begin("WELCOME", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 		{
+			ImGui::Text("Choose a Scene File or a Save File to continue");
+			ImGui::Separator();
+
 			load_scene = ImGui::OpenFileDialogue(scene_dialogue, "Scene File Name: ", scene_file);
 			load_save = ImGui::OpenFileDialogue(save_dialogue, "Save File Name: ", save_file);
 		}

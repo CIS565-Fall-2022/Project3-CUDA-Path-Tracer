@@ -162,6 +162,8 @@ private:
 		}
 	}
 public:
+	octree(octree const&) = delete;
+	octree(octree&&) = delete;
 	octree(Scene const& scene, AABB const& root_aabb, int depth_lim) : _depth_lim(depth_lim) {
 		new_node(AABB()); //dummy node
 		new_node(root_aabb); // root
@@ -192,14 +194,17 @@ struct octreeGPU {
 	Span<nodeGPU> _nodes;
 	MeshInfo _mesh_info;
 	Span<Geom> _geoms;
+	bool _is_copy;
 
-	__host__ octreeGPU() { }
-	__host__ void init(octree const& tree, MeshInfo mesh_info, Span<Geom> geoms) {
+	octreeGPU(octreeGPU const& o) 
+		: _nodes(o._nodes), _mesh_info(o._mesh_info), _geoms(o._geoms), _is_copy(true) { }
+	octreeGPU(octreeGPU&&) = delete;
+	octreeGPU(octree const& tree, MeshInfo mesh_info, Span<Geom> geoms) : _is_copy(false) {
 		// save mesh info of the scene
 		this->_mesh_info = mesh_info;
 		this->_geoms = geoms;
 
-		size_t num_nodes = tree._nodes.size();
+		int num_nodes = tree._nodes.size();
 		// first form GPU representation at host side
 		std::vector<nodeGPU> hst_nodes(num_nodes);
 		for (size_t i = 0; i < num_nodes; ++i) {
@@ -212,7 +217,11 @@ struct octreeGPU {
 		H2D(tmp, hst_nodes.data(), num_nodes);
 		_nodes = Span<nodeGPU>(num_nodes, tmp);
 	}
-	__host__ void free() {
+	~octreeGPU() {
+		if (_is_copy) {
+			return;
+		}
+
 		size_t num_nodes = _nodes.size();
 		// get data back from GPU so we can free it
 		nodeGPU* hst_nodes = new nodeGPU[num_nodes];
@@ -391,19 +400,31 @@ struct octreeGPU {
 	}
 };
 
-inline octree::octree(octreeGPU const& treeGPU) {
+inline octree::octree(octreeGPU const& treeGPU) : _depth_lim(OCTREE_DEPTH) {
+#pragma warning(push)
+#pragma warning(push)
+#pragma warning(disable : 6385)
+#pragma warning(disable : 6011)
+
 	size_t num_nodes = treeGPU._nodes.size();
 	nodeGPU* tmp = reinterpret_cast<nodeGPU*>(malloc(num_nodes * sizeof(nodeGPU)));
 	D2H(tmp, treeGPU._nodes, num_nodes);
-	
 	for (int i = 0; i < num_nodes; ++i) {
 		_nodes.emplace_back(tmp[i]);
 	}
 	free(tmp);
+
+#pragma warning(pop)
+#pragma warning(pop)
 }
 
 inline node::node(nodeGPU const& nodeGPU)
 	: bounds(nodeGPU.bounds) {
+#pragma warning(push)
+#pragma warning(push)
+#pragma warning(disable : 6385)
+#pragma warning(disable : 6011)
+
 	for (size_t i = 0; i < 8; ++i) {
 		children[i] = nodeGPU.children[i];
 	}
@@ -416,5 +437,8 @@ inline node::node(nodeGPU const& nodeGPU)
 		leaf_infos.emplace_back(tmp[i].triangle_id, tmp[i].geom_id);
 	}
 	free(tmp);
+
+#pragma warning(pop)
+#pragma warning(pop)
 }
 

@@ -9,7 +9,6 @@ __host__ __device__ inline void project(glm::vec3 axis, glm::vec3 const(&pos)[N]
     tmin = LARGE_FLOAT, tmax = SMALL_FLOAT;
     axis = glm::normalize(axis);
 
-#pragma unroll
     for (int i = 0; i < N; ++i) {
         float t = glm::dot(pos[i], axis);
         tmin = fmin(tmin, t);
@@ -216,7 +215,7 @@ __host__ __device__ inline float boxIntersectionTest(Geom box, Ray r, ShadeableI
             float ta = glm::min(t1, t2);
             float tb = glm::max(t1, t2);
             glm::vec3 n;
-            n[xyz] = t2 < t1 ? +1 : -1;
+            n[xyz] = t2 < t1 ? 1.f : -1.f;
             if (ta > 0 && ta > tmin) {
                 tmin = ta;
                 tmin_n = n;
@@ -293,24 +292,18 @@ __host__ __device__ inline float sphereIntersectionTest(Geom sphere, Ray r, Shad
     float t2 = firstTerm - squareRoot;
 
     float t = 0;
-    bool outside;
     if (t1 < 0 && t2 < 0) {
         return -1;
     } else if (t1 > 0 && t2 > 0) {
         t = fmin(t1, t2);
-        outside = true;
     } else {
         t = fmax(t1, t2);
-        outside = false;
     }
 
     glm::vec3 objspaceIntersection = getPointOnRay(rt, t);
 
     glm::vec3 intersectionPoint = multiplyMV(sphere.transform, glm::vec4(objspaceIntersection, 1.f));
     glm::vec3 normal = glm::normalize(multiplyMV(sphere.invTranspose, glm::vec4(objspaceIntersection, 0.f)));
-    //if (!outside) {
-    //    normal = -normal;
-    //}
 
     inters.hitPoint = intersectionPoint;
     inters.surfaceNormal = normal;
@@ -336,8 +329,6 @@ __device__ inline float intersFromTriangle(
     local_ray.origin = ro;
     local_ray.direction = rd;
 
-    auto const& meshes = meshInfo.meshes;
-    auto const& tris = meshInfo.tris;
     auto const& verts = meshInfo.vertices;
     auto const& norms = meshInfo.normals;
     auto const& uvs = meshInfo.uvs;
