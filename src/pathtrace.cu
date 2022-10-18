@@ -418,15 +418,42 @@ __global__ void finalGather(int numPixels, glm::vec3* image, PathSegment* iterat
  */
 int PathTracer::pathtrace(int iter) {
 	cur_iter = iter;
+	ProfileHelper frame_profiling("frame");
+	const int traceDepth = hst_scene->state.traceDepth;
+	const Camera& cam = hst_scene->state.camera;
+	const int pixelcount = cam.resolution.x * cam.resolution.y;
+
 	if (render_paused) {
+		if (enable_denoise) {
+			frame_profiling.begin();
+			{
+				thrust::transform(
+					thrust::device,
+					dev_image.get(),
+					dev_image.get() + pixelcount,
+					denoise_image,
+					RadianceToNormalizedRGB(cur_iter));
+
+				ProfileHelper denoise_profiling("denoise");
+				denoise_profiling.begin();
+				{
+					Denoiser::denoise(denoise_image, denoise_buffers, *denoise_params);
+				}
+				denoise_profiling.end();
+
+				thrust::transform(
+					thrust::device,
+					denoise_image,
+					denoise_image + pixelcount,
+					s_pbo_dptr,
+					NormalizedRGBToRGBA()
+				);
+			}
+			frame_profiling.end();
+		}
+
 		return iter;
 	}
-
-	ProfileHelper frame_profiling("frame");
-
-    const int traceDepth = hst_scene->state.traceDepth;
-    const Camera &cam = hst_scene->state.camera;
-    const int pixelcount = cam.resolution.x * cam.resolution.y;
 
     // 2D block for generating ray from camera
 	dim3 blk_per_grid2d(DIV_UP(cam.resolution.x, 8), DIV_UP(cam.resolution.y, 8));

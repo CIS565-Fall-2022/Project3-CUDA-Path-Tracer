@@ -1,6 +1,7 @@
 #include "guiData.h"
 #include "utilities.h"
 #include "main.h"
+#include "ImGui/imgui.h"
 #include <algorithm>
 
 GuiDataContainer::GuiDataContainer() :
@@ -9,22 +10,16 @@ GuiDataContainer::GuiDataContainer() :
     octree_depth_filter(-1),
     octree_intersection_cnt(0),
     test_tree(nullptr),
-    desc(Denoiser::FilterType::ATROUS, glm::min(60, width), glm::ivec2(width, height), 0.5f, 0.5f, 0.5f),
-    scene_file_dialog("Select Scene File", false, ".txt"),
-    save_file_dialog("Select Save File", true, ".sav"),
-    img_file_dialog("Select Image File", false),
-    img_file_data_dialog("Select Save File", true, ".csv"),
-    buf_id(0)
+    desc(Denoiser::FilterType::ATROUS, glm::min(60, width), glm::ivec2(width, height), 0.5f, 0.5f, 0.5f)
 {
     denoiser_options.is_on = false;
     denoiser_options.debug_tex_idx = 0;
 }
 void GuiDataContainer::Reset() {
-    for (int i = 0; i < bufs.size(); ++i) {
-        memcpy(bufs[i].get(), default_bufs[i].second.get(), default_bufs[i].first);
+    for (auto& kvp : bufs) {
+        memcpy(kvp.second.data.get(), kvp.second.default_data.get(), kvp.second.size_bytes);
     }
-    ResetBuf();
-
+    desc = Denoiser::ParamDesc(Denoiser::FilterType::ATROUS, glm::min(60, width), glm::ivec2(width, height), 0.5f, 0.5f, 0.5f);
     ref_img_file.clear();
     ref_img = nullptr;
     denoiser_options.is_on = false;
@@ -46,11 +41,31 @@ GuiDataContainer::~GuiDataContainer() {
     }
 }
 
-void GuiDataContainer::OpenFileDialogue(char const* label, bool dirmode, char const* ext) {
-    NextBuf<ImGui::FileDialogue>(label, dirmode, ext);
-    std::string tmp = ImGui::OpenFileDialogue(CurBufData<ImGui::FileDialogue>(), label);
-    if (tmp.size()) {
-        NextBuf<std::string>(tmp);
-        std::cout << CurBufData<std::string>() << std::endl;
+std::string GuiDataContainer::OpenFileDialogue(char const* label, bool dirmode, char const* ext) {
+    std::string key = label;
+    std::string ret = ImGui::OpenFileDialogue(*GetOrSetBuf<ImGui::FileDialogue>(key, label, dirmode, ext), label);
+    if (ret.size()) {
+        GetOrSetBuf<std::string>(key + "_string", ret);
     }
+    return ret;
+}
+
+bool GuiDataContainer::CheckBox(char const* label) {
+    auto ptr = GetOrSetBuf<bool>(label);
+    ImGui::Checkbox(label, ptr.get());
+    return *ptr;
+}
+
+bool GuiDataContainer::ToggleButton(char const* label_if_true, char const* label_if_false) {
+    auto ptr = GetOrSetBuf<bool>(label_if_true);
+    if (!ptr) {
+        if (ImGui::Button(label_if_false)) {
+            *ptr = true;
+        }
+    } else {
+        if (ImGui::Button(label_if_true)) {
+            *ptr = false;
+        }
+    }
+    return *ptr;
 }

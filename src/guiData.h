@@ -2,6 +2,7 @@
 #include "Denoise/denoise.h"
 #include "guiFileDialog.h"
 #include <vector>
+#include <unordered_map>
 #include <string>
 
 class octree;
@@ -21,11 +22,6 @@ public:
     int octree_intersection_cnt;
     octree* test_tree;
     Denoiser::ParamDesc desc;
-    
-    ImGui::FileDialogue scene_file_dialog;
-    ImGui::FileDialogue save_file_dialog;
-    ImGui::FileDialogue img_file_dialog;
-    ImGui::FileDialogue img_file_data_dialog;
 
     std::string img_data_file;
     std::string ref_img_file;
@@ -38,28 +34,32 @@ public:
         int debug_tex_idx;
     } denoiser_options;
 
+    struct BufInfo {
+        size_t size_bytes;
+        std::shared_ptr<void> data;
+        std::shared_ptr<void> default_data;
+    };
+
     // this allows us to create bufs in a completely generic way
-    std::vector<std::shared_ptr<void>> bufs;
-    std::vector<std::pair<int, std::shared_ptr<void>>> default_bufs;
-    int buf_id;
-    void ResetBuf() { buf_id = 0; }
+    std::unordered_map<std::string, BufInfo> bufs;
+
+    /// <summary>
+    /// registers a buffer with a string id "key"
+    /// </summary>
     template<typename T, typename... Args>
-    void NextBuf(Args&&... args) {
-        if (buf_id >= bufs.size()) {
-            bufs.emplace_back(new T(std::forward<Args>(args)...));
-            default_bufs.emplace_back(sizeof(T), new T(*std::static_pointer_cast<T>(bufs.back())));
+    std::shared_ptr<T> GetOrSetBuf(std::string const& key, Args&&... args) {
+        if (!bufs.count(key)) {
+            BufInfo info;
+            info.size_bytes = sizeof(T);
+            info.data = std::make_shared<T>(std::forward<Args>(args)...);
+            info.default_data = std::make_shared<T>(*std::static_pointer_cast<T>(info.data));
+            bufs[key] = std::move(info);
         }
-        ++buf_id;
+        return std::static_pointer_cast<T>(bufs[key].data);
     }
 
-    template<typename T>
-    std::shared_ptr<T> CurBuf() const { 
-        return std::static_pointer_cast<T>(bufs[buf_id-1]);
-    }
-    template<typename T>
-    T& CurBufData() const {
-        return *CurBuf<T>();
-    }
-
-    void OpenFileDialogue(char const* label, bool dirmode, char const* ext);
+    // convenience wrappers
+    std::string OpenFileDialogue(char const* label, bool dirmode, char const* ext);
+    bool CheckBox(char const* label);
+    bool ToggleButton(char const* label_if_true, char const* label_if_false);
 };

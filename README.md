@@ -24,7 +24,11 @@
 	- [G Buffer](#g-buffer)
 	- [G Buffer Optimization](#g-buffer-optimization)
 	- [Performance Analysis](#performance-analysis)
+		- [Filter Size / Resolution vs. Denoising Time](#filter-size--resolution-vs-denoising-time)
+		- [A-trous Filter vs. Gaussian Filter vs. No Denoising](#a-trous-filter-vs-gaussian-filter-vs-no-denoising)
 	- [How Good is the Denoiser?](#how-good-is-the-denoiser)
+		- [Image Quality over Time and Increasing Filter Size](#image-quality-over-time-and-increasing-filter-size)
+		- [Denoising Quality and Materials](#denoising-quality-and-materials)
 - [Anti-aliasing](#anti-aliasing)
 - [Mesh Loading and Texture Mapping](#mesh-loading-and-texture-mapping)
 	- [Diffuse Texture Mapping](#diffuse-texture-sampling)
@@ -170,7 +174,10 @@
 	- Filter Size is set to 60, all weights to 0.5
 	- Time refers to the total time that the relevant kernels have been running on GPU; CPU operations in the interim are not measured.
 
-#### Filter Size vs. Denoising Time
+#### Filter Size / Resolution vs. Denoising Time
+![](./img/Denoise/chart0.png)
+- As one would expect, the denoising time increases with the image resolution, because more pixels need to be processed.
+
 ![](./img/Denoise/chart2.png)
 - The number of applications of the A-trous filter has a logarithmic time complexity w.r.t. the desired filter size, so the denoising kernel stays performant despite the increasing filter size.
 
@@ -181,6 +188,7 @@
 ![](./img/Denoise/pa1.png)
 
 ### How Good is the Denoiser?
+#### Image Quality over Time and Increasing Filter Size
 - To measure how "smooth" the image is after denoising, I used Peak Signal-to-Noise Ratio (abbr. PSNR). It can be defined in terms of Mean Square Error (MSE) as shown:
 $$
 \mathrm{MSE}\left( S,R \right) =\frac{1}{N}\sum_{i=0}^{n-1}{\left( S_i-R_i \right) ^2}
@@ -191,7 +199,30 @@ $$
 - I have incorporated the functionality of measuring PSNR interactively through ImGui. Below is a simple demo of how to do it.
 ![](./img/Denoise/PSNR/psnr_demo.gif)
 - Given a reference image of 20000 SPP (ground truth), the following charts shows how the quality of image changes (1) over time, (2) over increasing filter size.
+![](./img/Denoise/chart3.png)
+![](./img/Denoise/chart4.png)
+- A few Observations
+	- The A-trous filter seems to quickly approach certain PSNR and stay there for the duration of the path tracing.
+	- As filter size increases, the quality actually becomes "worse" because details are lost.
+	- In conclusion, A-trous filter can achieve a good-looking image (~30 PSNR) with as few as 20 SSP, but it also hinders the image from converging to the ground truth.
 
+#### Denoising Quality and Materials
+- It is also worthwhile to investigate the relationship between denoised image quality and the type of materials.
+- Emissive, Reflective, or Smooth Materials tend to yield better denoising results, and as a matter of fact, they converge much more quickly even without denoising. This is because lights scatter less randomly on these surfaces and will be less likely to die off. With rough surfaces, there are more nuanced lighting interations that will be smoothed away.
+- A simple experiment confirms the above speculation.
+- the original cornell box
+
+| 20000 SPP | 10 SPP | 10 SPP A-Trous Denoised |
+|--|--|--|
+|Ground Truth, PSNR=100 dB|PSNR=17.55397 dB|PSNR=15.264759 dB|
+|![](./img/Denoise/PSNR/cornell_20000.png)|![](./img/Denoise/PSNR/cornell_10.png)|![](./img/Denoise/PSNR/cornell_10_denoised.png)|
+
+- cornell box with ceiling light (33 dB with just 10 samples!)
+
+| 20000 SPP | 10 SPP | 10 SPP A-Trous Denoised |
+|--|--|--|
+|Ground Truth, PSNR=100 dB|PSNR=18.229178 dB|PSNR=33.054626 dB|
+|![](./img/Denoise/PSNR/cornell_big_light_20000.png)|![](./img/Denoise/PSNR/cornell_big_light_10.png)|![](./img/Denoise/PSNR/cornell_big_light_10_denoised.png)|
 
 ## Anti-aliasing
 - Stochastic Anti-aliasing is used to reduce aliasing artifacts.

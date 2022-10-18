@@ -213,17 +213,19 @@ void Preview::InitImguiData() {
 
 static void RenderMainMenu() {
 	std::string lastScene;
+
 	ImGui::Text("Traced Depth %d", guiData->traced_depth);
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
 	lastScene = guiData->cur_scene;
-	std::string filename = ImGui::OpenFileDialogue(guiData->scene_file_dialog, "Scene File: ");
+
+	std::string filename = guiData->OpenFileDialogue("Select Scene File", false, ".txt");
 	if (filename.size()) {
 		guiData->cur_scene = filename;
 		switchScene(filename.c_str());
 	}
 
-	filename = ImGui::OpenFileDialogue(guiData->save_file_dialog, "Save File: ");
+	filename = guiData->OpenFileDialogue("Select Save File", false, ".txt");
 	if (filename.size()) {
 		if (!PathTracer::saveRenderState(filename.c_str())) {
 			std::cerr << "failed to save\n";
@@ -273,15 +275,13 @@ static void RenderDenoiserMenu() {
 
 	ImGui::Separator();
 
-	std::string filename = ImGui::OpenFileDialogue(guiData->img_file_dialog, "Select a Reference Image");
+	std::string filename = guiData->OpenFileDialogue("Select a Reference Image", false, nullptr);
 	if (filename.size()) {
 		guiData->ref_img = std::make_unique<Image>(filename);
 		guiData->ref_img_file = std::move(filename);
 	}
 
-	guiData->NextBuf<bool>();
-	ImGui::Checkbox("Display PSNR value", guiData->CurBuf<bool>().get());
-	if (*guiData->CurBuf<bool>()) {
+	if (guiData->CheckBox("Display PSNR value")) {
 		if (guiData->ref_img) {
 			DebugDrawer::DrawImage(guiData->ref_img_file.c_str(), 256, 256);
 			Image img1{ width, height, PathTracer::getPBO() };
@@ -290,7 +290,7 @@ static void RenderDenoiserMenu() {
 			float psnr_val = ImageUtils::CalculatePSNR(mse_val);
 			ImGui::Text("PSNR = %f, MSE = %f", psnr_val, mse_val);
 
-			std::string filename = ImGui::OpenFileDialogue(guiData->img_file_data_dialog, "Select A File to Save Data");
+			filename = guiData->OpenFileDialogue("Select A File to Save Data", true, ".csv");
 			if (filename.size()) {
 				guiData->img_data_file = filename;
 			}
@@ -339,41 +339,9 @@ static void RenderDebugMenu() {
 
 	bool draw_coord_frame, draw_debug_aabb, draw_world_aabb;
 
-	guiData->NextBuf<bool>();
-	if (!*guiData->CurBuf<bool>()) {
-		if (ImGui::Button("[DEBUG] Draw World Frame")) {
-			*guiData->CurBuf<bool>() = true;
-		}
-	} else {
-		if (ImGui::Button("[DEBUG] Don't draw World Frame")) {
-			*guiData->CurBuf<bool>() = false;
-		}
-	}
-	draw_coord_frame = *guiData->CurBuf<bool>();
-
-	guiData->NextBuf<bool>();
-	if (!*guiData->CurBuf<bool>()) {
-		if (ImGui::Button("[DEBUG] Draw AABB")) {
-			*guiData->CurBuf<bool>() = true;
-		}
-	} else {
-		if (ImGui::Button("[DEBUG] Don't draw AABB")) {
-			*guiData->CurBuf<bool>() = false;
-		}
-	}
-	draw_debug_aabb = *guiData->CurBuf<bool>();
-
-	guiData->NextBuf<bool>();
-	if (!*guiData->CurBuf<bool>()) {
-		if (ImGui::Button("[DEBUG] Draw World AABB")) {
-			*guiData->CurBuf<bool>() = true;
-		}
-	} else {
-		if (ImGui::Button("[DEBUG] Don't draw World AABB")) {
-			*guiData->CurBuf<bool>() = false;
-		}
-	}
-	draw_world_aabb = *guiData->CurBuf<bool>();
+	draw_coord_frame = guiData->ToggleButton("[DEBUG] Don't draw World Frame", "[DEBUG] Draw World Frame");
+	draw_debug_aabb = guiData->ToggleButton("[DEBUG] Don't draw AABB", "[DEBUG] Draw AABB");
+	draw_world_aabb = guiData->ToggleButton("[DEBUG] Draw World AABB", "[DEBUG] Don't draw World AABB");
 
 	ImGui::Text("Octree Test");
 	{
@@ -461,15 +429,15 @@ static void RenderImGui() {
 		ImGui::End();
 		return;
 	}
-	guiData->ResetBuf();
+
 	ImGui::SetWindowSize(ImVec2(k_menu_width, 3 * k_collapsable_width));
 	ImGui::Text("press H to hide GUI completely.");
 
-	guiData->NextBuf<bool>();
+	auto ptr = guiData->GetOrSetBuf<bool>("Hide");
 	if (ImGui::IsKeyPressed('H')) {
-		*guiData->CurBuf<bool>() = !*guiData->CurBuf<bool>();
+		*ptr = !*ptr;
 	}
-	if (*guiData->CurBuf<bool>()) {
+	if (*ptr) {
 		ImGui::SetNextWindowSize(ImVec2(-1, -1));
 		return;
 	}
@@ -489,6 +457,7 @@ static void RenderImGui() {
 	if (ImGui::CollapsingHeader("Debug")) {
 		RenderDebugMenu();
 	}
+
 	ImGui::End();
 
 	ImGui::Render();
