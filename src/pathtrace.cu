@@ -4,10 +4,12 @@
 #include <thrust/execution_policy.h>
 #include <thrust/random.h>
 #include <thrust/remove.h>
+#include <thrust/partition.h>
 
 #include "sceneStructs.h"
 #include "scene.h"
 #include "glm/glm.hpp"
+#include "glm/gtc/epsilon.hpp"
 #include "glm/gtx/norm.hpp"
 #include "utilities.h"
 #include "pathtrace.h"
@@ -55,6 +57,9 @@ __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
 		glm::vec3 pix = image[index];
 
 		glm::ivec3 color;
+		// Take the average for the monte carlo estimate over here!!!
+		// Also you shouldn't really do average like this, however
+		// The max value is only 255 so integer overflow is not much of a problem
 		color.x = glm::clamp((int)(pix.x / iter * 255.0), 0, 255);
 		color.y = glm::clamp((int)(pix.y / iter * 255.0), 0, 255);
 		color.z = glm::clamp((int)(pix.z / iter * 255.0), 0, 255);
@@ -133,12 +138,23 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 
 	if (x < cam.resolution.x && y < cam.resolution.y) {
 		int index = x + (y * cam.resolution.x);
+		// dev_paths and dev_image are basically parallel arrays
 		PathSegment& segment = pathSegments[index];
 
 		segment.ray.origin = cam.position;
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 		// TODO: implement antialiasing by jittering the ray
+
+		// Without jittering, we wouldn't have anti-aliasing on the 1st ray bounce?
+		// Since it would just point straight in a specific direction?
+		// Could still get illumination from 2nd ray bounce?
+
+		// eg. x index is (0, 1080) y index is (0, 720)
+		// ((float)x - (float)cam.resolution.x * 0.5f) => basically convert this range to (-540, 540)
+		// GUESSING: pixelLength.x is how many units correspond to 1 pixel in the camera?
+		// So pixelLength.x here = 2 / resolution.x <- kinda. Also need to look at fov
+
 		segment.ray.direction = glm::normalize(cam.view
 			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
@@ -153,6 +169,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 // computeIntersections handles generating ray intersections ONLY.
 // Generating new rays is handled in your shader(s).
 // Feel free to modify the code below.
+// For each index in parallel, compute intersections of ray corresponding to index
+// Intersection data has normal, distance raymarched (t), and material id
 __global__ void computeIntersections(
 	int depth
 	, int num_paths
@@ -168,17 +186,18 @@ __global__ void computeIntersections(
 	{
 		PathSegment pathSegment = pathSegments[path_index];
 
-		float t;
+		float t; // GUESSING the distance marched by the ray
 		glm::vec3 intersect_point;
 		glm::vec3 normal;
 		float t_min = FLT_MAX;
-		int hit_geom_index = -1;
-		bool outside = true;
+		int hit_geom_index = -1; // what object this intersection hit. Index should be index in dev_geoms
+		bool outside = true; // if it hit outer surface of object or not. Not sure what to do if false
 
 		glm::vec3 tmp_intersect;
 		glm::vec3 tmp_normal;
 
 		// naive parse through global geoms
+		// TODO*: replace this with kd tree or other acceleration structure...
 
 		for (int i = 0; i < geoms_size; i++)
 		{
@@ -207,7 +226,7 @@ __global__ void computeIntersections(
 
 		if (hit_geom_index == -1)
 		{
-			intersections[path_index].t = -1.0f;
+			intersections[path_index].t = -1.0f; // GUESSING: -1 means did not hit (raymarch didn't go anywhere?)
 		}
 		else
 		{
@@ -228,6 +247,7 @@ __global__ void computeIntersections(
 // Note that this shader does NOT do a BSDF evaluation!
 // Your shaders should handle that - this can allow techniques such as
 // bump mapping.
+// called PER INTERSECTION, NOT per ray
 __global__ void shadeFakeMaterial(
 	int iter
 	, int num_paths
@@ -258,7 +278,11 @@ __global__ void shadeFakeMaterial(
 			// like what you would expect from shading in a rasterizer like OpenGL.
 			// TODO: replace this! you should be able to start with basically a one-liner
 			else {
+				// light is pointing from above?
 				float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));
+				// The part of this that makes the material "fake" is ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f
+				// This makes the materialColor show up no matter what
+				// Plus some distance based shading the make it seem a bit more 3D
 				pathSegments[idx].color *= (materialColor * lightTerm) * 0.3f + ((1.0f - intersection.t * 0.02f) * materialColor) * 0.7f;
 				pathSegments[idx].color *= u01(rng); // apply some noise because why not
 			}
@@ -273,6 +297,54 @@ __global__ void shadeFakeMaterial(
 	}
 }
 
+__global__ void shadeMaterial(
+	int iter
+	, int num_paths
+	, int depth
+	, ShadeableIntersection* shadeableIntersections
+	, PathSegment* pathSegments
+	, Material* materials
+)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx < num_paths)
+	{
+		ShadeableIntersection intersection = shadeableIntersections[idx];
+		if (intersection.t > 0.0f) { // if the intersection exists...
+			thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, depth);
+
+			Material &material = materials[intersection.materialId];
+
+			// update the path bounce
+			// new direction will be totally random direction in the hemisphere surrounding the normal
+			glm::vec3 newOrigin = pathSegments[idx].ray.origin + intersection.t * pathSegments[idx].ray.direction;
+			newOrigin += intersection.surfaceNormal * 0.0001f; // TODO: tune
+			glm::vec3 newDirection = calculateRandomDirectionInHemisphere(intersection.surfaceNormal, rng); // w_i
+
+			// If the material indicates that the object was a light, "light" the ray
+			if (material.emittance > 0.0f) {
+				pathSegments[idx].color *= (material.color * material.emittance);
+				pathSegments->remainingBounces = 0; // hit light = stop tracing the path
+				return;
+			}
+			else {
+				// light is pointing from above?
+				float lightTerm = glm::clamp(glm::dot(intersection.surfaceNormal, newDirection), 0.0f, 1.0f);
+				pathSegments[idx].color *= material.color * lightTerm;
+				//pathSegments[idx].color = iter % 2 == 0 ? glm::vec3(1, 0, 0) : glm::vec3(0, 0, 1);
+			}
+
+			pathSegments[idx].ray.origin = newOrigin;
+			pathSegments[idx].ray.direction = newDirection;
+			pathSegments[idx].remainingBounces--;
+		}
+		else {
+			pathSegments[idx].color = glm::vec3(0.0f);
+			pathSegments->remainingBounces = 0; // no intersection = stop tracing the path
+		}
+	}
+}
+
 // Add the current iteration's output to the overall image
 __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iterationPaths)
 {
@@ -280,15 +352,28 @@ __global__ void finalGather(int nPaths, glm::vec3* image, PathSegment* iteration
 
 	if (index < nPaths)
 	{
-		PathSegment iterationPath = iterationPaths[index];
+		PathSegment &iterationPath = iterationPaths[index];
 		image[iterationPath.pixelIndex] += iterationPath.color;
 	}
 }
+
+struct path_should_continue
+{
+	__host__ __device__
+		bool operator()(const PathSegment segment)
+	{
+		return segment.remainingBounces >= 0;
+	}
+};
 
 /**
  * Wrapper for the __global__ call that sets up the kernel calls and does a ton
  * of memory management
  */
+// Each path-trace call runs 1 iteration
+// Each iteration, we add the new results of one ray per pixel to the dev_image
+// and send the new dev_image back to opengl
+// Why hasn't the image gone to white yet??
 void pathtrace(uchar4* pbo, int frame, int iter) {
 	const int traceDepth = hst_scene->state.traceDepth;
 	const Camera& cam = hst_scene->state.camera;
@@ -338,8 +423,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	checkCUDAError("generate camera ray");
 
 	int depth = 0;
-	PathSegment* dev_path_end = dev_paths + pixelcount;
-	int num_paths = dev_path_end - dev_paths;
+	PathSegment *dev_path_end = dev_paths + pixelcount;
+	int num_paths_to_trace = dev_path_end - dev_paths;
 
 	// --- PathSegment Tracing Stage ---
 	// Shoot ray into scene, bounce between objects, push shading chunks
@@ -348,13 +433,13 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	while (!iterationComplete) {
 
 		// clean shading chunks
-		cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
+		cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection)); // TODO: can change this to num paths
 
 		// tracing
-		dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
+		dim3 numblocksPathSegmentTracing = (num_paths_to_trace + blockSize1d - 1) / blockSize1d;
 		computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
 			depth
-			, num_paths
+			, num_paths_to_trace
 			, dev_paths
 			, dev_geoms
 			, hst_scene->geoms.size()
@@ -373,14 +458,22 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	  // TODO: compare between directly shading the path segments and shading
 	  // path segments that have been reshuffled to be contiguous in memory.
 
-		shadeFakeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
+		shadeMaterial << <numblocksPathSegmentTracing, blockSize1d >> > (
 			iter,
-			num_paths,
+			num_paths_to_trace,
+			depth,
 			dev_intersections,
 			dev_paths,
 			dev_materials
 			);
-		iterationComplete = true; // TODO: should be based off stream compaction results.
+
+		 //update num_paths using stream compaction
+		dev_path_end = thrust::stable_partition(thrust::device, dev_paths, dev_path_end, path_should_continue());
+		num_paths_to_trace = dev_path_end - dev_paths;
+
+		if (depth > traceDepth || num_paths_to_trace <= 0) {
+			iterationComplete = true;
+		}
 
 		if (guiData != NULL)
 		{
@@ -390,7 +483,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	// Assemble this iteration and apply it to the image
 	dim3 numBlocksPixels = (pixelcount + blockSize1d - 1) / blockSize1d;
-	finalGather << <numBlocksPixels, blockSize1d >> > (num_paths, dev_image, dev_paths);
+	finalGather << <numBlocksPixels, blockSize1d >> > (pixelcount, dev_image, dev_paths);
 
 	///////////////////////////////////////////////////////////////////////////
 

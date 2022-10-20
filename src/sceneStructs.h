@@ -41,12 +41,12 @@ struct Material {
 };
 
 struct Camera {
-    glm::ivec2 resolution;
+    glm::ivec2 resolution; // eg. 1080 x 1920
     glm::vec3 position;
-    glm::vec3 lookAt;
-    glm::vec3 view;
-    glm::vec3 up;
-    glm::vec3 right;
+    glm::vec3 lookAt; // NOT necessarily normalized
+    glm::vec3 view; // normalized, direction camera is facing
+    glm::vec3 up; // normalized
+    glm::vec3 right; // normalized
     glm::vec2 fov;
     glm::vec2 pixelLength;
 };
@@ -54,11 +54,18 @@ struct Camera {
 struct RenderState {
     Camera camera;
     unsigned int iterations;
-    int traceDepth;
+    int traceDepth; // DEPTH value in scene txt file
     std::vector<glm::vec3> image;
     std::string imageName;
 };
 
+// a path stores the multiple ray bounces from one pixel until the ray dies
+// GUESSING HERE: pixel index is where the light came from (backwards from the camera)
+// Ray would be... the current? ray that the path is on
+// color would be... the amount of color that's been ACCUMULATED? from this path
+// remainingBounces self explanatory
+// We have 1 pathsegment per pixel?
+// Guess we only need 1 pathsegment to consolidate multiple paths per pixel (for anti-aliasing) 
 struct PathSegment {
     Ray ray;
     glm::vec3 color;
@@ -71,6 +78,6 @@ struct PathSegment {
 // 2) BSDF evaluation: generate a new ray
 struct ShadeableIntersection {
   float t;
-  glm::vec3 surfaceNormal;
+  glm::vec3 surfaceNormal; // normalized
   int materialId;
 };
