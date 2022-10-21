@@ -199,7 +199,7 @@ SCALE       .01 20 20
 OBJECT 6
 mesh
 material 3
-FILENAME ../objs/LibertStatue.obj
+FILENAME ../objs/cow.obj
 TRANS 0 4 0
 ROTAT 0 0 0
 SCALE 3 3 3
