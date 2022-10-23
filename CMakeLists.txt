@@ -74,6 +74,7 @@ set(headers
     src/preview.h
     src/utilities.h
     src/ImGui/imconfig.h
+    src/setting.h
 	
 	src/ImGui/imgui.h
     src/ImGui/imconfig.h
@@ -83,7 +84,13 @@ set(headers
      src/ImGui/imgui_internal.h 
      src/ImGui/imstb_rectpack.h 
      src/ImGui/imstb_textedit.h 
-     src/ImGui/imstb_truetype.h 
+     src/ImGui/imstb_truetype.h
+
+     src/tiny_obj_loader.h
+     src/texture.h
+     src/stb_image/stb_image.h
+     src/stb_image/stb_image_resize.h
+     src/stb_image/stb_image_write.h
     )
 
 set(sources
@@ -112,10 +119,11 @@ source_group(Headers FILES ${headers})
 source_group(Sources FILES ${sources})
 
 #add_subdirectory(src/ImGui)
-#add_subdirectory(stream_compaction)  # TODO: uncomment if using your stream compaction
+add_subdirectory(stream_compaction)
+
 
 cuda_add_executable(${CMAKE_PROJECT_NAME} ${sources} ${headers})
 target_link_libraries(${CMAKE_PROJECT_NAME}
     ${LIBRARIES}
-    #stream_compaction  # TODO: uncomment if using your stream compaction
+    stream_compaction
     )

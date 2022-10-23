@@ -1,0 +1,5 @@
+1:
+mistakenly use n1 n2 value for Schlick's approximation
+
+2.
+glm::RayTriangleIntersection gives back barycentric coordinate rather than normal coordinate

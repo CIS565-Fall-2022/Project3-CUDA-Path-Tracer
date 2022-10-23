@@ -6,6 +6,10 @@
 #include "sceneStructs.h"
 #include "utilities.h"
 
+#define CHECK_ZERO(a) (a > -0.00001f && a < 0.00001f)
+
+
+
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
  */
@@ -19,6 +23,25 @@ __host__ __device__ inline unsigned int utilhash(unsigned int a) {
     return a;
 }
 
+__host__ __device__ glm::vec3 calcTriangleNormal(glm::vec3 v0, glm::vec3 v1, glm::vec3 v2)
+{
+    glm::vec3 edge1 = v1 - v0;
+    glm::vec3 edge2 = v2 - v0;
+
+    return glm::normalize(glm::cross(edge1, edge2));
+}
+
+template<typename VALUETYPE>
+__host__ __device__ VALUETYPE barycentricInterpolation(glm::vec3 v0, glm::vec3 v1, glm::vec3 v2, glm::vec3 point,
+    VALUETYPE value0, VALUETYPE value1, VALUETYPE value2)
+{
+    float S = 0.5f * glm::length(glm::cross(v0 - v1, v2 - v1));
+    float S0 = 0.5f * glm::length(glm::cross(v1 - point, v2 - point));
+    float S1 = 0.5f * glm::length(glm::cross(v0 - point, v2 - point));
+    float S2 = 0.5f * glm::length(glm::cross(v0 - point, v1 - point));
+    return (S0 / S) * value0 + (S1 / S) * value1 + (S2 / S) * value2;
+}
+
 // CHECKITOUT
 /**
  * Compute a point at parameter value `t` on ray `r`.
@@ -27,6 +50,7 @@ __host__ __device__ inline unsigned int utilhash(unsigned int a) {
 __host__ __device__ glm::vec3 getPointOnRay(Ray r, float t) {
     return r.origin + (t - .0001f) * glm::normalize(r.direction);
 }
+
 
 /**
  * Multiplies a mat4 and a vec4 and returns a vec3 clipped from the vec4.
@@ -141,4 +165,199 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     }
 
     return glm::length(r.origin - intersectionPoint);
+}
+
+
+__host__ __device__ float objIntersectionTest(Geom geom, Ray r, Triangle *triangles, 
+    LinearBVHNode* bvhNodes, int *bvhArrayToUse, int pixelIndex,
+        glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2& uv, int& triangleId, bool& outside)
+{
+    float minT = BIG_FLOAT;
+
+    // Ray to model space
+    Ray localRay;
+    localRay.origin = multiplyMV(geom.inverseTransform, glm::vec4(r.origin, 1.0f));
+    localRay.direction = glm::normalize(multiplyMV(geom.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+#if ENABLE_BVH
+
+    glm::vec3 invRayDir;
+    invRayDir.x = CHECK_ZERO(localRay.direction.x) ? 0.f : 1.f / localRay.direction.x;
+    invRayDir.y = CHECK_ZERO(localRay.direction.y) ? 0.f : 1.f / localRay.direction.y;
+    invRayDir.z = CHECK_ZERO(localRay.direction.z) ? 0.f : 1.f / localRay.direction.z;
+
+    int dirIsNeg[3] = { invRayDir.x < 0, invRayDir.y < 0, invRayDir.z < 0};
+
+    int arrayIndexSt = pixelIndex * BVH_INTERSECT_STACK_SIZE;
+    int toVisitOffset = 0, currNodeIndex = geom.bvhNodeStartIndex;
+
+    for (int i = arrayIndexSt; i < arrayIndexSt + BVH_INTERSECT_STACK_SIZE; ++i)
+    {
+        bvhArrayToUse[i] = -1;
+    }
+
+    while (currNodeIndex >= geom.bvhNodeStartIndex && currNodeIndex < geom.bvhNodeEndIndex)
+    {
+        const LinearBVHNode node = bvhNodes[currNodeIndex];    
+
+        // Bound ray intersection
+        bool hasIntersect = true;
+        float t0 = 0, t1 = BIG_FLOAT;
+        for (int i = 0; i < 3; ++i)
+        {
+            float tMin = (node.bound.pMin[i] - localRay.origin[i]) * invRayDir[i];
+            float tMax = (node.bound.pMax[i] - localRay.origin[i]) * invRayDir[i];
+            if (tMin > tMax)
+            {
+                float tmp = tMin;
+                tMin = tMax;
+                tMax = tmp;
+            }
+
+            t0 = tMin > t0 ? tMin : t0;
+            t1 = tMax < t1 ? tMax : t1;
+
+            if (t0 > t1)
+            {
+                hasIntersect = false;
+                break;
+            }
+        }
+
+        if(hasIntersect)
+        {    
+            if (node.nPrimitives > 0)
+            {
+                // When BVH Node is leaf node
+                for (int i = 0; i < node.nPrimitives; ++i)
+                {
+                    Triangle triangle = triangles[geom.triangleStartIndex + node.firstPrimOffset + i];
+                    glm::vec3 baryPos;
+                    glm::vec3 localIntersectionPoint;
+                    if (glm::intersectRayTriangle(localRay.origin, localRay.direction,
+                        triangle.v0, triangle.v1, triangle.v2, baryPos))
+                    {
+                        // Barycentric to normal coordinate
+                        localIntersectionPoint = (1 - baryPos[0] - baryPos[1]) * triangle.v0 +
+                            baryPos[0] * triangle.v1 + baryPos[1] * triangle.v2;
+                   
+                        float localT = glm::length(localIntersectionPoint - localRay.origin);
+                        if (localT > minT)
+                        {
+                            continue;
+                        }
+                        minT = localT;
+
+                        glm::vec3 localNormal;
+                        if (geom.hasNormal)
+                        {
+                            localNormal = barycentricInterpolation<glm::vec3>(triangle.v0, triangle.v1, triangle.v2, localIntersectionPoint,
+                                triangle.n0, triangle.n1, triangle.n2);
+                        }
+                        else
+                        {
+                            localNormal = calcTriangleNormal(triangle.v0, triangle.v1, triangle.v2);
+                        }
+
+                        // UV
+                        if (geom.hasUV)
+                        {
+                            uv = barycentricInterpolation<glm::vec2>(triangle.v0, triangle.v1, triangle.v2, localIntersectionPoint,
+                                triangle.tex0, triangle.tex1, triangle.tex2);
+                        }
+
+                        // Get value in world space
+                        outside = glm::dot(localNormal, localRay.direction) < 0;
+                        normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(localNormal, 0.f)));
+                        intersectionPoint = multiplyMV(geom.transform, glm::vec4(localIntersectionPoint, 1.f)) + 0.0001f * normal;
+                        triangleId = geom.triangleStartIndex + node.firstPrimOffset + i;
+                    }
+                }
+
+                if (toVisitOffset <= 0) break;
+                currNodeIndex = bvhArrayToUse[--toVisitOffset + arrayIndexSt];
+            }
+            else
+            {
+                // When BVH Node is interior node
+                if (dirIsNeg[node.axis])
+                {                   
+                    bvhArrayToUse[arrayIndexSt + toVisitOffset++] = currNodeIndex + 1;  // Insert left child
+                    currNodeIndex = node.rightChildOffset + geom.bvhNodeStartIndex;                              // Visit right child first
+                }
+                else
+                {
+                    bvhArrayToUse[arrayIndexSt + toVisitOffset++] = node.rightChildOffset + geom.bvhNodeStartIndex;
+                    currNodeIndex = currNodeIndex + 1;
+                }
+            }
+        }
+        else
+        {
+            if (toVisitOffset <= 0) break;
+            currNodeIndex = bvhArrayToUse[--toVisitOffset + arrayIndexSt];
+        }
+    }
+
+#else
+
+    for (int i = geom.triangleStartIndex; i < geom.triangleEndIndex; ++i)
+    {
+        Triangle triangle = triangles[i];
+        
+        glm::vec3 baryPos;
+        glm::vec3 localIntersectionPoint;
+        if (glm::intersectRayTriangle(localRay.origin, localRay.direction, 
+            triangle.v0, triangle.v1, triangle.v2, baryPos))
+        {
+            // Barycentric to normal coordinate
+            localIntersectionPoint = (1 - baryPos[0] - baryPos[1]) * triangle.v0 +
+                baryPos[0] * triangle.v1 + baryPos[1] *triangle.v2;
+
+            float localT = glm::length(localIntersectionPoint - localRay.origin);
+            if (localT > minT)
+            {
+                continue;
+            }
+            minT = localT;
+
+            glm::vec3 localNormal;
+            if (geom.hasNormal)
+            {
+                localNormal = barycentricInterpolation<glm::vec3>(triangle.v0, triangle.v1, triangle.v2, localIntersectionPoint,
+                    triangle.n0, triangle.n1, triangle.n2);
+            }
+            else
+            {
+                localNormal = calcTriangleNormal(triangle.v0, triangle.v1, triangle.v2);
+            }
+
+            // UV
+            if (geom.hasUV)
+            {
+                uv = barycentricInterpolation<glm::vec2>(triangle.v0, triangle.v1, triangle.v2, localIntersectionPoint,
+                    triangle.tex0, triangle.tex1, triangle.tex2);
+            }
+
+            // Get value in world space
+            outside = glm::dot(localNormal, localRay.direction) < 0;
+            normal = glm::normalize(multiplyMV(geom.invTranspose, glm::vec4(localNormal, 0.f)));
+            intersectionPoint = multiplyMV(geom.transform, glm::vec4(localIntersectionPoint, 1.f));
+            triangleId = i;
+        }
+    }
+#endif
+
+    if (CHECK_ZERO(minT - BIG_FLOAT))
+    {
+        return -1;
+    }
+    else
+    {
+        if (!outside) {
+            normal = -normal;
+        }
+
+        return glm::length(r.origin - intersectionPoint);
+    }  
 }

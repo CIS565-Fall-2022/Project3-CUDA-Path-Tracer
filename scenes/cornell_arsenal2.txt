@@ -1,0 +1,169 @@
+SKYBOX ../scenes/skybox.jpg
+
+// Emissive material (light)
+MATERIAL 0
+RGB         1 1 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   10
+
+MATERIAL 1
+RGB         1 1 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+
+// Diffuse
+MATERIAL 2
+RGB         0.4 0.4 0.4
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+
+// Diffuse white
+MATERIAL 3
+RGB         .3 .3 .3
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+
+
+// M1A1
+MATERIAL 4
+RGB         1 1 1
+TEXTURE		../scenes/objs/M1A1/BaseColor.png
+NORMALMAP	../scenes/objs/M1A1/Normal.png
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+
+// Brick Wall
+MATERIAL 5
+RGB         1 1 1
+TEXTURE		../scenes/objs/BrickWall/Diffuse.jpg
+NORMALMAP	../scenes/objs/BrickWall/Normal.jpg
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Wooden Crate Mat
+MATERIAL 6
+TEXTURE		../scenes/objs/WoodenCrate/Textures/1024/WoodenCrate_Crate_BaseColor.png
+NORMALMAP	../scenes/objs/WoodenCrate/Textures/1024/WoodenCrate_Crate_Normal.png
+RGB 		1 1 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+
+
+
+// Camera
+CAMERA
+RES         800 800
+FOVY        30	//45
+ITERATIONS  2000
+DEPTH      	15
+FILE        cornell
+EYE         0 10 35
+LOOKAT      0 10 0
+UP          0 1 0
+
+
+
+
+// Ceiling light
+OBJECT 0
+cube
+material 0
+TRANS       0 33 0
+ROTAT       0 0 0
+SCALE       30 1.5 6
+
+
+// Floor
+OBJECT 1
+cube
+material 2
+TRANS       0 -5 0
+ROTAT       0 0 0
+SCALE       40 0.1 40
+
+// Ceiling
+OBJECT 2
+cube
+material 2
+TRANS       0 33 0
+ROTAT       0 0 90
+SCALE       .1 40 40
+
+// Back wall
+OBJECT 3
+object
+../scenes/objs/BrickWall/wall.obj
+material 5
+TRANS       -20 15 -15
+ROTAT       0 0 0
+SCALE       3.2 3.2 1
+
+// Left wall
+OBJECT 4
+object
+../scenes/objs/BrickWall/wall.obj
+material 5
+TRANS       -18 10 25
+ROTAT       0 90 0
+SCALE       3.5 3.5 1
+
+// Right wall
+OBJECT 5
+object
+../scenes/objs/BrickWall/wall.obj
+material 5
+TRANS       20 15 -15
+ROTAT       0 -90 0
+SCALE       3.5 3.5 1
+
+
+
+OBJECT 6
+object
+../scenes/objs/WoodenCrate/WoodenCrate.obj
+material 6
+TRANS 4 -5 0
+ROTAT 0 30 0
+SCALE 3 3 3
+
+
+OBJECT 7
+object
+../scenes/objs/M1A1/model.obj
+material 4
+TRANS       0 10.5 3
+ROTAT       0 45 -90
+SCALE       30 30 30

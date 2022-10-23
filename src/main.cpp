@@ -1,6 +1,9 @@
 #include "main.h"
 #include "preview.h"
+#include "setting.h"
 #include <cstring>
+
+#include <Windows.h>
 
 static std::string startTimeString;
 
@@ -76,9 +79,33 @@ int main(int argc, char** argv) {
 	// Initialize ImGui Data
 	InitImguiData(guiData);
 	InitDataContainer(guiData);
+	
+#if ENABLE_SKYBOX
+	LoadSkyboxTextureToDevice(scene);
+#endif
+
+#if ENABLE_TEXTURE || ENABLE_NORMAL_MAP
+	LoadTexturesToDevice(scene);
+#endif
+
+#if ENABLE_BVH
+	LoadBVHToDevice(scene);
+#endif
 
 	// GLFW main loop
 	mainLoop();
+
+#if ENABLE_TEXTURE || ENABLE_NORMAL_MAP
+	FreeTextures();
+#endif
+
+#if ENABLE_BVH
+	FreeBVH();
+#endif
+
+#if ENABLE_SKYBOX
+	FreeSkyboxTexure();
+#endif
 
 	return 0;
 }
@@ -105,6 +132,7 @@ void saveImage() {
 	img.savePNG(filename);
 	//img.saveHDR(filename);  // Save a Radiance HDR file
 }
+
 
 void runCuda() {
 	if (camchanged) {
@@ -134,6 +162,7 @@ void runCuda() {
 		pathtraceFree();
 		pathtraceInit(scene);
 	}
+
 
 	if (iteration < renderState->iterations) {
 		uchar4* pbo_dptr = NULL;
