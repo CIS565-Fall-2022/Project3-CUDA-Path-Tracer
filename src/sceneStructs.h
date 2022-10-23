@@ -10,11 +10,29 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    MESH
+};
+
+struct Point {
+    glm::vec3 pos;
+    glm::vec3 nor;
+    glm::vec3 uv;
 };
 
 struct Ray {
     glm::vec3 origin;
     glm::vec3 direction;
+};
+
+struct Triangle {
+    Point v1;
+    Point v2;
+    Point v3;
+};
+
+struct BoundingBox {
+    glm::vec3 lowerPt = glm::vec3(FLT_MIN);
+    glm::vec3 upperPt = glm::vec3(FLT_MAX);
 };
 
 struct Geom {
@@ -26,6 +44,11 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+
+    Triangle*  triangles;
+    int numOfTriangles;
+
+    BoundingBox boundingbBox;
 };
 
 struct Material {
@@ -73,4 +96,13 @@ struct ShadeableIntersection {
   float t;
   glm::vec3 surfaceNormal;
   int materialId;
+};
+
+
+// CHECKITOUT - a simple struct for storing scene geometry information per-pixel.
+// What information might be helpful for guiding a denoising filter?
+struct GBufferPixel {
+    float t;
+    glm::vec3 pos;
+    glm::vec3 nor;
 };
