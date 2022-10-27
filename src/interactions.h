@@ -1,6 +1,9 @@
 #pragma once
 
 #include "intersections.h"
+#include "sample.h"
+#include "bsdf.h"
+
 
 // CHECKITOUT
 /**
@@ -15,7 +18,6 @@ glm::vec3 calculateRandomDirectionInHemisphere(
     float up = sqrt(u01(rng)); // cos(theta)
     float over = sqrt(1 - up * up); // sin(theta)
     float around = u01(rng) * TWO_PI;
-
     // Find a direction that is not the normal based off of whether or not the
     // normal's components are all equal to sqrt(1/3) or whether or not at
     // least one component is less than sqrt(1/3). Learned this trick from
@@ -72,8 +74,93 @@ void scatterRay(
         glm::vec3 intersect,
         glm::vec3 normal,
         const Material &m,
-        thrust::default_random_engine &rng) {
+        thrust::default_random_engine &rng,
+        float& pdf_f_f) {
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+    if (m.hasReflective == 1.f) {
+        //mirror
+        //glm::reflect  (1,1,0) (0, 1, 0) => (1, -1, 0)
+        glm::vec3 newDir = glm::reflect(pathSegment.ray.direction, normal);
+        pdf_f_f = 1.f;
+        pathSegment.beta *= m.specular.color;
+        pathSegment.ray.origin = intersect + 0.001f * normal;
+        pathSegment.ray.direction = newDir;
+        --(pathSegment.remainingBounces);
+    }
+    else if (m.hasRefractive == 1.f) {
+        //refract
+
+    }
+    else {
+        //lambert
+        glm::vec3 newDir = calculateRandomDirectionInHemisphere(normal, rng);
+        glm::vec3 lambertBRDF = m.color * INV_PI;
+        float lambertFactor = glm::dot(newDir, normal);
+        pdf_f_f = lambertFactor * INV_PI;
+        if (pdf_f_f == 0.f) {
+            pathSegment.color = glm::vec3(0.f);
+            pathSegment.remainingBounces = 0;
+        }
+        else {
+            pathSegment.beta *= ((lambertFactor * lambertBRDF) / pdf_f_f);
+            pathSegment.ray.origin = intersect + 0.001f * normal;
+            pathSegment.ray.direction = newDir;
+            --(pathSegment.remainingBounces);
+        }
+    }
+
+}
+
+__host__ __device__
+float powerHeuristic(int nf, float fPdf, int ng, float gPdf) {
+    float f = nf * fPdf, g = ng * gPdf;
+    return (f * f) / (f * f + g * g);
+}
+
+/**
+* According to the shape of the light, randomly choose a point on the light
+* and update pathsegment's ray direction, origin and beta
+*/
+__host__ __device__
+void scatterRayToLight(
+    PathSegment& pathSegment,
+    const glm::vec3 intersect,
+    const glm::vec3 normal,
+    const Material& m,
+    thrust::default_random_engine& rng,
+    int& lightGeomId,
+    const Geom* dev_lights,
+    const int num_lights,
+    float& pdf_l_l,
+    float& pdf_l_f
+) {
+    //randomly choose a light from all light sources, and update light_id
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    int light_idx = (int)(u01(rng) * num_lights);
+    lightGeomId = dev_lights[light_idx].geomId;
+    //randomly sample a point from the light
+    Geom light = dev_lights[light_idx];
+    glm::vec3 newDir_l;
+    sampleLight(
+        rng,
+        light,
+        newDir_l,
+        intersect,
+        pdf_l_l,
+        num_lights
+    );
+    glm::vec3 bsdf;
+    calculateBSDF(m, bsdf, pdf_l_f, newDir_l, pathSegment, normal, intersect);
+
+
+    pathSegment.beta *= (bsdf / pdf_l_l);
+    pathSegment.ray.origin = intersect + 0.001f * normal;
+    pathSegment.ray.direction = newDir_l;
+    --(pathSegment.remainingBounces);
+    if (pathSegment.beta == glm::vec3(0.f)) {
+        pathSegment.color = glm::vec3(0.f);
+        pathSegment.remainingBounces = 0;
+    }
 }

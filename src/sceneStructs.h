@@ -10,6 +10,7 @@
 enum GeomType {
     SPHERE,
     CUBE,
+    SQUARE_PLANE
 };
 
 struct Ray {
@@ -26,7 +27,11 @@ struct Geom {
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+    int lightId;
+    int geomId;
 };
+
+
 
 struct Material {
     glm::vec3 color;
@@ -60,10 +65,12 @@ struct RenderState {
 };
 
 struct PathSegment {
-    Ray ray;
-    glm::vec3 color;
-    int pixelIndex;
+    Ray ray;  //
+    glm::vec3 color;  //final color of the current ray
+    glm::vec3 beta;  //accumulator
+    int pixelIndex;  //pixel index of which it emit from
     int remainingBounces;
+    int lightGeomId;
 };
 
 // Use with a corresponding PathSegment to do:
@@ -73,4 +80,12 @@ struct ShadeableIntersection {
   float t;
   glm::vec3 surfaceNormal;
   int materialId;
+  int geomId;
+};
+
+struct ShadeableIntersectionDirectLight {
+    float t;
+    glm::vec3 surfaceNormal;
+    int materialId;
+    int lightId;
 };

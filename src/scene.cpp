@@ -13,6 +13,8 @@ Scene::Scene(string filename) {
         cout << "Error reading from file - aborting!" << endl;
         throw;
     }
+    int lightId = 0;
+    int geomId = 0;
     while (fp_in.good()) {
         string line;
         utilityCore::safeGetline(fp_in, line);
@@ -22,7 +24,7 @@ Scene::Scene(string filename) {
                 loadMaterial(tokens[1]);
                 cout << " " << endl;
             } else if (strcmp(tokens[0].c_str(), "OBJECT") == 0) {
-                loadGeom(tokens[1]);
+                loadGeom(tokens[1], geomId, lightId);
                 cout << " " << endl;
             } else if (strcmp(tokens[0].c_str(), "CAMERA") == 0) {
                 loadCamera();
@@ -32,7 +34,7 @@ Scene::Scene(string filename) {
     }
 }
 
-int Scene::loadGeom(string objectid) {
+int Scene::loadGeom(string objectid, int& geomId, int& lightId) {
     int id = atoi(objectid.c_str());
     if (id != geoms.size()) {
         cout << "ERROR: OBJECT ID does not match expected number of geoms" << endl;
@@ -52,9 +54,14 @@ int Scene::loadGeom(string objectid) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
             }
+            else if (strcmp(line.c_str(), "square_plane") == 0) {
+                cout << "Creating new square plane..." << endl;
+                newGeom.type = SQUARE_PLANE;
+            }
         }
 
         //link material
+        //since Material don't have an ID, materialId for a Geom is just the position of the material in materials vector.
         utilityCore::safeGetline(fp_in, line);
         if (!line.empty() && fp_in.good()) {
             vector<string> tokens = utilityCore::tokenizeString(line);
@@ -83,7 +90,14 @@ int Scene::loadGeom(string objectid) {
                 newGeom.translation, newGeom.rotation, newGeom.scale);
         newGeom.inverseTransform = glm::inverse(newGeom.transform);
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
-
+        newGeom.geomId = geomId++;
+        if (materials[newGeom.materialid].emittance > 0.f) {
+            newGeom.lightId = lightId++;
+            lights.push_back(newGeom);
+        }
+        else {
+            newGeom.lightId = -1;
+        }
         geoms.push_back(newGeom);
         return 1;
     }
