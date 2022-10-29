@@ -5,7 +5,7 @@
 
 #include "sceneStructs.h"
 #include "utilities.h"
-
+#include "bsdf.h"
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
  */
@@ -84,7 +84,8 @@ __host__ __device__ float boxIntersectionTest(Geom box, Ray r,
         }
         intersectionPoint = multiplyMV(box.transform, glm::vec4(getPointOnRay(q, tmin), 1.0f));
         normal = glm::normalize(multiplyMV(box.invTranspose, glm::vec4(tmin_n, 0.0f)));
-        return glm::length(r.origin - intersectionPoint);
+        float result = glm::length(r.origin - intersectionPoint);
+        return result;
     }
     return -1;
 }
@@ -157,4 +158,87 @@ __host__ __device__ float squarePlaneIntersectionTest(Geom squarePlane, Ray r,
         return t;
     }
     return -1;
+}
+
+__host__ __device__
+bool computeIntersectionWithLight(
+    PathSegment& pathSegment,
+    Geom* geoms,
+    int geoms_size,
+    int lightGeomIdx,
+    glm::vec3 orig_intersect,
+    glm::vec3 orig_normal,
+    bool outside,
+    float& pdf_f_l,
+    int num_lights
+) {
+
+    float t;
+    glm::vec3 intersect_point;
+    glm::vec3 normal;
+    float t_min = FLT_MAX;
+    int hit_geom_index = -1;
+
+    glm::vec3 tmp_intersect;
+    glm::vec3 tmp_normal;
+
+    for (int i = 0; i < geoms_size; ++i)
+    {
+        //get every object in the scene, and do a intersection test for every one of them.
+        Geom& geom = geoms[i];
+
+        if (geom.type == CUBE)
+        {
+            t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+        }
+        else if (geom.type == SPHERE)
+        {
+            t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+        }
+        else if (geom.type == SQUARE_PLANE) {
+            t = squarePlaneIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+        }
+
+        // Compute the minimum t from the intersection tests to determine what
+        // scene geometry object was hit first.
+        if (t > 0.0f && t_min > t)
+        {
+            t_min = t;
+            hit_geom_index = i;
+            intersect_point = tmp_intersect;
+            normal = tmp_normal;
+        }
+
+    }
+    /*if (t <= 0.f) {
+        return false;
+    }
+    else {
+        if (hit_geom_index == lightGeomIdx) {
+            calculateLightPdf(pathSegment, orig_intersect, tmp_intersect, orig_normal, outside, pdf_f_l, geoms[lightGeomIdx], num_lights);
+            return true;
+        }
+        else {
+            return false;
+        }
+    }*/
+    if (hit_geom_index == -1)
+    {
+        pathSegment.color = glm::vec3(0.f);
+        pathSegment.remainingBounces = 0;
+        return false;
+    }
+    else
+    {
+        //The ray hits something
+        if (hit_geom_index == lightGeomIdx) {
+            calculateLightPdf(pathSegment, orig_intersect, tmp_intersect, orig_normal, outside, pdf_f_l, geoms[lightGeomIdx], num_lights);
+            return true;
+        }
+        else {
+            pathSegment.color = glm::vec3(0.f);
+            pathSegment.remainingBounces = 0;
+            return false;
+        }
+    }
 }

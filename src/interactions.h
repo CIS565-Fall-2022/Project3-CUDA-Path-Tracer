@@ -70,12 +70,13 @@ glm::vec3 calculateRandomDirectionInHemisphere(
  */
 __host__ __device__
 void scatterRay(
-        PathSegment & pathSegment,
-        glm::vec3 intersect,
-        glm::vec3 normal,
-        const Material &m,
-        thrust::default_random_engine &rng,
-        float& pdf_f_f) {
+    PathSegment& pathSegment,
+    glm::vec3 intersect,
+    glm::vec3 normal,
+    const Material& m,
+    thrust::default_random_engine& rng,
+    float& pdf_f_f
+     ) {
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
@@ -122,6 +123,7 @@ float powerHeuristic(int nf, float fPdf, int ng, float gPdf) {
 /**
 * According to the shape of the light, randomly choose a point on the light
 * and update pathsegment's ray direction, origin and beta
+* 
 */
 __host__ __device__
 void scatterRayToLight(
@@ -151,7 +153,7 @@ void scatterRayToLight(
         pdf_l_l,
         num_lights
     );
-    glm::vec3 bsdf;
+    glm::vec3 bsdf; //this bsdf is multiplied by lambert factor!
     calculateBSDF(m, bsdf, pdf_l_f, newDir_l, pathSegment, normal, intersect);
 
 
@@ -162,5 +164,72 @@ void scatterRayToLight(
     if (pathSegment.beta == glm::vec3(0.f)) {
         pathSegment.color = glm::vec3(0.f);
         pathSegment.remainingBounces = 0;
+    }
+}
+
+
+//used in MIS, it update raySegment, and calcualte final color!!!
+__host__ __device__
+void scatterRayMIS(
+    PathSegment& pathSegment,
+    PathSegment& pathSegment2,
+    const glm::vec3 intersect,  //the first intersect
+    const glm::vec3 normal,
+    const Material& m,
+    thrust::default_random_engine& rng,
+    Geom* dev_geoms,
+    const int num_lights,
+    const int num_geoms,
+    Material* dev_materials
+) {
+    float pdf_f_f;
+    float pdf_f_l;
+    int lightGeomId = pathSegment.lightGeomId;
+    Geom& light = dev_geoms[lightGeomId];
+    pathSegment2.lightGeomId = lightGeomId;
+    bool needUpdateBeta = false;
+    //here we dont need check if it's light, since we partitioned
+    if (m.hasReflective == 1.f) {
+        //mirror
+        //glm::reflect  (1,1,0) (0, 1, 0) => (1, -1, 0)
+        glm::vec3 newDir = glm::reflect(pathSegment2.ray.direction, normal);
+        pdf_f_f = 1.f;
+        pathSegment2.beta *= m.specular.color;
+        pathSegment2.ray.origin = intersect + 0.001f * normal;
+        pathSegment2.ray.direction = newDir;
+        --(pathSegment2.remainingBounces);
+    }
+    else if (m.hasRefractive == 1.f) {
+        //refract
+
+    }
+    else {
+        //lambert
+        glm::vec3 newDir = calculateRandomDirectionInHemisphere(normal, rng);
+        glm::vec3 lambertBRDF = m.color * INV_PI;
+        float lambertFactor = glm::dot(newDir, normal);
+        pdf_f_f = lambertFactor * INV_PI;
+        if (pdf_f_f == 0.f) {
+            pathSegment2.color = glm::vec3(0.f);
+            pathSegment2.remainingBounces = 0;
+            return;
+        }
+        else {
+            pathSegment2.beta *= ((lambertFactor * lambertBRDF) / pdf_f_f);
+            pathSegment2.ray.origin = intersect + 0.001f * normal;
+            pathSegment2.ray.direction = newDir;
+            --(pathSegment2.remainingBounces);
+        }
+    }
+    //now check if this ray hit light
+    if (computeIntersectionWithLight(pathSegment2, dev_geoms, num_geoms, lightGeomId, intersect, normal, false, pdf_f_l, num_lights)) {
+        float wf = powerHeuristic(1, pdf_f_f, 1, pdf_f_l);
+        pathSegment2.beta *= wf;
+        Material& lightMaterial = dev_materials[light.materialid];
+        pathSegment2.color += pathSegment2.beta * lightMaterial.emittance;
+    }
+    else {
+        pathSegment2.color = glm::vec3(0.f);
+        pathSegment2.remainingBounces = 0;
     }
 }
