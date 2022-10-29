@@ -18,6 +18,7 @@
 
 #define ERRORCHECK 1
 #define SORT_BY_MATERIALS 1
+#define CACHE_FIRST_BOUNCE 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -89,7 +90,7 @@ static ShadeableIntersection* dev_intersections = NULL;
 // TODO: static variables for device memory, any extra info you need, etc
 // ...
 static int* dev_intersection_materials = NULL;
-
+static int* dev_first_bounce_paths = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -117,7 +118,13 @@ void pathtraceInit(Scene* scene) {
 	cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
 
 	// TODO: initialize any extra device memeory you need
+#if SORT_BY_MATERIALS
 	cudaMalloc(&dev_intersection_materials, pixelcount * sizeof(int));
+#endif
+
+#if CACHE_FIRST_BOUNCE
+	cudaMalloc(&dev_first_bounce_paths, pixelcount * sizeof(PathSegment));
+#endif
 
 	checkCUDAError("pathtraceInit");
 }
@@ -129,8 +136,12 @@ void pathtraceFree() {
 	cudaFree(dev_materials);
 	cudaFree(dev_intersections);
 	// TODO: clean up any extra device memory you created
+#if SORT_BY_MATERIALS
 	cudaFree(dev_intersection_materials);
-
+#endif
+#if CACHE_FIRST_BOUNCE
+	cudaFree(dev_first_bounce_paths);
+#endif
 	checkCUDAError("pathtraceFree");
 }
 
@@ -403,8 +414,19 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 
 	// TODO: perform one iteration of path tracing
 
+#if CACHE_FIRST_BOUNCE
+	if (iter == 1) { // on first iteration, need to generate new camera rays
+		generateRayFromCamera << <blocksPerGrid2d, blockSize2d >> > (cam, iter, traceDepth, dev_paths);
+		checkCUDAError("generate camera ray");
+		cudaMemcpy(dev_first_bounce_paths, dev_paths, pixelcount * sizeof(PathSegment), cudaMemcpyDeviceToDevice);
+	}
+	else { // on next iterations, we can used cached values from dev_first_bounce_paths
+		cudaMemcpy(dev_paths, dev_first_bounce_paths, pixelcount * sizeof(PathSegment), cudaMemcpyDeviceToDevice);
+	}
+#else
 	generateRayFromCamera << <blocksPerGrid2d, blockSize2d >> > (cam, iter, traceDepth, dev_paths);
 	checkCUDAError("generate camera ray");
+#endif
 
 	int depth = 0;
 	PathSegment *dev_path_end = dev_paths + pixelcount;
