@@ -64,6 +64,11 @@ __global__ void sendImageToPBO(uchar4* pbo, glm::ivec2 resolution,
 		color.y = glm::clamp((int)(pix.y / iter * 255.0), 0, 255);
 		color.z = glm::clamp((int)(pix.z / iter * 255.0), 0, 255);
 
+		//float cx = pix.x;
+		//float cy = pix.y;
+		//float cz = pix.z;
+		//pix = glm::vec3(cx, cy, cz);
+
 		// Each thread writes one pixel location in the texture (textel)
 		pbo[index].w = 0;
 		pbo[index].x = color.x;
@@ -309,38 +314,54 @@ __global__ void shadeMaterial(
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx < num_paths)
 	{
+		PathSegment &pathSegment = pathSegments[idx];
+
+		// If we didn't hit anything
+		if (pathSegment.remainingBounces <= 0) {
+			pathSegment.color = glm::vec3(0.0f);
+			return;
+		}
+
 		ShadeableIntersection intersection = shadeableIntersections[idx];
 		if (intersection.t > 0.0f) { // if the intersection exists...
 			thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, depth);
 
 			Material &material = materials[intersection.materialId];
 
-			// update the path bounce
-			// new direction will be totally random direction in the hemisphere surrounding the normal
-			glm::vec3 newOrigin = pathSegments[idx].ray.origin + intersection.t * pathSegments[idx].ray.direction;
-			newOrigin += intersection.surfaceNormal * 0.0001f; // TODO: tune
-			glm::vec3 newDirection = calculateRandomDirectionInHemisphere(intersection.surfaceNormal, rng); // w_i
+			glm::vec3 intersectionPoint = intersection.t + pathSegments[idx].ray.origin;
+			scatterRay(pathSegment, intersectionPoint, intersection.surfaceNormal, material, rng);
 
 			// If the material indicates that the object was a light, "light" the ray
 			if (material.emittance > 0.0f) {
-				pathSegments[idx].color *= (material.color * material.emittance);
-				pathSegments->remainingBounces = 0; // hit light = stop tracing the path
+				pathSegment.color *= (material.color * material.emittance);
+				pathSegment.remainingBounces = 0; // hit light = stop tracing the path
 				return;
 			}
 			else {
 				// light is pointing from above?
-				float lightTerm = glm::clamp(glm::dot(intersection.surfaceNormal, newDirection), 0.0f, 1.0f);
-				pathSegments[idx].color *= material.color * lightTerm;
+				//float lightTerm = glm::clamp(glm::dot(intersection.surfaceNormal, newDirection), 0.0f, 1.0f);
+				//pathSegments[idx].color *= material.color * lightTerm / pdf;
+				pathSegment.color *= material.color;
+
+				//if (depth > 1) {
+				//	float r = pathSegments[idx].color.r;
+				//	float g = pathSegments[idx].color.g;
+				//	float b = pathSegments[idx].color.b;
+				//	float mr = material.color.r;
+				//	float mg = material.color.g;
+				//	float mb = material.color.b;
+				//	material.color = glm::vec3(mr, mg, mb);
+				//	pathSegments[idx].color = glm::vec3(r, g, b);
+				//}
+
 				//pathSegments[idx].color = iter % 2 == 0 ? glm::vec3(1, 0, 0) : glm::vec3(0, 0, 1);
 			}
 
-			pathSegments[idx].ray.origin = newOrigin;
-			pathSegments[idx].ray.direction = newDirection;
-			pathSegments[idx].remainingBounces--;
+			pathSegment.remainingBounces--;
 		}
 		else {
-			pathSegments[idx].color = glm::vec3(0.0f);
-			pathSegments->remainingBounces = 0; // no intersection = stop tracing the path
+			pathSegment.color = glm::vec3(0);
+			pathSegment.remainingBounces = 0; // no intersection = stop tracing the path
 		}
 	}
 }
@@ -362,7 +383,7 @@ struct path_should_continue
 	__host__ __device__
 		bool operator()(const PathSegment segment)
 	{
-		return segment.remainingBounces >= 0;
+		return segment.remainingBounces > 0;
 	}
 };
 

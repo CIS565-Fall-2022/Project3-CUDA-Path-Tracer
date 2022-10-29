@@ -7,6 +7,7 @@
  * Computes a cosine-weighted random direction in a hemisphere.
  * Used for diffuse lighting.
  */
+// Also return the pdf
 __host__ __device__
 glm::vec3 calculateRandomDirectionInHemisphere(
         glm::vec3 normal, thrust::default_random_engine &rng) {
@@ -36,6 +37,7 @@ glm::vec3 calculateRandomDirectionInHemisphere(
     glm::vec3 perpendicularDirection2 =
         glm::normalize(glm::cross(normal, perpendicularDirection1));
 
+    // This sampling method guarantees that we get a vector on the correct side of the hemisphere
     return up * normal
         + cos(around) * over * perpendicularDirection1
         + sin(around) * over * perpendicularDirection2;
@@ -76,4 +78,10 @@ void scatterRay(
     // TODO: implement this.
     // A basic implementation of pure-diffuse shading will just call the
     // calculateRandomDirectionInHemisphere defined above.
+  			// update the path bounce
+			// new direction will be cosine-weighted random direction in the hemisphere surrounding the normal
+			glm::vec3 newDirection = calculateRandomDirectionInHemisphere(normal, rng); // w_i
+
+      pathSegment.ray.direction = newDirection;
+      pathSegment.ray.origin = intersect + newDirection * 0.0001f; // TODO: tune
 }
