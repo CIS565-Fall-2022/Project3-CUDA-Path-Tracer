@@ -83,5 +83,5 @@ void scatterRay(
 			glm::vec3 newDirection = calculateRandomDirectionInHemisphere(normal, rng); // w_i
 
       pathSegment.ray.direction = newDirection;
-      pathSegment.ray.origin = intersect + newDirection * 0.0001f; // TODO: tune
+      pathSegment.ray.origin = intersect + (newDirection * 0.0001f); // TODO: tune
 }

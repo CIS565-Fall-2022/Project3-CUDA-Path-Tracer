@@ -328,7 +328,7 @@ __global__ void shadeMaterial(
 
 			Material &material = materials[intersection.materialId];
 
-			glm::vec3 intersectionPoint = intersection.t + pathSegments[idx].ray.origin;
+			glm::vec3 intersectionPoint = intersection.t * pathSegment.ray.direction + pathSegment.ray.origin;
 			scatterRay(pathSegment, intersectionPoint, intersection.surfaceNormal, material, rng);
 
 			// If the material indicates that the object was a light, "light" the ray
@@ -355,9 +355,8 @@ __global__ void shadeMaterial(
 				//}
 
 				//pathSegments[idx].color = iter % 2 == 0 ? glm::vec3(1, 0, 0) : glm::vec3(0, 0, 1);
+				pathSegment.remainingBounces--;
 			}
-
-			pathSegment.remainingBounces--;
 		}
 		else {
 			pathSegment.color = glm::vec3(0);
