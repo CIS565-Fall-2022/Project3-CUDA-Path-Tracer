@@ -115,3 +115,13 @@ material 4
 TRANS       -1 4 -1
 ROTAT       0 0 0
 SCALE       3 3 3
+
+// Front wall for testing reflections
+// See if black spots are an artifact of some bug
+// Or if they're just the badly rendered reflections of outside
+// OBJECT 7
+// cube
+// material 1
+// TRANS       0 5 5
+// ROTAT       0 90 0
+// SCALE       .01 10 10

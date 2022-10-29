@@ -80,8 +80,16 @@ void scatterRay(
     // calculateRandomDirectionInHemisphere defined above.
   			// update the path bounce
 			// new direction will be cosine-weighted random direction in the hemisphere surrounding the normal
-			glm::vec3 newDirection = calculateRandomDirectionInHemisphere(normal, rng); // w_i
+    glm::vec3 newDirection;
+    if (m.hasReflective) {
+      // For the incident vector I and surface orientation N, returns the reflection direction : result = I - 2.0 * dot(N, I) * N.
+      // already has negative sign built in
+      newDirection = glm::reflect(pathSegment.ray.direction, normal);
+    }
+    else {
+      newDirection = calculateRandomDirectionInHemisphere(normal, rng); // w_i
+    }
 
-      pathSegment.ray.direction = newDirection;
-      pathSegment.ray.origin = intersect + (newDirection * 0.0001f); // TODO: tune
+    pathSegment.ray.direction = newDirection;
+    pathSegment.ray.origin = intersect + (newDirection * 0.0001f); // TODO: tune
 }
