@@ -1,6 +1,7 @@
 #include <iostream>
 #include "scene.h"
 #include <cstring>
+#include <filesystem>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
 
@@ -210,7 +211,87 @@ int Scene::loadMaterial(string materialid) {
     }
 }
 
-int Scene::loadTinyGltf(std::string filename) {
+// convert accessor index into float array
+// error if accessor points to non-float data type
+float* readBuffer(const tinygltf::Model& model, int accessorIdx, int* out_arraySize, const string &gltbDirectory) {
+  using namespace tinygltf;
+
+  const Accessor& accessor = model.accessors.at(accessorIdx);
+  if (accessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT) {
+    cout << "Trying to read non-float accessor meow" << endl;
+  }
+
+  int vectorSize = 0;
+
+  switch (accessor.type) {
+  case TINYGLTF_TYPE_VEC2:
+    vectorSize = 2;
+    break;
+  case TINYGLTF_TYPE_VEC3:
+    vectorSize = 3;
+    break;
+  default:
+    cout << "Trying to read non-vec2/vec3 meow" << endl;
+  }
+
+  // need to allocate vectorSize * numOfVectors floats
+  // eg. if we have 10 vec2s, we need 20 floats
+  if (!(accessor.count > 0)) {
+    cout << "Invalid accessor count meow" << endl;
+  }
+  int arraySize = vectorSize * accessor.count;
+  float* result = new float[arraySize];
+
+  const BufferView& bufferView = model.bufferViews.at(accessor.bufferView);
+  const Buffer& buffer = model.buffers.at(bufferView.buffer);
+
+  // open da buffer
+  // byteStride option not supported for now
+  ifstream fileStream;
+  string relativePath = gltbDirectory + '\\' + buffer.uri;
+  fileStream.open(relativePath, ios::binary); // try relative path first
+  if (!fileStream) {
+    // try direct path
+    fileStream.open(buffer.uri);
+    if (!fileStream) {
+        cout << "Could not open file " << buffer.uri << " at relative (" << relativePath << ") or absolute paths" << endl;
+    }
+    else {
+      cout << "Opened file at absolute path " << buffer.uri << endl;
+    }
+  }
+  else {
+    cout << "Opened file at relative path " << relativePath << endl;
+  }
+
+  if (!fileStream.seekg(bufferView.byteOffset, ios::beg)) {
+    cout << "Error getting offset from file" << endl;
+  }
+  else {
+    cout << bufferView.byteOffset << " bytes seeked successfully" << endl;
+  }
+
+  fileStream.read((char*) result, bufferView.byteLength);
+
+  cout << "Just read " << fileStream.gcount() << " bytes from file (" << bufferView.byteLength
+    << " were requested at offset " << bufferView.byteOffset << ")" << endl;
+
+  fileStream.close();
+
+  //for (int i = 0; i < arraySize; ++i) {
+  //  printf(" %6.4lf", result[i]);
+  //}
+
+  return result;
+}
+
+// https://stackoverflow.com/questions/8518743/get-directory-from-file-path-c
+string getDirectory(const string &filename) {
+  size_t found = filename.find_last_of("/\\");
+  return(filename.substr(0, found));
+}
+
+int Scene::loadTinyGltf(string filename) {
   using namespace tinygltf;
 
   Model model;
@@ -220,6 +301,9 @@ int Scene::loadTinyGltf(std::string filename) {
 
   //bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, filename);
   bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, filename);
+
+  // for loading from relative paths
+  string gltbDirectory = getDirectory(filename);
 
   if (!warn.empty()) {
     printf("Warn: %s\n", warn.c_str());
@@ -235,11 +319,20 @@ int Scene::loadTinyGltf(std::string filename) {
     return -1;
   }
 
-  cout << "Gltf read the file %s successfully!" << filename << endl;
+  cout << "Gltf read the json file successfully:" << filename << endl;
 
   cout << "MATERIALS PARSING-----" << endl;
-  for (const tinygltf::Material& gltfMaterial : model.materials) {
+  // materials will be ordered in scene array like original order
+  // so indices from geometry will still line up
+  for (int i = 0; i < model.materials.size(); ++i) {
+    const tinygltf::Material& gltfMaterial = model.materials[i];
     scene_structs::Material newMaterial;
+    // TODO: add support for textures, for now, it will just be a lambert
+    newMaterial.color = glm::vec3(0.8f, 0.2f, 0.7f);
+    newMaterial.emittance = 1.0f;
+
+    cout << "Adding material #" << i << ": " << gltfMaterial.name << endl;
+    materials.push_back(newMaterial);
   }
 
   cout << "GEOMETRY PARSING-----" << endl;
@@ -247,9 +340,12 @@ int Scene::loadTinyGltf(std::string filename) {
     // for now, don't worry about transformations/scene graph structure on nodes
     int meshIdx = node.mesh;
     Mesh mesh = model.meshes.at(meshIdx);
-    cout << "Gltf Parsing mesh %s\n" << mesh.name << endl;
+    cout << "Gltf Parsing mesh " << mesh.name << endl;
     for (const Primitive &p : mesh.primitives) {
-
+      // TODO: add other buffers here
+      int posArrSize;
+      int posAccessorIdx = p.attributes.at("POSITION");
+      float* positionArray = readBuffer(model, posAccessorIdx, &posArrSize, gltbDirectory);
     }
   }
 }
