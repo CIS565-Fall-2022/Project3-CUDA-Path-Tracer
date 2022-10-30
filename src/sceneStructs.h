@@ -71,6 +71,7 @@ struct PathSegment {
     int pixelIndex;  //pixel index of which it emit from
     int remainingBounces;
     int lightGeomId;
+    glm::vec3 specularBounce;
 };
 
 // Use with a corresponding PathSegment to do:

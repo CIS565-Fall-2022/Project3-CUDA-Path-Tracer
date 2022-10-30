@@ -101,6 +101,7 @@ void scatterRay(
         float lambertFactor = glm::dot(newDir, normal);
         pdf_f_f = lambertFactor * INV_PI;
         if (pdf_f_f == 0.f) {
+            pathSegment.beta = glm::vec3(0.f);
             pathSegment.color = glm::vec3(0.f);
             pathSegment.remainingBounces = 0;
         }
@@ -226,10 +227,57 @@ void scatterRayMIS(
         float wf = powerHeuristic(1, pdf_f_f, 1, pdf_f_l);
         pathSegment2.beta *= wf;
         Material& lightMaterial = dev_materials[light.materialid];
-        pathSegment2.color += pathSegment2.beta * lightMaterial.emittance;
+        pathSegment2.color += pathSegment2.beta * lightMaterial.emittance * lightMaterial.color;
+        
     }
     else {
         pathSegment2.color = glm::vec3(0.f);
         pathSegment2.remainingBounces = 0;
     }
+}
+
+__host__ __device__
+void scatterRayFullLight(
+    PathSegment& pathSegment,
+    glm::vec3 intersect,
+    glm::vec3 normal,
+    const Material& m,
+    thrust::default_random_engine& rng,
+    float& pdf_f_f
+) {
+    // TODO: implement this.
+    // A basic implementation of pure-diffuse shading will just call the
+    // calculateRandomDirectionInHemisphere defined above.
+    if (m.hasReflective == 1.f) {
+        //mirror
+        //glm::reflect  (1,1,0) (0, 1, 0) => (1, -1, 0)
+        glm::vec3 newDir = glm::reflect(pathSegment.ray.direction, normal);
+        pdf_f_f = 1.f;
+        pathSegment.beta *= m.specular.color;
+        pathSegment.ray.origin = intersect + 0.001f * normal;
+        pathSegment.ray.direction = newDir;
+        --(pathSegment.remainingBounces);
+    }
+    else if (m.hasRefractive == 1.f) {
+        //refract
+
+    }
+    else {
+        //lambert
+        glm::vec3 newDir = calculateRandomDirectionInHemisphere(normal, rng);
+        glm::vec3 lambertBRDF = m.color * INV_PI;
+        float lambertFactor = glm::dot(newDir, normal);
+        pdf_f_f = lambertFactor * INV_PI;
+        if (pdf_f_f == 0.f) {
+            pathSegment.beta = glm::vec3(0.f);
+            pathSegment.remainingBounces = 0;
+        }
+        else {
+            pathSegment.beta *= ((lambertFactor * lambertBRDF) / pdf_f_f);
+            pathSegment.ray.origin = intersect + 0.001f * normal;
+            pathSegment.ray.direction = newDir;
+            --(pathSegment.remainingBounces);
+        }
+    }
+
 }
