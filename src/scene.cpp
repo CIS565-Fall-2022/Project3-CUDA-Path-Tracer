@@ -4,11 +4,34 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
 
+#define TINYGLTF_IMPLEMENTATION
+#define TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
+#define TINYGLTF_NO_INCLUDE_STB_IMAGE
+
+#include <stb_image.h>
+#include <stb_image_write.h>
+
+#include "tiny_gltf.h"
+
+// source: https://stackoverflow.com/questions/20446201/how-to-check-if-string-ends-with-txt
+bool has_suffix(const std::string& str, const std::string& suffix)
+{
+  return str.size() >= suffix.size() &&
+    str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
 Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;
+
+    if (!has_suffix(filename, "txt")) {
+      loadTinyGltf(filename);
+      return;
+    }
+
     char* fname = (char*)filename.c_str();
     fp_in.open(fname);
+
     if (!fp_in.is_open()) {
         cout << "Error reading from file - aborting!" << endl;
         throw;
@@ -185,4 +208,30 @@ int Scene::loadMaterial(string materialid) {
         materials.push_back(newMaterial);
         return 1;
     }
+}
+
+int Scene::loadTinyGltf(std::string filename) {
+  using namespace tinygltf;
+
+  Model model;
+  TinyGLTF loader;
+  std::string err;
+  std::string warn;
+
+  bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, filename);
+  //bool ret = loader.LoadAsciiFromFile(&model, &err, &warn, argv[1]);
+
+  if (!warn.empty()) {
+    printf("Warn: %s\n", warn.c_str());
+  }
+
+  if (!err.empty()) {
+    printf("Err: %s\n", err.c_str());
+    return -1;
+  }
+
+  if (!ret) {
+    printf("Failed to parse glTF\n");
+    return -1;
+  }
 }
