@@ -12,6 +12,7 @@ namespace scene_structs {
 enum GeomType {
   SPHERE,
   CUBE,
+  MESH,
 };
 
 struct Ray {
@@ -28,6 +29,13 @@ struct Geom {
   glm::mat4 transform;
   glm::mat4 inverseTransform;
   glm::mat4 invTranspose;
+};
+
+struct MeshGeom : Geom {
+  std::vector<glm::vec3> positions;
+  std::vector<glm::vec3> normals;
+  std::vector<glm::vec2> uvCoords;
+  std::vector<unsigned int> indices;
 };
 
 struct Material {

@@ -211,36 +211,24 @@ int Scene::loadMaterial(string materialid) {
     }
 }
 
-// convert accessor index into float array
-// error if accessor points to non-float data type
-float* readBuffer(const tinygltf::Model& model, int accessorIdx, int* out_arraySize, const string &gltbDirectory) {
+// convert accessor index into float array OR int array
+// Either way they will be arrays of 4 bytes, we can cast later
+// error if accessor points to other data type
+void* readBuffer(const tinygltf::Model& model, int accessorIdx, const string& gltbDirectory,
+  int *out_arrayLength, int *out_componentType) {
   using namespace tinygltf;
 
   const Accessor& accessor = model.accessors.at(accessorIdx);
-  if (accessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT) {
-    cout << "Trying to read non-float accessor meow" << endl;
-  }
+  int componentSizeInBytes = GetComponentSizeInBytes(accessor.componentType);
+  int numComponents = GetNumComponentsInType(accessor.type);
 
-  int vectorSize = 0;
-
-  switch (accessor.type) {
-  case TINYGLTF_TYPE_VEC2:
-    vectorSize = 2;
-    break;
-  case TINYGLTF_TYPE_VEC3:
-    vectorSize = 3;
-    break;
-  default:
-    cout << "Trying to read non-vec2/vec3 meow" << endl;
-  }
-
-  // need to allocate vectorSize * numOfVectors floats
+  // need to allocate numComponents * numOfVectors floats
   // eg. if we have 10 vec2s, we need 20 floats
   if (!(accessor.count > 0)) {
     cout << "Invalid accessor count meow" << endl;
   }
-  int arraySize = vectorSize * accessor.count;
-  float* result = new float[arraySize];
+  int arraySizeInBytes = componentSizeInBytes * numComponents * accessor.count;
+  char* result = new char[arraySizeInBytes]; // we can cast this to int, float, etc. for index buffers... very sketchy
 
   const BufferView& bufferView = model.bufferViews.at(accessor.bufferView);
   const Buffer& buffer = model.buffers.at(bufferView.buffer);
@@ -252,7 +240,7 @@ float* readBuffer(const tinygltf::Model& model, int accessorIdx, int* out_arrayS
   fileStream.open(relativePath, ios::binary); // try relative path first
   if (!fileStream) {
     // try direct path
-    fileStream.open(buffer.uri);
+    fileStream.open(buffer.uri, ios::binary);
     if (!fileStream) {
         cout << "Could not open file " << buffer.uri << " at relative (" << relativePath << ") or absolute paths" << endl;
     }
@@ -278,11 +266,44 @@ float* readBuffer(const tinygltf::Model& model, int accessorIdx, int* out_arrayS
 
   fileStream.close();
 
-  //for (int i = 0; i < arraySize; ++i) {
+  //for (int i = 0; i < arraySizeInBytes; ++i) {
   //  printf(" %6.4lf", result[i]);
   //}
+  
+  // number of elements in array, not accounting for grouping by components
+  *out_arrayLength = numComponents * accessor.count;
+  if (out_componentType != NULL) {
+    *out_componentType = accessor.componentType;
+  }
+  return (void *) result;
+}
 
-  return result;
+void appendVec3Buffer(vector<glm::vec3> &vec3Buffer, const float* elts, int eltsLength) {
+  for (int i = 0; i + 2 < eltsLength; i = i + 3) {
+    glm::vec3 elt(elts[i], elts[i + 1], elts[i + 2]);
+    vec3Buffer.push_back(elt);
+  }
+}
+
+// need to deal with a bit differently depending on if int or short
+// official spec says indices should be an int array
+// but it's a short array in the avocado file
+void appendIndicesBuffer(vector<unsigned int>& indicesBuffer, void *elts, int eltsLength, int gltf_component_type) {
+  if (gltf_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+    unsigned int* indices = (unsigned int*)elts;
+    for (int i = 0; i < eltsLength; ++i) {
+      indicesBuffer.push_back(indices[i]);
+    }
+  }
+  else if (gltf_component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+    unsigned short* indices = (unsigned short*)elts;
+    for (int i = 0; i < eltsLength; ++i) {
+      indicesBuffer.push_back(indices[i]);
+    }
+  }
+  else {
+    cout << "Unsupported component type for indices, gtfo" << endl;
+  }
 }
 
 // https://stackoverflow.com/questions/8518743/get-directory-from-file-path-c
@@ -341,11 +362,27 @@ int Scene::loadTinyGltf(string filename) {
     int meshIdx = node.mesh;
     Mesh mesh = model.meshes.at(meshIdx);
     cout << "Gltf Parsing mesh " << mesh.name << endl;
+
+    MeshGeom newMesh;
+
     for (const Primitive &p : mesh.primitives) {
       // TODO: add other buffers here
-      int posArrSize;
-      int posAccessorIdx = p.attributes.at("POSITION");
-      float* positionArray = readBuffer(model, posAccessorIdx, &posArrSize, gltbDirectory);
+      int posArrLength, normArrLength, uvArrLength, indicesArrLength, indicesComponentType;
+
+      float* positionArray = (float*) readBuffer(model, p.attributes.at("POSITION"), gltbDirectory, &posArrLength, NULL);
+      float* normalArray = (float*)readBuffer(model, p.attributes.at("NORMAL"), gltbDirectory, &normArrLength, NULL);
+      if (posArrLength != normArrLength) {
+        cout << "Warning - Positions buffer length not equal to normals buffer length" << endl;
+      }
+      appendVec3Buffer(newMesh.positions, positionArray, posArrLength);
+      appendVec3Buffer(newMesh.normals, normalArray, normArrLength);
+
+      void* indicesArray = (void*)readBuffer(model, p.indices, gltbDirectory, &indicesArrLength, &indicesComponentType);
+      appendIndicesBuffer(newMesh.indices, indicesArray, indicesArrLength, indicesComponentType);
+
+      free(positionArray);
+      free(normalArray);
+      free(indicesArray);
     }
   }
 }
