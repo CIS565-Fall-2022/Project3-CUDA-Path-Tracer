@@ -16,6 +16,8 @@
 #include "intersections.h"
 #include "interactions.h"
 
+using namespace scene_structs;
+
 #define ERRORCHECK 1
 #define SORT_BY_MATERIALS 1
 #define CACHE_FIRST_BOUNCE 1

@@ -7,56 +7,58 @@
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 
+namespace scene_structs {
+
 enum GeomType {
-    SPHERE,
-    CUBE,
+  SPHERE,
+  CUBE,
 };
 
 struct Ray {
-    glm::vec3 origin;
-    glm::vec3 direction;
+  glm::vec3 origin;
+  glm::vec3 direction;
 };
 
 struct Geom {
-    enum GeomType type;
-    int materialid;
-    glm::vec3 translation;
-    glm::vec3 rotation;
-    glm::vec3 scale;
-    glm::mat4 transform;
-    glm::mat4 inverseTransform;
-    glm::mat4 invTranspose;
+  enum GeomType type;
+  int materialid;
+  glm::vec3 translation;
+  glm::vec3 rotation;
+  glm::vec3 scale;
+  glm::mat4 transform;
+  glm::mat4 inverseTransform;
+  glm::mat4 invTranspose;
 };
 
 struct Material {
+  glm::vec3 color;
+  struct {
+    float exponent;
     glm::vec3 color;
-    struct {
-        float exponent;
-        glm::vec3 color;
-    } specular;
-    float hasReflective;
-    float hasRefractive;
-    float indexOfRefraction;
-    float emittance;
+  } specular;
+  float hasReflective;
+  float hasRefractive;
+  float indexOfRefraction;
+  float emittance;
 };
 
 struct Camera {
-    glm::ivec2 resolution; // eg. 1080 x 1920
-    glm::vec3 position;
-    glm::vec3 lookAt; // NOT necessarily normalized
-    glm::vec3 view; // normalized, direction camera is facing
-    glm::vec3 up; // normalized
-    glm::vec3 right; // normalized
-    glm::vec2 fov;
-    glm::vec2 pixelLength;
+  glm::ivec2 resolution; // eg. 1080 x 1920
+  glm::vec3 position;
+  glm::vec3 lookAt; // NOT necessarily normalized
+  glm::vec3 view; // normalized, direction camera is facing
+  glm::vec3 up; // normalized
+  glm::vec3 right; // normalized
+  glm::vec2 fov;
+  glm::vec2 pixelLength;
 };
 
 struct RenderState {
-    Camera camera;
-    unsigned int iterations;
-    int traceDepth; // DEPTH value in scene txt file
-    std::vector<glm::vec3> image;
-    std::string imageName;
+  Camera camera;
+  unsigned int iterations;
+  int traceDepth; // DEPTH value in scene txt file
+  std::vector<glm::vec3> image;
+  std::string imageName;
 };
 
 // a path stores the multiple ray bounces from one pixel until the ray dies
@@ -67,10 +69,10 @@ struct RenderState {
 // We have 1 pathsegment per pixel?
 // Guess we only need 1 pathsegment to consolidate multiple paths per pixel (for anti-aliasing) 
 struct PathSegment {
-    Ray ray;
-    glm::vec3 color;
-    int pixelIndex;
-    int remainingBounces;
+  Ray ray;
+  glm::vec3 color;
+  int pixelIndex;
+  int remainingBounces;
 };
 
 // Use with a corresponding PathSegment to do:
@@ -81,3 +83,5 @@ struct ShadeableIntersection {
   glm::vec3 surfaceNormal; // normalized
   int materialId;
 };
+
+}

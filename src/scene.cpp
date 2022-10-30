@@ -218,8 +218,8 @@ int Scene::loadTinyGltf(std::string filename) {
   std::string err;
   std::string warn;
 
-  bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, filename);
-  //bool ret = loader.LoadAsciiFromFile(&model, &err, &warn, argv[1]);
+  //bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, filename);
+  bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, filename);
 
   if (!warn.empty()) {
     printf("Warn: %s\n", warn.c_str());
@@ -233,5 +233,23 @@ int Scene::loadTinyGltf(std::string filename) {
   if (!ret) {
     printf("Failed to parse glTF\n");
     return -1;
+  }
+
+  cout << "Gltf read the file %s successfully!" << filename << endl;
+
+  cout << "MATERIALS PARSING-----" << endl;
+  for (const tinygltf::Material& gltfMaterial : model.materials) {
+    scene_structs::Material newMaterial;
+  }
+
+  cout << "GEOMETRY PARSING-----" << endl;
+  for (const Node &node : model.nodes) {
+    // for now, don't worry about transformations/scene graph structure on nodes
+    int meshIdx = node.mesh;
+    Mesh mesh = model.meshes.at(meshIdx);
+    cout << "Gltf Parsing mesh %s\n" << mesh.name << endl;
+    for (const Primitive &p : mesh.primitives) {
+
+    }
   }
 }

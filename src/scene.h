@@ -9,6 +9,7 @@
 #include "sceneStructs.h"
 
 using namespace std;
+using namespace scene_structs;
 
 class Scene {
 private:

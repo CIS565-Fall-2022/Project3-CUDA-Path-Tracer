@@ -27,6 +27,8 @@ int iteration;
 int width;
 int height;
 
+using namespace scene_structs;
+
 //-------------------------------
 //-------------MAIN--------------
 //-------------------------------

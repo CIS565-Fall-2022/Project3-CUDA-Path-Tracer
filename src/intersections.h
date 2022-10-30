@@ -6,6 +6,8 @@
 #include "sceneStructs.h"
 #include "utilities.h"
 
+using namespace scene_structs;
+
 /**
  * Handy-dandy hash function that provides seeds for random number generation.
  */
