@@ -1,7 +1,6 @@
 #include <iostream>
 #include "scene.h"
 #include <cstring>
-#include <filesystem>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
 
@@ -363,7 +362,7 @@ int Scene::loadTinyGltf(string filename) {
     Mesh mesh = model.meshes.at(meshIdx);
     cout << "Gltf Parsing mesh " << mesh.name << endl;
 
-    MeshGeom newMesh;
+    InputMesh newMesh;
 
     for (const Primitive &p : mesh.primitives) {
       // TODO: add other buffers here
@@ -383,6 +382,35 @@ int Scene::loadTinyGltf(string filename) {
       free(positionArray);
       free(normalArray);
       free(indicesArray);
+
+      glm::vec3 default_translation = glm::vec3(0);
+      glm::vec3 default_rotation = glm::vec3(0);
+      glm::vec3 default_scale = glm::vec3(1);
+
+      // Now parse them into triangles
+      int indicesLen = newMesh.indices.size();
+      for (int i = 0; i + 2 < indicesLen; i = i + 3) {
+        Geom triangle;
+        triangle.type = TRIANGLE;
+        triangle.translation = default_translation;
+        triangle.rotation = default_rotation;
+        triangle.scale = default_scale;
+        triangle.materialid = p.material;
+
+        triangle.transform = utilityCore::buildTransformationMatrix(
+          triangle.translation, triangle.rotation, triangle.scale);
+        triangle.inverseTransform = glm::inverse(triangle.transform);
+        triangle.invTranspose = glm::inverseTranspose(triangle.transform);
+
+        for (int idx = i; idx < i + 3; ++idx) {
+          Vertex v;
+          v.position = newMesh.positions.at(newMesh.indices.at(idx));
+          v.normal = newMesh.normals.at(newMesh.indices.at(idx));
+          triangle.verts[idx - i] = v;
+        }
+
+        geoms.push_back(triangle);
+      }
     }
   }
 }

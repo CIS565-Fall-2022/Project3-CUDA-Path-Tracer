@@ -12,12 +12,18 @@ namespace scene_structs {
 enum GeomType {
   SPHERE,
   CUBE,
-  MESH,
+  TRIANGLE,
 };
 
 struct Ray {
   glm::vec3 origin;
   glm::vec3 direction;
+};
+
+struct Vertex {
+  glm::vec3 position;
+  glm::vec3 normal;
+  glm::vec2 uv;
 };
 
 struct Geom {
@@ -29,9 +35,13 @@ struct Geom {
   glm::mat4 transform;
   glm::mat4 inverseTransform;
   glm::mat4 invTranspose;
+  Vertex verts[3]; // should use polymorphism, and have geoms be vector of pointers instead
+                   // sadly they were set us as a vector of Geoms, not Geoms*
+                  // this is just too much for me to fix today
 };
 
-struct MeshGeom : Geom {
+// intermediate struct to parse triangles out of
+struct InputMesh {
   std::vector<glm::vec3> positions;
   std::vector<glm::vec3> normals;
   std::vector<glm::vec2> uvCoords;
