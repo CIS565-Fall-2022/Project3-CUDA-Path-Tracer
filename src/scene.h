@@ -15,6 +15,7 @@ class Scene {
 private:
     ifstream fp_in;
     int loadMaterial(string materialid);
+    void loadDefaultCamera();
     int loadGeom(string objectid);
     int loadCamera();
     int loadTinyGltf(std::string filename);

@@ -26,6 +26,7 @@ Scene::Scene(string filename) {
 
     if (!has_suffix(filename, "txt")) {
       loadTinyGltf(filename);
+      loadDefaultCamera();
       return;
     }
 
@@ -226,6 +227,38 @@ int Scene::loadMaterial(string materialid) {
     }
 }
 
+// The gltf models I could find don't have a camera, so lets load some default values
+void Scene::loadDefaultCamera() {
+  RenderState& state = this->state;
+  state.iterations = 5000;
+  state.traceDepth = 8;
+
+  Camera& camera = state.camera;
+  camera.resolution = glm::ivec2(800, 800);
+  camera.position = glm::vec3(0.0f, 5.0f, 10.5f);
+  camera.lookAt = glm::vec3(0, 5, 0);
+  camera.up = glm::vec3(0, 1, 0);
+
+  float fovy = 45;
+  float yscaled = tan(fovy * (PI / 180));
+  float xscaled = (yscaled * camera.resolution.x) / camera.resolution.y;
+  float fovx = (atan(xscaled) * 180) / PI;
+
+  camera.fov = glm::vec2(fovx, fovy);
+  camera.right = glm::normalize(glm::cross(camera.view, camera.up));
+  camera.pixelLength = glm::vec2(2 * xscaled / (float)camera.resolution.x,
+    2 * yscaled / (float)camera.resolution.y);
+
+  camera.view = glm::normalize(camera.lookAt - camera.position);
+
+  //set up render camera stuff
+  int arraylen = camera.resolution.x * camera.resolution.y;
+  state.image.resize(arraylen);
+  std::fill(state.image.begin(), state.image.end(), glm::vec3());
+
+  cout << "Loaded camera!" << endl;
+}
+
 // convert accessor index into float array OR int array
 // Either way they will be arrays of 4 bytes, we can cast later
 // error if accessor points to other data type
@@ -401,7 +434,7 @@ int Scene::loadTinyGltf(string filename) {
 
       glm::vec3 default_translation = glm::vec3(0);
       glm::vec3 default_rotation = glm::vec3(0);
-      glm::vec3 default_scale = glm::vec3(1);
+      glm::vec3 default_scale = glm::vec3(100);
 
       // Now parse them into triangles
       int indicesLen = newMesh.indices.size();
