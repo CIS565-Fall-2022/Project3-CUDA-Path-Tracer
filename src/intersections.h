@@ -144,3 +144,69 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 
     return glm::length(r.origin - intersectionPoint);
 }
+
+__host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
+  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, bool& out_outside) {
+
+  // first apply inverse transformation to ray
+  glm::vec3 ro = multiplyMV(triangle.inverseTransform, glm::vec4(r.origin, 1.0f));
+  glm::vec3 rd = glm::normalize(multiplyMV(triangle.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+  glm::vec3 v1 = triangle.verts[0].position;
+  glm::vec3 v2 = triangle.verts[1].position;
+  glm::vec3 v3 = triangle.verts[2].position;
+
+  glm::vec3 edge1 = v2 - v1; //       v1
+  glm::vec3 edge2 = v3 - v2; //     /   |
+  glm::vec3 edge3 = v1 - v3; //    v2---v3
+  
+  // triangle is a plane of the form ax + bx + cx = d, where (a,b,c) is the normal
+  glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2)); // vertices are counter-clockwise
+
+  // plug in arbitrary point (v0) to solve for d
+  float d = glm::dot(normal, v1);
+
+  if (glm::abs(glm::dot(normal, rd)) < 0.000001f) { // TODO: tune
+    // avoid divide by 0, ray could be parallel to plane in which case we don't see it
+    return -1;
+  }
+
+  // ro + t * rd = some point p that intersects with the plane
+  // because p intersects, we can plug in
+  // normal . (ro + t * rd) = d
+  float t = (d - glm::dot(normal, ro)) / glm::dot(normal, rd);
+
+  if (t < 0) { // Check if triangle is behind the camera
+    return -1;
+  }
+
+  // Check if ray hits triangle or not (barycentric coords)
+  // all signed areas must be positive (relative to normal) for point to be inside the triangle
+  glm::vec3 intersectionPoint = ro + t * rd;
+
+  glm::vec3 c1 = intersectionPoint - v1;
+  glm::vec3 c2 = intersectionPoint - v2;
+  glm::vec3 c3 = intersectionPoint - v3;
+  
+  bool isInsideTriangle = glm::dot(normal, glm::cross(edge1, c1)) > 0 &&
+    glm::dot(normal, glm::cross(edge2, c2)) > 0 &&
+    glm::dot(normal, glm::cross(edge3, c3)) > 0;
+
+  if (!isInsideTriangle) {
+    return -1;
+  }
+
+  // Finally, check if we are hitting front side or back side of face by checking
+  // to hit outside, normal and ray direction should point the opposite way
+  out_intersectionPoint = intersectionPoint;
+  if (glm::dot(rd, normal) > 0) {
+    out_normal = -normal;
+    out_outside = true;
+  }
+  else {
+    out_normal = normal;
+    out_outside = false;
+  }
+
+  return t;
+}

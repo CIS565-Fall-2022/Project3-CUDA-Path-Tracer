@@ -55,6 +55,16 @@ Scene::Scene(string filename) {
     }
 }
 
+void setDefaultVertsForTriangle(Geom &geom) {
+  geom.verts[0].position = glm::vec3(0, 1, 0);
+  geom.verts[1].position = glm::vec3(-1, 0, 0);
+  geom.verts[2].position = glm::vec3(1, 0, 0);
+
+  geom.verts[0].normal = glm::vec3(0, 0, 1);
+  geom.verts[1].normal = glm::vec3(0, 0, 1);
+  geom.verts[2].normal = glm::vec3(0, 0, 1);
+}
+
 int Scene::loadGeom(string objectid) {
     int id = atoi(objectid.c_str());
     if (id != geoms.size()) {
@@ -74,6 +84,12 @@ int Scene::loadGeom(string objectid) {
             } else if (strcmp(line.c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
+            }
+            else if (strcmp(line.c_str(), "triangle") == 0) {
+              cout << "Creating new triangle..." << endl;
+              // use default triangle
+              newGeom.type = TRIANGLE;
+              setDefaultVertsForTriangle(newGeom);
             }
         }
 
