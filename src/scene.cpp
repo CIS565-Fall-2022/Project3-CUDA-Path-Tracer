@@ -3,6 +3,8 @@
 #include <cstring>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #define TINYGLTF_IMPLEMENTATION
 #define TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
@@ -232,6 +234,7 @@ void Scene::loadDefaultCamera() {
   RenderState& state = this->state;
   state.iterations = 5000;
   state.traceDepth = 8;
+  state.imageName = "default_output_image";
 
   Camera& camera = state.camera;
   camera.resolution = glm::ivec2(800, 800);
@@ -360,6 +363,105 @@ string getDirectory(const string &filename) {
   return(filename.substr(0, found));
 }
 
+void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
+  const glm::mat4 &parentTransform, std::vector<Geom> &geoms) {
+  using namespace tinygltf;
+
+  const Node& node = model.nodes.at(nodeIdx);
+
+  glm::vec3 translation, rotation, scale, skew;
+  glm::vec4 perspective;
+  glm::quat rotationQuat;
+  glm::mat4 transform, invTransform, invTranspose;
+
+  if (node.matrix.size() == 16) {
+    // use as transform matrix T * R * S
+    std::vector<float> floatVec(node.matrix.begin(), node.matrix.end());
+    glm::mat4 localTransform = glm::make_mat4(&floatVec[0]);
+    // The global transformation matrix of a node is the product of the global transformation matrix
+    // of its parent node and its own local transformation matrix
+    transform = parentTransform * localTransform;
+  }
+  else {
+    // construct transform matrix from other stuff
+    // TODO
+    cout << "warning: transforms using translate/rotate/scale vectors not supported" << endl;
+    transform = parentTransform;
+  }
+
+  for (const int& childNodeIdx : node.children) {
+    loadNode(childNodeIdx, model, gltbDirectory, transform, geoms);
+  }
+
+  if (node.mesh == -1) {
+    // If it's a leaf node, we have no way to render it, so error
+    if (node.children.size() == 0) {
+      cout << "error Cannot render leaf node" << endl;
+    }
+    return;
+  }
+
+  Mesh mesh = model.meshes.at(node.mesh);
+  cout << "Gltf Parsing mesh " << mesh.name << endl;
+
+  InputMesh newMesh;
+
+  glm::decompose(transform, scale, rotationQuat, translation, skew, perspective);
+  rotationQuat = glm::conjugate(rotationQuat);
+  rotation = glm::eulerAngles(rotationQuat);
+
+  invTransform = glm::inverse(transform);
+  invTranspose = glm::inverseTranspose(transform);
+
+  for (const Primitive& p : mesh.primitives) {
+    // TODO: add other buffers here
+    int posArrLength, normArrLength, uvArrLength, indicesArrLength, indicesComponentType;
+
+    float* positionArray = (float*)readBuffer(model, p.attributes.at("POSITION"), gltbDirectory, &posArrLength, NULL);
+    float* normalArray = (float*)readBuffer(model, p.attributes.at("NORMAL"), gltbDirectory, &normArrLength, NULL);
+    if (posArrLength != normArrLength) {
+      cout << "Warning - Positions buffer length not equal to normals buffer length" << endl;
+    }
+    appendVec3Buffer(newMesh.positions, positionArray, posArrLength);
+    appendVec3Buffer(newMesh.normals, normalArray, normArrLength);
+
+    void* indicesArray = (void*)readBuffer(model, p.indices, gltbDirectory, &indicesArrLength, &indicesComponentType);
+    appendIndicesBuffer(newMesh.indices, indicesArray, indicesArrLength, indicesComponentType);
+
+    free(positionArray);
+    free(normalArray);
+    free(indicesArray);
+
+    glm::vec3 default_translation = glm::vec3(0);
+    glm::vec3 default_rotation = glm::vec3(0);
+    glm::vec3 default_scale = glm::vec3(10);
+
+    // Now parse them into triangles
+    int indicesLen = newMesh.indices.size();
+    for (int i = 0; i + 2 < indicesLen; i = i + 3) {
+      Geom triangle;
+      triangle.type = TRIANGLE;
+      triangle.translation = translation;
+      triangle.rotation = rotation;
+      triangle.scale = scale;
+      triangle.materialid = p.material;
+
+      triangle.transform = transform;
+      triangle.inverseTransform = invTransform;
+      triangle.invTranspose = invTranspose;
+
+      for (int idx = i; idx < i + 3; ++idx) {
+        Vertex v;
+        v.position = newMesh.positions.at(newMesh.indices.at(idx));
+        v.normal = newMesh.normals.at(newMesh.indices.at(idx));
+        triangle.verts[idx - i] = v;
+      }
+
+      geoms.push_back(triangle);
+    }
+  }
+}
+
 int Scene::loadTinyGltf(string filename) {
   using namespace tinygltf;
 
@@ -405,61 +507,9 @@ int Scene::loadTinyGltf(string filename) {
   }
 
   cout << "GEOMETRY PARSING-----" << endl;
-  for (const Node &node : model.nodes) {
-    // for now, don't worry about transformations/scene graph structure on nodes
-    int meshIdx = node.mesh;
-    Mesh mesh = model.meshes.at(meshIdx);
-    cout << "Gltf Parsing mesh " << mesh.name << endl;
+  const tinygltf::Scene& scene = model.scenes.at(model.defaultScene);
 
-    InputMesh newMesh;
-
-    for (const Primitive &p : mesh.primitives) {
-      // TODO: add other buffers here
-      int posArrLength, normArrLength, uvArrLength, indicesArrLength, indicesComponentType;
-
-      float* positionArray = (float*) readBuffer(model, p.attributes.at("POSITION"), gltbDirectory, &posArrLength, NULL);
-      float* normalArray = (float*)readBuffer(model, p.attributes.at("NORMAL"), gltbDirectory, &normArrLength, NULL);
-      if (posArrLength != normArrLength) {
-        cout << "Warning - Positions buffer length not equal to normals buffer length" << endl;
-      }
-      appendVec3Buffer(newMesh.positions, positionArray, posArrLength);
-      appendVec3Buffer(newMesh.normals, normalArray, normArrLength);
-
-      void* indicesArray = (void*)readBuffer(model, p.indices, gltbDirectory, &indicesArrLength, &indicesComponentType);
-      appendIndicesBuffer(newMesh.indices, indicesArray, indicesArrLength, indicesComponentType);
-
-      free(positionArray);
-      free(normalArray);
-      free(indicesArray);
-
-      glm::vec3 default_translation = glm::vec3(0);
-      glm::vec3 default_rotation = glm::vec3(0);
-      glm::vec3 default_scale = glm::vec3(100);
-
-      // Now parse them into triangles
-      int indicesLen = newMesh.indices.size();
-      for (int i = 0; i + 2 < indicesLen; i = i + 3) {
-        Geom triangle;
-        triangle.type = TRIANGLE;
-        triangle.translation = default_translation;
-        triangle.rotation = default_rotation;
-        triangle.scale = default_scale;
-        triangle.materialid = p.material;
-
-        triangle.transform = utilityCore::buildTransformationMatrix(
-          triangle.translation, triangle.rotation, triangle.scale);
-        triangle.inverseTransform = glm::inverse(triangle.transform);
-        triangle.invTranspose = glm::inverseTranspose(triangle.transform);
-
-        for (int idx = i; idx < i + 3; ++idx) {
-          Vertex v;
-          v.position = newMesh.positions.at(newMesh.indices.at(idx));
-          v.normal = newMesh.normals.at(newMesh.indices.at(idx));
-          triangle.verts[idx - i] = v;
-        }
-
-        geoms.push_back(triangle);
-      }
-    }
+  for (const int &nodeIdx : scene.nodes) {
+    loadNode(nodeIdx, model, gltbDirectory, glm::mat4(1.0), this->geoms);
   }
 }

@@ -48,6 +48,11 @@ struct InputMesh {
   std::vector<unsigned int> indices;
 };
 
+struct Texture {
+  glm::ivec2 resolution;
+  std::vector<glm::vec3> pixels;
+};
+
 struct Material {
   glm::vec3 color;
   struct {
