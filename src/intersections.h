@@ -199,12 +199,12 @@ __host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
   // Finally, check if we are hitting front side or back side of face by checking
   // to hit outside, normal and ray direction should point the opposite way
   out_intersectionPoint = intersectionPoint;
-  if (glm::dot(rd, normal) > 0) {
-    out_normal = -normal;
+  if (glm::dot(rd, normal) < 0) {
+    out_normal = normal;
     out_outside = true;
   }
   else {
-    out_normal = normal;
+    out_normal = -normal;
     out_outside = false;
   }
 
