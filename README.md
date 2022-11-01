@@ -31,4 +31,4 @@ Below is the same scene rendered with full light integrator in 100 iterations. W
 ![](./image/full_compare/cornell_test2_full_emittance20_depth8_iterations100.png)  
 * obj Mesh loading  
 I also implemented a mesh loading function to load a obj file.  
-![](./image/Obj/rabbit_depth8_iterations100.png)
+![](./image/rabbit_depth8_iterations100.png)
