@@ -13,6 +13,8 @@ Scene::Scene(string filename) {
         cout << "Error reading from file - aborting!" << endl;
         throw;
     }
+    int lightId = 0;
+    int geomId = 0;
     while (fp_in.good()) {
         string line;
         utilityCore::safeGetline(fp_in, line);
@@ -22,7 +24,7 @@ Scene::Scene(string filename) {
                 loadMaterial(tokens[1]);
                 cout << " " << endl;
             } else if (strcmp(tokens[0].c_str(), "OBJECT") == 0) {
-                loadGeom(tokens[1]);
+                loadGeom(tokens[1], geomId, lightId);
                 cout << " " << endl;
             } else if (strcmp(tokens[0].c_str(), "CAMERA") == 0) {
                 loadCamera();
@@ -32,7 +34,7 @@ Scene::Scene(string filename) {
     }
 }
 
-int Scene::loadGeom(string objectid) {
+int Scene::loadGeom(string objectid, int& geomId, int& lightId) {
     int id = atoi(objectid.c_str());
     if (id != geoms.size()) {
         cout << "ERROR: OBJECT ID does not match expected number of geoms" << endl;
@@ -52,9 +54,14 @@ int Scene::loadGeom(string objectid) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
             }
+            else if (strcmp(line.c_str(), "square_plane") == 0) {
+                cout << "Creating new square plane..." << endl;
+                newGeom.type = SQUARE_PLANE;
+            }
         }
 
         //link material
+        //since Material don't have an ID, materialId for a Geom is just the position of the material in materials vector.
         utilityCore::safeGetline(fp_in, line);
         if (!line.empty() && fp_in.good()) {
             vector<string> tokens = utilityCore::tokenizeString(line);
@@ -83,7 +90,14 @@ int Scene::loadGeom(string objectid) {
                 newGeom.translation, newGeom.rotation, newGeom.scale);
         newGeom.inverseTransform = glm::inverse(newGeom.transform);
         newGeom.invTranspose = glm::inverseTranspose(newGeom.transform);
-
+        newGeom.geomId = geomId++;
+        if (materials[newGeom.materialid].emittance > 0.f) {
+            newGeom.lightId = lightId++;
+            lights.push_back(newGeom);
+        }
+        else {
+            newGeom.lightId = -1;
+        }
         geoms.push_back(newGeom);
         return 1;
     }
@@ -184,5 +198,43 @@ int Scene::loadMaterial(string materialid) {
         }
         materials.push_back(newMaterial);
         return 1;
+    }
+}
+
+int Scene::loadMesh(string filename) {
+    cout << "Loading Mesh from " << filename << " ..." << endl;
+    cout << " " << endl;
+    char* fname = (char*)filename.c_str();
+    fp_in.close();  //给的code没有close()过，所以一直读不出来
+    fp_in.open(fname);
+    if (!fp_in.is_open()) {
+        cout << "Error reading from file - aborting!" << endl;
+        throw;
+    }
+    vector<glm::vec3> v;
+    while (fp_in.is_open()) {
+        string line;
+        utilityCore::safeGetline(fp_in, line);
+        if (!line.empty()) {
+            vector<string> tokens = utilityCore::tokenizeString(line);
+            if (strcmp(tokens[0].c_str(), "v") == 0) {
+                v.push_back(glm::vec3(atof(tokens[1].c_str()) * 30, atof(tokens[2].c_str())*30, atof(tokens[3].c_str())*30));
+            }
+            else if (strcmp(tokens[0].c_str(), "f") == 0) {
+                TriMesh tri;
+                tri.v1 = v[atoi(tokens[1].c_str()) - 1];
+                tri.v2 = v[atoi(tokens[2].c_str()) - 1];
+                tri.v3 = v[atoi(tokens[3].c_str()) - 1];
+                glm::vec3 v1v2 = tri.v2 - tri.v1;
+                glm::vec3 v2v3 = tri.v3 - tri.v2;
+                tri.n = glm::cross(glm::normalize(v1v2), glm::normalize(v2v3));
+                tri.materialid = 4;
+                meshes.push_back(tri);
+            }
+        }
+        else {
+            fp_in.close();
+            break;
+        }
     }
 }

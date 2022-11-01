@@ -39,10 +39,15 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
+
 	const char* sceneFile = argv[1];
 
 	// Load scene file
 	scene = new Scene(sceneFile);
+	if (argc == 3) {
+		const char* triMeshFile = argv[2];
+		scene->loadMesh(triMeshFile);
+	}
 
 	//Create Instance for ImGUIData
 	guiData = new GuiDataContainer();
@@ -137,13 +142,26 @@ void runCuda() {
 
 	if (iteration < renderState->iterations) {
 		uchar4* pbo_dptr = NULL;
-		iteration++;
+		++iteration;
 		cudaGLMapBufferObject((void**)&pbo_dptr, pbo);
 
 		// execute the kernel
 		int frame = 0;
+		//timer
+		cudaEvent_t event_start, event_end;
+		cudaEventCreate(&event_start);
+		cudaEventCreate(&event_end);
+		cudaEventRecord(event_start);
+		//
 		pathtrace(pbo_dptr, frame, iteration);
-
+		//
+		cudaEventRecord(event_end);
+		cudaEventSynchronize(event_end);
+		float timeElapsedMilliseconds;
+		cudaEventElapsedTime(&timeElapsedMilliseconds, event_start, event_end);
+		std::cout << "pathTrace() total time elapsed: " << timeElapsedMilliseconds << std::endl;
+		//timer end
+		
 		// unmap buffer object
 		cudaGLUnmapBufferObject(pbo);
 	}
