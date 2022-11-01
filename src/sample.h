@@ -28,7 +28,12 @@ void sampleLight(
         //calculate cos_theta
         newDir = glm::normalize(newDir);
         float cos_theta = glm::abs(glm::dot(newDir, lightNormal));
-        pdf_light = (pdf_dA * r_square / cos_theta) / num_lights;
+        if (cos_theta == 0.f) {
+            pdf_light = 0.f;
+        }
+        else {
+            pdf_light = (pdf_dA * r_square / cos_theta) / num_lights;
+        }
     }
 }
 

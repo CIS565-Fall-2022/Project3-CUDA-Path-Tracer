@@ -218,17 +218,17 @@ int Scene::loadMesh(string filename) {
         if (!line.empty()) {
             vector<string> tokens = utilityCore::tokenizeString(line);
             if (strcmp(tokens[0].c_str(), "v") == 0) {
-                v.push_back(glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+                v.push_back(glm::vec3(atof(tokens[1].c_str()) * 30, atof(tokens[2].c_str())*30, atof(tokens[3].c_str())*30));
             }
             else if (strcmp(tokens[0].c_str(), "f") == 0) {
                 TriMesh tri;
-                tri.v1 = v[atoi(tokens[1].c_str())];
-                tri.v2 = v[atoi(tokens[2].c_str())];
-                tri.v3 = v[atoi(tokens[3].c_str())];
+                tri.v1 = v[atoi(tokens[1].c_str()) - 1];
+                tri.v2 = v[atoi(tokens[2].c_str()) - 1];
+                tri.v3 = v[atoi(tokens[3].c_str()) - 1];
                 glm::vec3 v1v2 = tri.v2 - tri.v1;
                 glm::vec3 v2v3 = tri.v3 - tri.v2;
                 tri.n = glm::cross(glm::normalize(v1v2), glm::normalize(v2v3));
-                tri.materialid = 1;
+                tri.materialid = 4;
                 meshes.push_back(tri);
             }
         }

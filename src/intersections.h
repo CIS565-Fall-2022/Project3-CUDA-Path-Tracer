@@ -160,6 +160,39 @@ __host__ __device__ float squarePlaneIntersectionTest(Geom squarePlane, Ray r,
     return -1;
 }
 
+
+__host__ __device__ float triangleIntersectionTest(TriMesh& tri, Ray& r, glm::vec3& intersectionPoint, glm::vec3& normal) {
+    //首先测试ray是否与plane平行
+    if (glm::abs(glm::dot(r.direction, tri.n)) == 0.f) {
+        return -1;
+    }
+    float t = glm::dot(tri.n, (tri.v1 - r.origin)) / glm::dot(tri.n, r.direction);
+    if (t <= 0.f) {
+        return -1;
+    }
+    else {
+        glm::vec3 p = r.origin + t * r.direction;
+        glm::vec3 v1v2 = tri.v2 - tri.v1;
+        glm::vec3 v1p = p - tri.v1;
+        if (glm::dot(glm::cross(v1v2, v1p), tri.n) < 0.f) {
+            return -1;
+        }
+        glm::vec3 v2v3 = tri.v3 - tri.v2;
+        glm::vec3 v2p = p - tri.v2;
+        if (glm::dot(glm::cross(v2v3, v2p), tri.n) < 0.f) {
+            return -1;
+        }
+        glm::vec3 v3v1 = tri.v1 - tri.v3;
+        glm::vec3 v3p = p - tri.v3;
+        if (glm::dot(glm::cross(v3v1, v3p), tri.n) < 0.f) {
+            return -1;
+        }
+        intersectionPoint = p;
+        normal = tri.n;
+        return t;
+    }
+}
+
 __host__ __device__
 bool computeIntersectionWithLight(
     PathSegment& pathSegment,
@@ -170,7 +203,9 @@ bool computeIntersectionWithLight(
     glm::vec3 orig_normal,
     bool outside,
     float& pdf_f_l,
-    int num_lights
+    int num_lights,
+    TriMesh* meshes,
+    int num_meshes
 ) {
 
     float t;
@@ -210,6 +245,19 @@ bool computeIntersectionWithLight(
         }
 
     }
+    int hit_tri_index = -1;
+    for (int i = 0; i < num_meshes; ++i) {
+        TriMesh& tri = meshes[i];
+        t = triangleIntersectionTest(tri, pathSegment.ray, tmp_intersect, tmp_normal);
+        if (t > 0.0f && t_min > t)
+        {
+            t_min = t;
+            hit_tri_index = i;
+            hit_geom_index = -1;
+            intersect_point = tmp_intersect;
+            normal = tmp_normal;
+        }
+    }
     /*if (t <= 0.f) {
         return false;
     }
@@ -241,20 +289,4 @@ bool computeIntersectionWithLight(
             return false;
         }
     }
-}
-
-__host__ __device__ float triangleIntersectionTest(Geom squarePlane, Ray r,
-    glm::vec3& intersectionPoint, glm::vec3& normal, bool& outside) {
-    //transform the ray
-    Ray rInv;
-    rInv.origin = multiplyMV(squarePlane.inverseTransform, glm::vec4(r.origin, 1));
-    rInv.direction = glm::mat3(squarePlane.inverseTransform) * r.direction;
-    float t = glm::dot(glm::vec3(0, 1, 0), (glm::vec3(0.5f, 0.f, 0.5f) - rInv.origin)) / glm::dot(glm::vec3(0, 1, 0), rInv.direction);
-    normal = glm::mat3(squarePlane.transform) * glm::vec3(0, 1, 0);
-    intersectionPoint = rInv.origin + rInv.direction * t;
-    if (t > 0 && intersectionPoint.x >= -0.5f && intersectionPoint.x <= 0.5f && intersectionPoint.z >= -0.5f && intersectionPoint.z <= 0.5f)
-    {
-        return t;
-    }
-    return -1;
 }

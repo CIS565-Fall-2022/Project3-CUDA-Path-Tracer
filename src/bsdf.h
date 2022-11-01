@@ -55,6 +55,11 @@ void calculateLightPdf(
         glm::vec3 lightNormal = glm::normalize(glm::mat3(light.transform) * glm::vec3(0, 1, 0));
         newDir = glm::normalize(newDir);
         float cos_theta = glm::abs(glm::dot(newDir, lightNormal));
-        pdf_f_l = (pdf_dA * r_square / cos_theta) / num_lights;
+        if (cos_theta == 0.f) {
+            pdf_f_l = 0.f;
+        }
+        else {
+            pdf_f_l = (pdf_dA * r_square / cos_theta) / num_lights;
+        }
     }
 }

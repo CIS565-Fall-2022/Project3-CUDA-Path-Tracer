@@ -118,7 +118,12 @@ void scatterRay(
 __host__ __device__
 float powerHeuristic(int nf, float fPdf, int ng, float gPdf) {
     float f = nf * fPdf, g = ng * gPdf;
-    return (f * f) / (f * f + g * g);
+    if ((f * f + g * g) == 0) {
+        return 0.f;
+    }
+    else {
+        return (f * f) / (f * f + g * g);
+    }
 }
 
 /**
@@ -157,8 +162,12 @@ void scatterRayToLight(
     glm::vec3 bsdf; //this bsdf is multiplied by lambert factor!
     calculateBSDF(m, bsdf, pdf_l_f, newDir_l, pathSegment, normal, intersect);
 
-
-    pathSegment.beta *= (bsdf / pdf_l_l);
+    if (pdf_l_l == 0.f) {
+        pathSegment.beta = glm::vec3(0.f);
+    }
+    else {
+        pathSegment.beta *= (bsdf / pdf_l_l);
+    }
     pathSegment.ray.origin = intersect + 0.001f * normal;
     pathSegment.ray.direction = newDir_l;
     --(pathSegment.remainingBounces);
@@ -181,7 +190,9 @@ void scatterRayMIS(
     Geom* dev_geoms,
     const int num_lights,
     const int num_geoms,
-    Material* dev_materials
+    Material* dev_materials,
+    TriMesh* meshes,
+    int num_meshes
 ) {
     float pdf_f_f;
     float pdf_f_l;
@@ -223,7 +234,7 @@ void scatterRayMIS(
         }
     }
     //now check if this ray hit light
-    if (computeIntersectionWithLight(pathSegment2, dev_geoms, num_geoms, lightGeomId, intersect, normal, false, pdf_f_l, num_lights)) {
+    if (computeIntersectionWithLight(pathSegment2, dev_geoms, num_geoms, lightGeomId, intersect, normal, false, pdf_f_l, num_lights, meshes, num_meshes)) {
         float wf = powerHeuristic(1, pdf_f_f, 1, pdf_f_l);
         pathSegment2.beta *= wf;
         Material& lightMaterial = dev_materials[light.materialid];
@@ -285,7 +296,9 @@ void scatterRayFullLightBSDF(
     Geom* dev_geoms,
     const int num_lights,
     const int num_geoms,
-    Material* dev_materials
+    Material* dev_materials,
+    TriMesh* meshes,
+    int num_meshes
 ) {
     float pdf_f_f;
     float pdf_f_l;
@@ -312,13 +325,18 @@ void scatterRayFullLightBSDF(
         glm::vec3 lambertBRDF = m.color * INV_PI;
         float lambertFactor = glm::dot(newDir, normal);
         pdf_f_f = lambertFactor * INV_PI;
-        pathSegment3.beta *= ((lambertFactor * lambertBRDF) / pdf_f_f);
+        if (pdf_f_f == 0.f) {
+            pathSegment3.beta = glm::vec3(0.f);
+        }
+        else {
+            pathSegment3.beta *= ((lambertFactor * lambertBRDF) / pdf_f_f);
+        }
         pathSegment3.ray.origin = intersect + 0.001f * normal;
         pathSegment3.ray.direction = newDir;
         --(pathSegment3.remainingBounces);
     }
     //now check if this ray hit light
-    if (computeIntersectionWithLight(pathSegment3, dev_geoms, num_geoms, lightGeomId, intersect, normal, false, pdf_f_l, num_lights)) {
+    if (computeIntersectionWithLight(pathSegment3, dev_geoms, num_geoms, lightGeomId, intersect, normal, false, pdf_f_l, num_lights, meshes, num_meshes)) {
         float wf = powerHeuristic(1, pdf_f_f, 1, pdf_f_l);
         pathSegment3.beta *= wf;
         Material& lightMaterial = dev_materials[light.materialid];

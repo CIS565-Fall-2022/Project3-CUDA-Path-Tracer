@@ -156,6 +156,7 @@ void pathtraceFree() {
 	// TODO: clean up any extra device memory you created
 	cudaFree(dev_firstIntersections);
 	cudaFree(dev_lights);
+	cudaFree(dev_triMeshes);
 #if MISDIRECTLIGHTING || FULLLIGHTING
 	cudaFree(dev_paths2);
 #endif
@@ -269,6 +270,101 @@ __global__ void computeIntersections(
 			intersections[path_index].materialId = geoms[hit_geom_index].materialid;
 			intersections[path_index].geomId = hit_geom_index;
 			intersections[path_index].surfaceNormal = normal;
+		}
+	}
+}
+
+__global__ void computeIntersectionsTri(
+	int num_paths
+	, PathSegment* pathSegments
+	, Geom* geoms
+	, int geoms_size
+	, ShadeableIntersection* intersections
+	, TriMesh* meshes
+	, int meshesSize
+) {
+	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (path_index < num_paths)
+	{
+		PathSegment pathSegment = pathSegments[path_index];
+
+		float t;
+		glm::vec3 intersect_point;
+		glm::vec3 normal;
+		float t_min = FLT_MAX;
+		int hit_geom_index = -1;
+		bool outside = true;
+
+		glm::vec3 tmp_intersect;
+		glm::vec3 tmp_normal;
+
+		// naive parse through global geoms
+
+		for (int i = 0; i < geoms_size; ++i)
+		{
+			//get every object in the scene, and do a intersection test for every one of them.
+			Geom& geom = geoms[i];
+
+			if (geom.type == CUBE)
+			{
+				t = boxIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+			}
+			else if (geom.type == SPHERE)
+			{
+				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+			}
+			else if (geom.type == SQUARE_PLANE) {
+				t = squarePlaneIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+			}
+
+			// Compute the minimum t from the intersection tests to determine what
+			// scene geometry object was hit first.
+			if (t > 0.0f && t_min > t)
+			{
+				t_min = t;
+				hit_geom_index = i;
+				intersect_point = tmp_intersect;
+				normal = tmp_normal;
+			}
+		}
+
+		int hit_tri_index = -1;
+		for (int i = 0; i < meshesSize; ++i) {
+			TriMesh& tri = meshes[i];
+			t = triangleIntersectionTest(tri, pathSegment.ray, tmp_intersect, tmp_normal);
+			if (t > 0.0f && t_min > t)
+			{
+				t_min = t;
+				hit_tri_index = i;
+				hit_geom_index = -1;
+				intersect_point = tmp_intersect;
+				normal = tmp_normal;
+			}
+		}
+
+		if (hit_geom_index == -1 && hit_tri_index == -1)
+		{
+			intersections[path_index].t = -1.0f;
+			intersections[path_index].materialId = INT_MAX;
+		}
+		else
+		{
+			if (hit_tri_index == -1) {
+				//The ray hits something
+				intersections[path_index].t = t_min;
+				intersections[path_index].materialId = geoms[hit_geom_index].materialid;
+				intersections[path_index].geomId = hit_geom_index;
+				intersections[path_index].surfaceNormal = normal;
+				intersections[path_index].hitMesh = false;
+			}
+			else {
+				intersections[path_index].t = t_min;
+				intersections[path_index].materialId = meshes[hit_tri_index].materialid;
+				intersections[path_index].triId = hit_tri_index;
+				intersections[path_index].surfaceNormal = normal;
+				intersections[path_index].hitMesh = true;
+			}
 		}
 	}
 }
@@ -490,6 +586,8 @@ __global__ void shadeMaterialDirectLight(
 	, const int num_lights
 	, const int num_geoms
 	, Geom* dev_geoms
+	, TriMesh* meshes
+	, int num_meshes
 )
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -531,7 +629,7 @@ __global__ void shadeMaterialDirectLight(
 				int lightGeomId = pathSegments[idx].lightGeomId;
 				bool outside_null;
 				if (computeIntersectionWithLight(pathSegments[idx], dev_geoms, num_geoms, lightGeomId,
-					intersect, intersection.surfaceNormal, outside_null, pdf_null, num_lights)) {
+					intersect, intersection.surfaceNormal, outside_null, pdf_null, num_lights, meshes, num_meshes)) {
 					Geom& light = dev_geoms[lightGeomId];
 					float emittance = materials[light.materialid].emittance;
 					pathSegments[idx].color += emittance * pathSegments[idx].beta;
@@ -560,6 +658,8 @@ __global__ void shadeMaterialMISLight(
 	, const int num_lights
 	, Geom* dev_geoms
 	, const int num_geoms
+	, TriMesh* meshes
+	, int num_meshes
 ) {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx < num_paths)
@@ -601,7 +701,7 @@ __global__ void shadeMaterialMISLight(
 				float pdf_null;
 				int lightGeomId = pathSegments[idx].lightGeomId;
 				if (computeIntersectionWithLight(pathSegments[idx], dev_geoms, num_geoms, lightGeomId,
-					intersect, intersection.surfaceNormal, false, pdf_null, num_lights)) {
+					intersect, intersection.surfaceNormal, false, pdf_null, num_lights, meshes, num_meshes)) {
 					Geom& light = dev_geoms[lightGeomId];
 					float emittance = materials[light.materialid].emittance;
 					pathSegments[idx].color += emittance * pathSegments[idx].beta;
@@ -630,6 +730,8 @@ __global__ void shadeMaterialFullLight(
 	, Geom* dev_geoms
 	, const int num_geoms
 	, bool* bools
+	, TriMesh* meshes
+	, int num_meshes
 ) {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx < num_paths)
@@ -667,7 +769,7 @@ __global__ void shadeMaterialFullLight(
 			float pdf_null;
 			int lightGeomId = pathSegments2[idx].lightGeomId;
 			if (computeIntersectionWithLight(pathSegments2[idx], dev_geoms, num_geoms, lightGeomId,
-				intersect, intersection.surfaceNormal, false, pdf_null, num_lights)) {
+				intersect, intersection.surfaceNormal, false, pdf_null, num_lights, meshes, num_meshes)) {
 				Geom& light = dev_geoms[lightGeomId];
 				float emittance = materials[light.materialid].emittance;
 				glm::vec3 materialColor = materials[light.materialid].color;
@@ -692,6 +794,8 @@ __global__ void shadeMaterialMIS(
 	, int geomSize
 	, int num_lights
 	, Geom* dev_geoms
+	, TriMesh* meshes
+	, int num_meshes
 ) {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx < num_paths) {
@@ -702,7 +806,7 @@ __global__ void shadeMaterialMIS(
 			glm::vec3 materialColor = material.color;
 			glm::vec3 intersect = pathSegments2[idx].ray.origin + intersection.t * pathSegments2[idx].ray.direction;
 			
-			scatterRayMIS(pathSegments[idx], pathSegments2[idx], intersect, intersection.surfaceNormal, material, rng, dev_geoms, num_lights, geomSize, materials);
+			scatterRayMIS(pathSegments[idx], pathSegments2[idx], intersect, intersection.surfaceNormal, material, rng, dev_geoms, num_lights, geomSize, materials, meshes, num_meshes);
 		}
 	}
 }
@@ -743,7 +847,9 @@ __global__ void shadeMaterialFullBSDF(
 	const int num_geoms,
 	const int num_lights,
 	Geom* dev_geoms,
-	bool* bools
+	bool* bools,
+	TriMesh* meshes,
+	int num_meshes
 ) {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx < num_paths) {
@@ -752,7 +858,7 @@ __global__ void shadeMaterialFullBSDF(
 			thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
 			Material material = materials[intersection.materialId];
 			glm::vec3 intersect = pathSegments[idx].ray.origin + intersection.t * pathSegments[idx].ray.direction;
-			scatterRayFullLightBSDF(pathSegments[idx], pathSegments2[idx], pathSegments3[idx], intersect, intersection.surfaceNormal, material, rng, dev_geoms, num_lights, num_geoms, materials);
+			scatterRayFullLightBSDF(pathSegments[idx], pathSegments2[idx], pathSegments3[idx], intersect, intersection.surfaceNormal, material, rng, dev_geoms, num_lights, num_geoms, materials, meshes, num_meshes);
 		}
 	}
 }
@@ -817,7 +923,7 @@ __global__ void resetPaths(
 	}
 }
 
-void directLightIntegrator(int iter, int pixelcount, int blockSize1d, int num_lights, int num_geoms) {
+void directLightIntegrator(int iter, int pixelcount, int blockSize1d, int num_lights, int num_geoms, int num_meshes) {
 	PathSegment* dev_path_end = dev_paths + pixelcount;
 	int num_paths = pixelcount;
 	
@@ -851,6 +957,8 @@ void directLightIntegrator(int iter, int pixelcount, int blockSize1d, int num_li
 		, num_lights
 		, num_geoms
 		, dev_geoms
+		, dev_triMeshes
+		, num_meshes
 	);
 
 	if (guiData != NULL)
@@ -859,7 +967,7 @@ void directLightIntegrator(int iter, int pixelcount, int blockSize1d, int num_li
 	}
 }
 
-void misDirLightIntegrator(int iter, int pixelcount, int blockSize1d, int num_lights, int num_geoms) {
+void misDirLightIntegrator(int iter, int pixelcount, int blockSize1d, int num_lights, int num_geoms, int num_meshes) {
 	PathSegment* dev_path_end = dev_paths + pixelcount;
 	int num_paths = pixelcount;
 
@@ -870,12 +978,14 @@ void misDirLightIntegrator(int iter, int pixelcount, int blockSize1d, int num_li
 		cudaMemcpy(dev_intersections, dev_firstIntersections, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
 	}
 	else {
-		computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+		computeIntersectionsTri << <numblocksPathSegmentTracing, blockSize1d >> > (
 			num_paths
 			, dev_paths
 			, dev_geoms
 			, hst_scene->geoms.size()
 			, dev_intersections
+			, dev_triMeshes
+			, num_meshes
 			);
 		cudaMemcpy(dev_firstIntersections, dev_intersections, pixelcount * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
 	}
@@ -898,6 +1008,8 @@ void misDirLightIntegrator(int iter, int pixelcount, int blockSize1d, int num_li
 		, num_lights
 		, dev_geoms
 		, num_geoms
+		, dev_triMeshes
+		, num_meshes
 	);
 
 	//sort once, clean those paths that hit a light or hit nothing
@@ -914,7 +1026,9 @@ void misDirLightIntegrator(int iter, int pixelcount, int blockSize1d, int num_li
 		dev_materials,
 		hst_scene->geoms.size(),
 		num_lights,
-		dev_geoms
+		dev_geoms,
+		dev_triMeshes,
+		num_meshes
 		);
 
 	//combine the two pathSegment
@@ -931,7 +1045,7 @@ void misDirLightIntegrator(int iter, int pixelcount, int blockSize1d, int num_li
 	}
 }
 
-void fullLightIntegrator(int iter, int pixelcount, int traceDepth, int blockSize1d, int num_lights, int num_geoms) {
+void fullLightIntegrator(int iter, int pixelcount, int traceDepth, int blockSize1d, int num_lights, int num_geoms, int num_meshes) {
 
 	int depth = 0;
 	PathSegment* dev_path_end = dev_paths + pixelcount;
@@ -949,12 +1063,14 @@ void fullLightIntegrator(int iter, int pixelcount, int traceDepth, int blockSize
 			cudaMemcpy(dev_intersections, dev_firstIntersections, num_paths * sizeof(ShadeableIntersection), cudaMemcpyDeviceToDevice);
 		}
 		else {
-			computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+			computeIntersectionsTri << <numblocksPathSegmentTracing, blockSize1d >> > (
 				num_paths
 				, dev_paths
 				, dev_geoms
 				, hst_scene->geoms.size()
 				, dev_intersections
+				, dev_triMeshes
+				, num_meshes
 				);
 			cudaDeviceSynchronize();
 			if (iter == 1 && depth == 0) {
@@ -979,6 +1095,8 @@ void fullLightIntegrator(int iter, int pixelcount, int traceDepth, int blockSize
 			, dev_geoms
 			, num_geoms
 			, dev_fullBools
+			, dev_triMeshes
+			, num_meshes
 			);
 		cudaDeviceSynchronize();
 		
@@ -994,7 +1112,9 @@ void fullLightIntegrator(int iter, int pixelcount, int traceDepth, int blockSize
 			hst_scene->geoms.size(),
 			num_lights,
 			dev_geoms,
-			dev_fullBools
+			dev_fullBools,
+			dev_triMeshes,
+			num_meshes
 			);
 		cudaDeviceSynchronize();
 
@@ -1049,6 +1169,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	const int pixelcount = cam.resolution.x * cam.resolution.y;
 	const int num_lights = hst_scene->lights.size();
 	const int num_geoms = hst_scene->geoms.size();
+	const int num_meshes = hst_scene->meshes.size();
 
 	// 2D block for generating ray from camera
 	const dim3 blockSize2d(8, 8);   //64 threads per block
@@ -1094,12 +1215,12 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 	checkCUDAError("generate camera ray");
 
 #if DIRECTLIGHTING
-	directLightIntegrator(iter, pixelcount, blockSize1d, num_lights, num_geoms);
+	directLightIntegrator(iter, pixelcount, blockSize1d, num_lights, num_geoms, num_meshes);
 #elif MISDIRECTLIGHTING
 	generateRayFromCamera << <blocksPerGrid2d, blockSize2d >> > (cam, iter, traceDepth, dev_paths2);
-	misDirLightIntegrator(iter, pixelcount, blockSize1d, num_lights, num_geoms);
+	misDirLightIntegrator(iter, pixelcount, blockSize1d, num_lights, num_geoms, num_meshes);
 #elif FULLLIGHTING
-	fullLightIntegrator(iter, pixelcount, traceDepth, blockSize1d, num_lights, num_geoms);
+	fullLightIntegrator(iter, pixelcount, traceDepth, blockSize1d, num_lights, num_geoms, num_meshes);
 #else
 	naiveIntegrator(iter, pixelcount, traceDepth, blockSize1d);
 #endif

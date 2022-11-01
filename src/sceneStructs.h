@@ -89,6 +89,8 @@ struct ShadeableIntersection {
   glm::vec3 surfaceNormal;
   int materialId;
   int geomId;
+  int triId;
+  bool hitMesh;
 };
 
 struct ShadeableIntersectionDirectLight {
