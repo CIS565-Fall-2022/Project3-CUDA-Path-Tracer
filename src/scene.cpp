@@ -200,3 +200,41 @@ int Scene::loadMaterial(string materialid) {
         return 1;
     }
 }
+
+int Scene::loadMesh(string filename) {
+    cout << "Loading Mesh from " << filename << " ..." << endl;
+    cout << " " << endl;
+    char* fname = (char*)filename.c_str();
+    fp_in.close();  //给的code没有close()过，所以一直读不出来
+    fp_in.open(fname);
+    if (!fp_in.is_open()) {
+        cout << "Error reading from file - aborting!" << endl;
+        throw;
+    }
+    vector<glm::vec3> v;
+    while (fp_in.is_open()) {
+        string line;
+        utilityCore::safeGetline(fp_in, line);
+        if (!line.empty()) {
+            vector<string> tokens = utilityCore::tokenizeString(line);
+            if (strcmp(tokens[0].c_str(), "v") == 0) {
+                v.push_back(glm::vec3(atof(tokens[1].c_str()), atof(tokens[2].c_str()), atof(tokens[3].c_str()));
+            }
+            else if (strcmp(tokens[0].c_str(), "f") == 0) {
+                TriMesh tri;
+                tri.v1 = v[atoi(tokens[1].c_str())];
+                tri.v2 = v[atoi(tokens[2].c_str())];
+                tri.v3 = v[atoi(tokens[3].c_str())];
+                glm::vec3 v1v2 = tri.v2 - tri.v1;
+                glm::vec3 v2v3 = tri.v3 - tri.v2;
+                tri.n = glm::cross(glm::normalize(v1v2), glm::normalize(v2v3));
+                tri.materialid = 1;
+                meshes.push_back(tri);
+            }
+        }
+        else {
+            fp_in.close();
+            break;
+        }
+    }
+}

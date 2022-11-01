@@ -228,7 +228,6 @@ void scatterRayMIS(
         pathSegment2.beta *= wf;
         Material& lightMaterial = dev_materials[light.materialid];
         pathSegment2.color += pathSegment2.beta * lightMaterial.emittance * lightMaterial.color;
-        
     }
     else {
         pathSegment2.color = glm::vec3(0.f);
@@ -256,7 +255,6 @@ void scatterRayFullLight(
         pathSegment.beta *= m.specular.color;
         pathSegment.ray.origin = intersect + 0.001f * normal;
         pathSegment.ray.direction = newDir;
-        --(pathSegment.remainingBounces);
     }
     else if (m.hasRefractive == 1.f) {
         //refract
@@ -268,16 +266,65 @@ void scatterRayFullLight(
         glm::vec3 lambertBRDF = m.color * INV_PI;
         float lambertFactor = glm::dot(newDir, normal);
         pdf_f_f = lambertFactor * INV_PI;
-        if (pdf_f_f == 0.f) {
-            pathSegment.beta = glm::vec3(0.f);
-            pathSegment.remainingBounces = 0;
-        }
-        else {
-            pathSegment.beta *= ((lambertFactor * lambertBRDF) / pdf_f_f);
-            pathSegment.ray.origin = intersect + 0.001f * normal;
-            pathSegment.ray.direction = newDir;
-            --(pathSegment.remainingBounces);
-        }
+        pathSegment.beta *= ((lambertFactor * lambertBRDF) / pdf_f_f);
+        pathSegment.ray.origin = intersect + 0.001f * normal;
+        pathSegment.ray.direction = newDir;
     }
 
+}
+
+__host__ __device__
+void scatterRayFullLightBSDF(
+    PathSegment& pathSegment,
+    PathSegment& pathSegment2,
+    PathSegment& pathSegment3,
+    const glm::vec3 intersect,  //the first intersect
+    const glm::vec3 normal,
+    const Material& m,
+    thrust::default_random_engine& rng,
+    Geom* dev_geoms,
+    const int num_lights,
+    const int num_geoms,
+    Material* dev_materials
+) {
+    float pdf_f_f;
+    float pdf_f_l;
+    int lightGeomId = pathSegment2.lightGeomId;
+    Geom& light = dev_geoms[lightGeomId];
+    pathSegment3.lightGeomId = lightGeomId;
+    //here we dont need check if it's light, since we partitioned
+    if (m.hasReflective == 1.f) {
+        //mirror
+        //glm::reflect  (1,1,0) (0, 1, 0) => (1, -1, 0)
+        glm::vec3 newDir = glm::reflect(pathSegment.ray.direction, normal);
+        pdf_f_f = 1.f;
+        pathSegment3.beta *= m.specular.color;
+        pathSegment3.ray.origin = intersect + 0.001f * normal;
+        pathSegment3.ray.direction = newDir;
+    }
+    else if (m.hasRefractive == 1.f) {
+        //refract
+
+    }
+    else {
+        //lambert
+        glm::vec3 newDir = calculateRandomDirectionInHemisphere(normal, rng);
+        glm::vec3 lambertBRDF = m.color * INV_PI;
+        float lambertFactor = glm::dot(newDir, normal);
+        pdf_f_f = lambertFactor * INV_PI;
+        pathSegment3.beta *= ((lambertFactor * lambertBRDF) / pdf_f_f);
+        pathSegment3.ray.origin = intersect + 0.001f * normal;
+        pathSegment3.ray.direction = newDir;
+        --(pathSegment3.remainingBounces);
+    }
+    //now check if this ray hit light
+    if (computeIntersectionWithLight(pathSegment3, dev_geoms, num_geoms, lightGeomId, intersect, normal, false, pdf_f_l, num_lights)) {
+        float wf = powerHeuristic(1, pdf_f_f, 1, pdf_f_l);
+        pathSegment3.beta *= wf;
+        Material& lightMaterial = dev_materials[light.materialid];
+        pathSegment3.color += pathSegment3.beta * lightMaterial.emittance * lightMaterial.color;
+    }
+    else {
+        pathSegment3.color = glm::vec3(0.f);
+    }
 }

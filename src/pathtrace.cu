@@ -100,6 +100,7 @@ static Geom* dev_lights = NULL;
 static PathSegment* dev_paths2 = NULL;
 static PathSegment* dev_paths3 = NULL;
 static bool* dev_fullBools = NULL;
+static TriMesh* dev_triMeshes = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -139,6 +140,10 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_paths3, pixelcount * sizeof(PathSegment));
 	cudaMalloc(&dev_fullBools, pixelcount * sizeof(bool));
 #endif
+	if (scene->meshes.size() != 0) {
+		cudaMalloc(&dev_triMeshes, pixelcount * sizeof(TriMesh));
+		cudaMemcpy(dev_triMeshes, scene->meshes.data(), scene->meshes.size() * sizeof(TriMesh), cudaMemcpyHostToDevice);
+	}
 	checkCUDAError("pathtraceInit");
 }
 
@@ -721,7 +726,9 @@ __global__ void combineTwoSegFull (
 ) {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx < num_paths) {
-		pathSegments[idx].color += pathSegments2[idx].color;
+		if (bools[idx]) {
+			pathSegments[idx].color += pathSegments2[idx].color;
+		}
 	}
 }
 
@@ -745,7 +752,7 @@ __global__ void shadeMaterialFullBSDF(
 			thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
 			Material material = materials[intersection.materialId];
 			glm::vec3 intersect = pathSegments[idx].ray.origin + intersection.t * pathSegments[idx].ray.direction;
-			scatterRayMIS(pathSegments2[idx], pathSegments3[idx], intersect, intersection.surfaceNormal, material, rng, dev_geoms, num_lights, num_geoms, materials);
+			scatterRayFullLightBSDF(pathSegments[idx], pathSegments2[idx], pathSegments3[idx], intersect, intersection.surfaceNormal, material, rng, dev_geoms, num_lights, num_geoms, materials);
 		}
 	}
 }
@@ -992,7 +999,7 @@ void fullLightIntegrator(int iter, int pixelcount, int traceDepth, int blockSize
 		cudaDeviceSynchronize();
 
 		combineTwoSegFull << <numblocksPathSegmentTracing, blockSize1d >> > (
-			dev_paths2,
+			dev_paths,
 			dev_paths3,
 			num_paths,
 			dev_fullBools

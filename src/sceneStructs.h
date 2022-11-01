@@ -10,7 +10,8 @@
 enum GeomType {
     SPHERE,
     CUBE,
-    SQUARE_PLANE
+    SQUARE_PLANE,
+    TRIANGLE
 };
 
 struct Ray {
@@ -31,7 +32,13 @@ struct Geom {
     int geomId;
 };
 
-
+struct TriMesh {
+    glm::vec3 v1;
+    glm::vec3 v2;
+    glm::vec3 v3;
+    glm::vec3 n;
+    int materialid;
+};
 
 struct Material {
     glm::vec3 color;

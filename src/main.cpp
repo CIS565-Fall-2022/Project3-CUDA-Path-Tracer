@@ -39,10 +39,15 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
+
 	const char* sceneFile = argv[1];
 
 	// Load scene file
 	scene = new Scene(sceneFile);
+	if (argc == 3) {
+		const char* triMeshFile = argv[2];
+		scene->loadMesh(triMeshFile);
+	}
 
 	//Create Instance for ImGUIData
 	guiData = new GuiDataContainer();
