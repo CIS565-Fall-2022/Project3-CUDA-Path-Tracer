@@ -24,6 +24,7 @@ endif()
 # CUDA Setup
 ########################################
 find_package(CUDA 10 REQUIRED)
+
 include(${CMAKE_MODULE_PATH}/CUDAComputesList.cmake)
 
 list(APPEND CUDA_NVCC_FLAGS ${CUDA_GENERATE_CODE})
@@ -61,29 +62,45 @@ endif(UNIX)
 set(GLM_ROOT_DIR "external")
 find_package(GLM REQUIRED)
 include_directories(${GLM_INCLUDE_DIRS})
-
 set(headers
     src/main.h
     src/image.h
     src/interactions.h
-    src/intersections.h
+    src/intersections.cuh
     src/glslUtility.hpp
     src/pathtrace.h
     src/scene.h
     src/sceneStructs.h
     src/preview.h
     src/utilities.h
+    src/rendersave.h
+    src/Collision/AABB.h
+    src/Collision/DebugDrawer.h
+    src/consts.h
+    src/Octree/octree.h
+    src/Denoise/denoise.cuh
+    src/Denoise/denoise.h
+    src/Profile/timer.h
+    src/Profile/pathtracer_profile.h
+    src/guiData.h
+    src/guiFileDialog.h
+    src/camState.h
+    src/imageUtils.h
+
     src/ImGui/imconfig.h
-	
 	src/ImGui/imgui.h
     src/ImGui/imconfig.h
     src/ImGui/imgui_impl_glfw.h
-     src/ImGui/imgui_impl_opengl3.h 
-     src/ImGui/imgui_impl_opengl3_loader.h 
-     src/ImGui/imgui_internal.h 
-     src/ImGui/imstb_rectpack.h 
-     src/ImGui/imstb_textedit.h 
-     src/ImGui/imstb_truetype.h 
+    src/ImGui/imgui_impl_opengl3.h 
+    src/ImGui/imgui_impl_opengl3_loader.h 
+    src/ImGui/imgui_internal.h 
+    src/ImGui/imstb_rectpack.h 
+    src/ImGui/imstb_textedit.h 
+    src/ImGui/imstb_truetype.h 
+    src/intellisense.h
+
+    src/TinyObjLoader/tiny_obj_loader.h
+    src/ColorConsole/color.hpp
     )
 
 set(sources
@@ -91,18 +108,27 @@ set(sources
     src/stb.cpp
     src/image.cpp
     src/glslUtility.cpp
-    src/pathtrace.cu
     src/scene.cpp
     src/preview.cpp
     src/utilities.cpp
-	
+    src/rendersave.cpp
+    src/Collision/DebugDrawer.cpp
+    src/Profile/timer.cpp
+
+    src/guiData.cpp
+    src/guiFileDialog.cpp
+    src/imageUtils.cpp
+
+    src/pathtrace.cu
+
     src/ImGui/imgui.cpp 
-      src/ImGui/imgui_demo.cpp 
-      src/ImGui/imgui_draw.cpp 
-     src/ImGui/imgui_impl_glfw.cpp 
-     src/ImGui/imgui_impl_opengl3.cpp 
-     src/ImGui/imgui_tables.cpp 
-     src/ImGui/imgui_widgets.cpp 
+    src/ImGui/imgui_demo.cpp 
+    src/ImGui/imgui_draw.cpp 
+    src/ImGui/imgui_impl_glfw.cpp 
+    src/ImGui/imgui_impl_opengl3.cpp 
+    src/ImGui/imgui_tables.cpp 
+    src/ImGui/imgui_widgets.cpp 
+    src/TinyObjLoader/tiny_obj_loader.cc
     )
 
 list(SORT headers)
@@ -115,7 +141,9 @@ source_group(Sources FILES ${sources})
 #add_subdirectory(stream_compaction)  # TODO: uncomment if using your stream compaction
 
 cuda_add_executable(${CMAKE_PROJECT_NAME} ${sources} ${headers})
+set_target_properties(cis565_path_tracer PROPERTIES CUDA_ARCHITECTURES "all-major")
+
 target_link_libraries(${CMAKE_PROJECT_NAME}
     ${LIBRARIES}
-    #stream_compaction  # TODO: uncomment if using your stream compaction
+    # stream_compaction  # TODO: uncomment if using your stream compaction
     )

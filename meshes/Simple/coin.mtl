@@ -1,0 +1,11 @@
+newmtl lambert2SG
+Kd 1 1 1
+Ks 1 1 1
+Ns 0
+ior 1
+refl 1
+refr 0
+emit 0
+rough 0
+map_Kd wave.jpg
+# bump wave_norm.png

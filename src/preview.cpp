@@ -1,33 +1,38 @@
 //#define _CRT_SECURE_NO_DEPRECATE
-#include <ctime>
 #include "main.h"
 #include "preview.h"
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_glfw.h"
 #include "ImGui/imgui_impl_opengl3.h"
+#include "image.h"
+#include "imageUtils.h"
+
+#include "guiData.h"
+#include "guiFileDialog.h"
+
+#include "rendersave.h"
+#include "pathtrace.h"
+#include "Collision/DebugDrawer.h"
+#include "Octree/octree.h"
+#include "Denoise/denoise.h"
+
+#include <thrust/execution_policy.h>
+
 GLuint positionLocation = 0;
 GLuint texcoordsLocation = 1;
 GLuint pbo;
 GLuint displayImage;
 
 GLFWwindow* window;
-GuiDataContainer* imguiData = NULL;
+GuiDataContainer* guiData = NULL;
 ImGuiIO* io = nullptr;
-bool mouseOverImGuiWinow = false;
-
-std::string currentTimeString() {
-	time_t now;
-	time(&now);
-	char buf[sizeof "0000-00-00_00-00-00z"];
-	strftime(buf, sizeof buf, "%Y-%m-%d_%H-%M-%Sz", gmtime(&now));
-	return std::string(buf);
-}
+bool mouseOverImGuiWinow;
 
 //-------------------------------
 //----------SETUP STUFF----------
 //-------------------------------
 
-void initTextures() {
+static void initTextures() {
 	glGenTextures(1, &displayImage);
 	glBindTexture(GL_TEXTURE_2D, displayImage);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -35,7 +40,7 @@ void initTextures() {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
 }
 
-void initVAO(void) {
+static void initVAO(void) {
 	GLfloat vertices[] = {
 		-1.0f, -1.0f,
 		1.0f, -1.0f,
@@ -69,7 +74,7 @@ void initVAO(void) {
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 }
 
-GLuint initShader() {
+static GLuint initShader() {
 	const char* attribLocations[] = { "Position", "Texcoords" };
 	GLuint program = glslUtility::createDefaultProgram(attribLocations, 2);
 	GLint location;
@@ -82,7 +87,7 @@ GLuint initShader() {
 	return program;
 }
 
-void deletePBO(GLuint* pbo) {
+static void deletePBO(GLuint* pbo) {
 	if (pbo) {
 		// unregister this buffer object with CUDA
 		cudaGLUnregisterBufferObject(*pbo);
@@ -94,12 +99,12 @@ void deletePBO(GLuint* pbo) {
 	}
 }
 
-void deleteTexture(GLuint* tex) {
+static void deleteTexture(GLuint* tex) {
 	glDeleteTextures(1, tex);
 	*tex = (GLuint)NULL;
 }
 
-void cleanupCuda() {
+static void cleanupCuda() {
 	if (pbo) {
 		deletePBO(&pbo);
 	}
@@ -108,14 +113,14 @@ void cleanupCuda() {
 	}
 }
 
-void initCuda() {
+static void initCuda() {
 	cudaGLSetGLDevice(0);
 
 	// Clean up on program exit
 	atexit(cleanupCuda);
 }
 
-void initPBO() {
+static void initPBO() {
 	// set up vertex data parameter
 	int num_texels = width * height;
 	int num_values = num_texels * 4;
@@ -137,7 +142,7 @@ void errorCallback(int error, const char* description) {
 	fprintf(stderr, "%s\n", description);
 }
 
-bool init() {
+bool Preview::initImguiGL() {
 	glfwSetErrorCallback(errorCallback);
 
 	if (!glfwInit()) {
@@ -164,11 +169,20 @@ bool init() {
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
+
 	io = &ImGui::GetIO(); (void)io;
-	ImGui::StyleColorsLight();
+	ImGui::StyleColorsDark();
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init("#version 120");
 
+	return true;
+}
+
+GuiDataContainer* Preview::GetGUIData() {
+	return guiData;
+}
+
+bool Preview::initBufs() {
 	// Initialize other stuff
 	initVAO();
 	initTextures();
@@ -182,64 +196,339 @@ bool init() {
 	return true;
 }
 
-void InitImguiData(GuiDataContainer* guiData)
-{
-	imguiData = guiData;
+void Preview::InitImguiData() {
+	if (!guiData) {
+		guiData = new GuiDataContainer();
+	} else {
+		guiData->Reset();
+	}
+
+	if (guiData->denoiser_options.is_on) {
+		PathTracer::enableDenoise();
+	} else {
+		PathTracer::disableDenoise();
+	}
+	PathTracer::setDenoise(guiData->desc);
 }
 
+static void RenderMainMenu() {
+	std::string lastScene;
 
-// LOOK: Un-Comment to check ImGui Usage
-void RenderImGui()
-{
-	mouseOverImGuiWinow = io->WantCaptureMouse;
+	ImGui::Text("Traced Depth %d", guiData->traced_depth);
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+	lastScene = guiData->cur_scene;
+
+	std::string filename = guiData->OpenFileDialogue("Select Scene File", false, ".txt");
+	if (filename.size()) {
+		guiData->cur_scene = filename;
+		switchScene(filename.c_str());
+	}
+
+	filename = guiData->OpenFileDialogue("Select Save File", false, ".txt");
+	if (filename.size()) {
+		if (!PathTracer::saveRenderState(filename.c_str())) {
+			std::cerr << "failed to save\n";
+		}
+	}
+	if (ImGui::Button("Reload Scene")) {
+		switchScene(guiData->cur_scene.c_str(), true);
+	}
+	if (PathTracer::isPaused()) {
+		if (ImGui::Button("Resume Render")) {
+			PathTracer::togglePause();
+		}
+	} else {
+		if (ImGui::Button("Pause Render")) {
+			PathTracer::togglePause();
+		}
+	}
+}
+
+static void RenderDenoiserMenu() {
+	static constexpr char const* filter_options[Denoiser::FilterType::NUM_FILTERS] = {
+		"A Trous",
+		"Gaussian",
+		"Simple Blur",
+	};
+
+	static constexpr char const* texture_options[DebugTextureType::NUM_OPTIONS] = {
+		"None",
+		"Show Normal Buffer",
+		"Show Position Buffer",
+		"Show Diffuse Buffer",
+	};
+
+	auto& ops = guiData->denoiser_options;
+	auto& params = guiData->desc;
+
+	ImGui::Checkbox("Denoise", &ops.is_on);
+	ImGui::Checkbox("Use Diffuse Map", &params.use_diffuse);
+	ImGui::Combo("Filter Type", (int*)&params.type, filter_options, Denoiser::FilterType::NUM_FILTERS);
+	ImGui::SliderInt("Filter Size", &params.filter_size, 3, 500);
+	ImGui::SliderFloat("Color Weight", &params.c_phi, 0.0f, 10.0f);
+	ImGui::SliderFloat("Normal Weight", &params.n_phi, 0.0f, 10.0f);
+	ImGui::SliderFloat("Position Weight", &params.p_phi, 0.0f, 10.0f);
+	if (params.type == Denoiser::FilterType::GAUSSIAN) {
+		ImGui::SliderFloat("Std. Dev.", &params.s_dev, 1.0f, 10.0f);
+	}
+
+	ImGui::Separator();
+
+	std::string filename = guiData->OpenFileDialogue("Select a Reference Image", false, nullptr);
+	if (filename.size()) {
+		guiData->ref_img = std::make_unique<Image>(filename);
+		guiData->ref_img_file = std::move(filename);
+	}
+
+	if (guiData->CheckBox("Display PSNR value")) {
+		if (guiData->ref_img) {
+			DebugDrawer::DrawImage(guiData->ref_img_file.c_str(), 256, 256);
+			Image img1{ width, height, PathTracer::getPBO() };
+
+			float mse_val = ImageUtils::CalculateMSE(width * height, img1.getPixels(), guiData->ref_img->getPixels());
+			float psnr_val = ImageUtils::CalculatePSNR(mse_val);
+			ImGui::Text("PSNR = %f, MSE = %f", psnr_val, mse_val);
+
+			filename = guiData->OpenFileDialogue("Select A File to Save Data", true, ".csv");
+			if (filename.size()) {
+				guiData->img_data_file = filename;
+			}
+			if (g_iteration % 100 == 0 && guiData->img_data_file.size()) {
+				utilityCore::CreateOrAppendCSV(guiData->img_data_file, g_iteration, psnr_val, mse_val);
+			}
+		} else {
+			ImGui::Text("No Reference Image");
+		}
+	}
+
+	ImGui::Combo("Show Texture", &guiData->denoiser_options.debug_tex_idx, texture_options, DebugTextureType::NUM_OPTIONS);
+	if (ops.is_on) {
+		PathTracer::enableDenoise();
+	} else {
+		PathTracer::disableDenoise();
+	}
+	PathTracer::debugTexture((DebugTextureType)guiData->denoiser_options.debug_tex_idx);
+	PathTracer::setDenoise(params);
+}
+
+static void RenderProfilingStats() {
+	auto& data = PathTracer::GetProfileData();
+	if (ImGui::BeginTable("profile data", 3)) {
+		for (auto it = data.begin(); it != data.end(); ++it) {
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("%s", it->first);
+
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text("%s", it->second.to_string().c_str());
+		
+			ImGui::TableSetColumnIndex(2);
+			if (ImGui::Button("clear")) {
+				it->second.clear();
+			}
+		}
+		ImGui::EndTable();
+	}
+}
+
+static void RenderDebugMenu() {
+	if (ImGui::Button("Write PBO to Image")) {
+		ImageUtils::SaveImage(PathTracer::getPBO());
+	}
+
+	bool draw_coord_frame, draw_debug_aabb, draw_world_aabb;
+
+	draw_coord_frame = guiData->ToggleButton("[DEBUG] Don't draw World Frame", "[DEBUG] Draw World Frame");
+	draw_debug_aabb = guiData->ToggleButton("[DEBUG] Don't draw AABB", "[DEBUG] Draw AABB");
+	draw_world_aabb = guiData->ToggleButton("[DEBUG] Draw World AABB", "[DEBUG] Don't draw World AABB");
+
+	ImGui::Text("Octree Test");
+	{
+		ImGui::SliderInt("Octree Depth", &guiData->octree_depth, 0, 20);
+		if (ImGui::Button("Generate Octree")) {
+			if (guiData->test_tree) {
+				delete guiData->test_tree;
+				guiData->test_tree = nullptr;
+			}
+
+			guiData->test_tree = new octree(*g_scene, g_scene->world_AABB, guiData->octree_depth);
+		}
+		if (ImGui::Button("Pull Octree From GPU")) {
+			if (guiData->test_tree) {
+				delete guiData->test_tree;
+				guiData->test_tree = nullptr;
+			}
+
+			guiData->test_tree = new octree(PathTracer::getTree());
+		}
+		if (guiData->test_tree) {
+			if (ImGui::Button("Destroy Octree")) {
+				delete guiData->test_tree;
+				guiData->test_tree = nullptr;
+			}
+		}
+	}
+	if (draw_coord_frame) {
+		float x = g_scene->world_AABB.min().x + 1.f;
+		float y = g_scene->world_AABB.min().y + 1.f;
+		glm::vec3 origin{ x, y, 0 };
+		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(2, 0, 0), { 1,0,0 });
+		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(0, 2, 0), { 0,1,0 });
+		DebugDrawer::DrawLine3D(origin, origin + glm::vec3(0, 0, 2), { 0,0,1 });
+	}
+	if (draw_debug_aabb) {
+		for (Geom const& g : g_scene->geoms) {
+			if (g.type == MESH) {
+				DebugDrawer::DrawAABB(g.bounds, { 1,0,0 });
+			}
+		}
+	}
+	if (draw_world_aabb) {
+		DebugDrawer::DrawAABB(g_scene->world_AABB, { 0,0,1 });
+	}
+
+	if (guiData->test_tree) {
+		if (ImGui::Button("Clear Depth Filter")) {
+			if (guiData->octree_depth_filter != -1) {
+				guiData->octree_depth_filter = -1;
+			}
+		}
+		ImGui::SliderInt("Set Depth Filter (-1 means no)", &guiData->octree_depth_filter, -1, guiData->octree_depth);
+		guiData->octree_intersection_cnt = 0;
+		guiData->test_tree->dfs([&](node const& node, int depth) {
+			if (guiData->octree_depth_filter != -1) {
+				if (guiData->octree_depth_filter == depth) {
+					DebugDrawer::DrawAABB(node.bounds, { 0,1,0 });
+					guiData->octree_intersection_cnt += node.leaf_infos.size();
+				}
+			} else {
+				DebugDrawer::DrawAABB(node.bounds, { 0,1,0 });
+				guiData->octree_intersection_cnt += node.leaf_infos.size();
+			}
+			});
+		std::string info = "intersection cnt: " + std::to_string(guiData->octree_intersection_cnt) +
+			"\ntotal triangles: " + std::to_string(g_scene->triangles.size());
+
+		ImGui::Text(info.c_str());
+	}
+}
+
+static void RenderImGui() {
+	// very ugly, I know
+	extern Scene* g_scene;
+	static constexpr float k_menu_width = 400.f;
+	static constexpr float k_collapsable_width = 60.f;
+
 
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	bool show_demo_window = true;
-	bool show_another_window = false;
-	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-	static float f = 0.0f;
-	static int counter = 0;
+	if (!ImGui::Begin("Path Tracer", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::End();
+		return;
+	}
 
-	ImGui::Begin("Path Tracer Analytics");                  // Create a window called "Hello, world!" and append into it.
+	ImGui::SetWindowSize(ImVec2(k_menu_width, 3 * k_collapsable_width));
+	ImGui::Text("press H to hide GUI completely.");
+
+	auto ptr = guiData->GetOrSetBuf<bool>("Hide");
+	if (ImGui::IsKeyPressed('H')) {
+		*ptr = !*ptr;
+	}
+	if (*ptr) {
+		ImGui::SetNextWindowSize(ImVec2(-1, -1));
+		return;
+	}
 	
-	// LOOK: Un-Comment to check the output window and usage
-	//ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-	//ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-	//ImGui::Checkbox("Another Window", &show_another_window);
+	if (ImGui::CollapsingHeader("Main Menu")) {
+		RenderMainMenu();
+	}
+	ImGui::Separator();
+	if (ImGui::CollapsingHeader("Denoiser")) {
+		RenderDenoiserMenu();
+	}
+	ImGui::Separator();
+	if (ImGui::CollapsingHeader("Profiling Stats")) {
+		RenderProfilingStats();
+	}
+	ImGui::Separator();
+	if (ImGui::CollapsingHeader("Debug")) {
+		RenderDebugMenu();
+	}
 
-	//ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-	//ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-	//if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-	//	counter++;
-	//ImGui::SameLine();
-	//ImGui::Text("counter = %d", counter);
-	ImGui::Text("Traced Depth %d", imguiData->TracedDepth);
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 	ImGui::End();
-
 
 	ImGui::Render();
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
 }
 
-bool MouseOverImGuiWindow()
-{
-	return mouseOverImGuiWinow;
-}
+/// <summary>
+/// renders a pre-scene load menu
+/// </summary>
+void Preview::DoPreloadMenu() {
+	std::string scene_file, save_file;
+	ImGui::FileDialogue scene_dialogue("Select Scene File", false, ".txt");
+	ImGui::FileDialogue save_dialogue("Select Save File", false, ".sav");
 
-void mainLoop() {
-	while (!glfwWindowShouldClose(window)) {
-		
+	while (scene_file.empty() && save_file.empty() && !glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+
+		ImGui::Begin("WELCOME", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+		{
+			ImGui::Text("Choose a Scene File or a Save File to continue");
+			ImGui::Separator();
+
+			scene_file = ImGui::OpenFileDialogue(scene_dialogue, "Scene File Name: ");
+			save_file = ImGui::OpenFileDialogue(save_dialogue, "Save File Name: ");
+		}
+		ImGui::End();
+
+		ImGui::Render();
+
+		int display_w, display_h;
+		glfwGetFramebufferSize(window, &display_w, &display_h);
+		glViewport(0, 0, display_w, display_h);
+		glClearColor(0, 0, 0, 1);
+		glClear(GL_COLOR_BUFFER_BIT);
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+		glfwSwapBuffers(window);
+	}
+
+	if (!glfwWindowShouldClose(window)) {
+		if (scene_file.size()) {
+			switchScene(scene_file.c_str());
+			guiData->cur_scene = std::move(scene_file);
+
+		} else {
+			int iter;
+			if (read_state(save_file.c_str(), iter, g_scene)) {
+				switchScene(g_scene, iter, true, true);
+			}
+		}
+	} else {
+		exit(0);
+	}
+}
+
+bool Preview::CapturingMouse() {
+	return io->WantCaptureMouse;
+}
+bool Preview::CapturingKeyboard() {
+	return io->WantCaptureKeyboard;
+}
+void Preview::mainLoop() {
+	while (!glfwWindowShouldClose(window)) {
+		glfwPollEvents();
 		runCuda();
 
-		string title = "CIS565 Path Tracer | " + utilityCore::convertIntToString(iteration) + " Iterations";
+		std::string title = "CIS565 Path Tracer | " + utilityCore::convertIntToString(g_iteration) + " Iterations";
 		glfwSetWindowTitle(window, title.c_str());
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
 		glBindTexture(GL_TEXTURE_2D, displayImage);
@@ -250,11 +539,10 @@ void mainLoop() {
 		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
 		// VAO, shader program, and texture already bound
-		glDrawElements(GL_TRIANGLES, 6,  GL_UNSIGNED_SHORT, 0);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
 
 		// Render ImGui Stuff
 		RenderImGui();
-
 		glfwSwapBuffers(window);
 	}
 

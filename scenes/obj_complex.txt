@@ -1,0 +1,66 @@
+// Camera
+CAMERA
+RES         800 800
+FOVY        45
+ITERATIONS  5000
+DEPTH       8
+FILE        obj_complex
+EYE         -10 5 10.5
+LOOKAT      0 5 0
+UP          0 1 0
+
+// car
+OBJECT
+obj ../meshes/Humvee/Humvee.obj
+material    ../materials/diffuse_white.mtl
+TRANS       0 0 2
+ROTAT       0 0 0
+SCALE       0.04 0.04 0.04
+
+// sofa
+OBJECT
+obj ../meshes/Sofa/Sofa.obj
+material    ../materials/diffuse_white.mtl
+TRANS       5 0 -2
+ROTAT       0 90 0
+SCALE       3 3 3
+
+// Ceiling light
+OBJECT
+cube
+material    ../materials/emissive_white.mtl
+TRANS       0 10 0
+ROTAT       0 0 0
+SCALE       3 .3 5
+
+// Ceiling
+OBJECT
+cube
+material    ../materials/diffuse_white.mtl
+TRANS       0 10 0
+ROTAT       0 0 90
+SCALE       .01 15 15
+
+// Back wall
+OBJECT
+cube
+material   ../materials/diffuse_white.mtl
+TRANS       0 5 -7.5
+ROTAT       0 90 0
+SCALE       .01 10 15
+
+// Left wall
+OBJECT
+cube
+material    ../materials/diffuse_green.mtl
+TRANS       -7.5 5 0
+ROTAT       0 0 0
+SCALE       .01 10 15
+
+// Floor
+OBJECT
+cube
+material   ../materials/diffuse_white.mtl
+TRANS       0 0 0
+ROTAT       0 0 0
+SCALE       15 .01 15

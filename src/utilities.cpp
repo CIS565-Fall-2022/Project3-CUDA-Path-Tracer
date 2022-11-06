@@ -8,8 +8,40 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <iostream>
 #include <cstdio>
-
+#include "main.h"
 #include "utilities.h"
+
+#ifdef _WIN32
+#include <Windows.h>
+#endif // _WIN32
+
+std::vector<std::string> utilityCore::getFilesInDir(char const* dir) {
+    // credit: https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
+
+    std::vector<std::string> names;
+#ifdef _WIN32
+    std::string search_pattern(dir);
+    std::string search_path(dir);
+    search_pattern += "*.*";
+
+    WIN32_FIND_DATA fd;
+    HANDLE hFind = ::FindFirstFile(search_pattern.c_str(), &fd);
+    if (hFind != INVALID_HANDLE_VALUE) {
+        do {
+            // read all (real) files in current folder
+            // , delete '!' read other 2 default folder . and ..
+            if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+                names.emplace_back(search_path + fd.cFileName);
+            }
+        } while (::FindNextFile(hFind, &fd));
+        ::FindClose(hFind);
+    }
+#else
+    assert(!"unsupported platform")
+#endif
+    return names;
+}
+
 
 float utilityCore::clamp(float f, float min, float max) {
     if (f < min) {
@@ -20,7 +52,6 @@ float utilityCore::clamp(float f, float min, float max) {
         return f;
     }
 }
-
 bool utilityCore::replaceString(std::string& str, const std::string& from, const std::string& to) {
     size_t start_pos = str.find(from);
     if (start_pos == std::string::npos)
@@ -109,4 +140,13 @@ std::istream& utilityCore::safeGetline(std::istream& is, std::string& t) {
             t += (char)c;
         }
     }
+}
+
+
+std::istream& utilityCore::peekline(std::istream& is, std::string& t) {
+    t.clear();
+    int pos = is.tellg();
+    safeGetline(is, t);
+    is.seekg(pos, std::ios_base::beg);
+    return is;
 }

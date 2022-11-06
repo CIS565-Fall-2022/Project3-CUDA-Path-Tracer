@@ -1,0 +1,10 @@
+newmtl perfect_refl
+Kd 0.7 0.7 0.7
+Ks 0.98 0.98 0.98
+Ns 5
+
+ior 1
+reflect 1
+refr 0
+emit 0
+rough 0
