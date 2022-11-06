@@ -2,13 +2,11 @@
 #include "preview.h"
 #include "Collision/DebugDrawer.h"
 #include "consts.h"
+#include "imageUtils.h"
+
 #include <cstring>
 #include <iostream>
-
-static std::string startTimeString;
-
-std::string scene_files_dir = "../scenes/";
-std::string save_files_dir = "../saves/";
+#include <ctime>
 
 // For camera controls
 static bool leftMousePressed = false;
@@ -17,32 +15,32 @@ static bool middleMousePressed = false;
 static double lastX;
 static double lastY;
 
+static bool fromSave = false;
 static bool camchanged = true;
+static bool forceChange = false;
 
 JunksFromMain g_mainJunks;
 
 Scene* g_scene;
 RenderState* g_renderState;
-int iteration;
+int g_iteration;
 
 int width;
 int height;
 
+std::string currentTimeString() {
+	time_t now;
+	time(&now);
+	char buf[sizeof "0000-00-00_00-00-00z"];
+	strftime(buf, sizeof buf, "%Y-%m-%d_%H-%M-%Sz", gmtime(&now));
+	return std::string(buf);
+}
 //-------------------------------
 //-------------MAIN--------------
 //-------------------------------
 
 int main(int argc, char** argv) {
 
-#ifdef NO_DEFAULT_PATHS
-	std::cout << "Enter Scene Files Dir: \n";
-	std::cin >> scene_files_dir;
-	std::cout << "Enter Save Files Dir: \n";
-	std::cin >> save_files_dir;
-#endif // NO_DEFAULT_PATHS
-
-
-	startTimeString = Preview::currentTimeString();
 	height = width = 800;
 
 	// Initialize ImGui Data
@@ -84,7 +82,6 @@ void resetCamState() {
 	cam.position = cameraPosition;
 	cameraPosition += cam.lookAt;
 	cam.position = cameraPosition;
-	camchanged = false;
 }
 bool switchScene(Scene* scene, int start_iter, bool from_save, bool force) {
 	// Set up camera stuff from loaded path tracer settings
@@ -94,8 +91,9 @@ bool switchScene(Scene* scene, int start_iter, bool from_save, bool force) {
 	auto& cameraPosition = g_mainJunks.cameraPosition;
 	auto& ogLookAt = g_mainJunks.ogLookAt;
 
-	iteration = start_iter;
+	g_iteration = start_iter;
 	g_renderState = &scene->state;
+	fromSave = from_save;
 
 	if (!from_save) {
 		Camera const& cam = g_renderState->camera;
@@ -122,13 +120,13 @@ bool switchScene(Scene* scene, int start_iter, bool from_save, bool force) {
 
 
 	camchanged = true;
+	forceChange = force;
+
 	leftMousePressed = rightMousePressed = middleMousePressed = false;
 	lastX = lastY = 0;
 	Preview::InitImguiData();
 
 	resetCamState();
-	PathTracer::pathtraceFree(scene, force);
-	PathTracer::pathtraceInit(scene, g_renderState, force);
 
 	return true;
 }
@@ -142,59 +140,37 @@ bool switchScene(char const* path, bool force) {
 	return switchScene(g_scene, 0, false, force);
 }
 
-void saveImage() {
-	float samples = iteration;
-	// output image file
-	image img(width, height);
 
-	for (int x = 0; x < width; x++) {
-		for (int y = 0; y < height; y++) {
-			int index = x + (y * width);
-			glm::vec3 pix = g_renderState->image[index];
-			img.setPixel(width - 1 - x, y, glm::vec3(pix) / samples);
-		}
-	}
 
-	std::string filename = g_renderState->imageName;
-	std::ostringstream ss;
-	ss << filename << "." << startTimeString << "." << samples << "samp";
-	filename = ss.str();
+void runCuda() {
+	PathTracer::beginFrame(pbo);
 
-	// CHECKITOUT
-	img.savePNG(filename);
-	//img.saveHDR(filename);  // Save a Radiance HDR file
-}
-
-void runCuda(bool init) {
-
-	if (camchanged) {
-		iteration = 0;
-
-		if (!init) {
-			// clear image buffer
+	if (camchanged || forceChange) {
+		// clear image buffer
+		if (!fromSave) {
+			g_iteration = 0;
 			std::fill(g_renderState->image.begin(), g_renderState->image.end(), glm::vec3(0));
 		}
-		PathTracer::pathtraceFree(g_scene);
-		PathTracer::pathtraceInit(g_scene, g_renderState);
+
+		PathTracer::pathtraceFree(g_scene, forceChange);
+		PathTracer::pathtraceInit(g_scene, g_renderState, forceChange);
 
 		resetCamState();
+
+		fromSave = false;
+		camchanged = false;
+		forceChange = false;
 	}
 
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not use this buffer
 
-	if (iteration < g_renderState->iterations) {
-		uchar4* pbo_dptr = NULL;
-		cudaGLMapBufferObject((void**)&pbo_dptr, pbo);
-
-		// execute the kernel
-		int frame = 0;
-		iteration = PathTracer::pathtrace(pbo_dptr, iteration);
-
-		// unmap buffer object
-		cudaGLUnmapBufferObject(pbo);
+	if (g_iteration < g_renderState->iterations) {
+		g_iteration = PathTracer::pathtrace(g_iteration);
+		PathTracer::endFrame();
 	} else {
-		saveImage();
+		PathTracer::endFrame();
+		ImageUtils::SaveImage(g_renderState);
 		PathTracer::pathtraceFree(nullptr);
 		cudaDeviceReset();
 		exit(EXIT_SUCCESS);
@@ -207,12 +183,12 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 	if (action == GLFW_PRESS) {
 		switch (key) {
 		case GLFW_KEY_ESCAPE:
-			saveImage();
+			ImageUtils::SaveImage(g_renderState);
 			glfwSetWindowShouldClose(window, GL_TRUE);
 			break;
 		case GLFW_KEY_S:
 			if (!Preview::CapturingMouse() && !Preview::CapturingKeyboard()) {
-				saveImage();
+				ImageUtils::SaveImage(g_renderState);
 			}
 			break;
 		case GLFW_KEY_SPACE:

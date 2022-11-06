@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "intersections.cuh"
 #include "utilities.h"
 #include <thrust/random.h>
@@ -195,7 +194,6 @@ struct BSDF {
     }
     __device__ __forceinline__ glm::vec3 sample_ggx(glm::vec3 const& wo) const {
         thrust::uniform_real_distribution<float> u01(0,1);
-        float a2 = m.roughness * m.roughness;
         float r1 = u01(rng);
         float r2 = u01(rng);
         float theta = atanf(m.roughness * sqrtf(r1 / (1 - r1)));
@@ -229,7 +227,7 @@ struct BSDF {
         return ggx_G1(wo) * ggx_G1(wi);
     }
     __device__ color_t sample_f(glm::vec3 const& wo, glm::vec3& wi, float& pdf) const {
-        float etaI = 1, etaT = m.ior, eta, F;
+        float etaI = 1, etaT = m.ior, F;
         glm::vec3 wh; // half vector
         color_t tmp;
 

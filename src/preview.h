@@ -5,7 +5,6 @@ struct GuiDataContainer;
 
 
 namespace Preview {
-	std::string currentTimeString();
 	GuiDataContainer* GetGUIData();
 	bool initImguiGL();
 	bool initBufs();

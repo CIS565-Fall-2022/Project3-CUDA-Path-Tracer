@@ -1,8 +1,5 @@
 #pragma once
 
-// #define NO_DEFAULT_PATHS
-
-
 #define PRIM_SPHERE_RADIUS 0.5f
 #define PRIM_CUBE_EXTENT 0.5f
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
@@ -22,15 +19,21 @@
 
 // impl switches
 #define COMPACTION
-#define COMPACTION_USE_PARTITION
-
-#define SORT_MAT
+// #define SORT_MAT
 #define AABB_CULLING
 #define OCTREE_CULLING
 // #define DEPTH_OF_FIELD
 
 // #define ANTI_ALIAS_JITTER
 // #define FAKE_SHADE
+
+#define PROFILE
+
+#define DENOISE
+#define DENOISE_GBUF_OPTIMIZATION
+// #define DENOISE_SHARED_MEM
+
+#define DENOISE_IMG_COMP
 
 #define CACHE_FIRST_BOUNCE
 #if (defined(CACHE_FIRST_BOUNCE) && defined(ANTI_ALIAS_JITTER)) || (defined(CACHE_FIRST_BOUNCE) && defined(DEPTH_OF_FIELD)) 

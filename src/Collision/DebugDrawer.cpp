@@ -1,38 +1,30 @@
 #include "DebugDrawer.h"
 #include <glm/glm.hpp>
-#include <glm/ext.hpp>
+
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/transform.hpp>
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include "../sceneStructs.h"
 #include "../ImGui/imgui.h"
 #include "../ImGui/imgui_impl_glfw.h"
 #include "../ImGui/imgui_impl_opengl3.h"
-#include "../consts.h"
 
-extern RenderState* g_renderState;
-extern JunksFromMain g_mainJunks;
-extern int width;
-extern int height;
+#include "../consts.h"
+#include "../sceneStructs.h"
+#include "../camState.h"
+#include <stb_image.h>
 
 // world to screen
 static glm::vec2 w2s(glm::mat4 const& model, glm::vec3 const& point) {
-	glm::vec2 const& pixel_len = g_renderState->camera.pixelLength;
 	glm::vec3 const& look_point = g_renderState->camera.lookAt;
 	glm::vec3 const& eye = g_mainJunks.cameraPosition;
 	float fov = glm::radians(g_renderState->camera.fov.y * 2.0f);
 
 	glm::mat4 view = glm::lookAt(eye, look_point, WORLD_UP);
 	glm::mat4 proj = glm::perspective(fov, width / (float)height, 0.12f, 100.0f);
-	glm::vec4 tmp = proj * (view * (model * glm::vec4(point, 1)));
-	tmp /= tmp.w;
-
-	float w = width * 0.5f;
-	float h = height * 0.5f;
-	glm::vec2 ret(tmp.x * w, tmp.y * h);
-	// to viewport
-	ret.x = w + ret.x;
-	ret.y = h - ret.y;
-	return ret;
+	glm::vec4 tmp = CamState::get_proj() * (CamState::get_view() * (model * glm::vec4(point, 1)));
+	return glm::vec2(CamState::clip_to_viewport(tmp));
 }
 
 void DebugDrawer::DrawRect(float x, float y, float w, float h, color_t color) {
@@ -95,4 +87,45 @@ void DebugDrawer::DrawLine3D(glm::vec3 from, glm::vec3 to, color_t color, float 
 	glm::vec2 to2D = w2s(glm::mat4(1), to);
 	ImU32 col = ImGui::ColorConvertFloat4ToU32(ImVec4(color.x, color.y, color.z, 1));
 	ImGui::GetForegroundDrawList()->AddLine(ImVec2(from2D.x, from2D.y), ImVec2(to2D.x, to2D.y), col, thickness);
+}
+
+
+// reference: https://github.com/ocornut/imgui/wiki/Image-Loading-and-Displaying-Examples
+bool DebugDrawer::DrawImage(char const* filename, int width, int height) {
+	static GLuint s_texture_id = ~0;
+	static std::string s_filename;
+
+	// Create a OpenGL texture identifier
+	if (s_texture_id == ~0) {
+		glGenTextures(1, &s_texture_id);
+	}
+
+	if (s_filename != filename) {
+		s_filename = filename;
+
+		// Load from file
+		int image_width = 0;
+		int image_height = 0;
+		unsigned char* image_data = stbi_load(filename, &image_width, &image_height, NULL, 4);
+		if (image_data == NULL)
+			return false;
+
+		glBindTexture(GL_TEXTURE_2D, s_texture_id);
+		// Setup filtering parameters for display
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+
+		// Upload pixels into texture
+#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
+		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+#endif
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+
+		stbi_image_free(image_data);
+	}
+
+	ImGui::Image((void*)s_texture_id, ImVec2(width, height));
+	return true;
 }

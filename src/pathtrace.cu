@@ -1,5 +1,12 @@
 #include <cstdio>
 #include <cuda.h>
+
+#include <glm/glm.hpp>
+#include <glm/gtx/norm.hpp>
+
+#include <GL/glew.h>
+#include <cuda_gl_interop.h>
+
 #include <cmath>
 #include <thrust/execution_policy.h>
 #include <thrust/device_ptr.h>
@@ -7,11 +14,12 @@
 #include <thrust/remove.h>
 
 #include <thrust/random.h>
+#include <thrust/transform.h>
+
 #include <thrust/sort.h>
 #include "sceneStructs.h"
 #include "scene.h"
-#include "glm/glm.hpp"
-#include "glm/gtx/norm.hpp"
+
 #include "utilities.h"
 #include "pathtrace.h"
 #include "intersections.cuh"
@@ -20,6 +28,8 @@
 #include "Collision/AABB.h"
 #include "Octree/octree.h"
 #include "consts.h"
+#include "Denoise/denoise.cuh"
+#include "Profile/pathtracer_profile.h"
 
 void checkCUDAErrorFn(const char* msg, const char* file, int line) {
 #ifndef NDEBUG
@@ -47,87 +57,11 @@ thrust::default_random_engine makeSeededRandomEngine(int iter, int index, int de
 	return thrust::default_random_engine(h);
 }
 
-__device__ int f(int i) {
-	if (!i) return 1;
-	return f(i - 1) * i;
-}
-__global__ void recur_test() {
-	printf("recur_test: %d", f(5));
-}
-
-__global__ void print2d(Span<Span<int>> arr) {
-	for (int i = 0; i < arr.size(); ++i) {
-		for (int j = 0; j < arr[i].size(); ++j) {
-			printf("%d ", arr[i][j]);
-		}
-		printf("\n");
-	}
-}
-void PathTracer::unitTest() {
-#ifndef NDEBUG
-	// test 2d span
-#define SECTION(name) std::cout << "========= " << name << " =========\n";
-	SECTION("test 2d array") {
-		thrust::default_random_engine rng = makeSeededRandomEngine(0, 0, 0);
-		thrust::uniform_int_distribution<int> udist(3, 10);
-		std::vector<std::vector<int>> jagged(udist(rng));
-		for (int i = 0; i < jagged.size(); ++i) {
-			jagged[i].resize(udist(rng));
-			for (int j = 0; j < jagged[i].size(); ++j) {
-				jagged[i][j] = (i + 1) * (j + 1);
-			}
-		}
-
-		std::vector<Span<int>> dev_arrs;
-		for (auto const& v : jagged) {
-			int* arr;
-			ALLOC(arr, v.size());
-			H2D(arr, v.data(), v.size());
-			dev_arrs.emplace_back(v.size(), arr);
-		}
-
-		Span<int>* arrs;
-		ALLOC(arrs, jagged.size());
-		H2D(arrs, dev_arrs.data(), jagged.size());
-
-		print2d KERN_PARAM(1, 1) ( { (int)jagged.size(), arrs } );
-		for (int i = 0; i < jagged.size(); ++i) {
-			FREE(dev_arrs[i]);
-		}
-		FREE(arrs);
-	}
-	
-	SECTION("recursion test") {
-		recur_test KERN_PARAM(1, 1) ();
-	}
-#endif // !NDEBUG
-}
-
-//Kernel that writes the image to the OpenGL PBO directly.
-__global__ void sendImageToPBO(int iter, glm::vec3* pixs, uchar4* pbo, glm::ivec2 resolution) {
-	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
-	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
-
-	if (x < resolution.x && y < resolution.y) {
-		int index = x + (y * resolution.x);
-		glm::vec3 pix = pixs[index];
-
-		glm::ivec3 color;
-		color.x = glm::clamp((int)(pix.x / iter * 255.0), 0, 255);
-		color.y = glm::clamp((int)(pix.y / iter * 255.0), 0, 255);
-		color.z = glm::clamp((int)(pix.z / iter * 255.0), 0, 255);
-
-		// Each thread writes one pixel location in the texture (textel)
-		pbo[index].w = 0;
-		pbo[index].x = color.x;
-		pbo[index].y = color.y;
-		pbo[index].z = color.z;
-	}
-}
+void PathTracer::unitTest() {  }
 
 static RenderState* renderState = nullptr;
 static Scene* hst_scene = nullptr;
-static std::string cur_scene;
+static std::string cur_scene = "";
 
 static Span<glm::vec3>             dev_image;
 static Span<Geom>                  dev_geoms;
@@ -140,16 +74,40 @@ static Span<ShadeableIntersection> dev_cached_intersections;
 static Span<Light> dev_lights;
 static MeshInfo dev_mesh_info;
 
-static thrust::device_ptr<PathSegment> dev_thrust_paths;
 static std::vector<TextureGPU> dev_texs;
 
-// TODO
-static octree* tree;
-static octreeGPU dev_tree;
+static std::unique_ptr<octree> tree;
+static std::unique_ptr<octreeGPU> dev_tree;
+
+static GLuint s_pbo_id = 0;
+static uchar4* s_pbo_dptr = nullptr;
 
 // pathtracer state
+static bool enable_denoise = false;
 static bool render_paused = false;
+static bool texture_debug_active = false;
 static int cur_iter;
+
+// copy of the radiance buffer for denoising
+color_t* denoise_image;
+static Denoiser::DenoiseBuffers denoise_buffers;
+static std::unique_ptr<Denoiser::ParamDesc> denoise_params;
+
+// profiling
+std::unordered_map<std::string, Profiling::ProfileData> s_prof_data;
+std::unordered_map<std::string, Profiling::ProfileData>&
+PathTracer::GetProfileData() {
+	return s_prof_data;
+}
+
+void PathTracer::beginFrame(unsigned int pbo_id) {
+	s_pbo_id = pbo_id;
+	CHECK_CUDA(cudaGLMapBufferObject((void**)&s_pbo_dptr, s_pbo_id));
+}
+
+void PathTracer::endFrame() {
+	CHECK_CUDA(cudaGLUnmapBufferObject(s_pbo_id));
+}
 
 void PathTracer::pathtraceInit(Scene* scene, RenderState* state, bool force_change) {
 	if (!scene) throw;
@@ -167,9 +125,12 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state, bool force_chan
 #ifdef CACHE_FIRST_BOUNCE
 	dev_cached_intersections = make_span<ShadeableIntersection>(pixelcount);
 #endif // CACHE_FIRST_BOUNCE
-	dev_thrust_paths = thrust::device_ptr<PathSegment>((PathSegment*)dev_paths);
+
+	denoise_image = make_span(state->image);
 
 	if (scene_changed) {
+		denoise_buffers.init(cam.resolution.x, cam.resolution.y);
+
 		dev_geoms = make_span(scene->geoms);
 		dev_lights = make_span(scene->lights);
 		dev_mesh_info.vertices = make_span(scene->vertices);
@@ -186,8 +147,8 @@ void PathTracer::pathtraceInit(Scene* scene, RenderState* state, bool force_chan
 		}
 		dev_mesh_info.texs = make_span(dev_texs);
 #ifdef OCTREE_CULLING
-		tree = new octree(*scene, scene->world_AABB, OCTREE_DEPTH);
-		dev_tree.init(*tree, dev_mesh_info, dev_geoms);
+		tree = std::make_unique<octree>(*scene, scene->world_AABB, OCTREE_DEPTH);
+		dev_tree = std::make_unique<octreeGPU>(*tree, dev_mesh_info, dev_geoms);
 #endif // OCTREE_CULLING
 	}
     checkCUDAError("pathtraceInit");
@@ -202,7 +163,11 @@ void PathTracer::pathtraceFree(Scene* scene, bool force_change) {
 #ifdef CACHE_FIRST_BOUNCE
 	FREE(dev_cached_intersections);
 #endif // CACHE_FIRST_BOUNCE
+	FREE(denoise_image);
+
 	if (scene_changed) {
+		denoise_buffers.free();
+
 		FREE(dev_geoms);
 		FREE(dev_lights);
 		FREE(dev_mesh_info.vertices);
@@ -217,11 +182,6 @@ void PathTracer::pathtraceFree(Scene* scene, bool force_change) {
 		}
 		dev_texs.clear();
 		FREE(dev_mesh_info.texs);
-
-#ifdef OCTREE_CULLING
-		dev_tree.free();
-		delete tree;
-#endif
 	}
     checkCUDAError("pathtraceFree");
 }
@@ -257,8 +217,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
 		);
 
-		PathSegment& segment = pathSegments[index];
-		segment.init(traceDepth, index, cam_ray);
+		pathSegments[index].init(traceDepth, index, cam_ray);
 	}
 }
 
@@ -281,7 +240,7 @@ __global__ void computeIntersections(
 	PathSegment path = paths[path_index];
 
 #ifndef COMPACTION
-	if (!path.remainingBounces) {
+	if (path.remainingBounces <= 0) {
 		return;
 	}
 #endif // COMPACTION
@@ -344,16 +303,17 @@ __global__ void shadeMaterial(
 	}
 
 	PathSegment& path = paths[idx];
-	ShadeableIntersection intersection = shadeableIntersections[idx];
 
 #ifndef COMPACTION
-	if (!path.remainingBounces) {
+	if (path.remainingBounces <= 0) {
 		return;
 	}
 #endif // COMPACTION
 
 	assert(path.remainingBounces > 0);
 
+
+	ShadeableIntersection intersection = shadeableIntersections[idx];
 	if (intersection.t > 0.0f) {
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, 0);
 		thrust::uniform_real_distribution<float> u01(0, 1);
@@ -396,7 +356,11 @@ __global__ void shadeFakeMaterial(
 		PathSegment& path = paths[idx];
 		ShadeableIntersection intersection = shadeableIntersections[idx];
 
-		assert(path.remainingBounces > 0);
+#ifndef COMPACTION
+		if (path.remainingBounces <= 0) {
+			return;
+		}
+#endif // COMPACTION
 
 		if (intersection.t > 0.0f) { // if the intersection exists...
 		  // Set up the RNG
@@ -452,25 +416,53 @@ __global__ void finalGather(int numPixels, glm::vec3* image, PathSegment* iterat
  * 
  * Returns the new iteration
  */
-int PathTracer::pathtrace(uchar4 *pbo, int iter) {
+int PathTracer::pathtrace(int iter) {
 	cur_iter = iter;
+	ProfileHelper frame_profiling("frame");
+	const int traceDepth = hst_scene->state.traceDepth;
+	const Camera& cam = hst_scene->state.camera;
+	const int pixelcount = cam.resolution.x * cam.resolution.y;
+
 	if (render_paused) {
+		if (enable_denoise) {
+			frame_profiling.begin();
+			{
+				thrust::transform(
+					thrust::device,
+					dev_image.get(),
+					dev_image.get() + pixelcount,
+					denoise_image,
+					RadianceToNormalizedRGB(cur_iter));
+
+				ProfileHelper denoise_profiling("denoise");
+				denoise_profiling.begin();
+				{
+					Denoiser::denoise(denoise_image, denoise_buffers, *denoise_params);
+				}
+				denoise_profiling.end();
+
+				thrust::transform(
+					thrust::device,
+					denoise_image,
+					denoise_image + pixelcount,
+					s_pbo_dptr,
+					NormalizedRGBToRGBA()
+				);
+			}
+			frame_profiling.end();
+		}
+
 		return iter;
 	}
 
-    const int traceDepth = hst_scene->state.traceDepth;
-    const Camera &cam = hst_scene->state.camera;
-    const int pixelcount = cam.resolution.x * cam.resolution.y;
-
     // 2D block for generating ray from camera
-    const dim3 blockSize2d(8, 8);
-    const dim3 blocksPerGrid2d(
-            (cam.resolution.x + blockSize2d.x - 1) / blockSize2d.x,
-            (cam.resolution.y + blockSize2d.y - 1) / blockSize2d.y);
+	dim3 blk_per_grid2d(DIV_UP(cam.resolution.x, 8), DIV_UP(cam.resolution.y, 8));
+	dim3 blk_sz2d(8,8);
 
-    generateRayFromCamera KERN_PARAM(blocksPerGrid2d, blockSize2d) (cam, iter, traceDepth, dev_paths);
-    checkCUDAError("generate camera ray");
-
+	frame_profiling.call(generateRayFromCamera, blk_per_grid2d, blk_sz2d, 
+		cam, iter, traceDepth, dev_paths);
+	checkCUDAError("generate camera ray");
+    
     // --- PathSegment Tracing Stage ---
     // Shoot ray into scene, bounce between objects, push shading chunks
 
@@ -500,6 +492,7 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 		dev_inters = dev_intersections;
 		dev_cached_inters = nullptr;
 #endif
+
 		// split dev_paths [0 : num_paths] into chunks
 #ifndef MAX_INTERSECTION_TEST_SIZE // if not defined, launch all paths at once
 #define MAX_INTERSECTION_TEST_SIZE num_paths
@@ -509,54 +502,59 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 			int j = std::min(num_paths, i + MAX_INTERSECTION_TEST_SIZE);
 			int size = j - i;
 
-			computeIntersections KERN_PARAM(DIV_UP(size, BLOCK_SIZE), BLOCK_SIZE) (
+			frame_profiling.call(computeIntersections, DIV_UP(size, BLOCK_SIZE), BLOCK_SIZE,
 				i,
 				dev_paths.subspan(0, num_paths),
 				dev_geoms,
 				dev_inters,
 				dev_mesh_info,
 				dev_cached_inters,
-				dev_tree
+				*dev_tree
 			);
-			
+
 			checkCUDAError(std::string("trace one bounce, inters size = " +
 				std::to_string(MAX_INTERSECTION_TEST_SIZE)).c_str());
 			cudaDeviceSynchronize();
 		}
 
+#ifdef DENOISE
+		// initialize position and normal buffers for denoising
+		// NOTE: must do this before the material sorting
+		if (!depth && !iter) {
+			denoise_buffers.set(dev_inters, dev_mesh_info.materials);
+		}
+#endif
+
+		// stop before the shading stage if we're currently displaying a debug texture
+		if (texture_debug_active) {
+			return iter;
+		}
 
 		// --- Shading Stage ---
-		// Shade path segments based on intersections and generate new rays by
-		// evaluating the BSDF.
-		// Start off with just a big kernel that handles all the different
-		// materials you have in the scenefile.
-		// TODO: compare between directly shading the path segments and shading
-		// path segments that have been reshuffled to be contiguous in memory.
+		// Shade path segments based on intersections and generate new rays by evaluating the BSDF.
 #ifdef SORT_MAT
-		thrust::device_ptr<ShadeableIntersection> dev_thrust_inters(dev_inters);
-		thrust::sort_by_key(dev_thrust_inters, dev_thrust_inters + num_paths, dev_thrust_paths);
+		thrust::sort_by_key(thrust::device, dev_inters, dev_inters + num_paths, dev_paths.get());
 #endif
 
 #ifdef FAKE_SHADE
 #define shadeMaterial shadeFakeMaterial
 #endif
-		shadeMaterial KERN_PARAM(DIV_UP(num_paths, BLOCK_SIZE), BLOCK_SIZE) (
+		frame_profiling.call(shadeMaterial, DIV_UP(num_paths, BLOCK_SIZE), BLOCK_SIZE,
 			iter,
 			dev_paths.subspan(0, num_paths),
 			dev_lights,
 			dev_inters,
 			dev_mesh_info.materials
 		);
-
 		checkCUDAError("shadeMaterial");
 		cudaDeviceSynchronize();
 
 #ifdef COMPACTION
-#ifdef COMPACTION_USE_PARTITION
-		num_paths = thrust::partition(dev_thrust_paths, dev_thrust_paths + num_paths, PathSegment::PartitionRule()) - dev_thrust_paths;
-#else
-		num_paths = thrust::remove_if(dev_thrust_paths, dev_thrust_paths + num_paths, PathSegment::RemoveRule()) - dev_thrust_paths;
-#endif // COMPACTION_USE_PARTITION
+		frame_profiling.begin();
+		{
+			num_paths = thrust::partition(thrust::device, dev_paths.get(), dev_paths.get() + num_paths, PathSegment::PartitionRule()) - dev_paths.get();
+		}
+		frame_profiling.end();
 #endif // COMPACTION
 
 #ifdef MAX_DEPTH_OVERRIDE
@@ -566,20 +564,60 @@ int PathTracer::pathtrace(uchar4 *pbo, int iter) {
 	}
 	
 	// Assemble this iteration and apply it to the image
-    finalGather KERN_PARAM(DIV_UP(pixelcount, BLOCK_SIZE), BLOCK_SIZE) (pixelcount, dev_image, dev_paths);
+	frame_profiling.call(finalGather, DIV_UP(pixelcount, BLOCK_SIZE), BLOCK_SIZE,
+		pixelcount, dev_image, dev_paths
+	);
+	cudaDeviceSynchronize();
+	++cur_iter;
+
+	// ----- write raytraced image to PBO ------
+	// denoise
+	if (enable_denoise) {
+		frame_profiling.begin();
+		{
+			thrust::transform(
+				thrust::device,
+				dev_image.get(),
+				dev_image.get() + pixelcount,
+				denoise_image,
+				RadianceToNormalizedRGB(cur_iter));
+
+			ProfileHelper denoise_profiling("denoise");
+			denoise_profiling.begin();
+			{
+				Denoiser::denoise(denoise_image, denoise_buffers, *denoise_params);
+			}
+			denoise_profiling.end();
+
+			thrust::transform(
+				thrust::device,
+				denoise_image,
+				denoise_image + pixelcount,
+				s_pbo_dptr,
+				NormalizedRGBToRGBA()
+			);
+		}
+		frame_profiling.end();
+	} else {
+		frame_profiling.begin();
+		{
+			thrust::transform(
+				thrust::device,
+				dev_image.get(),
+				dev_image.get() + pixelcount,
+				s_pbo_dptr,
+				RadianceToRGBA(cur_iter));
+		}
+		frame_profiling.end();
+	}
 
     ///////////////////////////////////////////////////////////////////////////
-
-    // Send results to OpenGL buffer for rendering
-    sendImageToPBO KERN_PARAM(blocksPerGrid2d, blockSize2d) (iter, dev_image, pbo, cam.resolution);
-
     // Retrieve image from GPU
-    cudaMemcpy(hst_scene->state.image.data(), dev_image,
-            pixelcount * sizeof(glm::vec3), cudaMemcpyDeviceToHost);
+	D2H(hst_scene->state.image.data(), dev_image, pixelcount);
 
     checkCUDAError("pathtrace");
 
-	return cur_iter = iter + 1;
+	return cur_iter;
 }
 
 bool PathTracer::saveRenderState(char const* filename) {
@@ -594,6 +632,79 @@ bool PathTracer::isPaused() {
 	return render_paused;
 }
 
+void PathTracer::enableDenoise() {
+	enable_denoise = true;
+}
+void PathTracer::disableDenoise() {
+	enable_denoise = false;
+}
 octreeGPU PathTracer::getTree() {
-	return dev_tree;
+	return *dev_tree;
+}
+uchar4 const* PathTracer::getPBO() {
+	return s_pbo_dptr;
+}
+
+void PathTracer::setDenoise(Denoiser::ParamDesc const& desc) {
+	if (!denoise_params) {
+		denoise_params = std::make_unique<Denoiser::ParamDesc>(desc);
+	} else {
+		*denoise_params = desc;
+	}
+}
+#ifdef DENOISE_GBUF_OPTIMIZATION
+__global__ void kern_visualize_pos(
+	uchar4* pbo,
+	glm::mat4x4 inv_view,
+	glm::mat4x4 inv_proj,
+	glm::ivec2 res,
+	Denoiser::NormPos const* gbuf
+) {
+	int x = (blockIdx.x * blockDim.x) + threadIdx.x;
+	int y = (blockIdx.y * blockDim.y) + threadIdx.y;
+	int w = res[0], h = res[1];
+
+	if (x >= w || y >= h)
+		return;
+
+	int idx = x + (y * w);
+	pbo[idx] = Denoiser::DecodePosRGBA(inv_view, inv_proj, glm::ivec2(x, y), res)(gbuf[idx]);
+}
+#endif
+void PathTracer::debugTexture(DebugTextureType type) {
+	Camera const& cam = hst_scene->state.camera;
+	int pixelcount = cam.resolution.x * cam.resolution.y;
+
+	if (type == DebugTextureType::DIFFUSE_BUF) {
+		auto tex = denoise_buffers.get_diffuse();
+		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, NormalizedRGBToRGBA());
+	} else if (type == DebugTextureType::NORM_BUF) {
+		auto tex = denoise_buffers.get_normal();
+#ifdef DENOISE_GBUF_OPTIMIZATION
+		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, Denoiser::DecodeNormRGBA());
+#else
+		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, NormalToRGBA());
+#endif
+	} else if (type == DebugTextureType::POS_BUF) {
+		auto tex = denoise_buffers.get_pos();
+#ifdef DENOISE_GBUF_OPTIMIZATION
+		dim3 x(DIV_UP(cam.resolution.x, 8), DIV_UP(cam.resolution.y, 8));
+		dim3 y(8, 8);
+		kern_visualize_pos KERN_PARAM(x,y) (
+			s_pbo_dptr,
+			glm::inverse(CamState::get_view()),
+			glm::inverse(CamState::get_proj()),
+			cam.resolution,
+			tex
+		);
+#else
+		thrust::transform(thrust::device, tex, tex + pixelcount, s_pbo_dptr, 
+			PosToRGBA(hst_scene->world_AABB.min(), hst_scene->world_AABB.max()));
+#endif
+	} else {
+		texture_debug_active = false;
+		return;
+	}
+
+	texture_debug_active = true;
 }

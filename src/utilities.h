@@ -1,12 +1,14 @@
 #pragma once
 
-#include "glm/glm.hpp"
+#include <glm/glm.hpp>
+
 #include "intellisense.h"
 #include <cuda.h>
 
 #include <algorithm>
 #include <istream>
 #include <ostream>
+#include <fstream>
 #include <iostream>
 #include <iterator>
 #include <sstream>
@@ -19,33 +21,6 @@
 #define TWO_PI            6.2831853071795864769252867665590057683943f
 #define SQRT_OF_ONE_THIRD 0.5773502691896257645091487805019574556476f
 #define EPSILON           0.00001f
-
-
-class octree;
-class GuiDataContainer
-{
-public:
-    GuiDataContainer();
-    ~GuiDataContainer();
-    void Reset();
-    int traced_depth;
-    char** scene_file_names;
-    char** save_file_names;
-    int num_saves;
-    int num_scenes; 
-    int cur_scene;
-    int cur_save;
-    char buf[256];
-    char const* prompt_text;
-    bool draw_coord_frame;
-    bool draw_debug_aabb;
-    bool draw_world_aabb;
-    bool draw_GPU_tree;
-    int octree_depth;
-    int octree_depth_filter;
-    int octree_intersection_cnt;
-    octree* test_tree;
-};
 
 // convenience macro
 #ifndef NDEBUG
@@ -91,11 +66,15 @@ static inline void setGPU(T * dev, int i, T val) {
 }
 
 #ifdef __CUDACC__
-#define DEVICE __device__ __forceinline__
-#define HOST_DEVICE __host__ __device__ __forceinline__
+#define DEVICE __device__
+#define HOST __host__
+#define INLINE __forceinline__
+#define GLOBAL __global__
 #else
 #define DEVICE
-#define HOST_DEVICE
+#define HOST
+#define INLINE
+#define GLOBAL
 #endif
 
 /// <summary>
@@ -107,12 +86,12 @@ template<typename T>
 struct Span {
     int _size;
     T* _arr;
-    HOST_DEVICE Span() : _size(0), _arr(nullptr) { }
-    HOST_DEVICE Span(int size, T* arr) : _size(size), _arr(arr) { }
-    HOST_DEVICE operator T* () const {
+    HOST DEVICE INLINE Span() : _size(0), _arr(nullptr) { }
+    HOST DEVICE INLINE Span(int size, T* arr) : _size(size), _arr(arr) { }
+    HOST DEVICE INLINE operator T* () const {
         return _arr;
     }
-    HOST_DEVICE Span<T> subspan(int idx, int sub_sz) const {
+    HOST DEVICE INLINE Span<T> subspan(int idx, int sub_sz) const {
 #ifndef NDEBUG
         if (idx < 0 || idx + sub_sz > _size) {
             assert(!"invalid subspan");
@@ -120,7 +99,7 @@ struct Span {
 #endif
         return Span<T>(sub_sz, _arr + idx);
     }
-    DEVICE T& operator[](int idx) {
+    DEVICE INLINE T& operator[](int idx) {
 #ifndef NDEBUG
         if (idx < 0 || idx >= _size) {
             printf("array out of bounds, idx=%d, size=%d\n", idx, _size);
@@ -129,10 +108,12 @@ struct Span {
 #endif // !NDEBUG
         return _arr[idx];
     }
-    DEVICE T const& operator[](int idx) const {
+    DEVICE INLINE T const& operator[](int idx) const {
         return const_cast<Span<T>*>(this)->operator[](idx);
     }
-    HOST_DEVICE int size() const { return _size; }
+    HOST DEVICE INLINE T*& get() { return _arr; }
+    HOST DEVICE INLINE T* const& get() const { return _arr; }
+    HOST DEVICE INLINE int size() const { return _size; }
 };
 
 
@@ -169,13 +150,25 @@ Span<T> make_span(int n) {
 }
 
 namespace utilityCore {
-    extern float clamp(float f, float min, float max);
-    extern bool replaceString(std::string& str, const std::string& from, const std::string& to);
-    extern glm::vec3 clampRGB(glm::vec3 color);
-    extern bool epsilonCheck(float a, float b);
-    extern std::vector<std::string> tokenizeString(std::string str);
-    extern glm::mat4 buildTransformationMatrix(glm::vec3 translation, glm::vec3 rotation, glm::vec3 scale);
-    extern std::string convertIntToString(int number);
-    extern std::istream& safeGetline(std::istream& is, std::string& t); //Thanks to http://stackoverflow.com/a/6089413
-    extern std::istream& peekline(std::istream& is, std::string& t);
+    std::vector<std::string> getFilesInDir(char const* dir);
+    float clamp(float f, float min, float max);
+    bool replaceString(std::string& str, const std::string& from, const std::string& to);
+    glm::vec3 clampRGB(glm::vec3 color);
+    bool epsilonCheck(float a, float b);
+    std::vector<std::string> tokenizeString(std::string str);
+    glm::mat4 buildTransformationMatrix(glm::vec3 translation, glm::vec3 rotation, glm::vec3 scale);
+    std::string convertIntToString(int number);
+    std::istream& safeGetline(std::istream& is, std::string& t); //Thanks to http://stackoverflow.com/a/6089413
+    std::istream& peekline(std::istream& is, std::string& t);
+
+    template<typename Arg, typename... Args>
+    void CreateOrAppendCSV(std::string const& filename, Arg&& arg, Args&&... args) {
+        std::ofstream fout(filename, std::ios_base::app);
+        fout << std::forward<Arg>(arg);
+        using expander = int[];
+        (void)expander {
+            0, (void(fout << ',' << std::forward<Args>(args)), 0)...
+        };
+        fout << std::endl;
+    }
 }

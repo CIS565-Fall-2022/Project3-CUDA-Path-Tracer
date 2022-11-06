@@ -2411,12 +2411,12 @@ void ImGui::TableMergeDrawChannels(ImGuiTable* table)
             MergeGroup* merge_group = &merge_groups[merge_group_n];
             if (merge_group->ChannelsCount == 0)
                 continue;
-            char buf[32];
-            ImFormatString(buf, 32, "MG%d:%d", merge_group_n, merge_group->ChannelsCount);
+            char save_file_name_buf[32];
+            ImFormatString(save_file_name_buf, 32, "MG%d:%d", merge_group_n, merge_group->ChannelsCount);
             ImVec2 text_pos = merge_group->ClipRect.Min + ImVec2(4, 4);
-            ImVec2 text_size = CalcTextSize(buf, NULL);
+            ImVec2 text_size = CalcTextSize(save_file_name_buf, NULL);
             GetForegroundDrawList()->AddRectFilled(text_pos, text_pos + text_size, IM_COL32(0, 0, 0, 255));
-            GetForegroundDrawList()->AddText(text_pos, IM_COL32(255, 255, 0, 255), buf, NULL);
+            GetForegroundDrawList()->AddText(text_pos, IM_COL32(255, 255, 0, 255), save_file_name_buf, NULL);
             GetForegroundDrawList()->AddRect(merge_group->ClipRect.Min, merge_group->ClipRect.Max, IM_COL32(255, 255, 0, 255));
         }
 #endif

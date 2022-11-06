@@ -48,7 +48,7 @@ std::istream& operator>> (std::istream& in, std::vector<T>& v) {
 }
 
 bool save_state(int iter, RenderState const& state, Scene const& scene, char const* filename) {
-	std::ofstream fout(save_files_dir + std::string(filename) + ".sav");
+	std::ofstream fout(filename);
 	if (!fout) {
 		return false;
 	}
