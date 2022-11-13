@@ -408,9 +408,11 @@ struct DevScene {
             return InvalidPdf;
         }
 #endif
+        float area = Math::triangleArea(v0, v1, v2);
         radiance = lightUnitRadiance[lightId];
         wi = glm::normalize(posToSampled);
-        return Math::pdfAreaToSolidAngle(Math::luminance(radiance) * sumLightPowerInv, pos, sampled, normal);
+        float power = Math::luminance(radiance) / (area * 2.f * glm::pi<float>());
+        return Math::pdfAreaToSolidAngle(power * sumLightPowerInv, pos, sampled, normal);
     }
 
     glm::vec3* vertices = nullptr;
