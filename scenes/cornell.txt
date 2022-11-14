@@ -12,7 +12,7 @@ Rotation      -90 0 0
 Up          0 1 0
 
 Material Light
-BaseColor	8 8 8
+BaseColor	0.2 0.2 0.2
 Type		Light
 Metallic	0
 Roughness	1
