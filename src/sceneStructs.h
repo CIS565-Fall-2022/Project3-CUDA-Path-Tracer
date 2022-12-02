@@ -175,3 +175,50 @@ struct Obj {
     AABB box;
     Geom* data;
 };
+
+
+struct TriBounds {
+    glm::vec3 AABB_min;
+    glm::vec3 AABB_max;
+    glm::vec3 AABB_centroid;
+    int tri_ID;
+};
+
+struct BVHNode {
+    glm::vec3 AABB_min;
+    glm::vec3 AABB_max;
+    BVHNode* child_nodes[2];
+    int split_axis;
+    int tri_index;
+};
+
+struct BVHNode_GPU {
+    glm::vec3 AABB_min;
+    glm::vec3 AABB_max;
+    int tri_index;
+    int offset_to_second_child;
+    int axis;
+};
+
+struct Tri {
+    // positions
+    glm::vec3 p0;
+    glm::vec3 p1;
+    glm::vec3 p2;
+    // normals
+    glm::vec3 n0;
+    glm::vec3 n1;
+    glm::vec3 n2;
+    // uvs
+    glm::vec2 t0;
+    glm::vec2 t1;
+    glm::vec2 t2;
+    //transforms
+    glm::mat4 transform;
+    glm::mat4 inverseTransform;
+    glm::mat4 invTranspose;
+    // plane normal
+    glm::vec3 plane_normal;
+    float S;
+    int mat_ID;
+};

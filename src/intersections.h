@@ -182,6 +182,7 @@ float triangleIntersectionTest(Geom triangle, Ray r,
     Ray q;
     q.origin = multiplyMV(triangle.inverseTransform, glm::vec4(r.origin, 1.0f));
     q.direction = glm::normalize(multiplyMV(triangle.inverseTransform, glm::vec4(r.direction, 0.0f)));
+    
     glm::vec3 barycentric; //0: b1, 1: b2, 2: t
     bool inter = glm::intersectRayTriangle(q.origin, q.direction, triangle.pos[0], triangle.pos[1], triangle.pos[2], barycentric);
     
@@ -215,16 +216,6 @@ float meshIntersectionTest(Geom mesh, Ray r, Geom* triangle, int tri_size, bool 
         glm::vec3 t_normal;
         glm::vec2 t_uv;
         bool t_outside;
-        //for (int i = 0; i < tri_size; i++) {
-        //    temp_t = triangleIntersectionTest(triangle[i], r, t_intersetion, t_normal, t_uv, t_outside);
-        //    //if (temp_t < t_min)
-        //    //    t_min = temp_t;
-        //    if (temp_t != -1) {
-        //        t_min = temp_t;
-        //        break;
-        //    }
-        //}
-
 
         for (int i = start; i < end; i++) {
             temp_t = triangleIntersectionTest(triangle[i], r, t_intersetion, t_normal, t_uv, t_outside);
@@ -268,4 +259,31 @@ float meshIntersectionTest(Geom mesh, Ray r, Geom* triangle, int tri_size, bool 
         }
     }
     return -1;
+}
+
+__host__ __device__
+float triangleIntersectionTest(Tri triangle, Ray r,
+    glm::vec3& intersectionPoint, glm::vec3& normal, glm::vec2& uv, bool& outside)
+{
+
+    Ray q;
+    q.origin = multiplyMV(triangle.inverseTransform, glm::vec4(r.origin, 1.0f));
+    q.direction = glm::normalize(multiplyMV(triangle.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+    glm::vec3 barycentric; //0: b1, 1: b2, 2: t
+    bool inter = glm::intersectRayTriangle(q.origin, q.direction, triangle.p0, triangle.p1, triangle.p2, barycentric);
+
+    if (!inter) return -1;
+
+    float b1 = barycentric[0], b2 = barycentric[1], t = barycentric[2];
+    //intersectionPoint = b1 * triangle.pos[0] + b2 * triangle.pos[1] + (1 - b1 - b2) * triangle.pos[2];
+    normal = b1 * triangle.n0 + b2 * triangle.n1 + (1 - b1 - b2) * triangle.n2;
+    uv = b1 * triangle.t0 + b2 * triangle.t1 + (1 - b1 - b2) * triangle.t2;
+
+    glm::vec3 objspaceIntersection = getPointOnRay(q, t);
+
+    intersectionPoint = multiplyMV(triangle.transform, glm::vec4(objspaceIntersection, 1.f));
+    normal = glm::normalize(multiplyMV(triangle.invTranspose, glm::vec4(normal, 0.f)));
+
+    return glm::length(r.origin - intersectionPoint);
 }

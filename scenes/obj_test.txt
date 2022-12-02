@@ -234,16 +234,3 @@ ROTAT       0 0 0
 SCALE       8 8 8
 MATERIAL	6
 
-// OBJ
-OBJECT_obj ../scenes/bunny.obj
-TRANS       0 0 -1
-ROTAT       0 90 0
-SCALE       8 8 8
-MATERIAL	7
-
-OBJECT_obj ../scenes/bunny.obj
-TRANS       2 0.5 0.7
-ROTAT       0 -90 0
-SCALE       16 16 16
-MATERIAL	8
-

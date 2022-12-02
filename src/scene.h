@@ -34,4 +34,16 @@ public:
 
     std::vector<Geom> Obj_geoms;
     
+    BVHNode* buildBVH(int start_index, int end_index);
+    void reformatBVHToGPU();
+
+    int num_tris = 0;
+    int num_geoms = 0;
+    std::vector<Tri> mesh_tris;
+    std::vector<Tri> mesh_tris_sorted;
+    BVHNode* root_node;
+    int num_nodes = 0;
+    std::vector<BVHNode_GPU> bvh_nodes_gpu;
+    std::vector<TriBounds> tri_bounds;
+
 };

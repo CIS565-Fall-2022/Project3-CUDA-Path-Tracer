@@ -22,9 +22,10 @@
 #define SORT_MATERIAL 1
 #define COMPACTION 1
 #define DEPTH_OF_FIELD 0
-#define ANTI_ALIASING 1
-#define BOUNDING_BOX 1
+#define ANTI_ALIASING 0
+#define BOUNDING_BOX 0
 
+#define MAX_INTERSECT_DIST 10000.f
 
 #define ERRORCHECK 1
 
@@ -87,6 +88,10 @@ static Material* dev_materials = NULL;
 static PathSegment* dev_paths = NULL;
 static ShadeableIntersection* dev_intersections = NULL;
 
+//BVH
+static BVHNode_GPU* dev_bvh_nodes = NULL;
+static Tri* dev_tris = NULL;
+
 // TODO: static variables for device memory, any extra info you need, etc
 //for caching first bounce
 #if CACHE_FIRST_BOUNCE
@@ -131,6 +136,17 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_tinyobj, scene->Obj_geoms.size() * sizeof(Geom));
 	cudaMemcpy(dev_tinyobj, scene->Obj_geoms.data(), scene->Obj_geoms.size() * sizeof(Geom), cudaMemcpyHostToDevice);
 
+
+	//BVH
+	cudaMalloc(&dev_tris, scene->num_tris * sizeof(Tri));
+	cudaMemcpy(dev_tris, scene->mesh_tris_sorted.data(), scene->num_tris * sizeof(Tri), cudaMemcpyHostToDevice);
+
+	cudaMalloc(&dev_bvh_nodes, scene->bvh_nodes_gpu.size() * sizeof(BVHNode_GPU));
+	cudaMemcpy(dev_bvh_nodes, scene->bvh_nodes_gpu.data(), scene->bvh_nodes_gpu.size() * sizeof(BVHNode_GPU), cudaMemcpyHostToDevice);
+
+
+
+
 	checkCUDAError("pathtraceInit");
 }
 
@@ -146,6 +162,12 @@ void pathtraceFree() {
 	cudaFree(dev_first_paths);
 #endif
 	cudaFree(dev_tinyobj);
+
+
+	//BVH
+	cudaFree(dev_tris);
+	cudaFree(dev_bvh_nodes);
+
 	checkCUDAError("pathtraceFree");
 }
 
@@ -295,7 +317,7 @@ __global__ void computeIntersections(
 				t = triangleIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
 			}
 			else if (geom.type == MESH) {
-#ifdef BOUNDING_BOX
+#if BOUNDING_BOX
 				t = meshIntersectionTest(geom, pathSegment.ray, triangles, triangle_size, true,
 					tmp_intersect, tmp_normal, tmp_uv, outside);
 #else 
@@ -333,6 +355,205 @@ __global__ void computeIntersections(
 		}
 	}
 }
+
+__global__ void computeIntersections(
+	int depth
+	, int num_paths
+	, PathSegment* pathSegments
+	, Geom* geoms
+	, int geoms_size
+	, Tri* tris
+	, int tris_size
+	, ShadeableIntersection* intersections
+	, BVHNode_GPU* bvh_nodes
+)
+{
+	int path_index = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (path_index < num_paths)
+	{
+
+		Ray r = pathSegments[path_index].ray;
+
+		ShadeableIntersection isect;
+		isect.t = MAX_INTERSECT_DIST;
+
+		float t;
+		glm::vec3 tmp_intersect;
+		glm::vec2 tmp_uv = glm::vec2(-1, -1);
+		glm::vec3 tmp_normal;
+		bool outside = true;
+
+		int obj_ID = -1;
+
+		glm::vec3 intersect_point;
+		glm::vec3 normal;
+		glm::vec2 uv = glm::vec2(-1, -1);
+		float t_min = FLT_MAX;
+		int hit_geom_index = -1;
+
+		if (tris_size != 0) 
+		{
+			int stack_pointer = 0;
+			int cur_node_index = 0;
+			int node_stack[128];
+			BVHNode_GPU cur_node;
+			glm::vec3 P;
+			glm::vec3 s;
+			float t1;
+			float t2;
+			float tmin;
+			float tmax;
+			while (true) 
+			{
+				cur_node = bvh_nodes[cur_node_index];
+				auto invDir = 1.f / r.direction;
+				// (ray-aabb test node)
+				t1 = (cur_node.AABB_min.x - r.origin.x) * invDir.x;
+				t2 = (cur_node.AABB_max.x - r.origin.x) * invDir.x;
+				tmin = glm::min(t1, t2);
+				tmax = glm::max(t1, t2);
+				t1 = (cur_node.AABB_min.y - r.origin.y) * invDir.y;
+				t2 = (cur_node.AABB_max.y - r.origin.y) * invDir.y;
+				tmin = glm::max(tmin, glm::min(t1, t2));
+				tmax = glm::min(tmax, glm::max(t1, t2));
+				t1 = (cur_node.AABB_min.z - r.origin.z) * invDir.z;
+				t2 = (cur_node.AABB_max.z - r.origin.z) * invDir.z;
+				tmin = glm::max(tmin, glm::min(t1, t2));
+				tmax = glm::min(tmax, glm::max(t1, t2));
+				if (tmax >= tmin) {
+					// we intersected AABB
+					if (cur_node.tri_index != -1) {
+						// this is leaf node
+						// triangle intersection test
+						Tri tri = tris[cur_node.tri_index];
+						
+						//t = triangleIntersectionTest(tri, r, tmp_intersect, tmp_normal, tmp_uv, outside);
+
+
+						t = glm::dot(tri.plane_normal, (tri.p0 - r.origin)) / glm::dot(tri.plane_normal, r.direction);
+						if (t >= -0.0001f) {
+							P = r.origin + t * r.direction;
+							// barycentric coords
+							s = glm::vec3(glm::length(glm::cross(P - tri.p1, P - tri.p2)),
+								glm::length(glm::cross(P - tri.p2, P - tri.p0)),
+								glm::length(glm::cross(P - tri.p0, P - tri.p1))) / tri.S;
+
+							if (s.x >= -0.0001f && s.x <= 1.0001f && s.y >= -0.0001f && s.y <= 1.0001f &&
+								s.z >= -0.0001f && s.z <= 1.0001f && (s.x + s.y + s.z <= 1.0001f) && (s.x + s.y + s.z >= -0.0001f) && t_min > t) {
+								t_min = t;
+								hit_geom_index = 2;
+								normal = glm::normalize(s.x * tri.n0 + s.y * tri.n1 + s.z * tri.n2);
+							}
+						}
+
+
+						/*if (t > 0.0f && t_min > t)
+						{
+							t_min = t;
+							hit_geom_index = 0;
+							intersect_point = tmp_intersect;
+							normal = tmp_normal;
+							uv = tmp_uv;
+						}*/
+
+						// if last node in tree, we are done
+						if (stack_pointer == 0) {
+							break;
+						}
+						// otherwise need to check rest of the things in the stack
+						stack_pointer--;
+						cur_node_index = node_stack[stack_pointer];
+					}
+					else {
+						node_stack[stack_pointer] = cur_node.offset_to_second_child;
+						stack_pointer++;
+						cur_node_index++;
+					}
+				}
+				else {
+					// didn't intersect AABB, remove from stack
+					if (stack_pointer == 0) {
+						break;
+					}
+					stack_pointer--;
+					cur_node_index = node_stack[stack_pointer];
+				}
+			}
+
+
+			for (int i = 0; i < geoms_size; ++i)
+			{
+				Geom& geom = geoms[i];
+
+				if (geom.type == CUBE)
+				{
+					t = boxIntersectionTest(geom, r, tmp_intersect, tmp_normal, outside);
+				}
+				else if (geom.type == SPHERE)
+				{
+					t = sphereIntersectionTest(geom, r, tmp_intersect, tmp_normal, outside);
+
+				}
+				// TODO: add more intersection tests here... triangle? metaball? CSG?
+				//else if (geom.type == TRIANGLE) {
+				//	t = triangleIntersectionTest(geom, r, tmp_intersect, tmp_normal, tmp_uv, outside);
+				//}
+
+				if (t > 0.0f && t_min > t)
+				{
+					t_min = t;
+					hit_geom_index = i;
+					intersect_point = tmp_intersect;
+					normal = tmp_normal;
+
+
+					uv = tmp_uv;
+				}
+
+				//if (depth == 0 && glm::dot(tmp_normal, r.direction) > 0.0) {
+				//	continue;
+				//}
+				//else if (t > 0.0f && isect.t > t) {
+				//	obj_ID = i;
+				//	isect.t = t;
+				//	isect.materialId = geom.materialid;
+				//	isect.surfaceNormal = tmp_normal;
+				//}
+
+			}
+
+			if (hit_geom_index == -1)
+			{
+				intersections[path_index].t = -1.0f;
+			}
+			else
+			{
+				//The ray hits something
+				intersections[path_index].t = t_min;
+				if (hit_geom_index >= geoms_size)
+					intersections[path_index].materialId = 1;
+				else
+					intersections[path_index].materialId = geoms[hit_geom_index].materialid;
+				intersections[path_index].surfaceNormal = normal;
+				intersections[path_index].uv = uv;
+
+			}
+
+
+			//if (isect.t >= MAX_INTERSECT_DIST) {
+			//	// hits nothing
+			//	pathSegments[path_index].remainingBounces = 0;
+			//}
+			//else {
+			//	intersections[path_index] = isect;
+			//}
+		}
+	}
+}
+
+
+
 
 // LOOK: "fake" shader demonstrating what you might do with the info in
 // a ShadeableIntersection, as well as how to use thrust's random number
@@ -655,16 +876,28 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			cudaDeviceSynchronize();
 		}
 #else 
+		//computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
+		//	depth,
+		//	num_paths,
+		//	dev_paths,
+		//	dev_geoms,
+		//	hst_scene->geoms.size(),
+		//	dev_tinyobj,
+		//	hst_scene->Obj_geoms.size(),
+		//	dev_intersections,
+		//	iter
+		//	);
+
 		computeIntersections << <numblocksPathSegmentTracing, blockSize1d >> > (
-			depth,
-			num_paths,
-			dev_paths,
-			dev_geoms,
-			hst_scene->geoms.size(),
-			dev_tinyobj,
-			hst_scene->Obj_geoms.size(),
-			dev_intersections,
-			iter
+			  depth
+			, num_paths
+			, dev_paths
+			, dev_geoms
+			, hst_scene->geoms.size()
+			, dev_tris
+			, hst_scene->num_tris
+			, dev_intersections
+			, dev_bvh_nodes
 			);
 		checkCUDAError("trace one bounce");
 		cudaDeviceSynchronize();
