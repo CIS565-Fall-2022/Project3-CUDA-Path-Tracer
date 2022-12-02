@@ -2,6 +2,8 @@
 #include "preview.h"
 #include <cstring>
 
+#include <chrono>
+
 static std::string startTimeString;
 
 // For camera controls
@@ -50,6 +52,9 @@ int main(int argc, char** argv) {
 	// Set up camera stuff from loaded path tracer settings
 	iteration = 0;
 	renderState = &scene->state;
+
+	//renderState->iterations = 50;
+
 	Camera& cam = renderState->camera;
 	width = cam.resolution.x;
 	height = cam.resolution.y;
@@ -135,7 +140,9 @@ void runCuda() {
 		pathtraceInit(scene);
 	}
 
+	auto start = std::chrono::steady_clock::now();
 	if (iteration < renderState->iterations) {
+
 		uchar4* pbo_dptr = NULL;
 		iteration++;
 		cudaGLMapBufferObject((void**)&pbo_dptr, pbo);
@@ -148,6 +155,9 @@ void runCuda() {
 		cudaGLUnmapBufferObject(pbo);
 	}
 	else {
+		auto end = std::chrono::steady_clock::now();
+		std::chrono::duration<double> elapsed_seconds = end - start;
+		std::cout << "elapsed time to compute: " << elapsed_seconds.count() << "s\n";
 		saveImage();
 		pathtraceFree();
 		cudaDeviceReset();

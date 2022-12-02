@@ -1,0 +1,70 @@
+// Emissive material (light)
+MATERIAL 0
+RGB         1 1 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   5
+
+// Diffuse white
+MATERIAL 1
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Microfacet white
+MATERIAL 2
+RGB         0.2 0.2 0.2
+MICROFACET	1
+ROUGHNESS	0.2
+offset
+offset
+offset
+offset
+
+// Camera
+CAMERA
+RES         800 800
+FOVY        45
+ITERATIONS  5000
+DEPTH       8
+FILE        cornell
+EYE         0.0 5 7.5
+LOOKAT      0 5 0
+UP          0 1 0
+FOCAL       10	
+LENSE       0.3
+
+
+// Ceiling light
+OBJECT 0
+cube
+material 0
+TRANS       0 10 0
+ROTAT       0 0 0
+SCALE       3 .3 3
+
+
+
+// Sphere, pure diffuse
+OBJECT 1
+sphere
+material 2
+TRANS       3 2 -1
+ROTAT       0 0 0
+SCALE       3 3 3
+
+// OBJ
+OBJECT_obj ../scenes/bunny.obj
+material	2
+TRANS       0 3 2
+ROTAT       0 0 0
+SCALE	      0.6 0.6 0.6
+TEXTURE	../scenes/wahoo.bmp
+
