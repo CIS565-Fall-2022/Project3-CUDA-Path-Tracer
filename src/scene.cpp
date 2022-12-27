@@ -338,6 +338,13 @@ void appendVec3Buffer(vector<glm::vec3> &vec3Buffer, const float* elts, int elts
   }
 }
 
+void appendVec2Buffer(vector<glm::vec2>& vec2Buffer, const float* elts, int eltsLength) {
+  for (int i = 0; i + 1 < eltsLength; i = i + 2) {
+    glm::vec2 elt(elts[i], elts[i + 1]);
+    vec2Buffer.push_back(elt);
+  }
+}
+
 // need to deal with a bit differently depending on if int or short
 // official spec says indices should be an int array
 // but it's a short array in the avocado file
@@ -427,12 +434,16 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
     appendVec3Buffer(newMesh.positions, positionArray, posArrLength);
     appendVec3Buffer(newMesh.normals, normalArray, normArrLength);
 
+    float* uvArray = (float*)readBuffer(model, p.attributes.at("TEXCOORD_0"), gltbDirectory, &uvArrLength, NULL);
+    appendVec2Buffer(newMesh.uvCoords, uvArray, uvArrLength);
+
     void* indicesArray = (void*)readBuffer(model, p.indices, gltbDirectory, &indicesArrLength, &indicesComponentType);
     appendIndicesBuffer(newMesh.indices, indicesArray, indicesArrLength, indicesComponentType);
 
     free(positionArray);
     free(normalArray);
     free(indicesArray);
+    free(uvArray);
 
     glm::vec3 default_translation = glm::vec3(0);
     glm::vec3 default_rotation = glm::vec3(0);
@@ -456,6 +467,7 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
         Vertex v;
         v.position = newMesh.positions.at(newMesh.indices.at(idx));
         v.normal = newMesh.normals.at(newMesh.indices.at(idx));
+        v.uv = newMesh.uvCoords.at(newMesh.indices.at(idx));
         triangle.verts[idx - i] = v;
       }
 
@@ -540,6 +552,7 @@ int Scene::loadTinyGltf(string filename) {
     }
 
     newMaterial.colorImageId = model.textures.at(textureIndex).source;
+    newMaterial.emittance = 1;
 
     cout << "Adding material #" << i << ": " << gltfMaterial.name << endl;
     materials.push_back(newMaterial);

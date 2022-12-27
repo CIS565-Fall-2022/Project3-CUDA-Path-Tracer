@@ -93,6 +93,7 @@ static ShadeableIntersection* dev_intersections = NULL;
 // ...
 static int* dev_intersection_materials = NULL;
 static int* dev_first_bounce_paths = NULL;
+static Image* dev_imageSources = NULL;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -127,6 +128,9 @@ void pathtraceInit(Scene* scene) {
 #if CACHE_FIRST_BOUNCE
 	cudaMalloc(&dev_first_bounce_paths, pixelcount * sizeof(PathSegment));
 #endif
+
+	cudaMalloc(&dev_imageSources, scene->images.size() * sizeof(Image));
+	cudaMemcpy(dev_imageSources, scene->images.data(), scene->images.size() * sizeof(Image), cudaMemcpyHostToDevice);
 
 	checkCUDAError("pathtraceInit");
 }
@@ -219,6 +223,7 @@ __global__ void computeIntersections(
 
 		glm::vec3 tmp_intersect;
 		glm::vec3 tmp_normal;
+		glm::vec2 tmp_uv;
 
 		// naive parse through global geoms
 		// TODO*: replace this with kd tree or other acceleration structure...
@@ -237,7 +242,7 @@ __global__ void computeIntersections(
 			}
 			else if (geom.type == TRIANGLE) { // TODO: add more intersection tests here... triangle? metaball? CSG?
 
-				t = triangleIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
+				t = triangleIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
@@ -264,6 +269,13 @@ __global__ void computeIntersections(
 	}
 }
 
+__device__ glm::vec3 getTextureColor(const Image& image, const glm::vec2 &uv) {
+	int h = (int) glm::floor(uv[1] * image.height);
+	int w = (int) glm::floor(uv[0] * image.width);
+
+	return image.pixels[h * image.height + w];
+}
+
 __global__ void shadeMaterial(
 	int iter
 	, int num_paths
@@ -271,6 +283,7 @@ __global__ void shadeMaterial(
 	, ShadeableIntersection* shadeableIntersections
 	, PathSegment* pathSegments
 	, Material* materials
+	, Image* images
 )
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -289,13 +302,22 @@ __global__ void shadeMaterial(
 			thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, depth);
 
 			Material &material = materials[intersection.materialId];
+			glm::vec3 materialColor;
+
+			if (material.colorImageId == -1) {
+				materialColor = material.color;
+			}
+			else {
+				Image& baseColorImage = images[material.colorImageId];
+				materialColor = getTextureColor(baseColorImage, intersection.uv);
+			}
 
 			glm::vec3 intersectionPoint = intersection.t * pathSegment.ray.direction + pathSegment.ray.origin;
 			scatterRay(pathSegment, intersectionPoint, intersection.surfaceNormal, material, rng);
 
 			// If the material indicates that the object was a light, "light" the ray
 			if (material.emittance > 0.0f) {
-				pathSegment.color *= (material.color * material.emittance);
+				pathSegment.color *= (materialColor * material.emittance);
 				pathSegment.remainingBounces = 0; // hit light = stop tracing the path
 				return;
 			}
@@ -311,7 +333,7 @@ __global__ void shadeMaterial(
 				// Also, what happens for reflective materials?
 				// Never mind, the answer has to be correct because it converges to a result
 				// If we multiply PI the image gets brighter and brighter...
-				pathSegment.color *= material.color;
+				pathSegment.color *= materialColor;
 
 				//if (depth > 1) {
 				//	float r = pathSegments[idx].color.r;
@@ -487,7 +509,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			depth,
 			dev_intersections,
 			dev_paths,
-			dev_materials
+			dev_materials,
+			dev_imageSources
 			);
 
 		 //update num_paths using stream compaction

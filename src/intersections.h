@@ -146,7 +146,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 }
 
 __host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
-  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, bool& out_outside) {
+  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2 & out_uv, bool& out_outside) {
 
   // first apply inverse transformation to ray
   glm::vec3 ro = multiplyMV(triangle.inverseTransform, glm::vec4(r.origin, 1.0f));
@@ -200,13 +200,15 @@ __host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
   // to hit outside, normal and ray direction should point the opposite way
   out_intersectionPoint = intersectionPoint;
   if (glm::dot(rd, normal) < 0) {
-    out_normal = normal;
     out_outside = true;
   }
   else {
-    out_normal = -normal;
     out_outside = false;
   }
+
+  // TODO: get normals and uv using barycentric interpolation
+  out_normal = normal;
+  out_uv = triangle.verts[0].uv;
 
   return t;
 }
