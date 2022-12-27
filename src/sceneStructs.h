@@ -35,9 +35,7 @@ struct Geom {
   glm::mat4 transform;
   glm::mat4 inverseTransform;
   glm::mat4 invTranspose;
-  Vertex verts[3]; // should use polymorphism, and have geoms be vector of pointers instead
-                   // sadly they were set us as a vector of Geoms, not Geoms*
-                  // this is just too much for me to fix today
+  Vertex verts[3];
 };
 
 // intermediate struct to parse triangles out of
@@ -48,12 +46,14 @@ struct InputMesh {
   std::vector<unsigned int> indices;
 };
 
-struct Texture {
-  glm::ivec2 resolution;
+struct Image {
+  int height;
+  int width;
   std::vector<glm::vec3> pixels;
 };
 
 struct Material {
+  int colorImageId; // -1 means there is no texture
   glm::vec3 color;
   struct {
     float exponent;

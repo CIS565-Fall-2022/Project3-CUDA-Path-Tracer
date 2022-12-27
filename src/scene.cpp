@@ -10,6 +10,8 @@
 #define TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
 #define TINYGLTF_NO_INCLUDE_STB_IMAGE
 
+#define DEBUG_GLTF_TEXTURES 1
+
 #include <stb_image.h>
 #include <stb_image_write.h>
 
@@ -492,15 +494,52 @@ int Scene::loadTinyGltf(string filename) {
 
   cout << "Gltf read the json file successfully:" << filename << endl;
 
+  cout << "TEXTURES PARSING------" << endl;
+  for (const tinygltf::Texture& texture : model.textures) {
+    // For simplicity, assume all textures are complete images, with no special sampler
+    // Thus, textures and images have a 1 to 1 correspondence
+    const tinygltf::Image& imageSource = model.images.at(texture.source);
+
+    if (texture.sampler != -1) {
+      cout << "UNSUPPORTED - Samplers are not supported" << endl;
+    }
+
+    scene_structs::Image newImage;
+    newImage.height = imageSource.height;
+    newImage.width = imageSource.width;
+
+    // images will be vector of color channel data
+    // Read the rgb channels
+    if (imageSource.component < 3) { // component is the number of channels per pixel
+      cout << "UNSUPPORTED - image source does not have complete rgba data" << endl;
+    }
+    for (int i = 0; i < imageSource.image.size(); i += imageSource.component) {
+      const float r = (int) imageSource.image.at(i) / 255.0f; // convert char rgb to float rgb
+      const float g = (int) imageSource.image.at(i + 1) / 255.0f;
+
+      const float b = (int) imageSource.image.at(i + 2) / 255.0f;
+      newImage.pixels.push_back(glm::vec3(r, g, b));
+    }
+
+    cout << "Adding image: " << imageSource.uri << endl;
+    images.push_back(newImage);
+  }
+
   cout << "MATERIALS PARSING-----" << endl;
   // materials will be ordered in scene array like original order
   // so indices from geometry will still line up
   for (int i = 0; i < model.materials.size(); ++i) {
     const tinygltf::Material& gltfMaterial = model.materials[i];
     scene_structs::Material newMaterial;
-    // TODO: add support for textures, for now, it will just be a lambert
-    newMaterial.color = glm::vec3(0.8f, 0.2f, 0.7f);
-    newMaterial.emittance = 1.0f;
+
+    const int textureIndex = gltfMaterial.pbrMetallicRoughness.baseColorTexture.index;
+    if (textureIndex == -1 || DEBUG_GLTF_TEXTURES) {
+      cout << "UNSUPPORTED - No base color texture found. Will render as pink light" << endl;
+      newMaterial.color = glm::vec3(0.8f, 0.2f, 0.7f);
+      newMaterial.emittance = 1.0f;
+    }
+
+    newMaterial.colorImageId = model.textures.at(textureIndex).source;
 
     cout << "Adding material #" << i << ": " << gltfMaterial.name << endl;
     materials.push_back(newMaterial);
