@@ -5,6 +5,7 @@
 #include <thrust/random.h>
 #include <thrust/remove.h>
 #include <thrust/partition.h>
+#include <thrust/device_vector.h>
 
 #include "sceneStructs.h"
 #include "scene.h"
@@ -93,7 +94,14 @@ static ShadeableIntersection* dev_intersections = NULL;
 // ...
 static int* dev_intersection_materials = NULL;
 static int* dev_first_bounce_paths = NULL;
-static Image* dev_imageSources = NULL;
+// same as scene_structs::Image, except pixels' data type is pointer to gpu buffer instead of vector
+// instead of cpu vector
+struct DevImage {
+	int height;
+	int width;
+	glm::vec3* pixels;
+};
+static DevImage *dev_imageSources;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -129,8 +137,30 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_first_bounce_paths, pixelcount * sizeof(PathSegment));
 #endif
 
-	cudaMalloc(&dev_imageSources, scene->images.size() * sizeof(Image));
-	cudaMemcpy(dev_imageSources, scene->images.data(), scene->images.size() * sizeof(Image), cudaMemcpyHostToDevice);
+	int numImages = scene->images.size();
+	cudaMalloc(&dev_imageSources, numImages * sizeof(DevImage));
+
+	DevImage* dev_image_current = dev_imageSources;
+
+	// Then copy into dev images buffer and copy image dimensions
+	for (int i = 0; i < numImages; ++i) {
+		const Image& image = scene->images.at(i);
+		int imageSize = image.height * image.width;
+
+		DevImage temp_image;
+		temp_image.height = image.height;
+		temp_image.width = image.width;
+		cudaMemcpy(&dev_image_current, &temp_image, sizeof(DevImage), cudaMemcpyHostToDevice);
+
+		glm::vec3* dev_pixels_temp;
+
+		cudaMalloc(&dev_pixels_temp, imageSize * sizeof(glm::vec3));
+		cudaMemcpy(&dev_pixels_temp, image.pixels.data(), imageSize * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+
+		cudaMemcpy(&(dev_image_current->pixels), &dev_pixels_temp, sizeof(glm::vec3*), cudaMemcpyHostToDevice);
+
+		dev_image_current += 1;
+	}
 
 	checkCUDAError("pathtraceInit");
 }
@@ -148,6 +178,10 @@ void pathtraceFree() {
 #if CACHE_FIRST_BOUNCE
 	cudaFree(dev_first_bounce_paths);
 #endif
+
+	cudaFree(dev_imageSources);
+	// TODO: free up dev_imageSources' pixel buffers as well
+
 	checkCUDAError("pathtraceFree");
 }
 
@@ -269,10 +303,9 @@ __global__ void computeIntersections(
 	}
 }
 
-__device__ glm::vec3 getTextureColor(const Image& image, const glm::vec2 &uv) {
+__device__ glm::vec3 getTextureColor(const DevImage& image, const glm::vec2 &uv) {
 	int h = (int) glm::floor(uv[1] * image.height);
 	int w = (int) glm::floor(uv[0] * image.width);
-
 	return image.pixels[h * image.height + w];
 }
 
@@ -283,7 +316,7 @@ __global__ void shadeMaterial(
 	, ShadeableIntersection* shadeableIntersections
 	, PathSegment* pathSegments
 	, Material* materials
-	, Image* images
+	, DevImage* imageSources
 )
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -308,7 +341,7 @@ __global__ void shadeMaterial(
 				materialColor = material.color;
 			}
 			else {
-				Image& baseColorImage = images[material.colorImageId];
+				DevImage& baseColorImage = imageSources[material.colorImageId];
 				materialColor = getTextureColor(baseColorImage, intersection.uv);
 			}
 
