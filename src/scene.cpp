@@ -5,6 +5,7 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm\gtx\transform.hpp>
 
 #define TINYGLTF_IMPLEMENTATION
 #define TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
@@ -312,7 +313,7 @@ void* readBuffer(const tinygltf::Model& model, int accessorIdx, const string& gl
     cout << bufferView.byteOffset << " bytes seeked successfully" << endl;
   }
 
-  fileStream.read((char*) result, bufferView.byteLength);
+  fileStream.read((char*)result, bufferView.byteLength);
 
   cout << "Just read " << fileStream.gcount() << " bytes from file (" << bufferView.byteLength
     << " were requested at offset " << bufferView.byteOffset << ")" << endl;
@@ -372,31 +373,68 @@ string getDirectory(const string &filename) {
   return(filename.substr(0, found));
 }
 
+glm::mat4 getTransforms(glm::mat4 parentTransform, const tinygltf::Node& node,
+  glm::vec3 &out_translation, glm::vec3 &out_rotation, glm::vec3 &out_scale) {
+  
+  // According to gltf spec, matrix overrides translate/rotate/scale properties
+  if (node.matrix.size() == 16) { 
+    glm::mat4 localTransform = glm::make_mat4(&node.matrix[0]);
+    // The global transformation matrix of a node is the product of the global transformation matrix
+    // of its parent node and its own local transformation matrix
+    glm::mat4 transform = parentTransform * localTransform;
+
+    // get components from matrix
+    glm::quat rotationQuat;
+    glm::vec3 skew;
+    glm::vec4 perspective;
+    glm::decompose(transform, out_scale, rotationQuat, out_translation, skew, perspective);
+    rotationQuat = glm::conjugate(rotationQuat);
+    out_rotation = glm::eulerAngles(rotationQuat);
+
+    return transform;
+  }
+
+  // No matrix case, use translate/rotate/scale
+  if (node.translation.size() >= 3) {
+    out_translation = glm::make_vec3(&node.translation[0]);
+  }
+  else {
+    out_translation = glm::vec3(0);
+  }
+
+  if (node.scale.size() >= 3) {
+    out_scale = glm::make_vec3(&node.scale[0]);
+  }
+  else {
+    out_scale = glm::vec3(1);
+  }
+
+  glm::quat rotationQuat;
+  if (node.rotation.size() >= 4) {
+    rotationQuat = glm::make_quat(&node.rotation[0]);
+  }
+  else {
+    rotationQuat = glm::quat(glm::vec3(0));
+  }
+  out_rotation = glm::eulerAngles(rotationQuat);
+
+  // use as transform matrix T * R * S
+  glm::mat4 localTransform = glm::translate(out_translation) * glm::mat4_cast(rotationQuat) * glm::scale(out_scale);
+  return parentTransform * localTransform;
+}
+
 void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
   const glm::mat4 &parentTransform, std::vector<Geom> &geoms) {
   using namespace tinygltf;
 
   const Node& node = model.nodes.at(nodeIdx);
 
-  glm::vec3 translation, rotation, scale, skew;
-  glm::vec4 perspective;
-  glm::quat rotationQuat;
+  glm::vec3 translation, rotation, scale;
   glm::mat4 transform, invTransform, invTranspose;
 
-  if (node.matrix.size() == 16) {
-    // use as transform matrix T * R * S
-    std::vector<float> floatVec(node.matrix.begin(), node.matrix.end());
-    glm::mat4 localTransform = glm::make_mat4(&floatVec[0]);
-    // The global transformation matrix of a node is the product of the global transformation matrix
-    // of its parent node and its own local transformation matrix
-    transform = parentTransform * localTransform;
-  }
-  else {
-    // construct transform matrix from other stuff
-    // TODO
-    cout << "warning: transforms using translate/rotate/scale vectors not supported" << endl;
-    transform = parentTransform;
-  }
+  transform = getTransforms(parentTransform, node, translation, rotation, scale);
+  invTransform = glm::inverse(transform);
+  invTranspose = glm::inverseTranspose(transform);
 
   for (const int& childNodeIdx : node.children) {
     loadNode(childNodeIdx, model, gltbDirectory, transform, geoms);
@@ -414,13 +452,6 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
   cout << "Gltf Parsing mesh " << mesh.name << endl;
 
   InputMesh newMesh;
-
-  glm::decompose(transform, scale, rotationQuat, translation, skew, perspective);
-  rotationQuat = glm::conjugate(rotationQuat);
-  rotation = glm::eulerAngles(rotationQuat);
-
-  invTransform = glm::inverse(transform);
-  invTranspose = glm::inverseTranspose(transform);
 
   for (const Primitive& p : mesh.primitives) {
     // TODO: add other buffers here
@@ -546,13 +577,16 @@ int Scene::loadTinyGltf(string filename) {
 
     const int textureIndex = gltfMaterial.pbrMetallicRoughness.baseColorTexture.index;
     if (textureIndex == -1 || DEBUG_GLTF_TEXTURES) {
-      cout << "UNSUPPORTED - No base color texture found. Will render as pink light" << endl;
-      newMaterial.color = glm::vec3(0.8f, 0.2f, 0.7f);
-      newMaterial.emittance = 1.0f;
+      cout << "Material has no base color texture. Will render using base color factor" << endl;
+      auto& color = gltfMaterial.pbrMetallicRoughness.baseColorFactor;
+      newMaterial.color = glm::vec3(color[0], color[1], color[2]);
+    }
+    else {
+      cout << "Material has image base color texture" << endl;
+      newMaterial.colorImageId = model.textures.at(textureIndex).source;
     }
 
-    newMaterial.colorImageId = model.textures.at(textureIndex).source;
-    newMaterial.emittance = 1;
+    newMaterial.emittance = 1; // TODO: add light for material instead.
 
     cout << "Adding material #" << i << ": " << gltfMaterial.name << endl;
     materials.push_back(newMaterial);
