@@ -145,7 +145,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     return glm::length(r.origin - intersectionPoint);
 }
 
-__host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
+__host__ __device__ float triangleIntersectionTest(const Geom &triangle, Ray r,
   glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2 & out_uv, bool& out_outside) {
 
   // first apply inverse transformation to ray
@@ -187,10 +187,13 @@ __host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
   glm::vec3 c1 = intersectionPoint - v1;
   glm::vec3 c2 = intersectionPoint - v2;
   glm::vec3 c3 = intersectionPoint - v3;
+
+  float v1Area = glm::dot(normal, glm::cross(edge2, c2));
+  float v2Area = glm::dot(normal, glm::cross(edge3, c3));
+  float v3Area = glm::dot(normal, glm::cross(edge1, c1));
+  float triangleArea = v1Area + v2Area + v3Area;
   
-  bool isInsideTriangle = glm::dot(normal, glm::cross(edge1, c1)) > 0 &&
-    glm::dot(normal, glm::cross(edge2, c2)) > 0 &&
-    glm::dot(normal, glm::cross(edge3, c3)) > 0;
+  bool isInsideTriangle = v1Area > 0 && v2Area > 0 && v3Area > 0;
 
   if (!isInsideTriangle) {
     return -1;
@@ -207,14 +210,10 @@ __host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
   }
 
   // TODO: get normals and uv using barycentric interpolation
-  out_normal = normal;
-  out_uv = triangle.verts[0].uv;
-
-  //float u = out_uv[0];
-  //float v = out_uv[1];
-  //if (u == v && u == -v && u != 0) {
-  //  return -t;
-  //}
+  out_normal = (triangle.verts[0].normal * v1Area + triangle.verts[1].normal * v2Area
+    + triangle.verts[2].normal * v3Area) / triangleArea;
+  out_uv = (triangle.verts[0].uv * v1Area + triangle.verts[1].uv * v2Area
+    + triangle.verts[2].uv * v3Area) / triangleArea;
 
   return t;
 }
