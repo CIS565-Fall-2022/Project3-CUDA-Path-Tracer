@@ -99,9 +99,10 @@ static int* dev_first_bounce_paths = NULL;
 struct DevImage {
 	int height;
 	int width;
-	glm::vec3* pixels;
+	int imageBufferOffset;
 };
 static DevImage *dev_imageSources;
+static glm::vec3* dev_imageBuffers;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -137,30 +138,35 @@ void pathtraceInit(Scene* scene) {
 	cudaMalloc(&dev_first_bounce_paths, pixelcount * sizeof(PathSegment));
 #endif
 
-	int numImages = scene->images.size();
-	cudaMalloc(&dev_imageSources, numImages * sizeof(DevImage));
+	int currentOffset = 0;
+	std::vector<DevImage> tempImages;
+	cudaMalloc(&dev_imageSources, scene->images.size() * sizeof(DevImage));
 
-	DevImage* dev_image_current = dev_imageSources;
-
-	// Then copy into dev images buffer and copy image dimensions
-	for (int i = 0; i < numImages; ++i) {
-		const Image& image = scene->images.at(i);
+	for (const auto &image: scene->images) {
 		int imageSize = image.height * image.width;
 
 		DevImage temp_image;
 		temp_image.height = image.height;
 		temp_image.width = image.width;
-		cudaMemcpy(&dev_image_current, &temp_image, sizeof(DevImage), cudaMemcpyHostToDevice);
+		temp_image.imageBufferOffset = currentOffset;
+		tempImages.push_back(temp_image);
 
-		glm::vec3* dev_pixels_temp;
-
-		cudaMalloc(&dev_pixels_temp, imageSize * sizeof(glm::vec3));
-		cudaMemcpy(&dev_pixels_temp, image.pixels.data(), imageSize * sizeof(glm::vec3), cudaMemcpyHostToDevice);
-
-		cudaMemcpy(&(dev_image_current->pixels), &dev_pixels_temp, sizeof(glm::vec3*), cudaMemcpyHostToDevice);
-
-		dev_image_current += 1;
+		currentOffset += imageSize;
 	}
+
+	cudaMemcpy(dev_imageSources, tempImages.data(), tempImages.size() * sizeof(DevImage), cudaMemcpyHostToDevice);
+	checkCUDAError("cudaMemcpy of dev_imageSources");
+
+	// current offset = total number of pixels of all images
+	cudaMalloc(&dev_imageBuffers, currentOffset * sizeof(glm::vec3));
+	std::vector<glm::vec3> tempImageBuffers;
+
+	for (const auto& image : scene->images) {
+		tempImageBuffers.insert(tempImageBuffers.end(), image.pixels.begin(), image.pixels.end());
+	}
+
+	cudaMemcpy(dev_imageBuffers, tempImageBuffers.data(), tempImageBuffers.size() * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+	checkCUDAError("cudaMemcpy of dev_imageBuffers");
 
 	checkCUDAError("pathtraceInit");
 }
@@ -180,7 +186,7 @@ void pathtraceFree() {
 #endif
 
 	cudaFree(dev_imageSources);
-	// TODO: free up dev_imageSources' pixel buffers as well
+	cudaFree(dev_imageBuffers);
 
 	checkCUDAError("pathtraceFree");
 }
@@ -303,10 +309,11 @@ __global__ void computeIntersections(
 	}
 }
 
-__device__ glm::vec3 getTextureColor(const DevImage& image, const glm::vec2 &uv) {
-	int h = (int) glm::floor(uv[1] * image.height);
-	int w = (int) glm::floor(uv[0] * image.width);
-	return image.pixels[h * image.height + w];
+__device__ glm::vec3 getTextureColor(const DevImage& image, glm::vec3 *imageBuffers, const glm::vec2 &uv) {
+	int h = (int) glm::floor(uv[0] * image.height);
+	int w = (int) glm::floor(uv[1] * image.width);
+	int index = image.imageBufferOffset + (h * image.height + w);
+	return imageBuffers[index];
 }
 
 __global__ void shadeMaterial(
@@ -317,6 +324,7 @@ __global__ void shadeMaterial(
 	, PathSegment* pathSegments
 	, Material* materials
 	, DevImage* imageSources
+	, glm::vec3* imageBuffers
 )
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -342,7 +350,7 @@ __global__ void shadeMaterial(
 			}
 			else {
 				DevImage& baseColorImage = imageSources[material.colorImageId];
-				materialColor = getTextureColor(baseColorImage, intersection.uv);
+				materialColor = getTextureColor(baseColorImage, imageBuffers, intersection.uv);
 			}
 
 			glm::vec3 intersectionPoint = intersection.t * pathSegment.ray.direction + pathSegment.ray.origin;
@@ -543,7 +551,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_intersections,
 			dev_paths,
 			dev_materials,
-			dev_imageSources
+			dev_imageSources,
+			dev_imageBuffers
 			);
 
 		 //update num_paths using stream compaction
