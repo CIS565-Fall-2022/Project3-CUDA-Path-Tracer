@@ -257,6 +257,7 @@ __global__ void computeIntersections(
 		float t; // GUESSING the distance marched by the ray
 		glm::vec3 intersect_point;
 		glm::vec3 normal;
+		glm::vec2 uv;
 		float t_min = FLT_MAX;
 		int hit_geom_index = -1; // what object this intersection hit. Index should be index in dev_geoms
 		bool outside = true; // if it hit outer surface of object or not. Not sure what to do if false
@@ -292,6 +293,7 @@ __global__ void computeIntersections(
 				hit_geom_index = i;
 				intersect_point = tmp_intersect;
 				normal = tmp_normal;
+				uv = tmp_uv;
 			}
 		}
 
@@ -305,17 +307,17 @@ __global__ void computeIntersections(
 			intersections[path_index].t = t_min;
 			intersections[path_index].materialId = geoms[hit_geom_index].materialid;
 			intersections[path_index].surfaceNormal = normal;
+			intersections[path_index].uv = uv;
 		}
 	}
 }
 
 __device__ glm::vec3 getTextureColor(const DevImage& image, glm::vec3 *imageBuffers, glm::vec2 uv) {
-	//int h = (int) glm::floor(uv[1] * image.height);
-	//int w = (int) glm::floor(uv[0] * image.width);
-	//int index = image.imageBufferOffset + (h * image.height + w);
-	//return imageBuffers[index];
-
-	return glm::vec3(uv[0], uv[1], 0.5);
+	int h = (int) glm::floor(uv[1] * image.height);
+	int w = (int) glm::floor(uv[0] * image.width);
+	int index = image.imageBufferOffset + (h * image.height + w);
+	return imageBuffers[index];
+	//return glm::vec3(uv[0], uv[1], 0.5);
 }
 
 __global__ void shadeMaterial(

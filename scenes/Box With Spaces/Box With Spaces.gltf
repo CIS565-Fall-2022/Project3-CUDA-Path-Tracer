@@ -79,7 +79,7 @@
         {
             "mimeType" : "image/png",
             "name" : "glTF Logo With Spaces",
-            "uri" : "glTF%20Logo%20With%20Spaces.png"
+            "uri" : "gltf%20Logo%20With%20Spaces.png"
         },
         {
             "mimeType" : "image/png",

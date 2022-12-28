@@ -240,8 +240,8 @@ void Scene::loadDefaultCamera() {
 
   Camera& camera = state.camera;
   camera.resolution = glm::ivec2(800, 800);
-  camera.position = glm::vec3(0.0f, 5.0f, 10.5f);
-  camera.lookAt = glm::vec3(0, 5, 0);
+  camera.position = glm::vec3(0.0f, 2.0f, 5.0f);
+  camera.lookAt = glm::vec3(0, 0, 0);
   camera.up = glm::vec3(0, 1, 0);
 
   float fovy = 45;
