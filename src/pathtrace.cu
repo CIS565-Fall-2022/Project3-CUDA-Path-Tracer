@@ -309,11 +309,13 @@ __global__ void computeIntersections(
 	}
 }
 
-__device__ glm::vec3 getTextureColor(const DevImage& image, glm::vec3 *imageBuffers, const glm::vec2 &uv) {
-	int h = (int) glm::floor(uv[0] * image.height);
-	int w = (int) glm::floor(uv[1] * image.width);
-	int index = image.imageBufferOffset + (h * image.height + w);
-	return imageBuffers[index];
+__device__ glm::vec3 getTextureColor(const DevImage& image, glm::vec3 *imageBuffers, glm::vec2 uv) {
+	//int h = (int) glm::floor(uv[1] * image.height);
+	//int w = (int) glm::floor(uv[0] * image.width);
+	//int index = image.imageBufferOffset + (h * image.height + w);
+	//return imageBuffers[index];
+
+	return glm::vec3(uv[0], uv[1], 0.5);
 }
 
 __global__ void shadeMaterial(

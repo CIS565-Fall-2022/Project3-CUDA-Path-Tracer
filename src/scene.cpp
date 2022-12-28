@@ -10,7 +10,7 @@
 #define TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
 #define TINYGLTF_NO_INCLUDE_STB_IMAGE
 
-#define DEBUG_GLTF_TEXTURES 1
+#define DEBUG_GLTF_TEXTURES 0
 
 #include <stb_image.h>
 #include <stb_image_write.h>

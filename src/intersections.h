@@ -210,5 +210,11 @@ __host__ __device__ float triangleIntersectionTest(Geom triangle, Ray r,
   out_normal = normal;
   out_uv = triangle.verts[0].uv;
 
+  //float u = out_uv[0];
+  //float v = out_uv[1];
+  //if (u == v && u == -v && u != 0) {
+  //  return -t;
+  //}
+
   return t;
 }
