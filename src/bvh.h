@@ -9,7 +9,7 @@ class Bvh
 private:
 
 public:
-  Bvh(const std::vector<Geom>& geoms);
+  Bvh(const std::vector<Triangle>& triangles);
   ~Bvh();
 };
 

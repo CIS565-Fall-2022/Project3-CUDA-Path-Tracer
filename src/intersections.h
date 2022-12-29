@@ -237,12 +237,17 @@ __host__ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh,
 
     if (t > 0.0f && t_min > t)
     {
+      hitGeom = true;
       t_min = t;
       out_intersectionPoint = tmp_intersect;
       out_normal = tmp_normal;
       out_uv = tmp_uv;
       out_outside = tmp_outside;
     }
+  }
+
+  if (!hitGeom) {
+    return -1;
   }
 
   return t_min;
