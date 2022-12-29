@@ -103,6 +103,7 @@ struct DevImage {
 };
 static DevImage *dev_imageSources;
 static glm::vec3* dev_imageBuffers;
+static Triangle* dev_triangles;
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -168,6 +169,10 @@ void pathtraceInit(Scene* scene) {
 	cudaMemcpy(dev_imageBuffers, tempImageBuffers.data(), tempImageBuffers.size() * sizeof(glm::vec3), cudaMemcpyHostToDevice);
 	checkCUDAError("cudaMemcpy of dev_imageBuffers");
 
+	cudaMalloc(&dev_triangles, sizeof(Triangle) * scene->triangles.size());
+	cudaMemcpy(dev_triangles, scene->triangles.data(), sizeof(Triangle) * scene->triangles.size(), cudaMemcpyHostToDevice);
+	checkCUDAError("cudaMemcpy of dev_triangles");
+
 	checkCUDAError("pathtraceInit");
 }
 
@@ -187,6 +192,7 @@ void pathtraceFree() {
 
 	cudaFree(dev_imageSources);
 	cudaFree(dev_imageBuffers);
+	cudaFree(dev_triangles);
 
 	checkCUDAError("pathtraceFree");
 }
@@ -244,6 +250,7 @@ __global__ void computeIntersections(
 	, int num_paths
 	, PathSegment* pathSegments
 	, Geom* geoms
+	, Triangle *triangles
 	, int geoms_size
 	, ShadeableIntersection* intersections
 )
@@ -281,9 +288,9 @@ __global__ void computeIntersections(
 			{
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
-			else if (geom.type == TRIANGLE) { // TODO: add more intersection tests here... triangle? metaball? CSG?
+			else if (geom.type == TRIANGLE_MESH) { // TODO: add more intersection tests here... triangle? metaball? CSG?
 
-				t = triangleIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
+				t = triangleMeshIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
@@ -519,6 +526,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, num_paths_to_trace
 			, dev_paths
 			, dev_geoms
+			, dev_triangles
 			, hst_scene->geoms.size()
 			, dev_intersections
 			);

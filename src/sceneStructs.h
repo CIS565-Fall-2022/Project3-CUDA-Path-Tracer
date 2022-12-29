@@ -12,7 +12,7 @@ namespace scene_structs {
 enum GeomType {
   SPHERE,
   CUBE,
-  TRIANGLE,
+  TRIANGLE_MESH,
 };
 
 struct Ray {
@@ -35,6 +35,13 @@ struct Geom {
   glm::mat4 transform;
   glm::mat4 inverseTransform;
   glm::mat4 invTranspose;
+
+  int triangleOffset; // for triangle_mesh type to index into triangle array
+  int numTriangles;
+};
+
+struct Triangle {
+  int geomId; // which triangle_mesh type geom this triangle belongs to
   Vertex verts[3];
 };
 

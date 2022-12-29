@@ -61,16 +61,6 @@ Scene::Scene(string filename) {
     }
 }
 
-void setDefaultVertsForTriangle(Geom &geom) {
-  geom.verts[0].position = glm::vec3(0, 1, 0);
-  geom.verts[1].position = glm::vec3(-1, 0, 0);
-  geom.verts[2].position = glm::vec3(1, 0, 0);
-
-  geom.verts[0].normal = glm::vec3(0, 0, 1);
-  geom.verts[1].normal = glm::vec3(0, 0, 1);
-  geom.verts[2].normal = glm::vec3(0, 0, 1);
-}
-
 int Scene::loadGeom(string objectid) {
     int id = atoi(objectid.c_str());
     if (id != geoms.size()) {
@@ -90,12 +80,6 @@ int Scene::loadGeom(string objectid) {
             } else if (strcmp(line.c_str(), "cube") == 0) {
                 cout << "Creating new cube..." << endl;
                 newGeom.type = CUBE;
-            }
-            else if (strcmp(line.c_str(), "triangle") == 0) {
-              cout << "Creating new triangle..." << endl;
-              // use default triangle
-              newGeom.type = TRIANGLE;
-              setDefaultVertsForTriangle(newGeom);
             }
         }
 
@@ -424,7 +408,7 @@ glm::mat4 getTransforms(glm::mat4 parentTransform, const tinygltf::Node& node,
 }
 
 void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
-  const glm::mat4 &parentTransform, std::vector<Geom> &geoms) {
+  const glm::mat4 &parentTransform, std::vector<Geom> &geoms, std::vector<Triangle> &triangles) {
   using namespace tinygltf;
 
   const Node& node = model.nodes.at(nodeIdx);
@@ -437,7 +421,7 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
   invTranspose = glm::inverseTranspose(transform);
 
   for (const int& childNodeIdx : node.children) {
-    loadNode(childNodeIdx, model, gltbDirectory, transform, geoms);
+    loadNode(childNodeIdx, model, gltbDirectory, transform, geoms, triangles);
   }
 
   if (node.mesh == -1) {
@@ -480,19 +464,23 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
     glm::vec3 default_rotation = glm::vec3(0);
     glm::vec3 default_scale = glm::vec3(10);
 
-    // Now parse them into triangles
+    // Each primitive is 1 mesh
+    Geom mesh;
+    mesh.type = TRIANGLE_MESH;
+    mesh.translation = translation;
+    mesh.rotation = rotation;
+    mesh.scale = scale;
+    mesh.materialid = p.material;
+    mesh.transform = transform;
+    mesh.inverseTransform = invTransform;
+    mesh.invTranspose = invTranspose;
+    
+    // Now parse the triangles of the mesh
+    mesh.triangleOffset = triangles.size();
+
     int indicesLen = newMesh.indices.size();
     for (int i = 0; i + 2 < indicesLen; i = i + 3) {
-      Geom triangle;
-      triangle.type = TRIANGLE;
-      triangle.translation = translation;
-      triangle.rotation = rotation;
-      triangle.scale = scale;
-      triangle.materialid = p.material;
-
-      triangle.transform = transform;
-      triangle.inverseTransform = invTransform;
-      triangle.invTranspose = invTranspose;
+      Triangle triangle;
 
       for (int idx = i; idx < i + 3; ++idx) {
         Vertex v;
@@ -502,8 +490,11 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
         triangle.verts[idx - i] = v;
       }
 
-      geoms.push_back(triangle);
+      triangles.push_back(triangle);
     }
+
+    mesh.numTriangles = triangles.size() - mesh.triangleOffset;
+    geoms.push_back(mesh);
   }
 }
 
@@ -596,6 +587,6 @@ int Scene::loadTinyGltf(string filename) {
   const tinygltf::Scene& scene = model.scenes.at(model.defaultScene);
 
   for (const int &nodeIdx : scene.nodes) {
-    loadNode(nodeIdx, model, gltbDirectory, glm::mat4(1.0), this->geoms);
+    loadNode(nodeIdx, model, gltbDirectory, glm::mat4(1.0), this->geoms, this->triangles);
   }
 }

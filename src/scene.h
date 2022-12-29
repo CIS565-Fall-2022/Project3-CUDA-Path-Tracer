@@ -26,6 +26,7 @@ public:
     std::vector<Geom> geoms;
     std::vector<Material> materials;
     std::vector<Image> images;
+    std::vector<Triangle> triangles; // all triangles in the scene from all meshes
 
     RenderState state;
 };

@@ -145,12 +145,8 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     return glm::length(r.origin - intersectionPoint);
 }
 
-__host__ __device__ float triangleIntersectionTest(const Geom &triangle, Ray r,
-  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2 & out_uv, bool& out_outside) {
-
-  // first apply inverse transformation to ray
-  glm::vec3 ro = multiplyMV(triangle.inverseTransform, glm::vec4(r.origin, 1.0f));
-  glm::vec3 rd = glm::normalize(multiplyMV(triangle.inverseTransform, glm::vec4(r.direction, 0.0f)));
+__host__ __device__ float triangleIntersectionTest(const Triangle& triangle, const glm::vec3 &ro, const glm::vec3 &rd,
+  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside) {
 
   glm::vec3 v1 = triangle.verts[0].position;
   glm::vec3 v2 = triangle.verts[1].position;
@@ -159,7 +155,7 @@ __host__ __device__ float triangleIntersectionTest(const Geom &triangle, Ray r,
   glm::vec3 edge1 = v2 - v1; //       v1
   glm::vec3 edge2 = v3 - v2; //     /   |
   glm::vec3 edge3 = v1 - v3; //    v2---v3
-  
+
   // triangle is a plane of the form ax + bx + cx = d, where (a,b,c) is the normal
   glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2)); // vertices are counter-clockwise
 
@@ -192,7 +188,7 @@ __host__ __device__ float triangleIntersectionTest(const Geom &triangle, Ray r,
   float v2Area = glm::dot(normal, glm::cross(edge3, c3));
   float v3Area = glm::dot(normal, glm::cross(edge1, c1));
   float triangleArea = v1Area + v2Area + v3Area;
-  
+
   bool isInsideTriangle = v1Area > 0 && v2Area > 0 && v3Area > 0;
 
   if (!isInsideTriangle) {
@@ -216,4 +212,38 @@ __host__ __device__ float triangleIntersectionTest(const Geom &triangle, Ray r,
     + triangle.verts[2].uv * v3Area) / triangleArea;
 
   return t;
+}
+
+__host__ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh, Triangle *triangles, Ray r,
+  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2 & out_uv, bool& out_outside) {
+
+  // first apply inverse transformation to ray
+  glm::vec3 ro = multiplyMV(triangleMesh.inverseTransform, glm::vec4(r.origin, 1.0f));
+  glm::vec3 rd = glm::normalize(multiplyMV(triangleMesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+  float t;
+  float t_min = FLT_MAX;
+  glm::vec3 tmp_intersect;
+  glm::vec3 tmp_normal;
+  glm::vec2 tmp_uv;
+  bool tmp_outside;
+
+  bool hitGeom = false;
+
+  for (int i = triangleMesh.triangleOffset; i < triangleMesh.triangleOffset + triangleMesh.numTriangles; ++i) {
+    Triangle& triangle = triangles[i];
+
+    t = triangleIntersectionTest(triangle, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside);
+
+    if (t > 0.0f && t_min > t)
+    {
+      t_min = t;
+      out_intersectionPoint = tmp_intersect;
+      out_normal = tmp_normal;
+      out_uv = tmp_uv;
+      out_outside = tmp_outside;
+    }
+  }
+
+  return t_min;
 }
