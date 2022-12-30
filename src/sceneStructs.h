@@ -42,7 +42,6 @@ struct Geom {
 
 #ifdef BVH
   int bvhOffset; // each triangle mesh has its own bvh
-  int bvhSize;
 #endif
 };
 

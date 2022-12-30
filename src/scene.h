@@ -7,6 +7,7 @@
 #include "glm/glm.hpp"
 #include "utilities.h"
 #include "sceneStructs.h"
+#include "bvh.h"
 
 using namespace std;
 using namespace scene_structs;
@@ -27,6 +28,7 @@ public:
     std::vector<Material> materials;
     std::vector<Image> images;
     std::vector<Triangle> triangles; // all triangles in the scene from all meshes
+    Bvh bvh;
 
     RenderState state;
 };

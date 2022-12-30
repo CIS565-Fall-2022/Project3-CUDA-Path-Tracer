@@ -32,6 +32,8 @@ Scene::Scene(string filename) {
     if (!has_suffix(filename, "txt")) {
       loadTinyGltf(filename);
       loadDefaultCamera();
+      cout << "Building Bvh trees --------------------------" << endl;
+      bvh = Bvh(triangles, geoms);
       return;
     }
 
