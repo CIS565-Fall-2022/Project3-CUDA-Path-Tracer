@@ -104,6 +104,9 @@ struct DevImage {
 static DevImage *dev_imageSources;
 static glm::vec3* dev_imageBuffers;
 static Triangle* dev_triangles;
+#ifdef BVH
+static BvhNode* dev_bvh;
+#endif
 
 void InitDataContainer(GuiDataContainer* imGuiData)
 {
@@ -173,6 +176,11 @@ void pathtraceInit(Scene* scene) {
 	cudaMemcpy(dev_triangles, scene->triangles.data(), sizeof(Triangle) * scene->triangles.size(), cudaMemcpyHostToDevice);
 	checkCUDAError("cudaMemcpy of dev_triangles");
 
+#ifdef BVH
+	cudaMalloc(&dev_bvh, sizeof(BvhNode) * scene->bvh.allBvhNodes.size());
+	cudaMemcpy(dev_bvh, scene->bvh.allBvhNodes.data(), sizeof(BvhNode) * scene->bvh.allBvhNodes.size(), cudaMemcpyHostToDevice);
+#endif
+
 	checkCUDAError("pathtraceInit");
 }
 
@@ -193,6 +201,9 @@ void pathtraceFree() {
 	cudaFree(dev_imageSources);
 	cudaFree(dev_imageBuffers);
 	cudaFree(dev_triangles);
+#ifdef BVH
+	cudaFree(dev_bvh);
+#endif
 
 	checkCUDAError("pathtraceFree");
 }
@@ -251,6 +262,9 @@ __global__ void computeIntersections(
 	, PathSegment* pathSegments
 	, Geom* geoms
 	, Triangle *triangles
+#ifdef BVH
+	, BvhNode* bvh
+#endif
 	, int geoms_size
 	, ShadeableIntersection* intersections
 )
@@ -289,8 +303,11 @@ __global__ void computeIntersections(
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
 			else if (geom.type == TRIANGLE_MESH) { // TODO: add more intersection tests here... triangle? metaball? CSG?
-
+#ifdef BVH
+				t = bvhTriangleMeshIntersectionTest(geom, bvh, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
+#else
 				t = triangleMeshIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
+#endif
 			}
 			// Compute the minimum t from the intersection tests to determine what
 			// scene geometry object was hit first.
@@ -527,6 +544,9 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, dev_paths
 			, dev_geoms
 			, dev_triangles
+#ifdef BVH
+			, dev_bvh
+#endif
 			, hst_scene->geoms.size()
 			, dev_intersections
 			);

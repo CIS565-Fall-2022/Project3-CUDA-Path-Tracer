@@ -252,3 +252,83 @@ __host__ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh,
 
   return t_min;
 }
+
+// slab test - clip the ray by the parallel planes
+__host__ __device__ bool rayIntersectsBounds(const glm::vec3& ro, const glm::vec3& rd, const Bounds &b) {
+  float tx1 = (b.min.x - ro.x) / rd.x, tx2 = (b.max.x - ro.x) / rd.x;
+  float tmin = min(tx1, tx2), tmax = max(tx1, tx2);
+  float ty1 = (b.min.y - ro.y) / rd.y, ty2 = (b.max.y - ro.y) / rd.y;
+  tmin = max(tmin, min(ty1, ty2)), tmax = min(tmax, max(ty1, ty2));
+  float tz1 = (b.min.z - ro.z) / rd.z, tz2 = (b.max.z - ro.z) / rd.z;
+  tmin = max(tmin, min(tz1, tz2)), tmax = min(tmax, max(tz1, tz2));
+  return tmax >= tmin && tmax > 0;
+}
+
+__host__ __device__ float traverseBvh(BvhNode* mesh_bvh, int currentNodeIdx, Triangle* mesh_triangles, glm::vec3& ro, glm::vec3& rd,
+  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside) {
+  float t;
+  float t_min = FLT_MAX;
+  glm::vec3 tmp_intersect;
+  glm::vec3 tmp_normal;
+  glm::vec2 tmp_uv;
+  bool tmp_outside;
+
+  bool hitGeom = false;
+
+  const BvhNode& curr_node = mesh_bvh[currentNodeIdx];
+
+  // if out of bounds, stop
+  if (!rayIntersectsBounds(ro, rd, curr_node.bounds)) {
+    return -1;
+  }
+
+  // if leaf node, then intersection test the triangles
+  if (curr_node.numTriangles > 0) {
+    for (int i = curr_node.firstTriangleOffset; i < curr_node.firstTriangleOffset + curr_node.numTriangles; ++i) {
+      Triangle& triangle = mesh_triangles[i];
+
+      t = triangleIntersectionTest(triangle, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside);
+
+      if (t > 0.0f && t_min > t)
+      {
+        hitGeom = true;
+        t_min = t;
+        out_intersectionPoint = tmp_intersect;
+        out_normal = tmp_normal;
+        out_uv = tmp_uv;
+        out_outside = tmp_outside;
+      }
+    }
+    if (!hitGeom) {
+      return -1;
+    }
+    return t_min;
+  }
+
+  // if non-leaf, then traverse children
+  float left_t = traverseBvh(mesh_bvh, curr_node.leftChildIndex, mesh_triangles, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside);
+  float right_t = traverseBvh(mesh_bvh, curr_node.rightChildIndex, mesh_triangles, ro, rd, out_intersectionPoint, out_normal, out_uv, out_outside);
+
+  // if left child has triangle that is closer than right child, then overwrite the out param results
+  if (left_t < right_t && left_t > 0.f) {
+    out_intersectionPoint = tmp_intersect;
+    out_normal = tmp_normal;
+    out_uv = tmp_uv;
+    out_outside = tmp_outside;
+    return left_t;
+  }
+
+  return right_t;
+}
+
+__host__ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNode *bvh_list, Triangle* triangles, Ray r,
+  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside) {
+
+  glm::vec3 ro = multiplyMV(triangleMesh.inverseTransform, glm::vec4(r.origin, 1.0f));
+  glm::vec3 rd = glm::normalize(multiplyMV(triangleMesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
+
+  BvhNode *mesh_bvh = bvh_list + triangleMesh.bvhOffset;
+  Triangle* mesh_triangles = triangles + triangleMesh.triangleOffset;
+
+  return traverseBvh(mesh_bvh, 0, mesh_triangles, ro, rd, out_intersectionPoint, out_normal, out_uv, out_outside);
+}

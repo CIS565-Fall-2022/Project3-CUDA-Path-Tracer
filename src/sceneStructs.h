@@ -6,7 +6,7 @@
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
-#define BVH
+#define BVH 
 
 namespace scene_structs {
 
@@ -39,10 +39,7 @@ struct Geom {
 
   int triangleOffset; // for triangle_mesh type to index into triangle array
   int numTriangles;
-
-#ifdef BVH
   int bvhOffset; // each triangle mesh has its own bvh
-#endif
 };
 
 struct Triangle {
