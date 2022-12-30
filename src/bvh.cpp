@@ -46,6 +46,63 @@ void updateNodeBounds(const std::vector<BvhPrimitiveData> &primitiveData, std::v
   }
 }
 
+// split bounding box along longest axis by half
+// x = 0, y = 1, z = 2
+int getSplitAxis(const Bounds &bounds, float &out_splitPos) {
+  glm::vec3 extent = bounds.max - bounds.min;
+  int axis = 0;
+  if (extent.y > extent.x) axis = 1;
+  if (extent.z > extent[axis]) axis = 2;
+
+  out_splitPos = bounds.min[axis] + extent[axis] * 0.5f;
+  return axis;
+}
+
+void subdivide(std::vector<BvhPrimitiveData>& primitiveData, std::vector<BvhNode>& bvhNodes,
+  int nodeIndex, int &nodesUsed) {
+  BvhNode& node = bvhNodes[nodeIndex];
+  float splitPos;
+  int axis = getSplitAxis(node.bounds, splitPos);
+
+  // Partition elements on smaller side of split to lower end of array
+  // By end of loop, i is the index of the first triangle to be on upper end of split
+  // i could be out of bounds if no triangles are on the right side
+  int i = node.firstTriangleOffset;
+  int j = i + node.numTriangles - 1;
+  while (i <= j) {
+    if (primitiveData[i].centroid[axis] < splitPos) {
+      i++;
+    }
+    else {
+      std::swap(primitiveData[i], primitiveData[j--]);
+    }
+  }
+
+  // Base case: let node be a leaf if next split is empty
+  int leftCount = i - node.firstTriangleOffset;
+  if (leftCount == 0 || leftCount == node.numTriangles) { 
+    return;
+  }
+
+  // otherwise, create child nodes
+  int leftChildIdx = nodesUsed++; // use 2 more nodes, serially, for left and right children
+  int rightChildIdx = nodesUsed++;
+  node.leftChildIndex = leftChildIdx;
+  node.rightChildIndex = rightChildIdx;
+
+  bvhNodes[leftChildIdx].firstTriangleOffset = node.firstTriangleOffset;
+  bvhNodes[leftChildIdx].numTriangles = leftCount;
+  bvhNodes[rightChildIdx].firstTriangleOffset = i;
+  bvhNodes[rightChildIdx].numTriangles = node.numTriangles - leftCount;
+  node.numTriangles = 0;
+
+  //recurse
+  updateNodeBounds(primitiveData, bvhNodes, leftChildIdx);
+  updateNodeBounds(primitiveData, bvhNodes, rightChildIdx);
+  subdivide(primitiveData, bvhNodes, leftChildIdx, nodesUsed);
+  subdivide(primitiveData, bvhNodes, rightChildIdx, nodesUsed);
+}
+
 Bvh::Bvh(const std::vector<Triangle> &triangles)
 {
   std::vector<BvhPrimitiveData> primitiveData;
@@ -74,4 +131,7 @@ Bvh::Bvh(const std::vector<Triangle> &triangles)
   root.rightChildIndex = 0;
   root.firstTriangleOffset = 0;
   root.numTriangles = triangles.size();
+
+  updateNodeBounds(primitiveData, bvhNodes, rootNodeIndex);
+  subdivide(primitiveData, bvhNodes, rootNodeIndex, nodesUsed);
 }
