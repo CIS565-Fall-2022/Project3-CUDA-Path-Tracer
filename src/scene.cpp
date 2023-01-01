@@ -591,7 +591,7 @@ int Scene::loadTinyGltf(string filename) {
 
     int textureIndex = gltfMaterial.pbrMetallicRoughness.baseColorTexture.index;
     if (textureIndex == -1 || DEBUG_GLTF_TEXTURES) {
-      cout << "Material has no base color texture. Will render using base color factor" << endl;
+      cout << "Material has no base color texture. Will render using base color factor (default is white)" << endl;
       auto& color = gltfMaterial.pbrMetallicRoughness.baseColorFactor;
       newMaterial.color = glm::vec3(color[0], color[1], color[2]);
     }
@@ -600,7 +600,9 @@ int Scene::loadTinyGltf(string filename) {
       newMaterial.colorImageId = model.textures.at(textureIndex).source;
     }
 
-    newMaterial.normalMapImageId = gltfMaterial.normalTexture.index;
+    if (!DEBUG_GLTF_TEXTURES) {
+      newMaterial.normalMapImageId = gltfMaterial.normalTexture.index;
+    }
     newMaterial.hasReflective = 0;
 
     newMaterial.emittance = 0; // all gltf scenes tested don't have emittance

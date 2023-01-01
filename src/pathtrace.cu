@@ -21,7 +21,9 @@ using namespace scene_structs;
 
 #define ERRORCHECK 1
 #define SORT_BY_MATERIALS 1
-#define CACHE_FIRST_BOUNCE 1
+// turn on at most ONE of first bounce caching and anti-aliasing
+#define CACHE_FIRST_BOUNCE 0
+#define ANTI_ALIAS 1
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -230,20 +232,18 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		segment.ray.origin = cam.position;
 		segment.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-		// TODO: implement antialiasing by jittering the ray
-
-		// Without jittering, we wouldn't have anti-aliasing on the 1st ray bounce?
-		// Since it would just point straight in a specific direction?
-		// Could still get illumination from 2nd ray bounce?
-
-		// eg. x index is (0, 1080) y index is (0, 720)
-		// ((float)x - (float)cam.resolution.x * 0.5f) => basically convert this range to (-540, 540)
-		// GUESSING: pixelLength.x is how many units correspond to 1 pixel in the camera?
-		// So pixelLength.x here = 2 / resolution.x <- kinda. Also need to look at fov
+		glm::vec2 jitter(0, 0);
+#if ANTI_ALIAS
+		// anti-aliasing with simple box filter (all samples weighted equally)
+		int stdDev = 0.2; // try different values from 0, .2, .5 etc.
+		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
+		thrust::normal_distribution<float> norm(0, stdDev);
+		jitter = glm::vec2(norm(rng), norm(rng));
+#endif
 
 		segment.ray.direction = glm::normalize(cam.view
-			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f)
-			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f)
+			- cam.right * cam.pixelLength.x * ((float)x - (float)cam.resolution.x * 0.5f + jitter.x)
+			- cam.up * cam.pixelLength.y * ((float)y - (float)cam.resolution.y * 0.5f + jitter.y)
 		);
 
 		segment.pixelIndex = index;
