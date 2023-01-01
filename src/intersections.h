@@ -252,13 +252,10 @@ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh, Triangle
   }
 
   // Don't forget to transform back
-  out_normal = glm::normalize(multiplyMV(triangleMesh.inverseTransform, glm::vec4(out_normal, 0)));
+  out_normal = glm::normalize(multiplyMV(triangleMesh.transform, glm::vec4(out_normal, 0)));
+  out_intersectionPoint = multiplyMV(triangleMesh.transform, glm::vec4(out_intersectionPoint, 1));
 
-  if (!hitGeom) {
-    return -1;
-  }
-
-  return t_min;
+  return hitGeom ? glm::length(r.origin - out_intersectionPoint) : -1;
 }
 
 // slab test - clip the ray by the parallel planes
@@ -336,9 +333,9 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
     assert(stackEndIndex < BVH_STACK_SIZE);
   }
 
-  // Don't forget to transform back the normal
-  // Intersection point doesn't need to be transformed
-  out_normal = glm::normalize(multiplyMV(triangleMesh.inverseTransform, glm::vec4(out_normal, 0)));
+  // Don't forget to transform back the normal and intersection point
+  out_normal = glm::normalize(multiplyMV(triangleMesh.transform, glm::vec4(out_normal, 0)));
+  out_intersectionPoint = multiplyMV(triangleMesh.transform, glm::vec4(out_intersectionPoint, 1));
   
-  return hitGeom ? t_min : -1;
+  return hitGeom ? glm::length(r.origin - out_intersectionPoint) : -1;
 }

@@ -22,8 +22,8 @@ using namespace scene_structs;
 #define ERRORCHECK 1
 #define SORT_BY_MATERIALS 1
 // turn on at most ONE of first bounce caching and anti-aliasing
-#define CACHE_FIRST_BOUNCE 0
-#define ANTI_ALIAS 1
+#define CACHE_FIRST_BOUNCE 1
+#define ANTI_ALIAS 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -235,7 +235,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		glm::vec2 jitter(0, 0);
 #if ANTI_ALIAS
 		// anti-aliasing with simple box filter (all samples weighted equally)
-		int boxSize = 0.2; // try different values from 0, .2, .5 etc.
+		float boxSize = 0.2; // try different values from 0, .2, .5 etc.
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
 		thrust::uniform_real_distribution<float> uniform(0, boxSize);
 		jitter = glm::vec2(uniform(rng), uniform(rng));
