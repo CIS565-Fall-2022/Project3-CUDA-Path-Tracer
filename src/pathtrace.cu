@@ -371,6 +371,15 @@ __global__ void shadeMaterial(
 
 			Material &material = materials[intersection.materialId];
 			glm::vec3 materialColor;
+			glm::vec3 normal;
+
+			if (material.normalMapImageId < 0) {
+				normal = intersection.surfaceNormal;
+			}
+			else {
+				DevImage& normalImage = imageSources[material.normalMapImageId];
+				normal = glm::normalize(getTextureColor(normalImage, imageBuffers, intersection.uv));
+			}
 
 			if (material.colorImageId < 0) {
 				materialColor = material.color;
@@ -381,7 +390,7 @@ __global__ void shadeMaterial(
 			}
 
 			glm::vec3 intersectionPoint = intersection.t * pathSegment.ray.direction + pathSegment.ray.origin;
-			scatterRay(pathSegment, intersectionPoint, intersection.surfaceNormal, material, rng);
+			scatterRay(pathSegment, intersectionPoint, normal, material, rng);
 
 			// If the material indicates that the object was a light, "light" the ray
 			if (material.emittance > 0.0f) {

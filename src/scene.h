@@ -17,6 +17,7 @@ private:
     ifstream fp_in;
     int loadMaterial(string materialid);
     void loadDefaultCamera();
+    void loadDefaultLight();
     int loadGeom(string objectid);
     int loadCamera();
     int loadTinyGltf(std::string filename);

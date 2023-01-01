@@ -36,6 +36,7 @@ Scene::Scene(string filename) {
 #ifdef BVH
       bvh = Bvh(triangles, geoms);
 #endif
+      loadDefaultLight();
       return;
     }
 
@@ -229,8 +230,8 @@ void Scene::loadDefaultCamera() {
 
   Camera& camera = state.camera;
   camera.resolution = glm::ivec2(800, 800);
-  camera.position = glm::vec3(0.0f, -1.3f, 1.0f);
-  camera.lookAt = glm::vec3(0, 0.5, 0);
+  camera.position = glm::vec3(0.0, 5, 10.5);
+  camera.lookAt = glm::vec3(0, 5, 0);
   camera.up = glm::vec3(0, 1, 0);
 
   float fovy = 45;
@@ -251,6 +252,26 @@ void Scene::loadDefaultCamera() {
   std::fill(state.image.begin(), state.image.end(), glm::vec3());
 
   cout << "Loaded camera!" << endl;
+}
+
+void Scene::loadDefaultLight() {
+  // Add these after gltf is loaded so the ids don't interfere
+  Material lightMat;
+  lightMat.color = glm::vec3(1);
+  lightMat.emittance = 5;
+
+  materials.push_back(lightMat);
+
+  Geom square;
+  square.type = CUBE;
+  square.materialid = materials.size() - 1;
+  square.translation = glm::vec3(0, 10, 0);
+  square.rotation = glm::vec3(0);
+  square.scale = glm::vec3(3, .3, 3);
+  square.transform = glm::translate(square.translation) * glm::mat4_cast(glm::quat(square.rotation)) * glm::scale(square.scale);
+  square.inverseTransform = glm::inverse(square.transform);
+  square.invTranspose = glm::inverseTranspose(square.transform);
+  geoms.push_back(square);
 }
 
 // convert accessor index into float array OR int array
@@ -564,7 +585,7 @@ int Scene::loadTinyGltf(string filename) {
     const tinygltf::Material& gltfMaterial = model.materials[i];
     scene_structs::Material newMaterial;
 
-    const int textureIndex = gltfMaterial.pbrMetallicRoughness.baseColorTexture.index;
+    int textureIndex = gltfMaterial.pbrMetallicRoughness.baseColorTexture.index;
     if (textureIndex == -1 || DEBUG_GLTF_TEXTURES) {
       cout << "Material has no base color texture. Will render using base color factor" << endl;
       auto& color = gltfMaterial.pbrMetallicRoughness.baseColorFactor;
@@ -575,7 +596,9 @@ int Scene::loadTinyGltf(string filename) {
       newMaterial.colorImageId = model.textures.at(textureIndex).source;
     }
 
-    newMaterial.emittance = 1; // TODO: add light for material instead.
+    newMaterial.normalMapImageId = gltfMaterial.normalTexture.index;
+
+    newMaterial.emittance = 0; // all gltf scenes tested don't have emittance
 
     cout << "Adding material #" << i << ": " << gltfMaterial.name << endl;
     materials.push_back(newMaterial);

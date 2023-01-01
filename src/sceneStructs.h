@@ -62,6 +62,7 @@ struct Image {
 
 struct Material {
   int colorImageId = -1; // -1 means there is no texture
+  int normalMapImageId = -1;
   glm::vec3 color;
   struct {
     float exponent;

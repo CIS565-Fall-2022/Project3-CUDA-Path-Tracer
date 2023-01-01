@@ -206,8 +206,13 @@ __device__ float triangleIntersectionTest(const Triangle& triangle, const glm::v
   }
 
   // TODO: get normals and uv using barycentric interpolation
-  out_normal = (triangle.verts[0].normal * v1Area + triangle.verts[1].normal * v2Area
-    + triangle.verts[2].normal * v3Area) / triangleArea;
+  out_normal = glm::normalize((triangle.verts[0].normal * v1Area + triangle.verts[1].normal * v2Area
+    + triangle.verts[2].normal * v3Area));
+  if (out_outside) {
+    out_normal = -out_normal;
+  }
+  //out_normal = triangle.verts[0].normal;
+
   out_uv = (triangle.verts[0].uv * v1Area + triangle.verts[1].uv * v2Area
     + triangle.verts[2].uv * v3Area) / triangleArea;
 
