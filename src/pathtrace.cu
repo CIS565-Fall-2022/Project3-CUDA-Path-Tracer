@@ -235,10 +235,10 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		glm::vec2 jitter(0, 0);
 #if ANTI_ALIAS
 		// anti-aliasing with simple box filter (all samples weighted equally)
-		int stdDev = 0.2; // try different values from 0, .2, .5 etc.
+		int boxSize = 0.2; // try different values from 0, .2, .5 etc.
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
-		thrust::normal_distribution<float> norm(0, stdDev);
-		jitter = glm::vec2(norm(rng), norm(rng));
+		thrust::uniform_real_distribution<float> uniform(0, boxSize);
+		jitter = glm::vec2(uniform(rng), uniform(rng));
 #endif
 
 		segment.ray.direction = glm::normalize(cam.view
