@@ -179,6 +179,7 @@ void pathtraceInit(Scene* scene) {
 #ifdef BVH
 	cudaMalloc(&dev_bvh, sizeof(BvhNode) * scene->bvh.allBvhNodes.size());
 	cudaMemcpy(dev_bvh, scene->bvh.allBvhNodes.data(), sizeof(BvhNode) * scene->bvh.allBvhNodes.size(), cudaMemcpyHostToDevice);
+	checkCUDAError("cudaMemcpy of dev_bvh");
 #endif
 
 	checkCUDAError("pathtraceInit");
@@ -262,9 +263,7 @@ __global__ void computeIntersections(
 	, PathSegment* pathSegments
 	, Geom* geoms
 	, Triangle *triangles
-#ifdef BVH
 	, BvhNode* bvh
-#endif
 	, int geoms_size
 	, ShadeableIntersection* intersections
 )
@@ -546,6 +545,8 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, dev_triangles
 #ifdef BVH
 			, dev_bvh
+#else
+			, NULL
 #endif
 			, hst_scene->geoms.size()
 			, dev_intersections

@@ -33,7 +33,9 @@ Scene::Scene(string filename) {
       loadTinyGltf(filename);
       loadDefaultCamera();
       cout << "Building Bvh trees --------------------------" << endl;
+#ifdef BVH
       bvh = Bvh(triangles, geoms);
+#endif
       return;
     }
 

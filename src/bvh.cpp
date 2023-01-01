@@ -51,7 +51,8 @@ void subdivide(std::vector<BvhPrimitiveData>& primitiveData, std::vector<BvhNode
   int i = node.firstTriangleOffset;
   int j = i + node.numTriangles - 1;
   while (i <= j) {
-    if (primitiveData[i].centroid[axis] < splitPos) {
+    if (primitiveData[i].bounds.min[axis] < splitPos
+      && primitiveData[i].bounds.max[axis] < splitPos) {
       i++;
     }
     else {

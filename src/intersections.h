@@ -145,7 +145,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     return glm::length(r.origin - intersectionPoint);
 }
 
-__host__ __device__ float triangleIntersectionTest(const Triangle& triangle, const glm::vec3 &ro, const glm::vec3 &rd,
+__host__ __device__ float triangleIntersectionTest(const Triangle& triangle, glm::vec3 ro, glm::vec3 rd,
   glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside) {
 
   glm::vec3 v1 = triangle.verts[0].position;
@@ -254,7 +254,7 @@ __host__ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh,
 }
 
 // slab test - clip the ray by the parallel planes
-__host__ __device__ bool rayIntersectsBounds(const glm::vec3& ro, const glm::vec3& rd, const Bounds &b) {
+ __device__ bool rayIntersectsBounds(const glm::vec3& ro, const glm::vec3& rd, const Bounds &b) {
   float tx1 = (b.min.x - ro.x) / rd.x, tx2 = (b.max.x - ro.x) / rd.x;
   float tmin = min(tx1, tx2), tmax = max(tx1, tx2);
   float ty1 = (b.min.y - ro.y) / rd.y, ty2 = (b.max.y - ro.y) / rd.y;
@@ -264,18 +264,20 @@ __host__ __device__ bool rayIntersectsBounds(const glm::vec3& ro, const glm::vec
   return tmax >= tmin && tmax > 0;
 }
 
-__host__ __device__ float traverseBvh(BvhNode* mesh_bvh, int currentNodeIdx, Triangle* mesh_triangles, glm::vec3& ro, glm::vec3& rd,
+__device__ float traverseBvh(BvhNode* mesh_bvh, int currentNodeIdx, Triangle* mesh_triangles, glm::vec3& ro, glm::vec3& rd,
   glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside) {
+  if (currentNodeIdx < 0) {
+    return -1;
+  }
+  const BvhNode& curr_node = mesh_bvh[currentNodeIdx];
+
   float t;
   float t_min = FLT_MAX;
   glm::vec3 tmp_intersect;
   glm::vec3 tmp_normal;
   glm::vec2 tmp_uv;
   bool tmp_outside;
-
   bool hitGeom = false;
-
-  const BvhNode& curr_node = mesh_bvh[currentNodeIdx];
 
   // if out of bounds, stop
   if (!rayIntersectsBounds(ro, rd, curr_node.bounds)) {
@@ -285,7 +287,7 @@ __host__ __device__ float traverseBvh(BvhNode* mesh_bvh, int currentNodeIdx, Tri
   // if leaf node, then intersection test the triangles
   if (curr_node.numTriangles > 0) {
     for (int i = curr_node.firstTriangleOffset; i < curr_node.firstTriangleOffset + curr_node.numTriangles; ++i) {
-      Triangle& triangle = mesh_triangles[i];
+      const Triangle& triangle = mesh_triangles[i];
 
       t = triangleIntersectionTest(triangle, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside);
 
@@ -321,14 +323,16 @@ __host__ __device__ float traverseBvh(BvhNode* mesh_bvh, int currentNodeIdx, Tri
   return right_t;
 }
 
-__host__ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNode *bvh_list, Triangle* triangles, Ray r,
+__device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNode* bvh_list, Triangle* triangles, Ray r,
   glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside) {
 
   glm::vec3 ro = multiplyMV(triangleMesh.inverseTransform, glm::vec4(r.origin, 1.0f));
   glm::vec3 rd = glm::normalize(multiplyMV(triangleMesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
 
-  BvhNode *mesh_bvh = bvh_list + triangleMesh.bvhOffset;
+  BvhNode* mesh_bvh = bvh_list + triangleMesh.bvhOffset;
   Triangle* mesh_triangles = triangles + triangleMesh.triangleOffset;
 
   return traverseBvh(mesh_bvh, 0, mesh_triangles, ro, rd, out_intersectionPoint, out_normal, out_uv, out_outside);
+
+  //return traverseBvh(bvh_list, 0, triangles, ro, rd, out_intersectionPoint, out_normal, out_uv, out_outside);
 }
