@@ -615,4 +615,5 @@ int Scene::loadTinyGltf(string filename) {
   for (const int &nodeIdx : scene.nodes) {
     loadNode(nodeIdx, model, gltbDirectory, glm::mat4(1.0), this->geoms, this->triangles, materialOffset);
   }
+  return 0;
 }

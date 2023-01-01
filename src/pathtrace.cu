@@ -361,7 +361,7 @@ __global__ void shadeMaterial(
 
 		// If we didn't hit anything
 		if (pathSegment.remainingBounces <= 0) {
-			pathSegment.color = glm::vec3(0.0f);
+			pathSegment.color = BACKGROUND_COLOR;
 			return;
 		}
 
@@ -399,31 +399,7 @@ __global__ void shadeMaterial(
 				return;
 			}
 			else {
-				// light is pointing from above?
-				//float lightTerm = glm::clamp(glm::dot(intersection.surfaceNormal, newDirection), 0.0f, 1.0f);
-				//pathSegments[idx].color *= material.color * lightTerm / pdf;
-
-				// TOASK: this looks like the reference image, but isn't the reference image too dark?
-				// We're doing cosine weighted sampling, so cosine in the denominator of the pdf
-				// cancels with cosine in the numerator of the product
-				// But isn't the pdf supposed to be cos(theta)/pi? shouldn't we multiply pi here?
-				// Also, what happens for reflective materials?
-				// Never mind, the answer has to be correct because it converges to a result
-				// If we multiply PI the image gets brighter and brighter...
 				pathSegment.color *= materialColor;
-
-				//if (depth > 1) {
-				//	float r = pathSegments[idx].color.r;
-				//	float g = pathSegments[idx].color.g;
-				//	float b = pathSegments[idx].color.b;
-				//	float mr = material.color.r;
-				//	float mg = material.color.g;
-				//	float mb = material.color.b;
-				//	material.color = glm::vec3(mr, mg, mb);
-				//	pathSegments[idx].color = glm::vec3(r, g, b);
-				//}
-
-				//pathSegments[idx].color = iter % 2 == 0 ? glm::vec3(1, 0, 0) : glm::vec3(0, 0, 1);
 				pathSegment.remainingBounces--;
 			}
 		}
