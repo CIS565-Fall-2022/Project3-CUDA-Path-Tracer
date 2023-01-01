@@ -162,7 +162,7 @@ __device__ float triangleIntersectionTest(const Triangle& triangle, const glm::v
   // plug in arbitrary point (v0) to solve for d
   float d = glm::dot(normal, v1);
 
-  if (glm::abs(glm::dot(normal, rd)) < 0.000001f) { // TODO: tune
+  if (glm::abs(glm::dot(normal, rd)) < 0.0001f) { // TODO: tune
     // avoid divide by 0, ray could be parallel to plane in which case we don't see it
     return -1;
   }

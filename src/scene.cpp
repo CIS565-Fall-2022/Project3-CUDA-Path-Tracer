@@ -229,8 +229,8 @@ void Scene::loadDefaultCamera() {
 
   Camera& camera = state.camera;
   camera.resolution = glm::ivec2(800, 800);
-  camera.position = glm::vec3(0.0f, 2.0f, 5.0f);
-  camera.lookAt = glm::vec3(0, 0, 0);
+  camera.position = glm::vec3(0.0f, -1.3f, 1.0f);
+  camera.lookAt = glm::vec3(0, 0.5, 0);
   camera.up = glm::vec3(0, 1, 0);
 
   float fovy = 45;
@@ -533,15 +533,9 @@ int Scene::loadTinyGltf(string filename) {
   cout << "Gltf read the json file successfully:" << filename << endl;
 
   cout << "TEXTURES PARSING------" << endl;
-  for (const tinygltf::Texture& texture : model.textures) {
+  for (const tinygltf::Image& imageSource : model.images) {
     // For simplicity, assume all textures are complete images, with no special sampler
     // Thus, textures and images have a 1 to 1 correspondence
-    const tinygltf::Image& imageSource = model.images.at(texture.source);
-
-    if (texture.sampler != -1) {
-      cout << "UNSUPPORTED - Samplers are not supported" << endl;
-    }
-
     scene_structs::Image newImage;
     newImage.height = imageSource.height;
     newImage.width = imageSource.width;
