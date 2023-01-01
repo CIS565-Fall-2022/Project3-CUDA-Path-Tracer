@@ -90,7 +90,7 @@ void Bvh::buildBvh(std::vector<Triangle> &triangles, int startIdx, int numTriang
   std::vector<BvhPrimitiveData> primitiveData;
 
   // Preprocessing - get centroids and bounding boxes of primitives
-  for (int i = startIdx; i < numTriangles; ++i) {
+  for (int i = startIdx; i < startIdx + numTriangles; ++i) {
     const glm::vec3& v1 = triangles[i].verts[0].position;
     const glm::vec3& v2 = triangles[i].verts[1].position;
     const glm::vec3& v3 = triangles[i].verts[2].position;
@@ -105,14 +105,14 @@ void Bvh::buildBvh(std::vector<Triangle> &triangles, int startIdx, int numTriang
   int rootNodeIndex = 0;
   int nodesUsed = 1;
 
-  int numNodes = 2 * triangles.size() - 1;
+  int numNodes = 2 * numTriangles - 1;
   std::vector<BvhNode> bvhNodes(numNodes);
 
   BvhNode& root = bvhNodes[rootNodeIndex];
   root.leftChildIndex = 0;
   root.rightChildIndex = 0;
   root.firstTriangleOffset = 0;
-  root.numTriangles = triangles.size();
+  root.numTriangles = numTriangles;
 
   updateNodeBounds(primitiveData, bvhNodes, rootNodeIndex);
   subdivide(primitiveData, bvhNodes, rootNodeIndex, nodesUsed);
@@ -127,7 +127,7 @@ void Bvh::buildBvh(std::vector<Triangle> &triangles, int startIdx, int numTriang
   }
   std::vector<Triangle> newTriangles(numTriangles);
   for (int i = 0; i < numTriangles; ++i) {
-    newTriangles[i] = triangles[startIdx + primitiveData[i].index];
+    newTriangles[i] = triangles[primitiveData[i].index];
   }
   for (int i = 0; i < numTriangles; ++i) {
     triangles[startIdx + i] = newTriangles[i];

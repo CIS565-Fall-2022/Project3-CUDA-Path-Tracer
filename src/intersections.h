@@ -264,65 +264,6 @@ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh, Triangle
   return tmax >= tmin && tmax > 0;
 }
 
-__device__ float traverseBvh(BvhNode* mesh_bvh, int currentNodeIdx, Triangle* mesh_triangles, const glm::vec3 &ro, const glm::vec3 &rd,
-  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside) {
-
-
-
-  const BvhNode& curr_node = mesh_bvh[currentNodeIdx];
-
-  float t;
-  float t_min = FLT_MAX;
-  glm::vec3 tmp_intersect;
-  glm::vec3 tmp_normal;
-  glm::vec2 tmp_uv;
-  bool tmp_outside;
-  bool hitGeom = false;
-
-  // if out of bounds, stop
-  if (!rayIntersectsBounds(ro, rd, curr_node.bounds)) {
-    return -1;
-  }
-
-  // if leaf node, then intersection test the triangles
-  if (curr_node.numTriangles > 0) {
-    for (int i = curr_node.firstTriangleOffset; i < curr_node.firstTriangleOffset + curr_node.numTriangles; ++i) {
-      const Triangle& triangle = mesh_triangles[i];
-
-      t = triangleIntersectionTest(triangle, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside);
-
-      if (t > 0.0f && t_min > t)
-      {
-        hitGeom = true;
-        t_min = t;
-        out_intersectionPoint = tmp_intersect;
-        out_normal = tmp_normal;
-        out_uv = tmp_uv;
-        out_outside = tmp_outside;
-      }
-    }
-    if (!hitGeom) {
-      return -1;
-    }
-    return t_min;
-  }
-
-  // if non-leaf, then traverse children
-  float left_t = traverseBvh(mesh_bvh, curr_node.leftChildIndex, mesh_triangles, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside);
-  float right_t = traverseBvh(mesh_bvh, curr_node.rightChildIndex, mesh_triangles, ro, rd, out_intersectionPoint, out_normal, out_uv, out_outside);
-
-  // if left child has triangle that is closer than right child, then overwrite the out param results
-  if (left_t < right_t && left_t > 0.f) {
-    out_intersectionPoint = tmp_intersect;
-    out_normal = tmp_normal;
-    out_uv = tmp_uv;
-    out_outside = tmp_outside;
-    return left_t;
-  }
-
-  return right_t;
-}
-
 #define BVH_STACK_SIZE 128
 
 __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNode* bvh_list, Triangle* triangle_list, Ray r,
@@ -333,7 +274,7 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
   BvhNode* mesh_bvh = bvh_list + triangleMesh.bvhOffset;
   Triangle* mesh_triangles = triangle_list + triangleMesh.triangleOffset;
 
-  float t = -1;
+  bool hitGeom = false;
   float t_min = FLT_MAX;
   glm::vec3 tmp_intersect;
   glm::vec3 tmp_normal;
@@ -346,10 +287,10 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
   // can't allocate dynamic memory on gpu so hardcoding length
   int bvhIndicesStack[BVH_STACK_SIZE];
   bvhIndicesStack[0] = 0; // start traversing at root node (0)
-  int stackSize = 1;
+  int stackEndIndex = 0;
   
-  while (stackSize > 0) {
-    int currNodeIdx = bvhIndicesStack[(stackSize--) - 1]; // pop
+  while (stackEndIndex >= 0) {
+    int currNodeIdx = bvhIndicesStack[stackEndIndex--]; // pop
     const BvhNode& curr_node = mesh_bvh[currNodeIdx];
 
     if (!rayIntersectsBounds(ro, rd, curr_node.bounds)) {
@@ -361,7 +302,7 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
       for (int i = curr_node.firstTriangleOffset; i < curr_node.firstTriangleOffset + curr_node.numTriangles; ++i) {
         const Triangle& triangle = mesh_triangles[i];
 
-        t = triangleIntersectionTest(triangle, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside);
+        float t = triangleIntersectionTest(triangle, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside);
 
         if (t > 0.0f && t_min > t)
         {
@@ -370,6 +311,7 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
           out_normal = tmp_normal;
           out_uv = tmp_uv;
           out_outside = tmp_outside;
+          hitGeom = true;
         }
       }
       continue;
@@ -377,14 +319,14 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
 
     // Case: parent node. Add left and/or right children to stack
     if (curr_node.leftChildIndex != -1) {
-      bvhIndicesStack[stackSize++] = curr_node.leftChildIndex;
+      bvhIndicesStack[++stackEndIndex] = curr_node.leftChildIndex;
     }
     if (curr_node.rightChildIndex != -1) {
-      bvhIndicesStack[stackSize++] = curr_node.rightChildIndex;
+      bvhIndicesStack[++stackEndIndex] = curr_node.rightChildIndex;
     }
 
-    assert(stackSize < BVH_STACK_SIZE);
+    assert(stackEndIndex < BVH_STACK_SIZE);
   }
 
-  return t;
+  return hitGeom ? t_min : -1;
 }
