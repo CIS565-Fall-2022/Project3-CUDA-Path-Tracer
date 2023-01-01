@@ -372,7 +372,7 @@ __global__ void shadeMaterial(
 			Material &material = materials[intersection.materialId];
 			glm::vec3 materialColor;
 
-			if (material.colorImageId == -1) {
+			if (material.colorImageId < 0) {
 				materialColor = material.color;
 			}
 			else {
@@ -587,6 +587,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			dev_imageSources,
 			dev_imageBuffers
 			);
+		checkCUDAError("Shade material");
 
 		 //update num_paths using stream compaction
 		dev_path_end = thrust::stable_partition(thrust::device, dev_paths, dev_path_end, path_should_continue());

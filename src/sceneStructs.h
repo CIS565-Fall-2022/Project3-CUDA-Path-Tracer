@@ -61,7 +61,7 @@ struct Image {
 };
 
 struct Material {
-  int colorImageId; // -1 means there is no texture
+  int colorImageId = -1; // -1 means there is no texture
   glm::vec3 color;
   struct {
     float exponent;
