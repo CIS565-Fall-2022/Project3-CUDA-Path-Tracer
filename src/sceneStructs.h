@@ -6,7 +6,7 @@
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
-//#define BVH 
+#define BVH 
 
 namespace scene_structs {
 

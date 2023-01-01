@@ -149,8 +149,8 @@ Bvh::Bvh(std::vector<Triangle>& triangles, std::vector<Geom>& geoms) {
       int triangleStartIdx = geom.triangleOffset;
       int numTriangles = geom.numTriangles;
       geom.bvhOffset = allBvhNodes.size();
-      std::cout << "Added a bvh" << std::endl;
       buildBvh(triangles, triangleStartIdx, numTriangles);
+      std::cout << "Added a bvh with " << allBvhNodes.size() - geom.bvhOffset << " nodes" << std::endl;
     }
   }
 }

@@ -145,7 +145,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
     return glm::length(r.origin - intersectionPoint);
 }
 
-__host__ __device__ float triangleIntersectionTest(const Triangle& triangle, glm::vec3 ro, glm::vec3 rd,
+__device__ float triangleIntersectionTest(const Triangle& triangle, const glm::vec3 &ro, const glm::vec3 &rd,
   glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside) {
 
   glm::vec3 v1 = triangle.verts[0].position;
@@ -214,7 +214,7 @@ __host__ __device__ float triangleIntersectionTest(const Triangle& triangle, glm
   return t;
 }
 
-__host__ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh, Triangle *triangles, Ray r,
+__device__ float triangleMeshIntersectionTest(const Geom &triangleMesh, Triangle *triangles, Ray r,
   glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2 & out_uv, bool& out_outside) {
 
   // first apply inverse transformation to ray
@@ -254,7 +254,7 @@ __host__ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh,
 }
 
 // slab test - clip the ray by the parallel planes
- __device__ bool rayIntersectsBounds(const glm::vec3& ro, const glm::vec3& rd, const Bounds &b) {
+ __device__ bool rayIntersectsBounds(const glm::vec3 &ro, const glm::vec3 &rd, const Bounds &b) {
   float tx1 = (b.min.x - ro.x) / rd.x, tx2 = (b.max.x - ro.x) / rd.x;
   float tmin = min(tx1, tx2), tmax = max(tx1, tx2);
   float ty1 = (b.min.y - ro.y) / rd.y, ty2 = (b.max.y - ro.y) / rd.y;
@@ -264,11 +264,11 @@ __host__ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh,
   return tmax >= tmin && tmax > 0;
 }
 
-__device__ float traverseBvh(BvhNode* mesh_bvh, int currentNodeIdx, Triangle* mesh_triangles, glm::vec3& ro, glm::vec3& rd,
+__device__ float traverseBvh(BvhNode* mesh_bvh, int currentNodeIdx, Triangle* mesh_triangles, const glm::vec3 &ro, const glm::vec3 &rd,
   glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside) {
-  if (currentNodeIdx < 0) {
-    return -1;
-  }
+
+
+
   const BvhNode& curr_node = mesh_bvh[currentNodeIdx];
 
   float t;
@@ -323,16 +323,68 @@ __device__ float traverseBvh(BvhNode* mesh_bvh, int currentNodeIdx, Triangle* me
   return right_t;
 }
 
-__device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNode* bvh_list, Triangle* triangles, Ray r,
+#define BVH_STACK_SIZE 128
+
+__device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNode* bvh_list, Triangle* triangle_list, Ray r,
   glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside) {
 
   glm::vec3 ro = multiplyMV(triangleMesh.inverseTransform, glm::vec4(r.origin, 1.0f));
   glm::vec3 rd = glm::normalize(multiplyMV(triangleMesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
-
   BvhNode* mesh_bvh = bvh_list + triangleMesh.bvhOffset;
-  Triangle* mesh_triangles = triangles + triangleMesh.triangleOffset;
+  Triangle* mesh_triangles = triangle_list + triangleMesh.triangleOffset;
 
-  return traverseBvh(mesh_bvh, 0, mesh_triangles, ro, rd, out_intersectionPoint, out_normal, out_uv, out_outside);
+  float t = -1;
+  float t_min = FLT_MAX;
+  glm::vec3 tmp_intersect;
+  glm::vec3 tmp_normal;
+  glm::vec2 tmp_uv;
+  bool tmp_outside;
 
-  //return traverseBvh(bvh_list, 0, triangles, ro, rd, out_intersectionPoint, out_normal, out_uv, out_outside);
+  // Instead of recursion, which causes a stack overflow on the gpu
+  // use an actual stack to traverse bvh
+  // (thanks compute-sanitizer for enlightening me after debugging "memory access violation" for 2 days fml...)
+  // can't allocate dynamic memory on gpu so hardcoding length
+  int bvhIndicesStack[BVH_STACK_SIZE];
+  bvhIndicesStack[0] = 0; // start traversing at root node (0)
+  int stackSize = 1;
+  
+  while (stackSize > 0) {
+    int currNodeIdx = bvhIndicesStack[(stackSize--) - 1]; // pop
+    const BvhNode& curr_node = mesh_bvh[currNodeIdx];
+
+    if (!rayIntersectsBounds(ro, rd, curr_node.bounds)) {
+      continue; // no intersection with this bounding box -> move onto next
+    }
+    
+    // Case: leaf node. Do triangle intersection tests and don't add any child nodes to stack
+    if (curr_node.numTriangles > 0) {
+      for (int i = curr_node.firstTriangleOffset; i < curr_node.firstTriangleOffset + curr_node.numTriangles; ++i) {
+        const Triangle& triangle = mesh_triangles[i];
+
+        t = triangleIntersectionTest(triangle, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside);
+
+        if (t > 0.0f && t_min > t)
+        {
+          t_min = t;
+          out_intersectionPoint = tmp_intersect;
+          out_normal = tmp_normal;
+          out_uv = tmp_uv;
+          out_outside = tmp_outside;
+        }
+      }
+      continue;
+    }
+
+    // Case: parent node. Add left and/or right children to stack
+    if (curr_node.leftChildIndex != -1) {
+      bvhIndicesStack[stackSize++] = curr_node.leftChildIndex;
+    }
+    if (curr_node.rightChildIndex != -1) {
+      bvhIndicesStack[stackSize++] = curr_node.rightChildIndex;
+    }
+
+    assert(stackSize < BVH_STACK_SIZE);
+  }
+
+  return t;
 }

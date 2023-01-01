@@ -18,9 +18,9 @@ REFR        0
 REFRIOR     0
 EMITTANCE   0
 
-// Diffuse red
+// Diffuse yellow
 MATERIAL 2
-RGB         .85 .35 .35
+RGB         0.721 0.525 0.043
 SPECEX      0
 SPECRGB     0 0 0
 REFL        0
@@ -28,9 +28,9 @@ REFR        0
 REFRIOR     0
 EMITTANCE   0
 
-// Diffuse green
+// Diffuse purple
 MATERIAL 3
-RGB         .35 .85 .35
+RGB         0.729 0.333 0.827
 SPECEX      0
 SPECRGB     0 0 0
 REFL        0
