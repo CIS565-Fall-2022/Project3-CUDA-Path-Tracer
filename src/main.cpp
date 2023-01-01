@@ -42,9 +42,14 @@ int main(int argc, char** argv) {
 	}
 
 	const char* sceneFile = argv[1];
-
-	// Load scene file
-	scene = new Scene(sceneFile);
+	
+	if (argc == 3) {
+		const char* gltfFile = argv[2];
+		scene = new Scene(sceneFile, gltfFile);
+	}
+	else {
+		scene = new Scene(sceneFile);
+	}
 
 	//Create Instance for ImGUIData
 	guiData = new GuiDataContainer();

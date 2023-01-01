@@ -23,7 +23,8 @@ private:
     int loadTinyGltf(std::string filename);
 public:
     Scene(string filename);
-    ~Scene();
+    Scene(string filename, string gltfFilename);
+    //~Scene();
 
     std::vector<Geom> geoms;
     std::vector<Material> materials;

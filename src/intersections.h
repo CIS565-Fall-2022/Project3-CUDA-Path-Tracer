@@ -333,5 +333,8 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
     assert(stackEndIndex < BVH_STACK_SIZE);
   }
 
+  // Don't forget to transform the normal back
+  out_normal = multiplyMV(triangleMesh.inverseTransform, glm::vec4(out_normal, 1));
+
   return hitGeom ? t_min : -1;
 }

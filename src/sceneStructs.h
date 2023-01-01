@@ -68,10 +68,10 @@ struct Material {
     float exponent;
     glm::vec3 color;
   } specular;
-  float hasReflective;
-  float hasRefractive;
+  float hasReflective = 0;
+  float hasRefractive = 0;
   float indexOfRefraction;
-  float emittance;
+  float emittance = 0;
 };
 
 struct Camera {

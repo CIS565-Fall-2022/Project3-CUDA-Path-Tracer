@@ -428,7 +428,7 @@ __global__ void shadeMaterial(
 			}
 		}
 		else {
-			pathSegment.color = glm::vec3(0);
+			pathSegment.color = BACKGROUND_COLOR;
 			pathSegment.remainingBounces = 0; // no intersection = stop tracing the path
 		}
 	}

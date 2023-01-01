@@ -29,17 +29,6 @@ Scene::Scene(string filename) {
     cout << "Reading scene from " << filename << " ..." << endl;
     cout << " " << endl;
 
-    if (!has_suffix(filename, "txt")) {
-      loadTinyGltf(filename);
-      loadDefaultCamera();
-      cout << "Building Bvh trees --------------------------" << endl;
-#ifdef BVH
-      bvh = Bvh(triangles, geoms);
-#endif
-      loadDefaultLight();
-      return;
-    }
-
     char* fname = (char*)filename.c_str();
     fp_in.open(fname);
 
@@ -64,6 +53,14 @@ Scene::Scene(string filename) {
             }
         }
     }
+}
+
+Scene::Scene(string filename, string gltfFilename):Scene(filename) {
+  loadTinyGltf(gltfFilename);
+  std::cout << "Building Bvh trees --------------------------" << std::endl;
+#ifdef BVH
+  bvh = Bvh(triangles, geoms);
+#endif
 }
 
 int Scene::loadGeom(string objectid) {
@@ -254,11 +251,17 @@ void Scene::loadDefaultCamera() {
   cout << "Loaded camera!" << endl;
 }
 
+void updateTransformMats(Geom& geom) {
+  geom.transform = glm::translate(geom.translation) * glm::mat4_cast(glm::quat(geom.rotation)) * glm::scale(geom.scale);
+  geom.inverseTransform = glm::inverse(geom.transform);
+  geom.invTranspose = glm::inverseTranspose(geom.transform);
+}
+
 void Scene::loadDefaultLight() {
   // Add these after gltf is loaded so the ids don't interfere
   Material lightMat;
   lightMat.color = glm::vec3(1);
-  lightMat.emittance = 5;
+  lightMat.emittance = 50;
 
   materials.push_back(lightMat);
 
@@ -268,9 +271,7 @@ void Scene::loadDefaultLight() {
   square.translation = glm::vec3(0, 10, 0);
   square.rotation = glm::vec3(0);
   square.scale = glm::vec3(3, .3, 3);
-  square.transform = glm::translate(square.translation) * glm::mat4_cast(glm::quat(square.rotation)) * glm::scale(square.scale);
-  square.inverseTransform = glm::inverse(square.transform);
-  square.invTranspose = glm::inverseTranspose(square.transform);
+  updateTransformMats(square);
   geoms.push_back(square);
 }
 
@@ -433,7 +434,7 @@ glm::mat4 getTransforms(glm::mat4 parentTransform, const tinygltf::Node& node,
 }
 
 void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
-  const glm::mat4 &parentTransform, std::vector<Geom> &geoms, std::vector<Triangle> &triangles) {
+  const glm::mat4 &parentTransform, std::vector<Geom> &geoms, std::vector<Triangle> &triangles, int materialOffset) {
   using namespace tinygltf;
 
   const Node& node = model.nodes.at(nodeIdx);
@@ -446,7 +447,7 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
   invTranspose = glm::inverseTranspose(transform);
 
   for (const int& childNodeIdx : node.children) {
-    loadNode(childNodeIdx, model, gltbDirectory, transform, geoms, triangles);
+    loadNode(childNodeIdx, model, gltbDirectory, transform, geoms, triangles, materialOffset);
   }
 
   if (node.mesh == -1) {
@@ -495,7 +496,7 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
     mesh.translation = translation;
     mesh.rotation = rotation;
     mesh.scale = scale;
-    mesh.materialid = p.material;
+    mesh.materialid = materialOffset + p.material;
     mesh.transform = transform;
     mesh.inverseTransform = invTransform;
     mesh.invTranspose = invTranspose;
@@ -555,6 +556,7 @@ int Scene::loadTinyGltf(string filename) {
 
   cout << "TEXTURES PARSING------" << endl;
   for (const tinygltf::Image& imageSource : model.images) {
+
     // For simplicity, assume all textures are complete images, with no special sampler
     // Thus, textures and images have a 1 to 1 correspondence
     scene_structs::Image newImage;
@@ -579,6 +581,8 @@ int Scene::loadTinyGltf(string filename) {
   }
 
   cout << "MATERIALS PARSING-----" << endl;
+  int materialOffset = materials.size(); // offset indices of previously loaded materials, eg. from cornell box
+
   // materials will be ordered in scene array like original order
   // so indices from geometry will still line up
   for (int i = 0; i < model.materials.size(); ++i) {
@@ -597,6 +601,7 @@ int Scene::loadTinyGltf(string filename) {
     }
 
     newMaterial.normalMapImageId = gltfMaterial.normalTexture.index;
+    newMaterial.hasReflective = 0;
 
     newMaterial.emittance = 0; // all gltf scenes tested don't have emittance
 
@@ -608,6 +613,6 @@ int Scene::loadTinyGltf(string filename) {
   const tinygltf::Scene& scene = model.scenes.at(model.defaultScene);
 
   for (const int &nodeIdx : scene.nodes) {
-    loadNode(nodeIdx, model, gltbDirectory, glm::mat4(1.0), this->geoms, this->triangles);
+    loadNode(nodeIdx, model, gltbDirectory, glm::mat4(1.0), this->geoms, this->triangles, materialOffset);
   }
 }
