@@ -251,6 +251,9 @@ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh, Triangle
     }
   }
 
+  // Don't forget to transform back
+  out_normal = glm::normalize(multiplyMV(triangleMesh.inverseTransform, glm::vec4(out_normal, 0)));
+
   if (!hitGeom) {
     return -1;
   }
@@ -333,8 +336,9 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
     assert(stackEndIndex < BVH_STACK_SIZE);
   }
 
-  // Don't forget to transform the normal back
-  out_normal = multiplyMV(triangleMesh.inverseTransform, glm::vec4(out_normal, 1));
-
+  // Don't forget to transform back the normal
+  // Intersection point doesn't need to be transformed
+  out_normal = glm::normalize(multiplyMV(triangleMesh.inverseTransform, glm::vec4(out_normal, 0)));
+  
   return hitGeom ? t_min : -1;
 }
