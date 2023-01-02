@@ -371,27 +371,27 @@ __global__ void shadeMaterial(
 			glm::vec3 normal;
 			glm::vec3 roughnessMetallicColor;
 
-			if (material.normalMapImageId < 0) {
-				normal = intersection.surfaceNormal;
-			}
-			else {
-				// in gltf spec, normal textures are always in tangent space - need to convert to world space
-				DevImage& normalImage = imageSources[material.normalMapImageId];
+			//if (material.normalMapImageId < 0) {
+			//	normal = intersection.surfaceNormal;
+			//}
+			//else {
+			//	// in gltf spec, normal textures are always in tangent space - need to convert to world space
+			//	DevImage& normalImage = imageSources[material.normalMapImageId];
 
-				// Use provided vertex tangent
-				if (intersection.surfaceTangent != UNDEFINED_VEC4) {
-					glm::vec3 tangent(intersection.surfaceTangent);
-					glm::vec3 bitangent = glm::normalize(glm::cross(intersection.surfaceNormal, tangent)) * intersection.surfaceTangent.w;
-					glm::mat3 TBN = glm::mat3(tangent, bitangent, intersection.surfaceNormal);
+			//	// Use provided vertex tangent
+			//	if (intersection.surfaceTangent != UNDEFINED_VEC4) {
+			//		glm::vec3 tangent(intersection.surfaceTangent);
+			//		glm::vec3 bitangent = glm::normalize(glm::cross(intersection.surfaceNormal, tangent)) * intersection.surfaceTangent.w;
+			//		glm::mat3 TBN = glm::mat3(tangent, bitangent, intersection.surfaceNormal);
 
-					normal = getTextureColor(normalImage, imageBuffers, intersection.uv);
-					normal = glm::normalize(TBN * normal);
-				}
-				else {
+			//		normal = getTextureColor(normalImage, imageBuffers, intersection.uv);
+			//		normal = glm::normalize(TBN * normal);
+			//	}
+			//	else {
 					// TODO: have to calculate vertex tangent. For now just use the intersection normal
 					normal = intersection.surfaceNormal;
-				}
-			}
+			//	}
+			//}
 
 #if SHOW_NORMALS
 			pathSegment.color = glm::abs(normal);

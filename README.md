@@ -66,7 +66,20 @@ Most arbitrary gltf files exported from Blender can be loaded and rendered witho
 #### Color Map
 
 #### Normal Map
-Gltf normal textures must be in tangent space. They are transformed into world space using a TBN matrix. Intersection normals and tangents are interpolated from the vertex normal and tangent buffers from the file.
+Gltf normal textures must be in tangent space. They are transformed into world space using a TBN matrix. Intersection surface normals and tangents are interpolated from the vertex normal and tangent buffers from the file. The resulting normals can be debugged as colours by setting `SHOW_NORMALS` to 1.
+
+| Surface normals | Normal texture map | Combined: TBN * normal texture map |
+| ----------------| ----------------- | -----------------|
+|![](img/surface-normals.png) | ![](img/normal-texture.png) | ![](img/resulting-normals.png) |
+
+With diffuse shaders, a normal map is hard to notice because the light bounces in a random hemisphere around the normal anyway; the resulting bounce won't be too different from before. That's why I tested the normal map with the metallic shader.
+
+| Metallic shading with surface normals | Metallic shading with normal map |
+| ----------------| ----------------- |
+| ![](img/metal-no-normal-map.png) | ![](img/metal-with-normal-texture.png) |
+`metal.txt, metal.gltf`: 2000 samples, depth 8
+
+The render with the normal map has more highlights and the highlights line up better with the texture, making it look more like a rusty piece of metal than the render using interpolated surface normals.
 
 ### Metallic Shader
 I partially implemented gltf's microfacet (PBR metallic/roughness) workflow by adding a metallic shader. The metallic value from 0 to 1 comes from either the gltf material's `pbrMetallicRoughness.metallicFactor` or is read from a texture, where the blue channel is the metallic value. The metallic value is used to interpolate the diffuse and metallic shaders.
