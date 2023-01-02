@@ -6,7 +6,7 @@ SPECRGB     0 0 0
 REFL        0
 REFR        0
 REFRIOR     0
-EMITTANCE   12
+EMITTANCE   5
 
 // Diffuse white
 MATERIAL 1
@@ -58,9 +58,9 @@ REFR        0
 REFRIOR     0
 EMITTANCE   0
 
-// Diffuse dark blue
+// Diffuse blue
 MATERIAL 6
-RGB         0.2 0.3 0.65
+RGB         0.75 0.7 0.9
 SPECEX      0
 SPECRGB     0 0 0
 REFL        0
@@ -75,7 +75,7 @@ FOVY        45
 ITERATIONS  5000
 DEPTH       8
 FILE        cornell
-EYE         0.0 5 4.5
+EYE         0.0 5 4.9
 LOOKAT      0 5 0
 UP          0 1 0
 

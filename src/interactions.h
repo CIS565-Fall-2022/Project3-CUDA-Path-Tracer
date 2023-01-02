@@ -91,5 +91,5 @@ void scatterRay(
     }
 
     pathSegment.ray.direction = newDirection;
-    pathSegment.ray.origin = intersect + (newDirection * 0.0001f); // TODO: tune
+    pathSegment.ray.origin = intersect + (newDirection * 0.001f); // TODO: tune
 }

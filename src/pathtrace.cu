@@ -25,7 +25,7 @@ using namespace scene_structs;
 #define CACHE_FIRST_BOUNCE 1
 #define ANTI_ALIAS 0
 // for debugging
-#define SHOW_NORMALS 1
+#define SHOW_NORMALS 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -364,7 +364,7 @@ __global__ void shadeMaterial(
 
 		// If we didn't hit anything
 		if (pathSegment.remainingBounces <= 0) {
-			pathSegment.color = BACKGROUND_COLOR;
+			pathSegment.color *= BACKGROUND_COLOR;
 			return;
 		}
 
@@ -372,7 +372,7 @@ __global__ void shadeMaterial(
 		if (intersection.t > 0.0f) { // if the intersection exists...
 			thrust::default_random_engine rng = makeSeededRandomEngine(iter, idx, depth);
 
-			Material &material = materials[intersection.materialId];
+			Material& material = materials[intersection.materialId];
 			glm::vec3 materialColor;
 			glm::vec3 normal;
 
