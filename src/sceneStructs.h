@@ -8,7 +8,7 @@
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 #define UNDEFINED_VEC4 (glm::vec4(0.f))
 
-#define BVH 0
+#define BVH 1
 #define ROUGHNESS_METALLIC 1
 #define SORT_BY_MATERIALS 1
 // turn on at most ONE of first bounce caching and anti-aliasing

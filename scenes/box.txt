@@ -126,4 +126,3 @@ material 5
 TRANS       3 12 1.5
 ROTAT       0 0 0
 SCALE       4 .3 3
-

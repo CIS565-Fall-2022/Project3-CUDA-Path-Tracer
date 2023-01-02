@@ -3,8 +3,8 @@ CUDA Path Tracer
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 3**
 
-![](img/cover-image.png)
-
+![](img/cover-image.png)  
+`motorcycle.txt, motorcycle.gltf`: 5000 samples, depth 8, 960 x 720 px
 
 Constance Wang
   * [LinkedIn](https://www.linkedin.com/in/conswang/)
@@ -26,6 +26,7 @@ This is a Monte-Carlo pathtracer with GPU-accelerated intersection tests, shadin
 - Additional features
   - Gltf 2.0 loading & rendering
   - Texture mapping & bump mapping
+  - Metallic shader
   - Bounding volume hierarchy
   - Stochastic sampled anti-aliasing
 
@@ -60,14 +61,29 @@ Most arbitrary gltf files exported from Blender can be loaded and rendered witho
 - Copies position, normal, tangent, UV, and index buffers into an interleaved array on the GPU
 - Texture loading
 
-### Textures
+### Texture Mapping
 
+#### Color Map
+
+#### Normal Map
 Gltf normal textures must be in tangent space. They are transformed into world space using a TBN matrix. Intersection normals and tangents are interpolated from the vertex normal and tangent buffers from the file.
 
-### Anti-Aliasing
-Implemented anti-aliasing by jittering the camera ray in the up and right directions by the amount `boxSize`, aka. jitter ~ U(-boxSize, boxSize). This looks visually pleasing enough that it wasn't worth using a Gaussian distribution, since calculating its pdf would be much more expensive.
+### Metallic Shader
+I partially implemented gltf's microfacet (PBR metallic/roughness) workflow by adding a metallic shader. The metallic value from 0 to 1 comes from either the gltf material's `pbrMetallicRoughness.metallicFactor` or is read from a texture, where the blue channel is the metallic value. The metallic value is used to interpolate the diffuse and metallic shaders.
 
-When anti-aliasing is ON, first bounce caching must be turned off.
+![](img/metallic_box.png)  
+`box.txt, Box With Spaces.gltf`: 1000 samples, depth 8
+
+By setting `#define SHOW_METALLIC 1`, we can debug the metallic value. Here is what it looks like for the motorcycle scene. Brighter blue means more metallic. On the motorcycle, the metallic factor is defined for the entire material, whereas on the vending machine, the metallic factor comes from a texture. 
+
+![](img/metallic-debug.png)
+
+### Bounding Volume Hierarchy
+
+### Anti-Aliasing
+Implemented anti-aliasing by jittering the camera ray in the up and right directions by the amount `boxSize`, aka. jitter ~ uniform(-boxSize/2, boxSize/2). This looks visually pleasing enough that it wasn't worth using a Gaussian distribution, since calculating its pdf would be much more expensive.
+
+When anti-aliasing is ON, first bounce caching must be turned OFF.
 
 | boxSize | Scene | Close-up |
 |--------|------|-------|
