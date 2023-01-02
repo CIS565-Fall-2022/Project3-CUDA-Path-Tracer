@@ -488,8 +488,11 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
       free(tangentArray);
     }
 
-    float* uvArray = (float*)readBuffer(model, p.attributes.at("TEXCOORD_0"), gltbDirectory, &uvArrLength, NULL);
-    appendVec2Buffer(newMesh.uvCoords, uvArray, uvArrLength);
+    if (p.attributes.count("TEXCOORD_0")) {
+      float* uvArray = (float*)readBuffer(model, p.attributes.at("TEXCOORD_0"), gltbDirectory, &uvArrLength, NULL);
+      appendVec2Buffer(newMesh.uvCoords, uvArray, uvArrLength);
+      free(uvArray);
+    }
 
     void* indicesArray = (void*)readBuffer(model, p.indices, gltbDirectory, &indicesArrLength, &indicesComponentType);
     appendIndicesBuffer(newMesh.indices, indicesArray, indicesArrLength, indicesComponentType);
@@ -497,7 +500,6 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
     free(positionArray);
     free(normalArray);
     free(indicesArray);
-    free(uvArray);
 
     glm::vec3 default_translation = glm::vec3(0);
     glm::vec3 default_rotation = glm::vec3(0);
@@ -525,7 +527,9 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
         Vertex v;
         v.position = newMesh.positions.at(newMesh.indices.at(idx));
         v.normal = newMesh.normals.at(newMesh.indices.at(idx));
-        v.uv = newMesh.uvCoords.at(newMesh.indices.at(idx));
+        if (p.attributes.count("TEXCOORD_0")) {
+          v.uv = newMesh.uvCoords.at(newMesh.indices.at(idx));
+        }
         if (p.attributes.count("TANGENT")) {
           v.tangent = newMesh.tangents.at(newMesh.indices.at(idx));
         }

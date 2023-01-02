@@ -212,8 +212,16 @@ __device__ float triangleIntersectionTest(const Triangle& triangle, const glm::v
   }
 
   // interpolate and normalize only the first 3 components
-  out_tangent = triangle.verts[0].tangent * v1Area + triangle.verts[1].tangent * v2Area + triangle.verts[2].tangent * v3Area;
-  out_tangent = glm::vec4(glm::normalize(glm::vec3(out_tangent)), out_tangent.w);
+  if (triangle.verts[0].tangent == UNDEFINED_VEC4
+    || triangle.verts[1].tangent == UNDEFINED_VEC4 || triangle.verts[2].tangent == UNDEFINED_VEC4) {
+    out_tangent = UNDEFINED_VEC4;
+  }
+  else {
+    float tangentW = triangle.verts[0].tangent.w; // w should be same for all verts
+    glm::vec3 tangent3 = glm::normalize(glm::vec3(triangle.verts[0].tangent * v1Area
+      + triangle.verts[1].tangent * v2Area + triangle.verts[2].tangent * v3Area));
+    out_tangent = glm::vec4(tangent3, tangentW);
+  }
 
   out_uv = (triangle.verts[0].uv * v1Area + triangle.verts[1].uv * v2Area
     + triangle.verts[2].uv * v3Area) / triangleArea;
@@ -256,8 +264,8 @@ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh, Triangle
   }
 
   // Don't forget to transform back
-  out_normal = glm::normalize(multiplyMV(triangleMesh.transform, glm::vec4(out_normal, 0)));
-  out_tangent = triangleMesh.transform * out_tangent;
+  out_normal = glm::normalize(multiplyMV(triangleMesh.invTranspose, glm::vec4(out_normal, 0)));
+  out_tangent = triangleMesh.invTranspose * out_tangent; // tangent.w coordinate does not change
   out_intersectionPoint = multiplyMV(triangleMesh.transform, glm::vec4(out_intersectionPoint, 1));
 
   return hitGeom ? glm::length(r.origin - out_intersectionPoint) : -1;
@@ -341,8 +349,8 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
   }
 
   // Don't forget to transform back the normal and intersection point
-  out_normal = glm::normalize(multiplyMV(triangleMesh.transform, glm::vec4(out_normal, 0)));
-  out_tangent = triangleMesh.transform * out_tangent;
+  out_normal = glm::normalize(multiplyMV(triangleMesh.invTranspose, glm::vec4(out_normal, 0)));
+  out_tangent = triangleMesh.invTranspose * out_tangent;
   out_intersectionPoint = multiplyMV(triangleMesh.transform, glm::vec4(out_intersectionPoint, 1));
   
   return hitGeom ? glm::length(r.origin - out_intersectionPoint) : -1;

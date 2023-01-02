@@ -39,8 +39,8 @@ int getSplitAxis(const Bounds &bounds, float &out_splitPos) {
   return axis;
 }
 
-void subdivide(std::vector<BvhPrimitiveData>& primitiveData, std::vector<BvhNode>& bvhNodes,
-  int nodeIndex, int &nodesUsed) {
+int subdivide(std::vector<BvhPrimitiveData>& primitiveData, std::vector<BvhNode>& bvhNodes,
+  int nodeIndex, int &nodesUsed, int &maxLeafSize) {
   BvhNode& node = bvhNodes[nodeIndex];
   float splitPos;
   int axis = getSplitAxis(node.bounds, splitPos);
@@ -63,7 +63,8 @@ void subdivide(std::vector<BvhPrimitiveData>& primitiveData, std::vector<BvhNode
   // Base case: let node be a leaf if next split is empty
   int leftCount = i - node.firstTriangleOffset;
   if (leftCount == 0 || leftCount == node.numTriangles) { 
-    return;
+    maxLeafSize = node.numTriangles;
+    return 1;
   }
 
   // otherwise, create child nodes
@@ -81,11 +82,15 @@ void subdivide(std::vector<BvhPrimitiveData>& primitiveData, std::vector<BvhNode
   //recurse
   updateNodeBounds(primitiveData, bvhNodes, leftChildIdx);
   updateNodeBounds(primitiveData, bvhNodes, rightChildIdx);
-  subdivide(primitiveData, bvhNodes, leftChildIdx, nodesUsed);
-  subdivide(primitiveData, bvhNodes, rightChildIdx, nodesUsed);
+  int leftMaxLeafSize, rightMaxLeafSize;
+  int leftDepth = subdivide(primitiveData, bvhNodes, leftChildIdx, nodesUsed, leftMaxLeafSize);
+  int rightDepth = subdivide(primitiveData, bvhNodes, rightChildIdx, nodesUsed, rightMaxLeafSize);
+  
+  maxLeafSize = std::max(leftMaxLeafSize, rightMaxLeafSize);
+  return 1 + std::max(leftDepth, rightDepth);
 }
 
-void Bvh::buildBvh(std::vector<Triangle> &triangles, int startIdx, int numTriangles)
+int Bvh::buildBvh(std::vector<Triangle> &triangles, int startIdx, int numTriangles, int &maxLeafSize)
 {
   std::vector<BvhPrimitiveData> primitiveData;
 
@@ -115,7 +120,7 @@ void Bvh::buildBvh(std::vector<Triangle> &triangles, int startIdx, int numTriang
   root.numTriangles = numTriangles;
 
   updateNodeBounds(primitiveData, bvhNodes, rootNodeIndex);
-  subdivide(primitiveData, bvhNodes, rootNodeIndex, nodesUsed);
+  int maxDepth = subdivide(primitiveData, bvhNodes, rootNodeIndex, nodesUsed, maxLeafSize);
 
   // reorder the triangles, taking offset into account
   // aka. triangle at position offset + 2, would have index 2 in the bvh primitive array
@@ -135,6 +140,7 @@ void Bvh::buildBvh(std::vector<Triangle> &triangles, int startIdx, int numTriang
 
   // stack bvh array into big array
   allBvhNodes.insert(allBvhNodes.end(), bvhNodes.begin(), bvhNodes.begin() + nodesUsed);
+  return maxDepth;
 }
 
 Bvh::Bvh(std::vector<Triangle>& triangles, std::vector<Geom>& geoms) {
@@ -149,8 +155,11 @@ Bvh::Bvh(std::vector<Triangle>& triangles, std::vector<Geom>& geoms) {
       int triangleStartIdx = geom.triangleOffset;
       int numTriangles = geom.numTriangles;
       geom.bvhOffset = allBvhNodes.size();
-      buildBvh(triangles, triangleStartIdx, numTriangles);
-      std::cout << "Added a bvh with " << allBvhNodes.size() - geom.bvhOffset << " nodes" << std::endl;
+
+      int maxLeafSize;
+      int depth = buildBvh(triangles, triangleStartIdx, numTriangles, maxLeafSize);
+      std::cout << "Added a bvh with " << allBvhNodes.size() - geom.bvhOffset
+        << " nodes and depth of " << depth << " with max leaf size " << maxLeafSize << std::endl;
     }
   }
 }

@@ -27,7 +27,7 @@ struct BvhNode {
 class Bvh
 {
 private:
-  void buildBvh(std::vector<Triangle>& triangles, int startIdx, int numTriangles);
+  int buildBvh(std::vector<Triangle>& triangles, int startIdx, int numTriangles, int &maxLeafSize);
 public:
   std::vector<BvhNode> allBvhNodes;
 

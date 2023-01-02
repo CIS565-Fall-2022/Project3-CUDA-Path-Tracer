@@ -7,6 +7,7 @@
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 #define BVH 
+#define UNDEFINED_VEC4 (glm::vec4(0.f))
 
 namespace scene_structs {
 
@@ -24,7 +25,7 @@ struct Ray {
 struct Vertex {
   glm::vec3 position;
   glm::vec3 normal;
-  glm::vec4 tangent;
+  glm::vec4 tangent = UNDEFINED_VEC4; // many meshes don't have tangent maps
   glm::vec2 uv;
 };
 
