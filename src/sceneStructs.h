@@ -16,7 +16,7 @@
 #define ANTI_ALIAS 1
 // for debugging
 #define SHOW_NORMALS 0
-#define SHOW_METALLIC 1
+#define SHOW_METALLIC 0
 
 namespace scene_structs {
 

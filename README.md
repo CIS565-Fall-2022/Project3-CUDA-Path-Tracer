@@ -25,9 +25,7 @@ This is a Monte-Carlo pathtracer with GPU-accelerated intersection tests, shadin
     - Cache first bounce intersections
 - Additional features
   - Gltf 2.0 loading & rendering
-    - Scene graph traversal
-    - Reads normal, tangent, UV, index buffers
-    - Renders base color texture, normal map, metallic map
+  - Texture mapping & bump mapping
   - Bounding volume hierarchy
   - Stochastic sampled anti-aliasing
 
@@ -37,8 +35,10 @@ The base code has been modified to take two arguments. The first argument is a f
 ```
 ./pathtracer.exe [motorcycle.txt] [motorcycle.gltf]
 ```
+#### Dependencies
+- Clone and add [tinygltf.h](https://github.com/syoyo/tinygltf) to external includes
 
-### Toggleable features
+### Feature Toggles
 All macros are defined in `sceneStructs.h`.  
 - Performance
   - `SORT_BY_MATERIALS`
@@ -50,3 +50,27 @@ All macros are defined in `sceneStructs.h`.
 - Debugging
   - `SHOW_NORMALS`: render normals as color
   - `SHOW_METALLIC`: render metallicness as color
+
+### GLTF
+Most arbitrary gltf files exported from Blender can be loaded and rendered without errors. The base code is used to render the lights and camera while gltf is used to load meshes.
+
+- Scene graph traversal is supported
+  - Both matrix and translation/rotation/scale attributes are supported to describe local transformations of nodes
+  - See `motorcycle.gltf` for an example of a complex scene with many nodes in a tree-like structure
+- Copies position, normal, tangent, UV, and index buffers into an interleaved array on the GPU
+- Texture loading
+
+### Textures
+
+Gltf normal textures must be in tangent space. They are transformed into world space using a TBN matrix. Intersection normals and tangents are interpolated from the vertex normal and tangent buffers from the file.
+
+### Anti-Aliasing
+Implemented anti-aliasing by jittering the camera ray in the up and right directions by the amount `boxSize`, aka. jitter ~ U(-boxSize, boxSize). This looks visually pleasing enough that it wasn't worth using a Gaussian distribution, since calculating its pdf would be much more expensive.
+
+When anti-aliasing is ON, first bounce caching must be turned off.
+
+| boxSize | Scene | Close-up |
+|--------|------|-------|
+| 0 (no AA) |![](img/antialias_cornell_avocado_0.png) | ![](img/aa-0-zoom.png) |
+|1|![](img/antialias_cornell_avocado_1.png) | ![](img/aa-1-zoom.png)|
+|2| ![](img/antialias_cornell_avocado_2.png) | ![](img/aa-2-zoom.png)
