@@ -6,8 +6,9 @@
 #include "glm/glm.hpp"
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
-#define BVH 
 #define UNDEFINED_VEC4 (glm::vec4(0.f))
+
+#define BVH 0
 #define ROUGHNESS_METALLIC 1
 #define SORT_BY_MATERIALS 1
 // turn on at most ONE of first bounce caching and anti-aliasing
@@ -15,6 +16,7 @@
 #define ANTI_ALIAS 1
 // for debugging
 #define SHOW_NORMALS 0
+#define SHOW_METALLIC 1
 
 namespace scene_structs {
 

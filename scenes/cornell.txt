@@ -6,7 +6,7 @@ SPECRGB     0 0 0
 REFL        0
 REFR        0
 REFRIOR     0
-EMITTANCE   5
+EMITTANCE   10
 
 // Diffuse white
 MATERIAL 1
@@ -18,9 +18,9 @@ REFR        0
 REFRIOR     0
 EMITTANCE   0
 
-// Diffuse yellow
+// Diffuse red
 MATERIAL 2
-RGB         0.721 0.525 0.043
+RGB         .85 .35 .35
 SPECEX      0
 SPECRGB     0 0 0
 REFL        0
@@ -28,9 +28,9 @@ REFR        0
 REFRIOR     0
 EMITTANCE   0
 
-// Diffuse purple
+// Diffuse green
 MATERIAL 3
-RGB         0.729 0.333 0.827
+RGB         .35 .85 .35
 SPECEX      0
 SPECRGB     0 0 0
 REFL        0
@@ -40,30 +40,10 @@ EMITTANCE   0
 
 // Specular white
 MATERIAL 4
-RGB         .9 .9 .9
+RGB         .98 .98 .98
 SPECEX      0
 SPECRGB     .98 .98 .98
 REFL        1
-REFR        0
-REFRIOR     0
-EMITTANCE   0
-
-// Specular tinted
-MATERIAL 5
-RGB         1 0.9 0.8
-SPECEX      0
-SPECRGB     0 0 0
-REFL        0
-REFR        0
-REFRIOR     0
-EMITTANCE   0
-
-// Diffuse blue
-MATERIAL 6
-RGB         0.75 0.7 0.9
-SPECEX      0
-SPECRGB     0 0 0
-REFL        0
 REFR        0
 REFRIOR     0
 EMITTANCE   0
@@ -75,7 +55,7 @@ FOVY        45
 ITERATIONS  5000
 DEPTH       8
 FILE        cornell
-EYE         0.0 5 4.9
+EYE         0.0 5 10.5
 LOOKAT      0 5 0
 UP          0 1 0
 
@@ -128,24 +108,10 @@ TRANS       5 5 0
 ROTAT       0 0 0
 SCALE       .01 10 10
 
-// Sphere 1
+// Sphere
 OBJECT 6
 sphere
 material 4
-TRANS       -2 7 -2
+TRANS       -1 4 -1
 ROTAT       0 0 0
 SCALE       3 3 3
-
-OBJECT 7
-cube
-material 5
-TRANS       3 3 -3
-ROTAT       0 30 0
-SCALE       2.5 7 1.5
-
-OBJECT 8
-cube
-material 6
-TRANS       0 5 5
-ROTAT       0 90 0
-SCALE       .01 10 10

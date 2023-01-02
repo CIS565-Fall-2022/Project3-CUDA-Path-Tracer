@@ -58,7 +58,7 @@ Scene::Scene(string filename) {
 Scene::Scene(string filename, string gltfFilename):Scene(filename) {
   loadTinyGltf(gltfFilename);
   std::cout << "Building Bvh trees --------------------------" << std::endl;
-#ifdef BVH
+#if BVH
   bvh = Bvh(triangles, geoms);
 #endif
 }

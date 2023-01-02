@@ -102,7 +102,7 @@ struct DevImage {
 static DevImage *dev_imageSources;
 static glm::vec3* dev_imageBuffers;
 static Triangle* dev_triangles;
-#ifdef BVH
+#if BVH
 static BvhNode* dev_bvh;
 #endif
 
@@ -174,7 +174,7 @@ void pathtraceInit(Scene* scene) {
 	cudaMemcpy(dev_triangles, scene->triangles.data(), sizeof(Triangle) * scene->triangles.size(), cudaMemcpyHostToDevice);
 	checkCUDAError("cudaMemcpy of dev_triangles");
 
-#ifdef BVH
+#if BVH
 	cudaMalloc(&dev_bvh, sizeof(BvhNode) * scene->bvh.allBvhNodes.size());
 	cudaMemcpy(dev_bvh, scene->bvh.allBvhNodes.data(), sizeof(BvhNode) * scene->bvh.allBvhNodes.size(), cudaMemcpyHostToDevice);
 	checkCUDAError("cudaMemcpy of dev_bvh");
@@ -200,7 +200,7 @@ void pathtraceFree() {
 	cudaFree(dev_imageSources);
 	cudaFree(dev_imageBuffers);
 	cudaFree(dev_triangles);
-#ifdef BVH
+#if BVH
 	cudaFree(dev_bvh);
 #endif
 
@@ -297,10 +297,10 @@ __global__ void computeIntersections(
 				t = sphereIntersectionTest(geom, pathSegment.ray, tmp_intersect, tmp_normal, outside);
 			}
 			else if (geom.type == TRIANGLE_MESH) { // TODO: add more intersection tests here... triangle? metaball? CSG?
-#ifdef BVH
+#if BVH
 				t = bvhTriangleMeshIntersectionTest(geom, bvh, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside, tmp_tangent);
 #else
-				t = triangleMeshIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
+				t = triangleMeshIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside, tmp_tangent);
 #endif
 			}
 			// Compute the minimum t from the intersection tests to determine what
@@ -416,6 +416,11 @@ __global__ void shadeMaterial(
 				DevImage& roughnessMetallicImage = imageSources[material.roughnessMetallicImageId];
 				roughnessMetallicColor = getTextureColor(roughnessMetallicImage, imageBuffers, intersection.uv);
 			}
+#if SHOW_METALLIC
+			pathSegment.color = glm::vec3(0, 0, roughnessMetallicColor.b);
+			pathSegment.remainingBounces = 0;
+			return;
+#endif
 #endif
 			glm::vec3 intersectionPoint = intersection.t * pathSegment.ray.direction + pathSegment.ray.origin;
 			scatterRay(pathSegment, intersectionPoint, normal, material, roughnessMetallicColor, materialColor, rng);
@@ -545,7 +550,7 @@ void pathtrace(uchar4* pbo, int frame, int iter) {
 			, dev_paths
 			, dev_geoms
 			, dev_triangles
-#ifdef BVH
+#if BVH
 			, dev_bvh
 #else
 			, NULL
