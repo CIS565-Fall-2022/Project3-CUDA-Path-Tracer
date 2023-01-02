@@ -24,6 +24,7 @@ struct Ray {
 struct Vertex {
   glm::vec3 position;
   glm::vec3 normal;
+  glm::vec4 tangent;
   glm::vec2 uv;
 };
 
@@ -51,6 +52,7 @@ struct InputMesh {
   std::vector<glm::vec3> positions;
   std::vector<glm::vec3> normals;
   std::vector<glm::vec2> uvCoords;
+  std::vector<glm::vec4> tangents;
   std::vector<unsigned int> indices;
 };
 
@@ -113,6 +115,7 @@ struct PathSegment {
 struct ShadeableIntersection {
   float t;
   glm::vec3 surfaceNormal; // normalized
+  glm::vec4 surfaceTangent; // to convert tangent space normal from texture into normal
   glm::vec2 uv;
   int materialId;
 };

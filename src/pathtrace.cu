@@ -22,8 +22,8 @@ using namespace scene_structs;
 #define ERRORCHECK 1
 #define SORT_BY_MATERIALS 1
 // turn on at most ONE of first bounce caching and anti-aliasing
-#define CACHE_FIRST_BOUNCE 0
-#define ANTI_ALIAS 1
+#define CACHE_FIRST_BOUNCE 1
+#define ANTI_ALIAS 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -278,6 +278,7 @@ __global__ void computeIntersections(
 		glm::vec3 intersect_point;
 		glm::vec3 normal;
 		glm::vec2 uv;
+		glm::vec4 tangent;
 		float t_min = FLT_MAX;
 		int hit_geom_index = -1; // what object this intersection hit. Index should be index in dev_geoms
 		bool outside = true; // if it hit outer surface of object or not. Not sure what to do if false
@@ -285,9 +286,7 @@ __global__ void computeIntersections(
 		glm::vec3 tmp_intersect;
 		glm::vec3 tmp_normal;
 		glm::vec2 tmp_uv;
-
-		// naive parse through global geoms
-		// TODO*: replace this with kd tree or other acceleration structure...
+		glm::vec4 tmp_tangent;
 
 		for (int i = 0; i < geoms_size; i++)
 		{
@@ -303,7 +302,7 @@ __global__ void computeIntersections(
 			}
 			else if (geom.type == TRIANGLE_MESH) { // TODO: add more intersection tests here... triangle? metaball? CSG?
 #ifdef BVH
-				t = bvhTriangleMeshIntersectionTest(geom, bvh, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
+				t = bvhTriangleMeshIntersectionTest(geom, bvh, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside, tmp_tangent);
 #else
 				t = triangleMeshIntersectionTest(geom, triangles, pathSegment.ray, tmp_intersect, tmp_normal, tmp_uv, outside);
 #endif
@@ -317,6 +316,7 @@ __global__ void computeIntersections(
 				intersect_point = tmp_intersect;
 				normal = tmp_normal;
 				uv = tmp_uv;
+				tangent = tmp_tangent;
 			}
 		}
 
@@ -331,6 +331,7 @@ __global__ void computeIntersections(
 			intersections[path_index].materialId = geoms[hit_geom_index].materialid;
 			intersections[path_index].surfaceNormal = normal;
 			intersections[path_index].uv = uv;
+			intersections[path_index].surfaceTangent = tangent;
 		}
 	}
 }
@@ -380,6 +381,10 @@ __global__ void shadeMaterial(
 				DevImage& normalImage = imageSources[material.normalMapImageId];
 				normal = glm::normalize(getTextureColor(normalImage, imageBuffers, intersection.uv));
 			}
+
+			pathSegment.color = glm::abs(normal);
+			pathSegment.remainingBounces = 0;
+			return;
 
 			if (material.colorImageId < 0) {
 				materialColor = material.color;

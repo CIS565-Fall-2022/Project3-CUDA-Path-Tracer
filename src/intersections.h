@@ -146,7 +146,7 @@ __host__ __device__ float sphereIntersectionTest(Geom sphere, Ray r,
 }
 
 __device__ float triangleIntersectionTest(const Triangle& triangle, const glm::vec3 &ro, const glm::vec3 &rd,
-  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside) {
+  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside, glm::vec4 &out_tangent) {
 
   glm::vec3 v1 = triangle.verts[0].position;
   glm::vec3 v2 = triangle.verts[1].position;
@@ -205,13 +205,15 @@ __device__ float triangleIntersectionTest(const Triangle& triangle, const glm::v
     out_outside = false;
   }
 
-  // TODO: get normals and uv using barycentric interpolation
   out_normal = glm::normalize((triangle.verts[0].normal * v1Area + triangle.verts[1].normal * v2Area
     + triangle.verts[2].normal * v3Area));
   if (out_outside) {
     out_normal = -out_normal;
   }
-  //out_normal = triangle.verts[0].normal;
+
+  // interpolate and normalize only the first 3 components
+  out_tangent = triangle.verts[0].tangent * v1Area + triangle.verts[1].tangent * v2Area + triangle.verts[2].tangent * v3Area;
+  out_tangent = glm::vec4(glm::normalize(glm::vec3(out_tangent)), out_tangent.w);
 
   out_uv = (triangle.verts[0].uv * v1Area + triangle.verts[1].uv * v2Area
     + triangle.verts[2].uv * v3Area) / triangleArea;
@@ -220,7 +222,7 @@ __device__ float triangleIntersectionTest(const Triangle& triangle, const glm::v
 }
 
 __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh, Triangle *triangles, Ray r,
-  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2 & out_uv, bool& out_outside) {
+  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2 & out_uv, bool& out_outside, glm::vec4 &out_tangent) {
 
   // first apply inverse transformation to ray
   glm::vec3 ro = multiplyMV(triangleMesh.inverseTransform, glm::vec4(r.origin, 1.0f));
@@ -231,6 +233,7 @@ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh, Triangle
   glm::vec3 tmp_intersect;
   glm::vec3 tmp_normal;
   glm::vec2 tmp_uv;
+  glm::vec4 tmp_tangent;
   bool tmp_outside;
 
   bool hitGeom = false;
@@ -238,7 +241,7 @@ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh, Triangle
   for (int i = triangleMesh.triangleOffset; i < triangleMesh.triangleOffset + triangleMesh.numTriangles; ++i) {
     Triangle& triangle = triangles[i];
 
-    t = triangleIntersectionTest(triangle, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside);
+    t = triangleIntersectionTest(triangle, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside, tmp_tangent);
 
     if (t > 0.0f && t_min > t)
     {
@@ -247,12 +250,14 @@ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh, Triangle
       out_intersectionPoint = tmp_intersect;
       out_normal = tmp_normal;
       out_uv = tmp_uv;
+      out_tangent = tmp_tangent;
       out_outside = tmp_outside;
     }
   }
 
   // Don't forget to transform back
   out_normal = glm::normalize(multiplyMV(triangleMesh.transform, glm::vec4(out_normal, 0)));
+  out_tangent = triangleMesh.transform * out_tangent;
   out_intersectionPoint = multiplyMV(triangleMesh.transform, glm::vec4(out_intersectionPoint, 1));
 
   return hitGeom ? glm::length(r.origin - out_intersectionPoint) : -1;
@@ -272,7 +277,7 @@ __device__ float triangleMeshIntersectionTest(const Geom &triangleMesh, Triangle
 #define BVH_STACK_SIZE 128
 
 __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNode* bvh_list, Triangle* triangle_list, Ray r,
-  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside) {
+  glm::vec3& out_intersectionPoint, glm::vec3& out_normal, glm::vec2& out_uv, bool& out_outside, glm::vec4 &out_tangent) {
 
   glm::vec3 ro = multiplyMV(triangleMesh.inverseTransform, glm::vec4(r.origin, 1.0f));
   glm::vec3 rd = glm::normalize(multiplyMV(triangleMesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -284,6 +289,7 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
   glm::vec3 tmp_intersect;
   glm::vec3 tmp_normal;
   glm::vec2 tmp_uv;
+  glm::vec4 tmp_tangent;
   bool tmp_outside;
 
   // Instead of recursion, which causes a stack overflow on the gpu
@@ -307,7 +313,7 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
       for (int i = curr_node.firstTriangleOffset; i < curr_node.firstTriangleOffset + curr_node.numTriangles; ++i) {
         const Triangle& triangle = mesh_triangles[i];
 
-        float t = triangleIntersectionTest(triangle, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside);
+        float t = triangleIntersectionTest(triangle, ro, rd, tmp_intersect, tmp_normal, tmp_uv, tmp_outside, tmp_tangent);
 
         if (t > 0.0f && t_min > t)
         {
@@ -315,6 +321,7 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
           out_intersectionPoint = tmp_intersect;
           out_normal = tmp_normal;
           out_uv = tmp_uv;
+          out_tangent = tmp_tangent;
           out_outside = tmp_outside;
           hitGeom = true;
         }
@@ -335,6 +342,7 @@ __device__ float bvhTriangleMeshIntersectionTest(const Geom& triangleMesh, BvhNo
 
   // Don't forget to transform back the normal and intersection point
   out_normal = glm::normalize(multiplyMV(triangleMesh.transform, glm::vec4(out_normal, 0)));
+  out_tangent = triangleMesh.transform * out_tangent;
   out_intersectionPoint = multiplyMV(triangleMesh.transform, glm::vec4(out_intersectionPoint, 1));
   
   return hitGeom ? glm::length(r.origin - out_intersectionPoint) : -1;

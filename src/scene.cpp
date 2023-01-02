@@ -342,6 +342,13 @@ void* readBuffer(const tinygltf::Model& model, int accessorIdx, const string& gl
   return (void *) result;
 }
 
+void appendVec4Buffer(vector<glm::vec4>& vec4Buffer, const float* elts, int eltsLength) {
+  for (int i = 0; i + 3 < eltsLength; i = i + 4) {
+    glm::vec4 elt(elts[i], elts[i + 1], elts[i + 2], elts[i + 3]);
+    vec4Buffer.push_back(elt);
+  }
+}
+
 void appendVec3Buffer(vector<glm::vec3> &vec3Buffer, const float* elts, int eltsLength) {
   for (int i = 0; i + 2 < eltsLength; i = i + 3) {
     glm::vec3 elt(elts[i], elts[i + 1], elts[i + 2]);
@@ -465,7 +472,7 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
 
   for (const Primitive& p : mesh.primitives) {
     // TODO: add other buffers here
-    int posArrLength, normArrLength, uvArrLength, indicesArrLength, indicesComponentType;
+    int posArrLength, normArrLength, uvArrLength, tangentArrLength, indicesArrLength, indicesComponentType;
 
     float* positionArray = (float*)readBuffer(model, p.attributes.at("POSITION"), gltbDirectory, &posArrLength, NULL);
     float* normalArray = (float*)readBuffer(model, p.attributes.at("NORMAL"), gltbDirectory, &normArrLength, NULL);
@@ -474,6 +481,12 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
     }
     appendVec3Buffer(newMesh.positions, positionArray, posArrLength);
     appendVec3Buffer(newMesh.normals, normalArray, normArrLength);
+
+    if (p.attributes.count("TANGENT")) {
+      float* tangentArray = (float*)readBuffer(model, p.attributes.at("TANGENT"), gltbDirectory, &tangentArrLength, NULL);
+      appendVec4Buffer(newMesh.tangents, tangentArray, tangentArrLength);
+      free(tangentArray);
+    }
 
     float* uvArray = (float*)readBuffer(model, p.attributes.at("TEXCOORD_0"), gltbDirectory, &uvArrLength, NULL);
     appendVec2Buffer(newMesh.uvCoords, uvArray, uvArrLength);
@@ -513,6 +526,9 @@ void loadNode(int nodeIdx, const tinygltf::Model &model, string gltbDirectory,
         v.position = newMesh.positions.at(newMesh.indices.at(idx));
         v.normal = newMesh.normals.at(newMesh.indices.at(idx));
         v.uv = newMesh.uvCoords.at(newMesh.indices.at(idx));
+        if (p.attributes.count("TANGENT")) {
+          v.tangent = newMesh.tangents.at(newMesh.indices.at(idx));
+        }
         triangle.verts[idx - i] = v;
       }
 
