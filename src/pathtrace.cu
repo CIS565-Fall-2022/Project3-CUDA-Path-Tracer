@@ -20,12 +20,6 @@
 using namespace scene_structs;
 
 #define ERRORCHECK 1
-#define SORT_BY_MATERIALS 1
-// turn on at most ONE of first bounce caching and anti-aliasing
-#define CACHE_FIRST_BOUNCE 1
-#define ANTI_ALIAS 0
-// for debugging
-#define SHOW_NORMALS 0
 
 #define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define checkCUDAError(msg) checkCUDAErrorFn(msg, FILENAME, __LINE__)
@@ -239,7 +233,7 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 		// anti-aliasing with simple box filter (all samples weighted equally)
 		float boxSize = 1; // try different values from 0, .2, .5 etc.
 		thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
-		thrust::uniform_real_distribution<float> uniform(0, boxSize);
+		thrust::uniform_real_distribution<float> uniform(-boxSize * 0.5f, boxSize * 0.5f);
 		jitter = glm::vec2(uniform(rng), uniform(rng));
 #endif
 
@@ -375,6 +369,7 @@ __global__ void shadeMaterial(
 			Material& material = materials[intersection.materialId];
 			glm::vec3 materialColor;
 			glm::vec3 normal;
+			glm::vec3 roughnessMetallicColor;
 
 			if (material.normalMapImageId < 0) {
 				normal = intersection.surfaceNormal;
@@ -412,19 +407,18 @@ __global__ void shadeMaterial(
 				materialColor = getTextureColor(baseColorImage, imageBuffers, intersection.uv);
 			}
 
-			glm::vec3 intersectionPoint = intersection.t * pathSegment.ray.direction + pathSegment.ray.origin;
-			scatterRay(pathSegment, intersectionPoint, normal, material, rng);
-
-			// If the material indicates that the object was a light, "light" the ray
-			if (material.emittance > 0.0f) {
-				pathSegment.color *= (materialColor * material.emittance);
-				pathSegment.remainingBounces = 0; // hit light = stop tracing the path
-				return;
+#if ROUGHNESS_METALLIC
+			if (material.roughnessMetallicImageId < 0) {
+				// blue channel = metallic
+				roughnessMetallicColor = glm::vec3(0, 0, material.metallicFactor);
 			}
 			else {
-				pathSegment.color *= materialColor;
-				pathSegment.remainingBounces--;
+				DevImage& roughnessMetallicImage = imageSources[material.roughnessMetallicImageId];
+				roughnessMetallicColor = getTextureColor(roughnessMetallicImage, imageBuffers, intersection.uv);
 			}
+#endif
+			glm::vec3 intersectionPoint = intersection.t * pathSegment.ray.direction + pathSegment.ray.origin;
+			scatterRay(pathSegment, intersectionPoint, normal, material, roughnessMetallicColor, materialColor, rng);
 		}
 		else {
 			pathSegment.color = BACKGROUND_COLOR;

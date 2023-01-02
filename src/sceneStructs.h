@@ -8,6 +8,13 @@
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 #define BVH 
 #define UNDEFINED_VEC4 (glm::vec4(0.f))
+#define ROUGHNESS_METALLIC 1
+#define SORT_BY_MATERIALS 1
+// turn on at most ONE of first bounce caching and anti-aliasing
+#define CACHE_FIRST_BOUNCE 0
+#define ANTI_ALIAS 1
+// for debugging
+#define SHOW_NORMALS 0
 
 namespace scene_structs {
 
@@ -66,6 +73,8 @@ struct Image {
 struct Material {
   int colorImageId = -1; // -1 means there is no texture
   int normalMapImageId = -1;
+  int roughnessMetallicImageId = -1;
+  float metallicFactor = 0;
   glm::vec3 color;
   struct {
     float exponent;

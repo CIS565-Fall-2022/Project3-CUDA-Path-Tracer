@@ -622,6 +622,8 @@ int Scene::loadTinyGltf(string filename) {
 
     if (!DEBUG_GLTF_TEXTURES) {
       newMaterial.normalMapImageId = gltfMaterial.normalTexture.index;
+      newMaterial.roughnessMetallicImageId = gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index;
+      newMaterial.metallicFactor = gltfMaterial.pbrMetallicRoughness.metallicFactor;
     }
     newMaterial.hasReflective = 0;
 
