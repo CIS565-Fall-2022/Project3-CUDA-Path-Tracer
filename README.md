@@ -50,8 +50,9 @@ All macros are defined in `sceneStructs.h`.
   - `ANTI_ALIAS`
   - `ROUGHNESS_METALLIC`: render metallic shader
 - Debugging
-  - `SHOW_NORMALS`: render normals as color
-  - `SHOW_METALLIC`: render metallicness as color
+  - `SHOW_NORMALS`: render normals as colour
+  - `SHOW_METALLIC`: render metallicness as colour
+  - `DEBUG_GLTF_TEXTURES`: render Lambert instead of gltf texture
 
 ### Core
 

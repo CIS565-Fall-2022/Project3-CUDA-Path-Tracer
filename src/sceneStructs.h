@@ -18,6 +18,7 @@
 #define SHOW_NORMALS 0
 #define SHOW_METALLIC 0
 #define MEASURE_PERF 1
+#define DEBUG_GLTF_TEXTURES 0
 
 namespace scene_structs {
 
