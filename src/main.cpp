@@ -2,6 +2,8 @@
 #include "preview.h"
 #include <cstring>
 
+#include <chrono>
+
 static std::string startTimeString;
 
 // For camera controls
@@ -28,6 +30,8 @@ int width;
 int height;
 
 using namespace scene_structs;
+
+double totalIterTime = 0;
 
 //-------------------------------
 //-------------MAIN--------------
@@ -149,7 +153,16 @@ void runCuda() {
 
 		// execute the kernel
 		int frame = 0;
+
+#if MEASURE_PERF
+		auto start = std::chrono::system_clock::now();
 		pathtrace(pbo_dptr, frame, iteration);
+		auto end = std::chrono::system_clock::now();
+		std::chrono::duration<double> elapsed_seconds = end - start;
+		totalIterTime += elapsed_seconds.count();
+#else
+		pathtrace(pbo_dptr, frame, iteration);
+#endif
 
 		// unmap buffer object
 		cudaGLUnmapBufferObject(pbo);
@@ -160,6 +173,10 @@ void runCuda() {
 		cudaDeviceReset();
 		exit(EXIT_SUCCESS);
 	}
+
+#if MEASURE_PERF
+	std::cout << "Total iter time " << totalIterTime << std::endl;
+#endif
 }
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {

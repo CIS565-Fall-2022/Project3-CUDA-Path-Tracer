@@ -1,0 +1,135 @@
+{
+    "asset" : {
+        "generator" : "Khronos glTF Blender I/O v3.3.32",
+        "version" : "2.0"
+    },
+    "scene" : 0,
+    "scenes" : [
+        {
+            "name" : "Scene",
+            "nodes" : [
+                2
+            ]
+        }
+    ],
+    "nodes" : [
+        {
+            "mesh" : 0,
+            "name" : "Object_2.001",
+            "translation" : [
+                0,
+                0,
+                -0.022554250434041023
+            ]
+        },
+        {
+            "children" : [
+                0
+            ],
+            "name" : "Geode"
+        },
+        {
+            "children" : [
+                1
+            ],
+            "name" : "Sketchfab_model.001",
+            "scale" : [
+                33.744319915771484,
+                33.744319915771484,
+                33.744319915771484
+            ],
+            "translation" : [
+                0,
+                -1.7134827375411987,
+                0
+            ]
+        }
+    ],
+    "materials" : [
+        {
+            "doubleSided" : true,
+            "name" : "Scene_-_Root",
+            "pbrMetallicRoughness" : {
+                "baseColorFactor" : [
+                    0.5,
+                    0.5,
+                    0.5,
+                    1
+                ],
+                "metallicFactor" : 0,
+                "roughnessFactor" : 0.8999999761581421
+            }
+        }
+    ],
+    "meshes" : [
+        {
+            "name" : "Object_0.001",
+            "primitives" : [
+                {
+                    "attributes" : {
+                        "POSITION" : 0,
+                        "NORMAL" : 1
+                    },
+                    "indices" : 2,
+                    "material" : 0
+                }
+            ]
+        }
+    ],
+    "accessors" : [
+        {
+            "bufferView" : 0,
+            "componentType" : 5126,
+            "count" : 8948,
+            "max" : [
+                0.09523569792509079,
+                0.19634300470352173,
+                0.04082620143890381
+            ],
+            "min" : [
+                -0.10758499801158905,
+                0.0528440997004509,
+                -0.04983599856495857
+            ],
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 1,
+            "componentType" : 5126,
+            "count" : 8948,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 2,
+            "componentType" : 5123,
+            "count" : 33018,
+            "type" : "SCALAR"
+        }
+    ],
+    "bufferViews" : [
+        {
+            "buffer" : 0,
+            "byteLength" : 107376,
+            "byteOffset" : 0,
+            "target" : 34962
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 107376,
+            "byteOffset" : 107376,
+            "target" : 34962
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 66036,
+            "byteOffset" : 214752,
+            "target" : 34963
+        }
+    ],
+    "buffers" : [
+        {
+            "byteLength" : 280788,
+            "uri" : "low_res_dragon.bin"
+        }
+    ]
+}

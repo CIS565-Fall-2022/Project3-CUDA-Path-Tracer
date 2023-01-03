@@ -52,6 +52,19 @@ All macros are defined in `sceneStructs.h`.
   - `SHOW_NORMALS`: render normals as color
   - `SHOW_METALLIC`: render metallicness as color
 
+### Core Shaders
+
+The dragon and ball are perfect specular surfaces; the walls and box are diffuse surfaces.
+
+![](img/specular-dragon.png)  
+`avocado_cornell.txt, low_res_dragon.gltf`: 2000 samples, depth 8, 800 x 800 px 
+
+### Sorting Rays by Material
+
+### Path Termination with Stream Compaction
+
+### First Bounce Caching
+
 ### GLTF
 Most arbitrary gltf files exported from Blender can be loaded and rendered without errors. The base code is used to render the lights and camera while gltf is used to load meshes.
 
@@ -62,8 +75,7 @@ Most arbitrary gltf files exported from Blender can be loaded and rendered witho
 - Texture loading
 
 ### Texture Mapping
-
-#### Color Map
+Tinygltf loads the images into arrays, which are then copied over to the GPU in one contiguous images array (dev_imageBuffers). The dimensions of the image are stored separately and used to index into the images buffer. UV's are interpolated and converted to pixel space to sample the image buffer for the colour.
 
 #### Normal Map
 Gltf normal textures must be in tangent space. They are transformed into world space using a TBN matrix. Intersection surface normals and tangents are interpolated from the vertex normal and tangent buffers from the file. The resulting normals can be debugged as colours by setting `SHOW_NORMALS` to 1.
@@ -72,26 +84,46 @@ Gltf normal textures must be in tangent space. They are transformed into world s
 | ----------------| ----------------- | -----------------|
 |![](img/surface-normals.png) | ![](img/normal-texture.png) | ![](img/resulting-normals.png) |
 
-With diffuse shaders, a normal map is hard to notice because the light bounces in a random hemisphere around the normal anyway; the resulting bounce won't be too different from before. That's why I tested the normal map with the metallic shader.
+With diffuse shaders, a normal map is hard to notice because the light bounces in a random hemisphere around the normal anyway; the resulting bounce won't be too different from before. That's why I also tested the normal map with the metallic shader.
 
 | Metallic shading with surface normals | Metallic shading with normal map |
 | ----------------| ----------------- |
 | ![](img/metal-no-normal-map.png) | ![](img/metal-with-normal-texture.png) |
-`metal.txt, metal.gltf`: 2000 samples, depth 8
+
+`metal.txt, metal.gltf`: 2000 samples, depth 8, 800 x 800 px
 
 The render with the normal map has more highlights and the highlights line up better with the texture, making it look more like a rusty piece of metal than the render using interpolated surface normals.
 
 ### Metallic Shader
-I partially implemented gltf's microfacet (PBR metallic/roughness) workflow by adding a metallic shader. The metallic value from 0 to 1 comes from either the gltf material's `pbrMetallicRoughness.metallicFactor` or is read from a texture, where the blue channel is the metallic value. The metallic value is used to interpolate the diffuse and metallic shaders.
+I partially implemented gltf's microfacet (PBR metallic/roughness) workflow by adding a metallic shader. The metallic value from 0 to 1 comes from either the gltf material's `pbrMetallicRoughness.metallicFactor` or is read from a texture, where the blue channel is the metallic value. The metallic value is used to interpolate the diffuse and metallic shaders. The metallic shader is simplified to a specular shader multiplied by the tint of the base color.
 
 ![](img/metallic_box.png)  
 `box.txt, Box With Spaces.gltf`: 1000 samples, depth 8
-
-By setting `#define SHOW_METALLIC 1`, we can debug the metallic value. Here is what it looks like for the motorcycle scene. Brighter blue means more metallic. On the motorcycle, the metallic factor is defined for the entire material, whereas on the vending machine, the metallic factor comes from a texture. 
+z
+According to the box's texture, only the GLTF letters are metallic, so there is no highlight on the black part. By setting `#define SHOW_METALLIC 1`, we can debug the metallic value. Here is what it looks like for the motorcycle scene. Brighter blue means more metallic. On the motorcycle, the metallic factor is defined for the entire material, whereas on the vending machine, the metallic factor comes from a texture. 
 
 ![](img/metallic-debug.png)
 
 ### Bounding Volume Hierarchy
+
+As we get into hundreds of thousands of triangles, testing ray intersections quickly becomes a bottle-neck. I implemented a bounding volume hierarchy (BVH) data structure and sorted vertices by their bounding boxes. The constructor in `bvh.cpp` creates one BVH for each primitive `Geom`, which is necessary because primitives can have different transformations. One challenge was to serialize the tree structure of the BVH, since it's unpleasant to copy data structures with pointers from the CPU to GPU.
+
+The resulting code was adapted from [this site](https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/), except the BVH tree traversal is implemented on the GPU not using recursion. Recursively traversing the BVH on the GPU quickly causes a stack overflow, even on the Avocado mesh, which has only 83 total nodes, which shows how expensive local memory is. Instead, I traversed the GPU using a fixed-size stack to keep track of the next BVH nodes to search.
+
+![](img/bvh-perf.png)
+
+Bounding volumes are split by their longest axis, which worked better for the motorcycle scene than others like the table.
+
+The tree structures can give some insight. Each scene can have multiple meshes, and therefore multiple BVHs with different structures. If there are multiple BVHs then, the values in each column correspond to the worst case, aka. the maximum out of all the BVH trees generated for the scene.
+
+| Gltf Scene | Number of BVHs | Total Number of nodes  | Depth | Maximum leaf size |
+|-----|-----|-----|----| --- |
+| Avocado | 1 | 83 | 10 | 191 |
+| Low Res Dragon | 1 | 1731 | 18 | 1534 |
+| Motorcycle | 98 | 1777 | 21 | 1242 |
+| Table | 3 | 3265 | 24 | 10607 |
+
+Because the threads need to sync after one iteration of path-tracing, as long as there is a ray passing through the bounding box of a large leaf, the other threads will have to wait for those intersection tests to finish. As a result, each iterations' speed is bottlenecked by the max leaf size. With more time, it would be ideal to implement a better BVH splitting algorithm, or convert the BVH into a 4-nary or 8-nary tree to flatten it a bit more.
 
 ### Anti-Aliasing
 Implemented anti-aliasing by jittering the camera ray in the up and right directions by the amount `boxSize`, aka. jitter ~ uniform(-boxSize/2, boxSize/2). This looks visually pleasing enough that it wasn't worth using a Gaussian distribution, since calculating its pdf would be much more expensive.
@@ -103,3 +135,17 @@ When anti-aliasing is ON, first bounce caching must be turned OFF.
 | 0 (no AA) |![](img/antialias_cornell_avocado_0.png) | ![](img/aa-0-zoom.png) |
 |1|![](img/antialias_cornell_avocado_1.png) | ![](img/aa-1-zoom.png)|
 |2| ![](img/antialias_cornell_avocado_2.png) | ![](img/aa-2-zoom.png)
+
+`avocado_cornell.txt, avocado.gltf`: 5000 samples, depth 8, 800 x 800
+
+### Object sources
+I grabbed objects from Sketchfab or the [gltf sample models repo](https://github.com/KhronosGroup/glTF-Sample-Models), re-arranged them in Blender, and re-exported as gltf.
+- [Avocado](https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0/Avocado)
+- [Soda machines](https://sketchfab.com/3d-models/soda-machines-d0b81fdb4e514859bfcc95165144e8c7)
+- [Motorcycle](https://sketchfab.com/3d-models/motorcycle-38404e2077ca4b209cd2f1db30541b94)
+- [Rusty metal grate](https://sketchfab.com/3d-models/rusty-metal-grate-d814366c9dd24463bfc753a88f4d3ad0)
+- [Gltf cube](https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0/Box%20With%20Spaces)
+- [Low res stanford dragon](https://sketchfab.com/3d-models/stanford-dragon-vrip-res4-4c0714c7a68444f4b8a51cb5edda68aa)
+
+### Bloopers
+They're all [here](https://docs.google.com/document/d/1BJmclri4VJY_IXbsLU8Er_CQihQnfmzTQRi5cz9FthM/edit#heading=h.3ah9h2xfckz8).

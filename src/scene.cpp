@@ -61,6 +61,7 @@ Scene::Scene(string filename, string gltfFilename):Scene(filename) {
 #if BVH
   bvh = Bvh(triangles, geoms);
 #endif
+  std::cout << "Total number of triangles: " << triangles.size();
 }
 
 int Scene::loadGeom(string objectid) {
