@@ -10,14 +10,14 @@
 
 #define BVH 1
 #define ROUGHNESS_METALLIC 1
-#define SORT_BY_MATERIALS 1
+#define SORT_BY_MATERIALS 0
 // turn on at most ONE of first bounce caching and anti-aliasing
-#define CACHE_FIRST_BOUNCE 1
+#define CACHE_FIRST_BOUNCE 0
 #define ANTI_ALIAS 0
 // for debugging
 #define SHOW_NORMALS 0
 #define SHOW_METALLIC 0
-#define MEASURE_PERF 0
+#define MEASURE_PERF 1
 
 namespace scene_structs {
 

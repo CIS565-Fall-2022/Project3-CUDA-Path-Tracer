@@ -36,6 +36,7 @@ The base code has been modified to take two arguments. The first argument is a f
 ```
 ./pathtracer.exe [motorcycle.txt] [motorcycle.gltf]
 ```
+
 #### Dependencies
 - Clone and add [tinygltf.h](https://github.com/syoyo/tinygltf) to external includes
 
@@ -52,21 +53,30 @@ All macros are defined in `sceneStructs.h`.
   - `SHOW_NORMALS`: render normals as color
   - `SHOW_METALLIC`: render metallicness as color
 
-### Core Shaders
+### Core
 
 The dragon and ball are perfect specular surfaces; the walls and box are diffuse surfaces.
 
 ![](img/specular-dragon.png)  
 `avocado_cornell.txt, low_res_dragon.gltf`: 2000 samples, depth 8, 800 x 800 px 
 
-### Sorting Rays by Material
+Stream compaction is used to filter out rays that don't hit anything, at each depth.
 
-### Path Termination with Stream Compaction
+### Sorting Rays by Material
+I added a toggle to sort the path segments by material before shading them. In theory, this should improve performance because more threads that are shading the same material will be in the same block. Since they are shading the same material, there won't be any divergence, which will increase the amount of parallellism, whereas if there were random materials in each block, there would be more divergence, causing the threads to delay each other. The effects should be more noticeable when there are more materials (up until each ray hits a different material; in that case there's no reason to sort...).
+
+![](img/sorting-perf.png)
+
+However, it seems that the overhead of shading is too costly - at 5 materials for the cornell box, sorting is twice as slow as not sorting. At 26 materials in the motorcycle scene, sorting is marginally better than not sorting.
+
+I even tried using a scene with as many materials as I could find (40 materials in `many_materials.gltf` + 7 materials in `avocado_cornell.txt` = 47 materials), and the runtime is very similar with and without sorting. However, many of these materials don't diverge in terms of how they are actually shaded - eg. they are different materials but simply index into the image buffer at a different place.
+
+The shading stage may not be complex enough for sorting to be helpful. In addition, this optimization would be effective if done in constant time without an extra kernel sort, which would probably be wavefront pathtracing.
 
 ### First Bounce Caching
 
 ### GLTF
-Most arbitrary gltf files exported from Blender can be loaded and rendered without errors. The base code is used to render the lights and camera while gltf is used to load meshes.
+Most arbitrary gltf files (.gltf file + separate textures) exported from Blender can be loaded and rendered without errors. The base code's file parser is used to load the lights and camera while tinygltf is used to load meshes.
 
 - Scene graph traversal is supported
   - Both matrix and translation/rotation/scale attributes are supported to describe local transformations of nodes
@@ -128,7 +138,7 @@ Because the threads need to sync after one iteration of path-tracing, as long as
 ### Anti-Aliasing
 Implemented anti-aliasing by jittering the camera ray in the up and right directions by the amount `boxSize`, aka. jitter ~ uniform(-boxSize/2, boxSize/2). This looks visually pleasing enough that it wasn't worth using a Gaussian distribution, since calculating its pdf would be much more expensive.
 
-When anti-aliasing is ON, first bounce caching must be turned OFF.
+When anti-aliasing is ON, first bounce caching must be turned OFF. AA has a negligible performance cost, its actual cost is that we need to recompute the first bounce each time.
 
 | boxSize | Scene | Close-up |
 |--------|------|-------|
@@ -146,6 +156,7 @@ I grabbed objects from Sketchfab or the [gltf sample models repo](https://github
 - [Rusty metal grate](https://sketchfab.com/3d-models/rusty-metal-grate-d814366c9dd24463bfc753a88f4d3ad0)
 - [Gltf cube](https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0/Box%20With%20Spaces)
 - [Low res stanford dragon](https://sketchfab.com/3d-models/stanford-dragon-vrip-res4-4c0714c7a68444f4b8a51cb5edda68aa)
+- [Many materials](https://sketchfab.com/3d-models/gltf-test-pbr-material-2fe88c82edf24a9f8b608c11a0eb6920)
 
 ### Bloopers
 They're all [here](https://docs.google.com/document/d/1BJmclri4VJY_IXbsLU8Er_CQihQnfmzTQRi5cz9FthM/edit#heading=h.3ah9h2xfckz8).
