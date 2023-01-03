@@ -74,6 +74,13 @@ I even tried using a scene with as many materials as I could find (40 materials 
 The shading stage may not be complex enough for sorting to be helpful. In addition, this optimization would be effective if done in constant time without an extra kernel sort, which would probably be wavefront pathtracing.
 
 ### First Bounce Caching
+The first ray cast from the camera to the scene will always be the same, so it makes sense to cache it (unless the rays should vary due to depth of field or anti-aliasing).
+
+However, I found that the performance is almost exactly the same, with or without caching, even at depth = 1.
+
+![](img/caching-perf.png)
+
+Looking at the calculations in `generateRayFromCamera`, they are all pretty lightweight, so it seems that this kernel has about the same runtime as a cudaMemcpy of the cache into the path segments buffer.
 
 ### GLTF
 Most arbitrary gltf files (.gltf file + separate textures) exported from Blender can be loaded and rendered without errors. The base code's file parser is used to load the lights and camera while tinygltf is used to load meshes.

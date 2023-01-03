@@ -146,7 +146,7 @@ void runCuda() {
 		pathtraceInit(scene);
 	}
 
-	if (iteration < 10) {
+	if (iteration < renderState->iterations) {
 		uchar4* pbo_dptr = NULL;
 		iteration++;
 		cudaGLMapBufferObject((void**)&pbo_dptr, pbo);
