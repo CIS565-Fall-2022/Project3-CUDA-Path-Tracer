@@ -53,6 +53,7 @@ All macros are defined in `sceneStructs.h`.
   - `SHOW_NORMALS`: render normals as colour
   - `SHOW_METALLIC`: render metallicness as colour
   - `DEBUG_GLTF_TEXTURES`: render Lambert instead of gltf texture
+  - `MEASURE_PERF`: print runtime
 
 ### Core
 
