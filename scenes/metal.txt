@@ -1,0 +1,137 @@
+// Emissive material (warm)
+MATERIAL 0
+RGB         1 0.8 0.8
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   10
+
+// Diffuse white
+MATERIAL 1
+RGB         .98 .98 .98
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Diffuse yellow
+MATERIAL 2
+RGB         0.721 0.525 0.043
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// diffuse green
+MATERIAL 3
+RGB         0.6 0.45 0
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+
+// Diffuse blue
+MATERIAL 4
+RGB         0.5 0.3 0
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   0
+
+// Emissive material (cool)
+MATERIAL 5
+RGB         0.9 0.9 1
+SPECEX      0
+SPECRGB     0 0 0
+REFL        0
+REFR        0
+REFRIOR     0
+EMITTANCE   10
+
+// Camera
+CAMERA
+RES         960 720
+FOVY        40
+ITERATIONS  2000
+DEPTH       8
+FILE        cornell
+EYE         0.0 5 9
+LOOKAT      0 6 0
+UP          0 1 0
+
+
+// Ceiling light
+OBJECT 0
+cube
+material 0
+TRANS       -3 12 -3
+ROTAT       0 0 0
+SCALE       4 .3 3
+
+// Floor
+OBJECT 1
+cube
+material 1
+TRANS       0 0 0
+ROTAT       0 0 0
+SCALE       20 .01 20
+
+// Ceiling
+OBJECT 2
+cube
+material 1
+TRANS       0 12 0
+ROTAT       0 0 90
+SCALE       .01 20 20
+
+// Left wall
+OBJECT 3
+cube
+material 2
+TRANS       -10 6 0
+ROTAT       0 0 0
+SCALE       .01 12 20
+
+// Back wall
+OBJECT 4
+cube
+material 3
+TRANS       0 6 -10
+ROTAT       0 90 0
+SCALE       .01 12 20
+
+// Right wall
+OBJECT 5
+cube
+material 4
+TRANS       10 6 0
+ROTAT       0 0 0
+SCALE       .01 12 20
+
+// Front wall
+OBJECT 6
+cube
+material 1
+TRANS       0 6 10
+ROTAT       0 90 0
+SCALE       .01 12 20
+
+// Ceiling light #2
+OBJECT 7
+cube
+material 5
+TRANS       3 12 1.5
+ROTAT       0 0 0
+SCALE       4 .3 3
+

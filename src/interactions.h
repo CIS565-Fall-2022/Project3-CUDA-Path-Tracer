@@ -7,6 +7,7 @@
  * Computes a cosine-weighted random direction in a hemisphere.
  * Used for diffuse lighting.
  */
+// Also return the pdf
 __host__ __device__
 glm::vec3 calculateRandomDirectionInHemisphere(
         glm::vec3 normal, thrust::default_random_engine &rng) {
@@ -36,6 +37,7 @@ glm::vec3 calculateRandomDirectionInHemisphere(
     glm::vec3 perpendicularDirection2 =
         glm::normalize(glm::cross(normal, perpendicularDirection1));
 
+    // This sampling method guarantees that we get a vector on the correct side of the hemisphere
     return up * normal
         + cos(around) * over * perpendicularDirection1
         + sin(around) * over * perpendicularDirection2;
@@ -72,8 +74,46 @@ void scatterRay(
         glm::vec3 intersect,
         glm::vec3 normal,
         const Material &m,
+        glm::vec3 roughnessMetallic,
+        glm::vec3 baseColor,
         thrust::default_random_engine &rng) {
-    // TODO: implement this.
-    // A basic implementation of pure-diffuse shading will just call the
-    // calculateRandomDirectionInHemisphere defined above.
+  glm::vec3 colorContribution = baseColor;
+  glm::vec3 newDirection;
+
+  if (m.hasReflective) {
+    // Perfect specular reflection
+    newDirection = glm::reflect(pathSegment.ray.direction, normal);
+  }
+  else {
+    // diffuse + metallic
+#if ROUGHNESS_METALLIC
+    float metallic = roughnessMetallic.b;
+    thrust::uniform_real_distribution<float> u01(0, 1);
+    float rand = u01(rng);
+
+    if (rand < metallic) {
+      newDirection = glm::reflect(pathSegment.ray.direction, normal);
+      colorContribution *= baseColor;
+    }
+    else {
+      newDirection = calculateRandomDirectionInHemisphere(normal, rng); // w_i
+    }
+#else
+    newDirection = calculateRandomDirectionInHemisphere(normal, rng);
+#endif
+  }
+
+  pathSegment.ray.direction = newDirection;
+  pathSegment.ray.origin = intersect + (newDirection * 0.0001f); // TODO: tune
+
+  // If the material indicates that the object was a light, "light" the ray
+  if (m.emittance > 0.0f) {
+    pathSegment.color *= (colorContribution * m.emittance);
+    pathSegment.remainingBounces = 0; // hit light = stop tracing the path
+    return;
+  }
+  else {
+    pathSegment.color *= colorContribution;
+    pathSegment.remainingBounces--;
+  }
 }

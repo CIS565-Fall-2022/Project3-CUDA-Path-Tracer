@@ -2,6 +2,8 @@
 #include "preview.h"
 #include <cstring>
 
+#include <chrono>
+
 static std::string startTimeString;
 
 // For camera controls
@@ -27,6 +29,10 @@ int iteration;
 int width;
 int height;
 
+using namespace scene_structs;
+
+double totalIterTime = 0;
+
 //-------------------------------
 //-------------MAIN--------------
 //-------------------------------
@@ -40,9 +46,14 @@ int main(int argc, char** argv) {
 	}
 
 	const char* sceneFile = argv[1];
-
-	// Load scene file
-	scene = new Scene(sceneFile);
+	
+	if (argc == 3) {
+		const char* gltfFile = argv[2];
+		scene = new Scene(sceneFile, gltfFile);
+	}
+	else {
+		scene = new Scene(sceneFile);
+	}
 
 	//Create Instance for ImGUIData
 	guiData = new GuiDataContainer();
@@ -114,9 +125,9 @@ void runCuda() {
 		cameraPosition.y = zoom * cos(theta);
 		cameraPosition.z = zoom * cos(phi) * sin(theta);
 
-		cam.view = -glm::normalize(cameraPosition);
+		cam.view = -glm::normalize(cameraPosition); // camera always looks toward origin?
 		glm::vec3 v = cam.view;
-		glm::vec3 u = glm::vec3(0, 1, 0);//glm::normalize(cam.up);
+		glm::vec3 u = glm::vec3(0, 1, 0);//glm::normalize(cam.up); // camera always faces up?
 		glm::vec3 r = glm::cross(v, u);
 		cam.up = glm::cross(r, v);
 		cam.right = r;
@@ -142,7 +153,16 @@ void runCuda() {
 
 		// execute the kernel
 		int frame = 0;
+
+#if MEASURE_PERF
+		auto start = std::chrono::system_clock::now();
 		pathtrace(pbo_dptr, frame, iteration);
+		auto end = std::chrono::system_clock::now();
+		std::chrono::duration<double> elapsed_seconds = end - start;
+		totalIterTime += elapsed_seconds.count();
+#else
+		pathtrace(pbo_dptr, frame, iteration);
+#endif
 
 		// unmap buffer object
 		cudaGLUnmapBufferObject(pbo);
@@ -153,6 +173,10 @@ void runCuda() {
 		cudaDeviceReset();
 		exit(EXIT_SUCCESS);
 	}
+
+#if MEASURE_PERF
+	std::cout << "Total iter time " << totalIterTime << std::endl;
+#endif
 }
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
