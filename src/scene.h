@@ -121,6 +121,13 @@ struct DevScene {
         return glm::normalize(glm::cross(v1 - v0, v2 - v0));
     }
 
+    __device__ float getPrimitiveArea(int primId) {
+        glm::vec3 v0 = vertices[primId * 3 + 0];
+        glm::vec3 v1 = vertices[primId * 3 + 1];
+        glm::vec3 v2 = vertices[primId * 3 + 2];
+        return Math::triangleArea(v0, v1, v2);
+    }
+
     __device__ void getIntersecGeomInfo(int primId, glm::vec2 bary, Intersection& intersec) {
         glm::vec3 va = vertices[primId * 3 + 0];
         glm::vec3 vb = vertices[primId * 3 + 1];
@@ -411,7 +418,7 @@ struct DevScene {
         float area = Math::triangleArea(v0, v1, v2);
         radiance = lightUnitRadiance[lightId];
         wi = glm::normalize(posToSampled);
-        float power = Math::luminance(radiance) / (area * 2.f * glm::pi<float>());
+        float power = Math::luminance(radiance) * (area * 2.f * glm::pi<float>());
         return Math::pdfAreaToSolidAngle(power * sumLightPowerInv, pos, sampled, normal);
     }
 
