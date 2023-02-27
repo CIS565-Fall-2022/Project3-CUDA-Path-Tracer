@@ -53,9 +53,9 @@ This project is about implementing a GPU path tracer with CUDA programming libra
 
 ![](./img/dragon_dof_2.jpg)
 
-<p align="center">Lens effect: depth of field with heart-shaped bokehs</p>
+<p align="center">Lens effect: depth of field with heart-shaped aperture blades</p>
 
-
+![](./img/cam1.jpg)
 
 ## Features
 
@@ -138,7 +138,7 @@ How to achieve this? The answer is to create a virtual aperture and randomly gen
 | --------------------------- | ----------------------- |
 | ![](./img/aperture_off.jpg) | ![](./img/aperture.jpg) |
 
-##### Custom Bokeh Shape
+##### Custom Aperture Shape
 
 This is my favorite part of the project.
 
