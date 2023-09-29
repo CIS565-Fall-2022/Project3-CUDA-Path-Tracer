@@ -1,12 +1,5 @@
 #include "bvh.h"
 
-/**
-* MTBVH builder
-* What is MTBVH? It's a variant of Bounding Volume Hierarchy invented by Toshiya Hachisuka.
-* MTBVH enables stackless BVH traversal on GPU, saving many registers that were used in stack-based
-* traversal. It's simple and efficient.
-* https://cs.uwaterloo.ca/~thachisu/tdf2015.pdf
-*/
 int BVHBuilder::build(
     const std::vector<glm::vec3>& vertices,
     std::vector<AABB>& boundingBoxes,
