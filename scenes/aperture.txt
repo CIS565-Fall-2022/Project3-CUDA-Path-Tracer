@@ -1,0 +1,29 @@
+Camera
+Resolution	1800 1350
+FovY       20.5
+LensRadius	0.39
+FocalDist	10.8
+ApertureMask	texture/star3.jpg
+Sample	3000
+Depth		8
+File        Cornell
+Eye         5.817 -2.796 9.069
+Rotation      232.378 10.823 0
+Up          0 1 0
+
+EnvMap	texture/moonless_golf_4k.hdr
+
+Material 	Glass
+Type		Dielectric
+BaseColor	1 1 1
+Metallic	0
+Roughness	0
+Ior		1.5
+NormalMap	Null
+
+Object 	Sphere
+model/sphere40.obj
+Material 	Glass
+Translate	0 0 0
+Rotate	0 0 0
+Scale		2 2 2

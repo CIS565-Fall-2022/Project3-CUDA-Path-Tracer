@@ -12,7 +12,6 @@
 #include <iostream>
 #include <sstream>
 #include <stdlib.h>
-#include <string>
 
 #include "sceneStructs.h"
 #include "image.h"
@@ -34,5 +33,6 @@ extern int height;
 
 void runCuda();
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
+void mouseScrollCallback(GLFWwindow* window, double offsetX, double offsetY);
 void mousePositionCallback(GLFWwindow* window, double xpos, double ypos);
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);

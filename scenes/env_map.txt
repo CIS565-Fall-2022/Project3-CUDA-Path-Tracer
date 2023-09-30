@@ -1,0 +1,137 @@
+Camera
+Resolution	1800 1350
+FovY        40
+LensRadius	0
+FocalDist	11
+ApertureMask	Null
+Sample		5000
+Depth		8
+File        Cornell
+Eye         0 0 10
+Rotation      -90 0 0
+Up          0 1 0
+
+EnvMap 	texture/gamrig_4k.hdr
+
+Material 	Light
+BaseColor	8 8 8
+Type		Light
+Metallic	0
+Roughness	1
+Ior			0
+NormalMap	Null
+
+Material 	Light2
+BaseColor	1 1 1
+Type		Light
+Metallic	0
+Roughness	1
+Ior			0
+NormalMap	Null
+
+Material 	White
+Type		Lambertian
+BaseColor	.98 .98 .98
+Metallic	0
+Roughness	1
+Ior			0
+NormalMap	Null
+
+Material 	Red
+Type		Lambertian
+BaseColor	.85 .25 .25
+Metallic	0
+Roughness	1
+Ior			0
+NormalMap	Null
+
+Material 	Green
+Type		Lambertian
+BaseColor	.25 .85 .25
+Metallic	0
+Roughness	1
+Ior			0
+NormalMap	Null
+
+Material 	Metal
+Type		MetallicWorkflow
+BaseColor	.98 .98 .98
+Metallic	1.0
+Roughness	0.2
+Ior			1.1
+NormalMap	Null
+
+Material	Mirror
+Type		Dielectric
+BaseColor	1 1 1
+Metallic	1
+Roughness	0
+Ior		0.05
+NormalMap	Null
+
+Material 	Plastic
+Type		MetallicWorkflow
+BaseColor	.2 .3 .8
+Metallic	0
+Roughness	0.15
+Ior		1
+NormalMap	Null
+
+Material 	Glass
+Type		Dielectric
+BaseColor	1 1 1
+Metallic	0
+Roughness	0
+Ior		1.5
+NormalMap	Null
+
+Material 	AlienMetal
+Type		MetallicWorkflow
+BaseColor	texture/sci-fi-panel1-albedo.png
+Metallic	1
+Roughness	0.3
+Ior		0
+NormalMap	texture/sci-fi-panel1-normal.png
+
+Material 	Textured2
+Type		MetallicWorkflow
+BaseColor	texture/pixel.png
+Metallic	0.1
+Roughness	0.1
+Ior		0
+NormalMap	Null
+
+Object 	Floor
+model/square.obj
+Material 	White
+Translate	0 -3 0
+Rotate	0 0 0
+Scale		100 100 100
+
+Object 	Bunny
+model/bunny.obj
+Material 	Plastic
+Translate	0.5 -2 0
+Rotate	0 0 0
+Scale		1 1 1
+
+Object 	Teapot
+model/teapot.obj
+Material	Glass
+Translate	2 0 -2
+Rotate	45 45 0
+Scale		.3 .3 .3
+
+Object 	Sphere
+model/sphere40.obj
+Material	Mirror
+Translate	4 0 0
+Rotate	0 0 0
+Scale		1 1 1
+
+Object Cube
+model/cube.obj
+Material	AlienMetal
+Translate	-2 1 -1
+Rotate	0 45 10
+Scale		1.1 1.1 1.1

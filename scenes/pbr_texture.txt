@@ -1,0 +1,105 @@
+Camera
+Resolution	1600 1200
+FovY       5.5
+LensRadius	0.03
+FocalDist	8.4
+ApertureMask	Null
+Sample	3000
+Depth		8
+File        Cornell
+Eye         2.237 3.863 7.587
+Rotation      253 -24.407 0
+Up          0 1 0
+
+EnvMap 	texture/photo_studio_loft_hall_4k.hdr
+
+Material 	Light
+BaseColor	8 8 8
+Type		Light
+Metallic	0
+Roughness	1
+Ior			0
+NormalMap	Null
+
+Material 	White
+BaseColor	texture/fleshy_granite1_albedo.png
+Type		MetallicWorkflow
+Metallic	0
+Roughness	0.1
+Ior			0
+NormalMap	Null
+
+Material 	Body
+Type		MetallicWorkflow
+BaseColor	model/Camera/textures/body_base.png
+Metallic	model/Camera/textures/body_metallic.png
+Roughness	model/Camera/textures/body_rough.png
+Ior			0
+NormalMap	model/Camera/textures/body_norm.png
+
+Material 	Lens
+Type		MetallicWorkflow
+BaseColor	model/Camera/textures/lens_base.png
+Metallic	model/Camera/textures/lens_metallic.png
+Roughness	model/Camera/textures/lens_rough.png
+Ior			0
+NormalMap	model/Camera/textures/lens_norm.png
+
+Material 	Strap
+Type		MetallicWorkflow
+BaseColor	model/Camera/textures/strap_base.png
+Metallic	model/Camera/textures/strap_metallic.png
+Roughness	model/Camera/textures/strap_rough.png
+Ior			1.1
+NormalMap	model/Camera/textures/strap_norm.png
+
+Material 	Glass
+Type		Dielectric
+BaseColor	1 1 1
+Metallic	0
+Roughness	0
+Ior		1.5
+NormalMap	Null
+
+Material	Clock
+Type		MetallicWorkflow
+BaseColor	model/clock/textures/base.jpg
+Metallic	model/clock/textures/metal.jpg
+Roughness	model/clock/textures/rough.jpg
+Ior		1
+NormalMap	model/clock/textures/norm.jpg
+
+Object 	Floor
+model/square.obj
+Material 	White
+Translate	0 0 0
+Rotate	0 0 0
+Scale		5 5 5
+
+Object	Body
+model/Camera/body.obj
+Material	Body
+Translate	0 0 0
+Rotate	0 0 0
+Scale		10 10 10
+
+Object	Lens
+model/Camera/lens.obj
+Material	Lens
+Translate	0 0 0
+Rotate	0 0 0
+Scale		10 10 10
+
+Object	Glass
+model/Camera/glass.obj
+Material	Glass
+Translate	0 0 0
+Rotate	0 0 0
+Scale		10 10 10
+
+Object	Strap
+model/Camera/strap.obj
+Material	Strap
+Translate	0 0 0
+Rotate	0 0 0
+Scale		10 10 10

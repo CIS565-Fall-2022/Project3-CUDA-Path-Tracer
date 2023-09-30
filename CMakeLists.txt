@@ -73,17 +73,22 @@ set(headers
     src/sceneStructs.h
     src/preview.h
     src/utilities.h
+    src/material.h
+    src/bvh.h
+    src/sampler.h
+    src/mathUtil.h
+    src/cudaUtil.h
     src/ImGui/imconfig.h
-	
-	src/ImGui/imgui.h
+    src/ImGui/imgui.h
     src/ImGui/imconfig.h
     src/ImGui/imgui_impl_glfw.h
-     src/ImGui/imgui_impl_opengl3.h 
-     src/ImGui/imgui_impl_opengl3_loader.h 
-     src/ImGui/imgui_internal.h 
-     src/ImGui/imstb_rectpack.h 
-     src/ImGui/imstb_textedit.h 
-     src/ImGui/imstb_truetype.h 
+    src/ImGui/imgui_impl_opengl3.h 
+    src/ImGui/imgui_impl_opengl3_loader.h 
+    src/ImGui/imgui_internal.h 
+    src/ImGui/imstb_rectpack.h 
+    src/ImGui/imstb_textedit.h 
+    src/ImGui/imstb_truetype.h 
+    src/common.h
     )
 
 set(sources
@@ -95,14 +100,19 @@ set(sources
     src/scene.cpp
     src/preview.cpp
     src/utilities.cpp
-	
+    src/bvh.cpp
+    src/sampler.cpp
+    src/mathUtil.cpp
     src/ImGui/imgui.cpp 
-      src/ImGui/imgui_demo.cpp 
-      src/ImGui/imgui_draw.cpp 
-     src/ImGui/imgui_impl_glfw.cpp 
-     src/ImGui/imgui_impl_opengl3.cpp 
-     src/ImGui/imgui_tables.cpp 
-     src/ImGui/imgui_widgets.cpp 
+    src/ImGui/imgui_demo.cpp 
+    src/ImGui/imgui_draw.cpp 
+    src/ImGui/imgui_impl_glfw.cpp 
+    src/ImGui/imgui_impl_opengl3.cpp 
+    src/ImGui/imgui_tables.cpp 
+    src/ImGui/imgui_widgets.cpp
+    src/tiny_obj_loader.cpp
+    src/common.cpp
+    src/tiny_gltf.cpp
     )
 
 list(SORT headers)

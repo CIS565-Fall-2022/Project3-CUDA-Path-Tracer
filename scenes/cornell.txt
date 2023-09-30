@@ -1,117 +1,147 @@
-// Emissive material (light)
-MATERIAL 0
-RGB         1 1 1
-SPECEX      0
-SPECRGB     0 0 0
-REFL        0
-REFR        0
-REFRIOR     0
-EMITTANCE   5
+Camera
+Resolution	1280 960
+FovY        22
+LensRadius	0.1
+FocalDist	11
+ApertureMask	Null
+Sample		5000
+Depth		8
+File        Cornell
+Eye         0 0 10
+Rotation      -90 0 0
+Up          0 1 0
 
-// Diffuse white
-MATERIAL 1
-RGB         .98 .98 .98
-SPECEX      0
-SPECRGB     0 0 0
-REFL        0
-REFR        0
-REFRIOR     0
-EMITTANCE   0
+Material Light
+BaseColor	16 16 16
+Type		Light
+Metallic	0
+Roughness	1
+Ior			0
+NormalMap	Null
 
-// Diffuse red
-MATERIAL 2
-RGB         .85 .35 .35
-SPECEX      0
-SPECRGB     0 0 0
-REFL        0
-REFR        0
-REFRIOR     0
-EMITTANCE   0
+Material White
+Type		Lambertian
+BaseColor	.98 .98 .98
+Metallic	0
+Roughness	1
+Ior			0
+NormalMap	Null
 
-// Diffuse green
-MATERIAL 3
-RGB         .35 .85 .35
-SPECEX      0
-SPECRGB     0 0 0
-REFL        0
-REFR        0
-REFRIOR     0
-EMITTANCE   0
+Material Red
+Type		Lambertian
+BaseColor	.85 .25 .25
+Metallic	0
+Roughness	1
+Ior			0
+NormalMap	Null
 
-// Specular white
-MATERIAL 4
-RGB         .98 .98 .98
-SPECEX      0
-SPECRGB     .98 .98 .98
-REFL        1
-REFR        0
-REFRIOR     0
-EMITTANCE   0
+Material Green
+Type		Lambertian
+BaseColor	.25 .85 .25
+Metallic	0
+Roughness	1
+Ior			0
+NormalMap	Null
 
-// Camera
-CAMERA
-RES         800 800
-FOVY        45
-ITERATIONS  5000
-DEPTH       8
-FILE        cornell
-EYE         0.0 5 10.5
-LOOKAT      0 5 0
-UP          0 1 0
+Material Metal
+Type		MetallicWorkflow
+BaseColor	.98 .98 .98
+Metallic	1.0
+Roughness	0.2
+Ior			1.1
+NormalMap	Null
 
+Material Plastic
+Type		MetallicWorkflow
+BaseColor	.2 .3 .8
+Metallic	1
+Roughness	0.15
+Ior		1
+NormalMap	Null
 
-// Ceiling light
-OBJECT 0
-cube
-material 0
-TRANS       0 10 0
-ROTAT       0 0 0
-SCALE       3 .3 3
+Material Glass
+Type		Dielectric
+BaseColor	1 1 1
+Metallic	0
+Roughness	0
+Ior		1.5
+NormalMap	Null
 
-// Floor
-OBJECT 1
-cube
-material 1
-TRANS       0 0 0
-ROTAT       0 0 0
-SCALE       10 .01 10
+Material 	AlienMetal
+Type		MetallicWorkflow
+BaseColor	texture/sci-fi-panel1-albedo.png
+Metallic	1
+Roughness	0.3
+Ior		0
+NormalMap	texture/sci-fi-panel1-normal.png
 
-// Ceiling
-OBJECT 2
-cube
-material 1
-TRANS       0 10 0
-ROTAT       0 0 90
-SCALE       .01 10 10
+Material 	Textured2
+Type		Lambertian
+BaseColor	texture/fleshy_granite1_albedo.png
+Metallic	0
+Roughness	0.2
+Ior		0
+NormalMap	Null
 
-// Back wall
-OBJECT 3
-cube
-material 1
-TRANS       0 5 -5
-ROTAT       0 90 0
-SCALE       .01 10 10
+Object Light
+model/square.obj
+Material 	Light
+Translate	0 2.98 0
+Rotate	0 0 0
+Scale		1 1 1
 
-// Left wall
-OBJECT 4
-cube
-material 2
-TRANS       -5 5 0
-ROTAT       0 0 0
-SCALE       .01 10 10
+Object Left
+model/square.obj
+Material 	Red
+Translate	-4 0 0
+Rotate	0 0 -90
+Scale		3 3 3
 
-// Right wall
-OBJECT 5
-cube
-material 3
-TRANS       5 5 0
-ROTAT       0 0 0
-SCALE       .01 10 10
+Object Right
+model/square.obj
+Material 	Green
+Translate	4 0 0
+Rotate	0 0 90
+Scale		3 3 3
 
-// Sphere
-OBJECT 6
-sphere
-material 4
-TRANS       -1 4 -1
-ROTAT       0 0 0
-SCALE       3 3 3
+Object Back
+model/square.obj
+Material 	Textured2
+Translate	0 0 -3
+Rotate	90 0 0
+Scale		4 3 3
+
+Object Floor
+model/square.obj
+Material 	White
+Translate	0 -3 0
+Rotate	0 0 0
+Scale		4 3 3
+
+Object Ceiling
+model/square.obj
+Material 	White
+Translate	0 3 0
+Rotate	180 0 0
+Scale		4 3 3
+
+Object Bunny
+model/bunny.obj
+Material 	Plastic
+Translate	0.5 -2 0
+Rotate	0 0 0
+Scale		1 1 1
+
+Object Teapot
+model/teapot_ori.obj
+Material	Glass
+Translate	2 0 -2
+Rotate	45 45 0
+Scale		.3 .3 .3
+
+Object Cube
+model/cube.obj
+Material	AlienMetal
+Translate	-2 1 -1
+Rotate	0 45 10
+Scale		1.1 1.1 1.1
